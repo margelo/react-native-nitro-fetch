@@ -1,0 +1,17 @@
+{
+  "cxxNamespace": ["nitrofetch"],
+  "ios": {
+    "iosModuleName": "NitroFetch"
+  },
+  "android": {
+    "androidNamespace": ["nitrofetch"],
+    "androidCxxLibName": "nitrofetch"
+  },
+  "autolinking": {
+    "NitroFetch": {
+      "swift": "NitroFetch",
+      "kotlin": "NitroFetch"
+    }
+  },
+  "ignorePaths": ["node_modules"]
+}
