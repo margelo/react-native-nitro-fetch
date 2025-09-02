@@ -9,8 +9,14 @@
   },
   "autolinking": {
     "NitroFetch": {
-      "swift": "NitroFetch",
-      "kotlin": "NitroFetch"
+      "cpp": "CppNitroFetch"
+    },
+    "NitroFetchClient": {
+      "cpp": "CppNitroFetchClient"
+    },
+    "NitroEnv": {
+      "swift": "NitroEnv",
+      "kotlin": "NitroEnv"
     }
   },
   "ignorePaths": ["node_modules"]

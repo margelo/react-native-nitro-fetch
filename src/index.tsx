@@ -1,9 +1,9 @@
-import { NitroModules } from 'react-native-nitro-modules';
-import type { NitroFetch } from './NitroFetch.nitro';
+export { nitroFetch as fetch, setNitroEnv } from './fetch';
+export type { NitroRequest, NitroResponse, NitroEnv } from './fetch';
+export { NitroFetch, NitroEnv as NitroEnvInstance } from './NitroInstances';
 
-const NitroFetchHybridObject =
-  NitroModules.createHybridObject<NitroFetch>('NitroFetch');
-
+// Keep legacy export to avoid breaking any local tests/usages during scaffolding.
+// Will be removed once native Cronet path is ready.
 export function multiply(a: number, b: number): number {
-  return NitroFetchHybridObject.multiply(a, b);
+  return a * b;
 }

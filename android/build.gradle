@@ -24,7 +24,7 @@ apply plugin: "com.android.library"
 apply plugin: "kotlin-android"
 apply from: '../nitrogen/generated/android/nitrofetch+autolinking.gradle'
 
-apply plugin: "com.facebook.react"
+// Do not apply React Gradle plugin in library to avoid RN codegen duplicating app classes
 
 def getExtOrIntegerDefault(name) {
   return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["NitroFetch_" + name]).toInteger()
@@ -42,7 +42,8 @@ android {
     externalNativeBuild {
       cmake {
         cppFlags "-frtti -fexceptions -Wall -fstack-protector-all"
-        arguments "-DANDROID_STL=c++_shared", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+        // Pass CRONET_ROOT so CMake can find headers/libs prepared by Gradle task
+        arguments "-DANDROID_STL=c++_shared", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON", "-DCRONET_ROOT=${buildDir}/cronet"
         abiFilters (*reactNativeArchitectures())
 
         buildTypes {
@@ -125,4 +126,197 @@ dependencies {
   implementation "com.facebook.react:react-android"
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
   implementation project(":react-native-nitro-modules")
+}
+
+// ---------- Cronet AAR extraction to provide native libs + headers for CMake ----------
+def cronetVersion = (getExtOrDefault("cronetVersion") ?: null)
+def gmsCronetVersion = (getExtOrDefault("gmsCronetVersion") ?: "18.0.1")
+def cronetZipPath = (getExtOrDefault("cronetZip") ?: null) // absolute path to prebuilt cronet_package zip
+
+configurations {
+  cronetAar
+  gmsCronetAar
+}
+
+dependencies {
+  // Prefer embedded Cronet that ships native .so; if no version is provided, use the latest available
+  cronetAar "org.chromium.net:cronet-embedded:${cronetVersion ?: '+'}"
+  // Keep GMS Cronet as a fallback (Java-only; usually no native C API libs)
+  gmsCronetAar "com.google.android.gms:play-services-cronet:${gmsCronetVersion}"
+}
+
+def cronetRoot = "$buildDir/cronet"
+def cronetAarDir = "$buildDir/cronet/aar"
+
+tasks.register("prepareCronet") {
+  group = "nitrofetch"
+  description = "Download Cronet AAR and extract .so + headers for CMake"
+  outputs.dir(cronetRoot)
+  doLast {
+    logger.lifecycle("[prepareCronet] cronetRoot=${cronetRoot}")
+    logger.lifecycle("[prepareCronet] cronetVersion=${cronetVersion ?: '<unset>'}, gmsCronetVersion=${gmsCronetVersion}, cronetZip=${cronetZipPath ?: '<unset>'}")
+    File aar = null
+    boolean extractedLibs = false
+
+    // Option 1: Use a local prebuilt cronet_package zip if provided
+    if (cronetZipPath != null) {
+      def zipFile = file(cronetZipPath)
+      if (!zipFile.exists()) throw new GradleException("NitroFetch_cronetZip path does not exist: ${cronetZipPath}")
+      def tmp = file("${buildDir}/cronet/package"); tmp.mkdirs()
+      logger.lifecycle("[prepareCronet] Using prebuilt cronet zip: ${zipFile}")
+      copy { from zipTree(zipFile); into tmp }
+      // Expect include/ and libs/<abi>
+      if (file("${tmp}/include").exists()) {
+        copy { from file("${tmp}/include"); into file("${cronetRoot}/include") }
+        logger.lifecycle("[prepareCronet] Copied headers from zip -> ${cronetRoot}/include")
+      }
+      def abis = reactNativeArchitectures()
+      abis.each { abi ->
+        def src = file("${tmp}/libs/${abi}")
+        if (src.exists()) {
+          copy { from src; into file("${cronetRoot}/libs/${abi}"); include "*.so" }
+          logger.lifecycle("[prepareCronet] Copied libs for ABI ${abi} from zip -> ${cronetRoot}/libs/${abi}")
+          extractedLibs = true
+        } else {
+          logger.lifecycle("[prepareCronet] Zip missing libs for ABI ${abi}")
+        }
+      }
+      if (!extractedLibs) logger.warn("Prebuilt cronet zip did not contain native libs for configured ABIs")
+    }
+
+    // Option 2: Resolve an AAR providing Cronet native libs.
+    if (!extractedLibs) {
+      try {
+        def files1 = configurations.cronetAar.resolve()
+        if (!files1.isEmpty()) {
+          aar = files1.iterator().next()
+          logger.lifecycle("[prepareCronet] Resolved org.chromium.net:cronet-embedded:${cronetVersion ?: '+'} -> ${aar}")
+        } else {
+          logger.lifecycle("[prepareCronet] No files resolved for cronet-embedded:${cronetVersion ?: '+'}")
+        }
+      } catch (Throwable ignored) {}
+
+      if (aar == null) {
+        def files2 = configurations.gmsCronetAar.resolve()
+        if (!files2.isEmpty()) {
+          aar = files2.iterator().next()
+          logger.lifecycle("[prepareCronet] Using Google Play Services Cronet AAR ${gmsCronetVersion} -> ${aar} (may not include C API libs)")
+        }
+      }
+
+      if (aar != null) {
+        // Extract AAR into a temporary dir (temp dir path prepared above)
+        def tmpExtract = new File(temporaryDir, "aar")
+        if (tmpExtract.exists()) { project.delete(tmpExtract) }
+        if (!tmpExtract.mkdirs()) {
+          logger.lifecycle("[prepareCronet] Recreating temp dir failed, retrying with project buildDir")
+          tmpExtract = file("${buildDir}/tmp/prepareCronet/aar")
+          if (tmpExtract.exists()) { project.delete(tmpExtract) }
+          tmpExtract.mkdirs()
+        }
+        logger.lifecycle("[prepareCronet] Extracting AAR to temp: ${tmpExtract}")
+        copy { from zipTree(aar); into tmpExtract }
+        tmpExtract.eachFileRecurse { f -> try { f.setWritable(true, false) } catch (Throwable ignored) {} }
+
+        def abis = reactNativeArchitectures()
+        abis.each { abi ->
+          def src = new File(tmpExtract, "jni/${abi}")
+          def dst = file("${cronetRoot}/libs/${abi}")
+          if (src.exists()) {
+            copy { from src; into dst; include "*.so" }
+            logger.lifecycle("[prepareCronet] Copied libs for ABI ${abi} from AAR -> ${dst}")
+            extractedLibs = true
+          } else {
+            logger.lifecycle("[prepareCronet] AAR missing libs for ABI ${abi}")
+          }
+        }
+        if (!extractedLibs) {
+          logger.warn("[prepareCronet] Resolved AAR did not contain native Cronet .so files. C API linking will be disabled; JS fallback will be used.")
+        }
+      } else if (!extractedLibs) {
+        logger.warn("[prepareCronet] No Cronet AAR resolved and no prebuilt zip provided. C API linking will be disabled; JS fallback will be used.")
+      }
+    }
+
+    // Detect Cronet version from lib filename if possible (e.g., libcronet.122.0.6261.69.so)
+    String detectedVersion = null
+    def tmpScanDir = new File(temporaryDir, "aar")
+    def anyAbi = reactNativeArchitectures().find { new File(tmpScanDir, "jni/${it}").exists() }
+    if (anyAbi != null) {
+      def libDir = new File(tmpScanDir, "jni/${anyAbi}")
+      def candidate = libDir.listFiles(new FilenameFilter() {
+        boolean accept(File dir, String name) { return name.startsWith("libcronet.") && name.endsWith(".so") }
+      })?.find { it }
+      if (candidate != null) {
+        def m = (candidate.name =~ /libcronet\.([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)/)
+        if (m.find()) detectedVersion = m.group(1)
+      }
+    }
+    logger.lifecycle("[prepareCronet] Detected Cronet version from libs: ${detectedVersion ?: '<unknown>'}")
+
+    // Fetch C headers into include/cronet (best effort)
+    def includeDir = file("${cronetRoot}/include/cronet"); includeDir.mkdirs()
+    def headerRef = detectedVersion ?: (cronetVersion ?: "main")
+    def headerPaths = [
+      // Common locations (try both with/without include/ segment)
+      "components/cronet/native/cronet_c.h",
+      "components/cronet/native/cronet_export.h",
+      "components/cronet/native/include/cronet_c.h",
+      "components/cronet/native/include/cronet_export.h",
+    ]
+    int downloaded = 0
+    headerPaths.each { p ->
+      def u = "https://raw.githubusercontent.com/chromium/chromium/${headerRef}/${p}"
+      try {
+        new URL(u).withInputStream { i ->
+          def name = p.tokenize('/')[-1]
+          new File(includeDir, name).bytes = i.bytes
+        }
+        logger.lifecycle("[prepareCronet] Downloaded header: ${u}")
+        downloaded++
+      } catch (Throwable t) {
+        logger.warn("[prepareCronet] Failed to download ${u}: ${t.message}")
+      }
+    }
+    if (downloaded == 0) {
+      logger.warn("[prepareCronet] No headers downloaded. If you have headers locally, place them under ${cronetRoot}/include/cronet (cronet_c.h, cronet_export.h)")
+    }
+
+    // Summary
+    def presentAbis = reactNativeArchitectures().findAll { new File("${cronetRoot}/libs/${it}").exists() }
+    logger.lifecycle("[prepareCronet] Summary: headersDir=${cronetRoot}/include, libsAbis=${presentAbis}")
+  }
+}
+
+// Ensure native builds depend on Cronet prep
+afterEvaluate {
+  tasks.matching { it.name.startsWith("externalNativeBuild") }.configureEach {
+    dependsOn("prepareCronet")
+  }
+}
+
+// Optional: fetch only headers (no AAR extraction)
+tasks.register("fetchCronetHeaders") {
+  group = "nitrofetch"
+  description = "Download Cronet C headers into ${buildDir}/cronet/include/cronet"
+  doLast {
+    logger.lifecycle("[fetchCronetHeaders] targetDir=${buildDir}/cronet/include/cronet, version=${cronetVersion}")
+    def includeDir = file("${buildDir}/cronet/include/cronet"); includeDir.mkdirs()
+    def version = cronetVersion
+    def urls = [
+      "https://raw.githubusercontent.com/chromium/chromium/${version}/components/cronet/native/cronet_c.h",
+      "https://raw.githubusercontent.com/chromium/chromium/${version}/components/cronet/native/cronet_export.h",
+    ]
+    urls.each { u ->
+      try {
+        new URL(u).withInputStream { i ->
+          def name = u.tokenize('/')[-1]
+          new File(includeDir, name).bytes = i.bytes
+        }
+        logger.lifecycle("[fetchCronetHeaders] Downloaded ${u}")
+      } catch (Throwable t) {
+        logger.warn("[fetchCronetHeaders] Failed to download ${u}: ${t.message}")
+      }
+    }
+  }
 }

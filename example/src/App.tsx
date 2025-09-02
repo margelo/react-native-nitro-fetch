@@ -1,12 +1,28 @@
+import React from 'react';
 import { Text, View, StyleSheet } from 'react-native';
-import { multiply } from 'react-native-nitro-fetch';
-
-const result = multiply(3, 7);
+import { fetch } from 'react-native-nitro-fetch';
 
 export default function App() {
+  const [text, setText] = React.useState('Loading...');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('https://httpbin.org/get');
+        const json = await res.json();
+        if (!cancelled) setText(`Status ${res.status} • Origin ${json.origin}`);
+      } catch (e: any) {
+        if (!cancelled) setText(`Error: ${e?.message ?? String(e)}`);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   return (
     <View style={styles.container}>
-      <Text>Result: {result}</Text>
+      <Text>{text}</Text>
     </View>
   );
 }
