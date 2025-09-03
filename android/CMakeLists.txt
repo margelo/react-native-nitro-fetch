@@ -8,7 +8,6 @@ set(CMAKE_CXX_STANDARD 20)
 # Define C++ library and add all sources
 add_library(${PACKAGE_NAME} SHARED
         src/main/cpp/cpp-adapter.cpp
-        src/main/cpp/nitrofetch.cpp
 )
 
 # Add Nitrogen specs :)
@@ -55,8 +54,7 @@ target_link_libraries(
         android # <-- Android core
 )
 
-# Ensure cpp autolink classes are visible to generated onLoad by force-including header
-target_compile_options(${PACKAGE_NAME} PRIVATE -include nitrofetch.hpp)
+## Kotlin-based implementation only; no custom C++ headers forced.
 
 # Optional: link Cronet if library file is present (drop-in via prepare script or Gradle task)
 set(CRONET_LIB_DIR ${CRONET_ROOT_DIR}/libs/${ANDROID_ABI})

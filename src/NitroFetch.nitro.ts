@@ -1,5 +1,4 @@
 import type { HybridObject } from 'react-native-nitro-modules';
-import type { NitroEnv } from './NitroEnv.nitro';
 
 // Minimal request/response types to model WHATWG fetch without streaming.
 export type NitroRequestMethod =
@@ -11,8 +10,10 @@ export type NitroRequestMethod =
   | 'DELETE'
   | 'OPTIONS';
 
-export type NitroHeader = [string, string];
-
+export interface NitroHeader  {
+  key: string;
+  value: string;
+};
 export interface NitroRequest {
   url: string;
   method?: NitroRequestMethod;
@@ -37,15 +38,15 @@ export interface NitroResponse {
 }
 
 export interface NitroFetchClient
-  extends HybridObject<{ ios: 'c++'; android: 'c++' }> {
+  extends HybridObject<{ ios: 'swift'; android: 'kotlin'; }> {
   // Client-binded request that uses the env configured at creation.
   request(req: NitroRequest): Promise<NitroResponse>;
 }
 
 export interface NitroFetch
-  extends HybridObject<{ ios: 'c++'; android: 'c++' }> {
+  extends HybridObject<{ ios: 'swift'; android: 'kotlin'; }> {
   // Create a client bound to a given environment (e.g., cache dir).
-  createClient(env?: NitroEnv): NitroFetchClient;
+  createClient(): NitroFetchClient;
 
   // Optional future: global abort/teardown
   // shutdown(): void;

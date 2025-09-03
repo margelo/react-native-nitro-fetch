@@ -4,7 +4,6 @@ import type {
   NitroRequest,
   NitroResponse,
 } from './NitroFetch.nitro';
-import type { NitroEnv } from './NitroEnv.nitro';
 import { NitroFetch as NitroFetchSingleton, NitroEnv as NitroEnvSingleton } from './NitroInstances';
 
 // Base64 helpers (no external deps)
@@ -110,7 +109,7 @@ let client: ReturnType<NitroFetchModule['createClient']> | undefined;
 function ensureClient() {
   if (client) return client;
   try {
-    client = NitroFetchHybrid.createClient(NitroEnvHybrid as any);
+    client = NitroFetchHybrid.createClient();
   } catch (err) {
     console.error('Failed to create NitroFetch client', err);
     // native not ready; keep undefined
