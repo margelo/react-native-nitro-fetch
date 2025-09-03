@@ -111,7 +111,8 @@ function ensureClient() {
   if (client) return client;
   try {
     client = NitroFetchHybrid.createClient(NitroEnvHybrid as any);
-  } catch (_) {
+  } catch (err) {
+    console.error('Failed to create NitroFetch client', err);
     // native not ready; keep undefined
   }
   return client;
@@ -160,10 +161,12 @@ export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): 
   // Ensure we have a client instance bound to env
   ensureClient();
   if (!client || typeof (client as any).request !== 'function') {
+    console.warn('NitroFetch client not available, falling back to global fetch', client);
     // @ts-ignore
     return fetch(input as any, init);
   }
   try {
+    console.log('Using nitro fetch for', req.method, req.url);
     // @ts-expect-error runtime hybrid object
     res = await client.request(req);
   } catch (e) {

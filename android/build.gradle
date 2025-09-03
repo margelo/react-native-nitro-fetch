@@ -139,7 +139,6 @@ dependencies {
 
 configurations {
   cronetAar
-  gmsCronetAar
 }
 
 dependencies {
@@ -147,7 +146,6 @@ dependencies {
   if (cronetVersion != null) {
     cronetAar "org.chromium.net:cronet-embedded:${cronetVersion}"
   }
-  gmsCronetAar "com.google.android.gms:play-services-cronet:${gmsCronetVersion}"
 }
 
 def cronetRoot = "$buildDir/cronet"
@@ -202,13 +200,7 @@ tasks.register("prepareCronet") {
           }
         } catch (Throwable ignored) {}
       }
-      if (aar == null) {
-        def files2 = configurations.gmsCronetAar.resolve()
-        if (!files2.isEmpty()) {
-          aar = files2.iterator().next()
-          logger.lifecycle("[prepareCronet] Using Google Play Services Cronet AAR ${gmsCronetVersion} -> ${aar} (may not include C API libs)")
-        }
-      }
+
 
       if (aar != null) {
         // Extract AAR into a temporary dir to avoid permission issues in ${buildDir}/cronet/aar
