@@ -105,23 +105,22 @@ function pairsToHeaders(pairs: NitroHeader[]): Headers {
 const NitroFetchHybrid: NitroFetchModule = NitroFetchSingleton;
 const NitroEnvHybrid: NitroEnv = NitroEnvSingleton;
 
-let providedEnv: NitroEnv | null = null;
-let client: NitroFetchModule["createClient"] extends (...args: any) => infer R ? R : any;
+let client: ReturnType<NitroFetchModule['createClient']> | undefined;
 
-export function setNitroEnv(env: NitroEnv) {
-  providedEnv = env;
+function ensureClient() {
+  if (client) return client;
   try {
-    client = NitroFetchSingleton.createClient(providedEnv);
+    client = NitroFetchHybrid.createClient(NitroEnvHybrid as any);
   } catch (_) {
-    // Native not ready; client remains undefined. JS fallback will be used.
+    // native not ready; keep undefined
   }
+  return client;
 }
 
 export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   // If native implementation is not present yet, fallback to global fetch
-  const hasNative = typeof (NitroFetchHybrid as any)?.request === 'function';
+  const hasNative = typeof (NitroFetchHybrid as any)?.createClient === 'function';
   if (!hasNative) {
-    console.log('no native fetch')
     // @ts-ignore: global fetch exists in RN
     return fetch(input as any, init);
   }
@@ -158,14 +157,11 @@ export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): 
   };
 
   let res: NitroResponse;
-  // Ensure we have a client instance
-  if (!client) {
-    try {
-      const envToUse: NitroEnv | undefined = providedEnv ?? (NitroEnvHybrid as any);
-      client = NitroFetchSingleton.createClient(envToUse);
-    } catch (_) {
-      // Will fallback below
-    }
+  // Ensure we have a client instance bound to env
+  ensureClient();
+  if (!client || typeof (client as any).request !== 'function') {
+    // @ts-ignore
+    return fetch(input as any, init);
   }
   try {
     // @ts-expect-error runtime hybrid object

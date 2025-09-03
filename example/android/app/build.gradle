@@ -116,4 +116,9 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Add Cronet Java implementation so CronetEngine.Builder() can find a provider.
+    // Keep version aligned with the libcronet you package.
+    def cronetVersion = project.rootProject.findProperty("NitroFetch_cronetVersion") ?: "119.6045.31"
+    implementation("org.chromium.net:cronet-embedded:${cronetVersion}")
 }

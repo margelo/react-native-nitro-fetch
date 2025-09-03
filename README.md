@@ -16,11 +16,9 @@ npm install react-native-nitro-fetch react-native-nitro-modules
 
 
 ```ts
-import { fetch, setNitroEnv, NitroFetch } from 'react-native-nitro-fetch';
+import { fetch, NitroFetch } from 'react-native-nitro-fetch';
 
-// Drop-in replacement for global fetch
-// Optionally provide NitroEnv to enable native cache dir usage
-// setNitroEnv(NitroModules.createHybridObject('NitroEnv'));
+// Drop-in replacement for global fetch; env is created internally
 const res = await fetch('https://httpbin.org/get');
 const json = await res.json();
 
