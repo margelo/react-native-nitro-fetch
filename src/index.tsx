@@ -1,6 +1,7 @@
 export { nitroFetch as fetch, nitroFetchOnWorklet } from './fetch';
 export type { NitroRequest, NitroResponse, NitroEnv } from './fetch';
 export { NitroFetch, NitroEnv as NitroEnvInstance } from './NitroInstances';
+import './fetch';
 
 // Keep legacy export to avoid breaking any local tests/usages during scaffolding.
 // Will be removed once native Cronet path is ready.
