@@ -19,8 +19,9 @@ export interface NitroRequest {
   method?: NitroRequestMethod;
   // Flattened list to keep bridging simple and deterministic
   headers?: NitroHeader[];
-  // Body encoded as base64. Omit or empty for no body.
-  bodyBase64?: string;
+  // Body as either UTF-8 string or raw bytes.
+  bodyString?: string;
+  bodyBytes?: ArrayBuffer;
   // Controls
   timeoutMs?: number;
   followRedirects?: boolean; // default true
@@ -33,8 +34,9 @@ export interface NitroResponse {
   ok: boolean;
   redirected: boolean;
   headers: NitroHeader[];
-  // Body as base64, not streamed (first implementation target)
-  bodyBase64: string;
+  // Body as either UTF-8 string or raw bytes (first implementation target)
+  bodyString?: string;
+  bodyBytes?: ArrayBuffer;
 }
 
 export interface NitroFetchClient

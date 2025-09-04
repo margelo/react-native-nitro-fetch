@@ -1,6 +1,7 @@
 package com.margelo.nitro.nitrofetch
 
 import com.facebook.proguard.annotations.DoNotStrip
+import com.margelo.nitro.core.ArrayBuffer
 import com.margelo.nitro.core.Promise
 import org.chromium.net.CronetEngine
 import org.chromium.net.CronetException
@@ -8,6 +9,15 @@ import org.chromium.net.UrlRequest
 import org.chromium.net.UrlResponseInfo
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
+
+fun ByteBuffer.toByteArray(): ByteArray {
+  // duplicate to avoid modifying the original buffer's position
+  val dup = this.duplicate()
+  dup.clear() // sets position=0, limit=capacity
+  val arr = ByteArray(dup.remaining())
+  dup.get(arr)
+  return arr
+}
 
 @DoNotStrip
 class NitroFetchClient(private val engine: CronetEngine, private val executor: Executor) : HybridNitroFetchClientSpec() {
@@ -38,19 +48,37 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
 
       override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) {
         try {
-          val headers = info.allHeadersAsList
-            .map { NitroHeader(it.key, it.value) }
-            .toTypedArray()
+          // Build headers as NitroHeader[]
+          val headersArr: Array<NitroHeader> =
+            info.allHeadersAsList
+              .map { NitroHeader(it.key, it.value) }
+              .toTypedArray()
+
           val status = info.httpStatusCode
-          val bodyB64 = android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+
+          // Accumulated body -> String (prefer charset from Content-Type, else UTF-8)
+          val bytes = out.toByteArray()
+          val contentType = info.allHeaders["Content-Type"] ?: info.allHeaders["content-type"]
+          val charset = run {
+            val ct = contentType ?: ""
+            val m = Regex("charset=([A-Za-z0-9_\\-:.]+)", RegexOption.IGNORE_CASE).find(ct.toString())
+            try {
+              if (m != null) java.nio.charset.Charset.forName(m.groupValues[1]) else Charsets.UTF_8
+            } catch (_: Throwable) {
+              Charsets.UTF_8
+            }
+          }
+          val bodyStr = try { String(bytes, charset) } catch (_: Throwable) { String(bytes, Charsets.UTF_8) }
+
           val res = NitroResponse(
             url = info.url,
             status = status.toDouble(),
             statusText = info.httpStatusText ?: "",
             ok = status in 200..299,
             redirected = info.url != url,
-            headers = headers,
-            bodyBase64 = bodyB64,
+            headers = headersArr,
+            bodyString = bodyStr,
+            bodyBytes = null,
           )
           promise.resolve(res)
         } catch (t: Throwable) {
@@ -72,11 +100,16 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
     val method = req.method?.name ?: "GET"
     builder.setHttpMethod(method)
     // Headers
-    req.headers?.forEach { h -> builder.addHeader(h.key, h.value) }
-    // Body (base64)
-    val bodyB64 = req.bodyBase64
-    if (!bodyB64.isNullOrEmpty()) {
-      val body = android.util.Base64.decode(bodyB64, android.util.Base64.DEFAULT)
+    req.headers?.forEach { (k, v) -> builder.addHeader(k, v) }
+    // Body (string or bytes)
+    val bodyBytes = req.bodyBytes
+    val bodyStr = req.bodyString
+    if ((bodyBytes != null) || !bodyStr.isNullOrEmpty()) {
+      val body: ByteArray = when {
+        bodyBytes != null -> bodyBytes.getBuffer(true).toByteArray()
+        !bodyStr.isNullOrEmpty() -> bodyStr!!.toByteArray(Charsets.UTF_8)
+        else -> ByteArray(0)
+      }
       val provider = object : org.chromium.net.UploadDataProvider() {
         private var pos = 0
         override fun getLength(): Long = body.size.toLong()

@@ -56,8 +56,6 @@ android {
 
   packagingOptions {
     excludes = [
-            "META-INF",
-            "META-INF/**",
             "**/libc++_shared.so",
             "**/libfbjni.so",
             "**/libjsi.so",
@@ -120,7 +118,8 @@ dependencies {
   implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
   implementation project(":react-native-nitro-modules")
   // Provide org.chromium.net Java API for CronetEngine in Kotlin
-  implementation "org.chromium.net:cronet-api:${cronetVersion}"
+  // Cronet
+  api "org.chromium.net:cronet-embedded:${cronetVersion}"
   implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0"
 }
 

@@ -4,58 +4,9 @@ import type {
   NitroRequest,
   NitroResponse,
 } from './NitroFetch.nitro';
-import { NitroFetch as NitroFetchSingleton, NitroEnv as NitroEnvSingleton } from './NitroInstances';
+import { NitroFetch as NitroFetchSingleton } from './NitroInstances';
 
-// Base64 helpers (no external deps)
-const b64Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let output = '';
-  let i = 0;
-  for (; i + 2 < bytes.length; i += 3) {
-    const triple = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
-    output +=
-      b64Alphabet[(triple >> 18) & 0x3f] +
-      b64Alphabet[(triple >> 12) & 0x3f] +
-      b64Alphabet[(triple >> 6) & 0x3f] +
-      b64Alphabet[triple & 0x3f];
-  }
-  if (i < bytes.length) {
-    const remaining = bytes.length - i; // 1 or 2
-    const a = bytes[i];
-    const b = remaining === 2 ? bytes[i + 1] : 0;
-    const triple = (a << 16) | (b << 8);
-    output += b64Alphabet[(triple >> 18) & 0x3f];
-    output += b64Alphabet[(triple >> 12) & 0x3f];
-    output += remaining === 2 ? b64Alphabet[(triple >> 6) & 0x3f] : '=';
-    output += '=';
-  }
-  return output;
-}
-
-function base64ToBytes(b64: string): Uint8Array {
-  // Remove padding and invalid chars
-  const clean = b64.replace(/[^A-Za-z0-9+/=]/g, '');
-  const len = clean.length;
-  if (len % 4 !== 0) throw new Error('Invalid base64');
-
-  const placeholders = clean.endsWith('==') ? 2 : clean.endsWith('=') ? 1 : 0;
-  const byteLen = ((len * 3) >> 2) - placeholders;
-  const bytes = new Uint8Array(byteLen);
-
-  let p = 0;
-  for (let i = 0; i < len; i += 4) {
-    const c1 = b64Alphabet.indexOf(clean[i]);
-    const c2 = b64Alphabet.indexOf(clean[i + 1]);
-    const c3 = b64Alphabet.indexOf(clean[i + 2]);
-    const c4 = b64Alphabet.indexOf(clean[i + 3]);
-    const triple = (c1 << 18) | (c2 << 12) | ((c3 & 0x3f) << 6) | (c4 & 0x3f);
-    if (p < byteLen) bytes[p++] = (triple >> 16) & 0xff;
-    if (p < byteLen) bytes[p++] = (triple >> 8) & 0xff;
-    if (p < byteLen) bytes[p++] = triple & 0xff;
-  }
-  return bytes;
-}
+// No base64: pass strings/ArrayBuffers directly
 
 function headersToPairs(headers?: HeadersInit): NitroHeader[] | undefined {
   if (!headers) return undefined;
@@ -75,21 +26,15 @@ function headersToPairs(headers?: HeadersInit): NitroHeader[] | undefined {
   return pairs;
 }
 
-async function bodyToBase64(body: BodyInit | null | undefined): Promise<string | undefined> {
+function normalizeBody(body: BodyInit | null | undefined): { bodyString?: string; bodyBytes?: ArrayBuffer } | undefined {
   if (body == null) return undefined;
-  if (typeof body === 'string') {
-    const encoder = new TextEncoder();
-    return bytesToBase64(encoder.encode(body));
-  }
-  if (body instanceof URLSearchParams) {
-    const encoder = new TextEncoder();
-    return bytesToBase64(encoder.encode(body.toString()))
-  }
-  if (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer) {
-    return bytesToBase64(new Uint8Array(body));
-  }
+  if (typeof body === 'string') return { bodyString: body };
+  if (body instanceof URLSearchParams) return { bodyString: body.toString() };
+  if (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer) return { bodyBytes: body };
   if (ArrayBuffer.isView(body)) {
-    return bytesToBase64(new Uint8Array(body.buffer, body.byteOffset, body.byteLength));
+    const view = body as ArrayBufferView;
+    // Pass a copy/slice of the underlying bytes without base64
+    return { bodyBytes: view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength) };
   }
   // TODO: Blob/FormData support can be added later
   throw new Error('Unsupported body type for nitro fetch');
@@ -97,12 +42,11 @@ async function bodyToBase64(body: BodyInit | null | undefined): Promise<string |
 
 function pairsToHeaders(pairs: NitroHeader[]): Headers {
   const h = new Headers();
-  for (const [k, v] of pairs) h.append(k, v);
+  for (const { key, value } of pairs) h.append(key, value);
   return h;
 }
 
 const NitroFetchHybrid: NitroFetchModule = NitroFetchSingleton;
-const NitroEnvHybrid: NitroEnv = NitroEnvSingleton;
 
 let client: ReturnType<NitroFetchModule['createClient']> | undefined;
 
@@ -146,13 +90,14 @@ export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): 
   }
 
   const headers = headersToPairs(headersInit);
-  const bodyBase64 = await bodyToBase64(body);
+  const normalized = normalizeBody(body);
 
   const req: NitroRequest = {
     url,
     method: (method?.toUpperCase() as any) ?? 'GET',
     headers,
-    bodyBase64,
+    bodyString: normalized?.bodyString,
+    bodyBytes: normalized?.bodyBytes,
     followRedirects: true,
   };
 
@@ -173,21 +118,31 @@ export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): 
     // @ts-ignore
     return fetch(input as any, init);
   }
-  const bytes = base64ToBytes(res.bodyBase64 ?? '');
+  const bytes = res.bodyBytes
+    ? new Uint8Array(res.bodyBytes)
+    : res.bodyString != null
+      ? new TextEncoder().encode(res.bodyString)
+      : new Uint8Array();
 
   // If Response is available, construct a real Response object for compatibility
   if (typeof Response !== 'undefined') {
     const respInit: ResponseInit = {
       status: res.status,
       statusText: res.statusText,
-      headers: pairsToHeaders(res.headers),
+      headers: res.headers.reduce((acc, { key, value }) => {
+        acc[key] = value;
+        return acc;
+      }, {} as Record<string, string>),
     };
-    return new Response(bytes, respInit);
+    // Prefer native bytes if available
+    return new Response(res.bodyBytes ?? bytes, respInit);
   }
 
   // Fallback lightweight Response-like object (minimal methods)
-  const decoder = new TextDecoder();
-  const headersObj = Object.fromEntries(res.headers);
+  const headersObj = res.headers.reduce((acc, { key, value }) => {
+        acc[key] = value;
+        return acc;
+      }, {} as Record<string, string>);
   const light: any = {
     url: res.url,
     ok: res.ok,
@@ -195,12 +150,12 @@ export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): 
     statusText: res.statusText,
     redirected: res.redirected,
     headers: headersObj,
-    arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-    text: async () => decoder.decode(bytes),
-    json: async () => JSON.parse(decoder.decode(bytes)),
+    arrayBuffer: async () => (res.bodyBytes ?? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)),
+    text: async () => res.bodyString ?? new TextDecoder().decode(bytes),
+    json: async () => JSON.parse(res.bodyString ?? new TextDecoder().decode(bytes)),
   };
   return light as Response;
 }
 
 export type { NitroRequest, NitroResponse } from './NitroFetch.nitro';
-export type { NitroEnv } from './NitroEnv.nitro';
+
