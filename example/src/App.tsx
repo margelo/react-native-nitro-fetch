@@ -1,6 +1,6 @@
 import React from 'react';
-import { Text, View, StyleSheet, Button, ScrollView } from 'react-native';
-import { fetch as nitroFetch } from 'react-native-nitro-fetch';
+import { Text, View, StyleSheet, Button, ScrollView, Modal, Pressable } from 'react-native';
+import { fetch as nitroFetch, nitroFetchOnWorklet } from 'react-native-nitro-fetch';
 
 type Row = {
   url: string;
@@ -8,6 +8,8 @@ type Row = {
   nitroMs: number;
   errorBuiltin?: string;
   errorNitro?: string;
+  cachedBuiltin?: boolean;
+  cachedNitro?: boolean;
 };
 
 const CANDIDATES: string[] = [
@@ -107,14 +109,33 @@ function trimmedAverage(values: number[], trimFraction = 0.1): number | null {
   return sum / sliced.length;
 }
 
-async function measure(fn: (url: string) => Promise<Response>, url: string): Promise<{ ms: number } & ({ ok: true } | { ok: false; error: string })> {
+function detectCached(headers: Headers): boolean {
+  const get = (k: string) => headers.get(k);
+  const age = get('age');
+  if (age && Number(age) > 0) return true;
+  const hits = get('x-cache-hits');
+  if (hits && Number(hits) > 0) return true;
+  const combined = (
+    (get('x-cache') || '') + ' ' +
+    (get('x-cache-status') || '') + ' ' +
+    (get('x-cache-remote') || '') + ' ' +
+    (get('cf-cache-status') || '') + ' ' +
+    (get('via') || '')
+  ).toUpperCase();
+  if (combined.includes('HIT') || combined.includes('REVALIDATED')) return true;
+  if (combined.includes('MISS')) return false;
+  return false;
+}
+
+async function measure(fn: (url: string) => Promise<Response>, url: string): Promise<{ ms: number } & ({ ok: true; cached: boolean } | { ok: false; error: string })> {
   const t0 = global.performance ? global.performance.now() : Date.now();
   try {
-    const res = await fn(`${url}?timestamp=${Date.now()}`);
+    const res = await fn(`${url}?timestamp=${performance.now()}`);
     // Ensure body read to make timing comparable
     await res.arrayBuffer();
     const t1 = global.performance ? global.performance.now() : Date.now();
-    return { ok: true, ms: t1 - t0 } as const;
+    const cached = detectCached(res.headers);
+    return { ok: true, ms: t1 - t0, cached } as const;
   } catch (e: any) {
     const t1 = global.performance ? global.performance.now() : Date.now();
     return { ok: false, ms: t1 - t0, error: e?.message ?? String(e) } as const;
@@ -123,9 +144,33 @@ async function measure(fn: (url: string) => Promise<Response>, url: string): Pro
 
 export default function App() {
   const [rows, setRows] = React.useState<Row[] | null>(null);
-  const [avgBuiltin, setAvgBuiltin] = React.useState<number | null>(null);
-  const [avgNitro, setAvgNitro] = React.useState<number | null>(null);
+  const [avgBuiltinAll, setAvgBuiltinAll] = React.useState<number | null>(null);
+  const [avgNitroAll, setAvgNitroAll] = React.useState<number | null>(null);
+  const [avgBuiltinNC, setAvgBuiltinNC] = React.useState<number | null>(null);
+  const [avgNitroNC, setAvgNitroNC] = React.useState<number | null>(null);
   const [running, setRunning] = React.useState(false);
+  const [showSheet, setShowSheet] = React.useState(false);
+  const [prices, setPrices] = React.useState<Array<{ id: string; usd: number }>>([]);
+
+  const loadPrices = React.useCallback(async () => {
+    console.log('Loading crypto prices from coingecko start');
+    const ids = [
+      'bitcoin','ethereum','solana','dogecoin','litecoin','cardano','ripple','polkadot','chainlink','polygon-pos'
+    ];
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids.join(','))}&vs_currencies=usd`;
+    const mapper = (payload: { bodyString?: string }) => {
+      'worklet';
+      const txt = payload.bodyString ?? '';
+      const json = JSON.parse(txt) as Record<string, { usd: number }>;
+      const arr = Object.entries(json).map(([id, v]) => ({ id, usd: v.usd }));
+      arr.sort((a, b) => a.id.localeCompare(b.id));
+      return arr;
+    };
+    console.log('Loading crypto prices from coingecko');
+    const data = await nitroFetchOnWorklet(url, undefined, mapper, { preferBytes: false });
+    console.log('Loaded crypto prices:', data);
+    setPrices(data);
+  }, []);
 
   const run = React.useCallback(async () => {
     if (running) return;
@@ -141,16 +186,22 @@ export default function App() {
             nitroMs: n.ms,
             errorBuiltin: b.ok ? undefined : b.error,
             errorNitro: n.ok ? undefined : n.error,
+            cachedBuiltin: b.ok ? b.cached : undefined,
+            cachedNitro: n.ok ? n.cached : undefined,
           };
         })
       );
       setRows(out);
       const okRows = out.filter((r) => r.errorBuiltin == null && r.errorNitro == null);
-      const avgB = trimmedAverage(okRows.map((r) => r.builtinMs));
-      const avgN = trimmedAverage(okRows.map((r) => r.nitroMs));
-      setAvgBuiltin(avgB);
-      setAvgNitro(avgN);
-      console.log('trimmed avgs', avgB, avgN);
+      const avgBAll = trimmedAverage(okRows.map((r) => r.builtinMs));
+      const avgNAll = trimmedAverage(okRows.map((r) => r.nitroMs));
+      const avgBNC = trimmedAverage(okRows.filter(r => r.cachedBuiltin === false).map((r) => r.builtinMs));
+      const avgNNC = trimmedAverage(okRows.filter(r => r.cachedNitro === false).map((r) => r.nitroMs));
+      setAvgBuiltinAll(avgBAll);
+      setAvgNitroAll(avgNAll);
+      setAvgBuiltinNC(avgBNC);
+      setAvgNitroNC(avgNNC);
+      console.log('trimmed avgs (all, not-cached)', avgBAll, avgNAll, avgBNC, avgNNC);
     } finally {
       setRunning(false);
     }
@@ -165,6 +216,8 @@ export default function App() {
       <Text style={styles.title}>Nitro vs Built-in Fetch</Text>
       <View style={styles.actions}>
         <Button title={running ? 'Running…' : 'Run Again'} onPress={run} disabled={running} />
+        <View style={{ width: 12 }} />
+        <Button title="Show Crypto Prices" onPress={() => { setShowSheet(true); loadPrices(); }} />
       </View>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         {rows == null ? (
@@ -175,6 +228,7 @@ export default function App() {
               <Text style={[styles.cell, styles.url]}>URL</Text>
               <Text style={styles.cell}>Built-in (ms)</Text>
               <Text style={styles.cell}>Nitro (ms)</Text>
+              <Text style={styles.cell}>Cache B/N</Text>
             </View>
             {rows.map((r) => {
               const builtinWins = r.builtinMs < r.nitroMs;
@@ -190,16 +244,52 @@ export default function App() {
                   <Text style={[styles.cell, nitroWins ? styles.winner : undefined]}>
                     {r.errorNitro ? 'Err' : Number.isFinite(r.nitroMs) ? r.nitroMs.toFixed(1) : '—'}
                   </Text>
+                  <Text style={styles.cell}>
+                    {r.cachedBuiltin == null ? '?' : r.cachedBuiltin ? 'B✓' : 'B✗'}{' '}
+                    {r.cachedNitro == null ? '?' : r.cachedNitro ? 'N✓' : 'N✗'}
+                  </Text>
                 </View>
               );
             })}
             <View style={styles.footer}>
-              <Text style={styles.avg}>Avg built-in (trimmed): {avgBuiltin != null ? avgBuiltin.toFixed(1) : '—'} ms</Text>
-              <Text style={styles.avg}>Avg nitro (trimmed): {avgNitro != null ? avgNitro.toFixed(1) : '—'} ms</Text>
+              <Text style={styles.avg}>
+                Built-in avg (all / not cached): {avgBuiltinAll != null ? avgBuiltinAll.toFixed(1) : '—'} ms / {avgBuiltinNC != null ? avgBuiltinNC.toFixed(1) : '—'} ms
+              </Text>
+              <Text style={styles.avg}>
+                Nitro avg (all / not cached): {avgNitroAll != null ? avgNitroAll.toFixed(1) : '—'} ms / {avgNitroNC != null ? avgNitroNC.toFixed(1) : '—'} ms
+              </Text>
             </View>
           </>
         )}
       </ScrollView>
+      <Modal
+        visible={showSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowSheet(false)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setShowSheet(false)}>
+          <View />
+        </Pressable>
+        <View style={styles.sheet}>
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Crypto Prices (USD)</Text>
+            <Button title="Close" onPress={() => setShowSheet(false)} />
+          </View>
+          <ScrollView style={{ maxHeight: 360 }}>
+            {prices.length === 0 ? (
+              <Text style={{ padding: 12 }}>Loading…</Text>
+            ) : (
+              prices.map((p) => (
+                <View key={p.id} style={styles.priceRow}>
+                  <Text style={styles.priceId}>{p.id}</Text>
+                  <Text style={styles.priceVal}>${p.usd.toLocaleString(undefined, { maximumFractionDigits: 6 })}</Text>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -208,6 +298,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: 48,
+
   },
   title: {
     fontSize: 18,
@@ -217,7 +308,52 @@ const styles = StyleSheet.create({
   },
   actions: {
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
     marginBottom: 8,
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)'
+  },
+  sheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    paddingBottom: 24,
+  },
+  sheetHeader: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#eee',
+  },
+  sheetTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: '#f1f1f1',
+  },
+  priceId: {
+    fontSize: 14,
+  },
+  priceVal: {
+    fontSize: 14,
+    fontVariant: ['tabular-nums'],
   },
   scroll: {
     flex: 1,

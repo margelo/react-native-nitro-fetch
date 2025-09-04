@@ -21,8 +21,12 @@ class NitroFetch : HybridNitroFetchSpec() {
 
     // Simpler & safer for callbacks than a pool (avoid reentrancy races in glue code).
     val ioExecutor: Executor by lazy {
-      Executors.newSingleThreadExecutor { r ->
-        Thread(r, "NitroCronet-io").apply { isDaemon = true }
+      val cores = Runtime.getRuntime().availableProcessors().coerceAtLeast(2)
+      Executors.newFixedThreadPool(cores) { r ->
+        Thread(r, "NitroCronet-io").apply {
+          isDaemon = true
+          priority = Thread.NORM_PRIORITY
+        }
       }
     }
 
@@ -47,6 +51,7 @@ class NitroFetch : HybridNitroFetchSpec() {
           .setStoragePath(cacheDir.absolutePath)
           .enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISK, 50 * 1024 * 1024)
           .setUserAgent("NitroFetch/0.1")
+
 
         // --- Optional debugging knobs (uncomment temporarily) ---
         // Enable NetLog-like tracing in NetworkService:

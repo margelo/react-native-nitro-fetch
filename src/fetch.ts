@@ -9,24 +9,33 @@ import { NitroFetch as NitroFetchSingleton } from './NitroInstances';
 // No base64: pass strings/ArrayBuffers directly
 
 function headersToPairs(headers?: HeadersInit): NitroHeader[] | undefined {
+  'worklet';
   if (!headers) return undefined;
   const pairs: NitroHeader[] = [];
   if (headers instanceof Headers) {
-    headers.forEach((v, k) => pairs.push([k, v]));
+    headers.forEach((v, k) => pairs.push({ key: k, value: v }));
     return pairs;
   }
   if (Array.isArray(headers)) {
-    // Already pairs
-    return headers as NitroHeader[];
+    // Convert tuple pairs to objects if needed
+    for (const entry of headers as any[]) {
+      if (Array.isArray(entry) && entry.length >= 2) {
+        pairs.push({ key: String(entry[0]), value: String(entry[1]) });
+      } else if (entry && typeof entry === 'object' && 'key' in entry && 'value' in entry) {
+        pairs.push(entry as NitroHeader);
+      }
+    }
+    return pairs;
   }
   // Record<string, string>
   for (const [k, v] of Object.entries(headers)) {
-    pairs.push([k, String(v)]);
+    pairs.push({ key: k, value: String(v) });
   }
   return pairs;
 }
 
 function normalizeBody(body: BodyInit | null | undefined): { bodyString?: string; bodyBytes?: ArrayBuffer } | undefined {
+  'worklet';
   if (body == null) return undefined;
   if (typeof body === 'string') return { bodyString: body };
   if (body instanceof URLSearchParams) return { bodyString: body.toString() };
@@ -41,6 +50,7 @@ function normalizeBody(body: BodyInit | null | undefined): { bodyString?: string
 }
 
 function pairsToHeaders(pairs: NitroHeader[]): Headers {
+  'worklet';
   const h = new Headers();
   for (const { key, value } of pairs) h.append(key, value);
   return h;
@@ -61,15 +71,8 @@ function ensureClient() {
   return client;
 }
 
-export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  // If native implementation is not present yet, fallback to global fetch
-  const hasNative = typeof (NitroFetchHybrid as any)?.createClient === 'function';
-  if (!hasNative) {
-    // @ts-ignore: global fetch exists in RN
-    return fetch(input as any, init);
-  }
-
-  // Normalize request
+function buildNitroRequest(input: RequestInfo | URL, init?: RequestInit): NitroRequest {
+  'worklet';
   let url: string;
   let method: string | undefined;
   let headersInit: HeadersInit | undefined;
@@ -92,7 +95,7 @@ export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): 
   const headers = headersToPairs(headersInit);
   const normalized = normalizeBody(body);
 
-  const req: NitroRequest = {
+  return {
     url,
     method: (method?.toUpperCase() as any) ?? 'GET',
     headers,
@@ -100,24 +103,50 @@ export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): 
     bodyBytes: normalized?.bodyBytes,
     followRedirects: true,
   };
+}
 
-  let res: NitroResponse;
-  // Ensure we have a client instance bound to env
+async function nitroFetchRaw(input: RequestInfo | URL, init?: RequestInit): Promise<NitroResponse> {
+  'worklet';
+  const hasNative = typeof (NitroFetchHybrid as any)?.createClient === 'function';
+  if (!hasNative) {
+    // Fallback path not supported for raw; use global fetch and synthesize minimal shape
+    // @ts-ignore: global fetch exists in RN
+    const res = await fetch(input as any, init);
+    const url = (res as any).url ?? String(input);
+    const bytes = await res.arrayBuffer();
+    const headers: NitroHeader[] = [];
+    res.headers.forEach((v, k) => headers.push({ key: k, value: v }));
+    return {
+      url,
+      status: res.status,
+      statusText: res.statusText,
+      ok: res.ok,
+      redirected: (res as any).redirected ?? false,
+      headers,
+      bodyBytes: bytes,
+      bodyString: undefined,
+    } as NitroResponse;
+  }
+
+  const req = buildNitroRequest(input, init);
   ensureClient();
-  if (!client || typeof (client as any).request !== 'function') {
-    console.warn('NitroFetch client not available, falling back to global fetch', client);
-    // @ts-ignore
+  if (!client || typeof (client as any).request !== 'function') throw new Error('NitroFetch client not available');
+  // @ts-expect-error runtime hybrid object
+  const res: NitroResponse = await client.request(req);
+  return res;
+}
+
+export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  'worklet';
+  // If native implementation is not present yet, fallback to global fetch
+  const hasNative = typeof (NitroFetchHybrid as any)?.createClient === 'function';
+  if (!hasNative) {
+    // @ts-ignore: global fetch exists in RN
     return fetch(input as any, init);
   }
-  try {
-    console.log('Using nitro fetch for', req.method, req.url);
-    // @ts-expect-error runtime hybrid object
-    res = await client.request(req);
-  } catch (e) {
-    // Native not implemented yet – fall back to platform fetch
-    // @ts-ignore
-    return fetch(input as any, init);
-  }
+
+  const res = await nitroFetchRaw(input, init);
+
   const bytes = res.bodyBytes
     ? new Uint8Array(res.bodyBytes)
     : res.bodyString != null
@@ -157,5 +186,84 @@ export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): 
   return light as Response;
 }
 
-export type { NitroRequest, NitroResponse } from './NitroFetch.nitro';
+// Optional off-thread processing using react-native-worklets-core
+export type NitroWorkletMapper<T> = (payload: {
+  url: string;
+  status: number;
+  statusText: string;
+  ok: boolean;
+  redirected: boolean;
+  headers: NitroHeader[];
+  bodyBytes?: ArrayBuffer;
+  bodyString?: string;
+}) => T;
 
+let nitroRuntime: any | undefined;
+let WorkletsRef: any | undefined;
+function ensureWorkletRuntime(name = 'nitro-fetch'): any | undefined {
+  'worklet';
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Worklets } = require('react-native-worklets-core');
+    nitroRuntime = nitroRuntime ?? Worklets.createRuntime(name);
+    return nitroRuntime;
+  } catch {
+    return undefined;
+  }
+}
+
+function getWorklets(): any | undefined {
+  try {
+    if (WorkletsRef) return WorkletsRef;
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Worklets } = require('react-native-worklets-core');
+    WorkletsRef = Worklets;
+    return WorkletsRef;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function nitroFetchOnWorklet<T>(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  mapWorklet: NitroWorkletMapper<T>,
+  options?: { preferBytes?: boolean; runtimeName?: string }
+): Promise<T> {
+  'worklet';
+  console.log('nitroFetchOnWorklet: starting');
+  const preferBytes = options?.preferBytes !== false; // default true
+  const rt = ensureWorkletRuntime(options?.runtimeName);
+  const Worklets = getWorklets();
+ 
+  return await new Promise<T>((resolve, reject) => {
+    try {
+      rt.run(async (map: NitroWorkletMapper<T>) => {
+        'worklet';
+        try {
+          console.log('nitroFetchOnWorklet: running fetch on worklet thread');
+          const res = await nitroFetchRaw(input, init);
+          console.log('nitroFetchOnWorklet: fetch completed');
+          const url = res.url;
+          const status = res.status;
+          const statusText = res.statusText;
+          const ok = res.ok;
+          const redirected = res.redirected;
+          const headersPairs: NitroHeader[] = res.headers;
+          const bodyBytes: ArrayBuffer | undefined = preferBytes ? res.bodyBytes : undefined;
+          const bodyString: string | undefined = preferBytes ? undefined : res.bodyString;
+          const payload = { url, status, statusText, ok, redirected, headers: headersPairs, bodyBytes, bodyString };
+          const out = map(payload);
+          // Resolve back on JS thread
+          Worklets.runOnJS(resolve)(out as any);
+        } catch (e) {
+          Worklets.runOnJS(reject)(e as any);
+        }
+      }, mapWorklet as any);
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
+export type { NitroRequest, NitroResponse } from './NitroFetch.nitro';

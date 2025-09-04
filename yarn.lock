@@ -10136,6 +10136,7 @@ __metadata:
     react-native-monorepo-config: ^0.1.9
     react-native-nitro-modules: ^0.29.2
     react-native-safe-area-context: ^5.5.2
+    react-native-worklets-core: ^1.6.0
   languageName: unknown
   linkType: soft
 
@@ -10172,6 +10173,10 @@ __metadata:
     react: "*"
     react-native: "*"
     react-native-nitro-modules: ^0.29.2
+    react-native-worklets-core: ^1.6.0
+  peerDependenciesMeta:
+    react-native-worklets-core:
+      optional: true
   languageName: unknown
   linkType: soft
 
@@ -10192,6 +10197,18 @@ __metadata:
     react: "*"
     react-native: "*"
   checksum: f346615d5f8f26c0c8459d29c149ea3f66684b8ae79cea6fd48d118d039851a69a92955d67b455d0e7ab46639155c4357ebf58ec1859b2377ee459e2a04b602b
+  languageName: node
+  linkType: hard
+
+"react-native-worklets-core@npm:^1.6.0":
+  version: 1.6.2
+  resolution: "react-native-worklets-core@npm:1.6.2"
+  dependencies:
+    string-hash-64: ^1.0.3
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 367981bfc8adf2f989ae73300849a5b8ef89bcea0174480e6ff1614df075f1eab28e30899daefa081a5c06588ca2df4d629c3de74e69f5830cbe54e004cf7235
   languageName: node
   linkType: hard
 
@@ -11149,6 +11166,13 @@ __metadata:
     es-errors: ^1.3.0
     internal-slot: ^1.1.0
   checksum: be944489d8829fb3bdec1a1cc4a2142c6b6eb317305eeace1ece978d286d6997778afa1ae8cb3bd70e2b274b9aa8c69f93febb1e15b94b1359b11058f9d3c3a1
+  languageName: node
+  linkType: hard
+
+"string-hash-64@npm:^1.0.3":
+  version: 1.0.3
+  resolution: "string-hash-64@npm:1.0.3"
+  checksum: 79de8431b4fa3e85a2429cd52a34f7948221ff167b7a094e05d6bcfd0173474b232e0c9845c96f74b0d7b6b0c8bbe2c3532a4cacb21635293ef0cf3cc8e77f06
   languageName: node
   linkType: hard
 

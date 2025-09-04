@@ -1,4 +1,4 @@
-export { nitroFetch as fetch } from './fetch';
+export { nitroFetch as fetch, nitroFetchOnWorklet } from './fetch';
 export type { NitroRequest, NitroResponse, NitroEnv } from './fetch';
 export { NitroFetch, NitroEnv as NitroEnvInstance } from './NitroInstances';
 
