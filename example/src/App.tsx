@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, View, StyleSheet, Button, ScrollView, Modal, Pressable } from 'react-native';
 import { fetch as nitroFetch, nitroFetchOnWorklet } from 'react-native-nitro-fetch';
+import 'react-native-nitro-fetch/src/fetch';
 
 type Row = {
   url: string;

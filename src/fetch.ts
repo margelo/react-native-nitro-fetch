@@ -201,13 +201,15 @@ export type NitroWorkletMapper<T> = (payload: {
 let nitroRuntime: any | undefined;
 let WorkletsRef: any | undefined;
 function ensureWorkletRuntime(name = 'nitro-fetch'): any | undefined {
-  'worklet';
+  console.log('ensuring worklet runtime');
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Worklets } = require('react-native-worklets-core');
     nitroRuntime = nitroRuntime ?? Worklets.createRuntime(name);
+    console.log('nitroRuntime:', !!nitroRuntime);
     return nitroRuntime;
   } catch {
+    console.warn('react-native-worklets-core not available');
     return undefined;
   }
 }
@@ -220,6 +222,7 @@ function getWorklets(): any | undefined {
     WorkletsRef = Worklets;
     return WorkletsRef;
   } catch {
+    console.warn('react-native-worklets-core not available');
     return undefined;
   }
 }
@@ -230,14 +233,40 @@ export async function nitroFetchOnWorklet<T>(
   mapWorklet: NitroWorkletMapper<T>,
   options?: { preferBytes?: boolean; runtimeName?: string }
 ): Promise<T> {
-  'worklet';
   console.log('nitroFetchOnWorklet: starting');
   const preferBytes = options?.preferBytes !== false; // default true
-  const rt = ensureWorkletRuntime(options?.runtimeName);
-  const Worklets = getWorklets();
- 
+  console.log('nitroFetchOnWorklet: preferBytes:', preferBytes);
+  let rt: any | undefined;
+  let Worklets: any | undefined;
+  try {
+    rt = ensureWorkletRuntime(options?.runtimeName);
+    console.log('nitroFetchOnWorklet: runtime created?', !!rt);
+    Worklets = getWorklets();
+    console.log('nitroFetchOnWorklet: Worklets available?', !!Worklets);
+  } catch (e) {
+    console.error('nitroFetchOnWorklet: setup failed', e);
+  }
+
+  // Fallback: if runtime is not available, do the work on JS
+  if (!rt || !Worklets || typeof rt.run !== 'function') {
+    console.warn('nitroFetchOnWorklet: no runtime, mapping on JS thread');
+    const res = await nitroFetchRaw(input, init);
+    const payload = {
+      url: res.url,
+      status: res.status,
+      statusText: res.statusText,
+      ok: res.ok,
+      redirected: res.redirected,
+      headers: res.headers,
+      bodyBytes: preferBytes ? res.bodyBytes : undefined,
+      bodyString: preferBytes ? undefined : res.bodyString,
+    } as const;
+    return mapWorklet(payload as any);
+  }
+
   return await new Promise<T>((resolve, reject) => {
     try {
+      console.log('nitroFetchOnWorklet: about to call rt.run');
       rt.run(async (map: NitroWorkletMapper<T>) => {
         'worklet';
         try {
@@ -261,9 +290,13 @@ export async function nitroFetchOnWorklet<T>(
         }
       }, mapWorklet as any);
     } catch (e) {
+      console.error('nitroFetchOnWorklet: rt.run failed', e);
       reject(e);
     }
   });
 }
+
+export const x = ensureWorkletRuntime();
+export const y = getWorklets();
 
 export type { NitroRequest, NitroResponse } from './NitroFetch.nitro';
