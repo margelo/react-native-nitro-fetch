@@ -218,6 +218,12 @@ export async function prefetchOnAppStart(
   input: RequestInfo | URL,
   init?: RequestInit & { prefetchKey?: string }
 ): Promise<void> {
+  // No-op on iOS
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Platform } = require('react-native');
+    if (Platform?.OS === 'ios') return;
+  } catch {}
   // Resolve request and prefetchKey
   const req = buildNitroRequest(input, init);
   const fromHeader = req.headers?.find(h => h.key.toLowerCase() === 'prefetchkey')?.value;
@@ -263,6 +269,12 @@ export async function prefetchOnAppStart(
 
 // Remove one entry (by prefetchKey) from the auto-prefetch queue in MMKV.
 export async function removeFromAutoPrefetch(prefetchKey: string): Promise<void> {
+  // No-op on iOS
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Platform } = require('react-native');
+    if (Platform?.OS === 'ios') return;
+  } catch {}
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { MMKV } = require('react-native-mmkv');
@@ -293,6 +305,12 @@ export async function removeFromAutoPrefetch(prefetchKey: string): Promise<void>
 
 // Remove all entries from the auto-prefetch queue in MMKV.
 export async function removeAllFromAutoprefetch(): Promise<void> {
+  // No-op on iOS
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Platform } = require('react-native');
+    if (Platform?.OS === 'ios') return;
+  } catch {}
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { MMKV } = require('react-native-mmkv');
@@ -355,6 +373,26 @@ export async function nitroFetchOnWorklet<T>(
   mapWorklet: NitroWorkletMapper<T>,
   options?: { preferBytes?: boolean; runtimeName?: string }
 ): Promise<T> {
+  // On iOS, explicitly run on JS thread (no worklet runtime)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { Platform } = require('react-native');
+    if (Platform?.OS === 'ios') {
+      const preferBytes = options?.preferBytes !== false; // default true
+      const res = await nitroFetchRaw(input, init);
+      const payload = {
+        url: res.url,
+        status: res.status,
+        statusText: res.statusText,
+        ok: res.ok,
+        redirected: res.redirected,
+        headers: res.headers,
+        bodyBytes: preferBytes ? res.bodyBytes : undefined,
+        bodyString: preferBytes ? undefined : res.bodyString,
+      } as const;
+      return mapWorklet(payload as any);
+    }
+  } catch {}
   console.log('nitroFetchOnWorklet: starting');
   const preferBytes = options?.preferBytes !== false; // default true
   console.log('nitroFetchOnWorklet: preferBytes:', preferBytes);
