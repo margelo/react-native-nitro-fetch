@@ -1,6 +1,13 @@
-export { nitroFetch as fetch, nitroFetchOnWorklet } from './fetch';
-export type { NitroRequest, NitroResponse, NitroEnv } from './fetch';
-export { NitroFetch, NitroEnv as NitroEnvInstance } from './NitroInstances';
+export {
+  nitroFetch as fetch,
+  nitroFetchOnWorklet,
+  prefetch,
+  prefetchOnAppStart,
+  removeFromAutoPrefetch,
+  removeAllFromAutoprefetch,
+} from './fetch';
+export type { NitroRequest, NitroResponse } from './fetch';
+export { NitroFetch } from './NitroInstances';
 import './fetch';
 
 // Keep legacy export to avoid breaking any local tests/usages during scaffolding.

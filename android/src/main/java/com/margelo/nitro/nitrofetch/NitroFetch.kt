@@ -30,7 +30,7 @@ class NitroFetch : HybridNitroFetchSpec() {
       }
     }
 
-    private fun getEngine(): CronetEngine {
+    fun getEngine(): CronetEngine {
       engineRef?.let { return it }
       synchronized(this) {
         engineRef?.let { return it }

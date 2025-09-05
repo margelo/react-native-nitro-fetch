@@ -43,6 +43,8 @@ export interface NitroFetchClient
   extends HybridObject<{ ios: 'swift'; android: 'kotlin'; }> {
   // Client-binded request that uses the env configured at creation.
   request(req: NitroRequest): Promise<NitroResponse>;
+  // Start a prefetch for a given request; expects a header `prefetchKey`.
+  prefetch(req: NitroRequest): Promise<void>;
 }
 
 export interface NitroFetch

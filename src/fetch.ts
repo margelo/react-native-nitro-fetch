@@ -186,6 +186,128 @@ export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): 
   return light as Response;
 }
 
+// Start a native prefetch. Requires a `prefetchKey` header on the request.
+export async function prefetch(input: RequestInfo | URL, init?: RequestInit): Promise<void> {
+  // If native implementation is not present yet, do nothing
+  const hasNative = typeof (NitroFetchHybrid as any)?.createClient === 'function';
+  if (!hasNative) return;
+
+  // Build NitroRequest and ensure prefetchKey header exists
+  const req = buildNitroRequest(input, init);
+  const hasKey = req.headers?.some(h => h.key.toLowerCase() === 'prefetchkey') ?? false;
+  // Also support passing prefetchKey via non-standard field on init
+  const fromInit = (init as any)?.prefetchKey as string | undefined;
+  if (!hasKey && fromInit) {
+    req.headers = (req.headers ?? []).concat([{ key: 'prefetchKey', value: fromInit }]);
+  }
+  const finalHasKey = req.headers?.some(h => h.key.toLowerCase() === 'prefetchkey');
+  if (!finalHasKey) {
+    throw new Error('prefetch requires a \"prefetchKey\" header');
+  }
+
+  // Ensure client and call native prefetch
+  ensureClient();
+  if (!client || typeof (client as any).prefetch !== 'function') return;
+  // @ts-expect-error hybrid object
+  await client.prefetch(req);
+}
+
+// Persist a request to MMKV so native can prefetch it on app start.
+// Stores an array of entries under the same key Android reads: "nitrofetch_autoprefetch_queue".
+export async function prefetchOnAppStart(
+  input: RequestInfo | URL,
+  init?: RequestInit & { prefetchKey?: string }
+): Promise<void> {
+  // Resolve request and prefetchKey
+  const req = buildNitroRequest(input, init);
+  const fromHeader = req.headers?.find(h => h.key.toLowerCase() === 'prefetchkey')?.value;
+  const fromInit = (init as any)?.prefetchKey as string | undefined;
+  const prefetchKey = fromHeader ?? fromInit;
+  if (!prefetchKey) {
+    throw new Error('prefetchOnAppStart requires a "prefetchKey" (header or init.prefetchKey)');
+  }
+
+  // Convert headers to a plain object for storage
+  const headersObj = (req.headers ?? []).reduce((acc, { key, value }) => {
+    acc[String(key)] = String(value);
+    return acc;
+  }, {} as Record<string, string>);
+
+  const entry = {
+    url: req.url,
+    prefetchKey,
+    headers: headersObj,
+  } as const;
+
+  // Write or append to MMKV queue
+  try {
+    // Dynamically require to keep it optional for consumers
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { MMKV } = require('react-native-mmkv');
+    const storage = new MMKV(); // default instance matches Android's defaultMMKV
+    const KEY = 'nitrofetch_autoprefetch_queue';
+    let arr: any[] = [];
+    try {
+      const raw = storage.getString(KEY);
+      if (raw) arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) arr = [];
+    } catch {
+      arr = [];
+    }
+    arr.push(entry);
+    storage.set(KEY, JSON.stringify(arr));
+  } catch (e) {
+    console.warn('react-native-mmkv not available; prefetchOnAppStart is a no-op', e);
+  }
+}
+
+// Remove one entry (by prefetchKey) from the auto-prefetch queue in MMKV.
+export async function removeFromAutoPrefetch(prefetchKey: string): Promise<void> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { MMKV } = require('react-native-mmkv');
+    const storage = new MMKV();
+    const KEY = 'nitrofetch_autoprefetch_queue';
+    let arr: any[] = [];
+    try {
+      const raw = storage.getString(KEY);
+      if (raw) arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) arr = [];
+    } catch {
+      arr = [];
+    }
+    const next = arr.filter((e) => e && e.prefetchKey !== prefetchKey);
+    if (next.length === 0) {
+      if (typeof (storage as any).delete === 'function') {
+        (storage as any).delete(KEY);
+      } else {
+        storage.set(KEY, JSON.stringify([]));
+      }
+    } else if (next.length !== arr.length) {
+      storage.set(KEY, JSON.stringify(next));
+    }
+  } catch (e) {
+    console.warn('react-native-mmkv not available; removeFromAutoPrefetch is a no-op', e);
+  }
+}
+
+// Remove all entries from the auto-prefetch queue in MMKV.
+export async function removeAllFromAutoprefetch(): Promise<void> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { MMKV } = require('react-native-mmkv');
+    const storage = new MMKV();
+    const KEY = 'nitrofetch_autoprefetch_queue';
+    if (typeof (storage as any).delete === 'function') {
+      (storage as any).delete(KEY);
+    } else {
+      storage.set(KEY, JSON.stringify([]));
+    }
+  } catch (e) {
+    console.warn('react-native-mmkv not available; removeAllFromAutoprefetch is a no-op', e);
+  }
+}
+
 // Optional off-thread processing using react-native-worklets-core
 export type NitroWorkletMapper<T> = (payload: {
   url: string;
