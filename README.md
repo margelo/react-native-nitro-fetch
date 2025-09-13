@@ -31,11 +31,27 @@ const json = await res.json();
 - Android auto-prefetch: enqueue requests to MMKV so they warm up on next app start.
 - Worklets helper: run mapping/parsing off the JS thread with `react-native-worklets-core`.
 
+## Why Prefetch
+
+- Faster first paint of data: Prefetching lets you move network I/O earlier on the critical path so the screen can render with data sooner.
+- App start wins: With auto‑prefetch + MMKV, we can begin fetching immediately at process start. In our measurements on mid‑range Android devices (e.g., Samsung A16), this starts at least ~220 ms earlier than initiating the same request from JS after React is up.
+- UX hooks: Kick off prefetch on navigation intent (button press) and serve the result when the destination screen mounts.
+
+See `docs/prefetch.md` for patterns and examples.
+
 ## Why Cronet
 
 - Performance: Enables HTTP/2 multiplexing and QUIC/HTTP/3, reducing latency and avoiding head‑of‑line blocking.
 - Efficiency: Advanced connection management, TLS/ALPN, Brotli, and robust on‑disk caching.
 - Battle‑tested: Built on Chromium’s networking stack (the same tech behind Chrome) and widely adopted across the ecosystem, including the Flutter community.
+
+## Philosophy
+
+- Nitro Fetch often outperforms built‑in fetch thanks to Cronet’s optimizations, but raw speed is not the primary goal.
+- The main goals are:
+  - High‑quality prefetching (including auto‑prefetch on app start)
+  - Enabling a multi‑threaded React Native architecture (e.g., off‑thread mapping with worklets)
+- Performance is a nice side‑effect.
 
 ## Usage Examples
 
@@ -80,7 +96,7 @@ const data = await nitroFetchOnWorklet('https://httpbin.org/get', undefined, map
 ## Platform Notes
 
 - Android: Uses Cronet Java API; no extra setup needed beyond install and rebuild. Cronet engine is initialized once and enables HTTP/2, QUIC, Brotli, and disk cache.
-- iOS: Currently uses the built-in fetch path; Cronet integration is planned.
+- iOS: Uses a native `URLSession` client for requests and prefetch (in‑memory cache). Cronet integration is still planned for future releases.
 
 ## Limitations & Alternatives
 
