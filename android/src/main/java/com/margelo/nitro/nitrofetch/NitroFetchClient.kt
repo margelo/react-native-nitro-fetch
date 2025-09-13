@@ -161,14 +161,46 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
     if (key != null) {
       // If a prefetch is currently pending, wait for it
       FetchCache.getPending(key)?.let { fut ->
+        fun withPrefetchedHeader(res: NitroResponse): NitroResponse {
+          val newHeaders = (res.headers?.toMutableList() ?: mutableListOf())
+          newHeaders.add(NitroHeader("nitroPrefetched", "true"))
+          return NitroResponse(
+            url = res.url,
+            status = res.status,
+            statusText = res.statusText,
+            ok = res.ok,
+            redirected = res.redirected,
+            headers = newHeaders.toTypedArray(),
+            bodyString = res.bodyString,
+            bodyBytes = res.bodyBytes
+          )
+        }
         fut.whenComplete { res, err ->
-          if (err != null) promise.reject(err) else promise.resolve(res)
+          if (err != null) {
+            promise.reject(err)
+          } else if (res != null) {
+            promise.resolve(withPrefetchedHeader(res))
+          } else {
+            promise.reject(IllegalStateException("Prefetch pending returned null result"))
+          }
         }
         return promise
       }
       // If a fresh prefetched result exists (<=5s old), return it immediately
       FetchCache.getResultIfFresh(key, 5_000L)?.let { cached ->
-        promise.resolve(cached)
+        val newHeaders = (cached.headers?.toMutableList() ?: mutableListOf())
+        newHeaders.add(NitroHeader("nitroPrefetched", "true"))
+        val wrapped = NitroResponse(
+          url = cached.url,
+          status = cached.status,
+          statusText = cached.statusText,
+          ok = cached.ok,
+          redirected = cached.redirected,
+          headers = newHeaders.toTypedArray(),
+          bodyString = cached.bodyString,
+          bodyBytes = cached.bodyBytes
+        )
+        promise.resolve(wrapped)
         return promise
       }
     }

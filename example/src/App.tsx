@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, View, StyleSheet, Button, ScrollView, Modal, Pressable } from 'react-native';
-import { fetch as nitroFetch, nitroFetchOnWorklet } from 'react-native-nitro-fetch';
-import 'react-native-nitro-fetch/src/fetch';
+import { fetch as nitroFetch, nitroFetchOnWorklet, prefetch, prefetchOnAppStart, removeAllFromAutoprefetch } from 'react-native-nitro-fetch';
+
 
 type Row = {
   url: string;
@@ -9,8 +9,8 @@ type Row = {
   nitroMs: number;
   errorBuiltin?: string;
   errorNitro?: string;
-  cacheableBuiltin?: boolean;
-  cacheableNitro?: boolean;
+  cachedBuiltin?: boolean;
+  cachedNitro?: boolean;
 };
 
 const CANDIDATES: string[] = [
@@ -110,35 +110,33 @@ function trimmedAverage(values: number[], trimFraction = 0.1): number | null {
   return sum / sliced.length;
 }
 
-function detectCacheable(headers: Headers, minSeconds = 60): boolean {
-  const cc = headers.get('cache-control')?.toLowerCase() ?? '';
-  if (cc.includes('no-store') || cc.includes('no-cache')) return false;
-  // s-maxage takes precedence for shared caches, but we treat either as cacheable
-  const maxAgeMatch = cc.match(/max-age=(\d+)/);
-  const sMaxAgeMatch = cc.match(/s-maxage=(\d+)/);
-  const maxAge = maxAgeMatch ? parseInt(maxAgeMatch[1], 10) : undefined;
-  const sMaxAge = sMaxAgeMatch ? parseInt(sMaxAgeMatch[1], 10) : undefined;
-  if ((maxAge !== undefined && maxAge > minSeconds) || (sMaxAge !== undefined && sMaxAge > minSeconds)) return true;
-  const expires = headers.get('expires');
-  if (expires) {
-    const t = Date.parse(expires);
-    if (!Number.isNaN(t)) {
-      const diffSec = (t - Date.now()) / 1000;
-      if (diffSec > minSeconds) return true;
-    }
-  }
+function detectCached(headers: Headers): boolean {
+  const get = (k: string) => headers.get(k);
+  const age = get('age');
+  if (age && Number(age) > 0) return true;
+  const hits = get('x-cache-hits');
+  if (hits && Number(hits) > 0) return true;
+  const combined = (
+    (get('x-cache') || '') + ' ' +
+    (get('x-cache-status') || '') + ' ' +
+    (get('x-cache-remote') || '') + ' ' +
+    (get('cf-cache-status') || '') + ' ' +
+    (get('via') || '')
+  ).toUpperCase();
+  if (combined.includes('HIT') || combined.includes('REVALIDATED')) return true;
+  if (combined.includes('MISS')) return false;
   return false;
 }
 
-async function measure(fn: (url: string) => Promise<Response>, url: string): Promise<{ ms: number } & ({ ok: true; cacheable: boolean } | { ok: false; error: string })> {
+async function measure(fn: (url: string) => Promise<Response>, url: string): Promise<{ ms: number } & ({ ok: true; cached: boolean } | { ok: false; error: string })> {
   const t0 = global.performance ? global.performance.now() : Date.now();
   try {
     const res = await fn(`${url}?timestamp=${performance.now()}`);
     // Ensure body read to make timing comparable
     await res.arrayBuffer();
     const t1 = global.performance ? global.performance.now() : Date.now();
-    const cacheable = detectCacheable(res.headers);
-    return { ok: true, ms: t1 - t0, cacheable } as const;
+    const cached = detectCached(res.headers);
+    return { ok: true, ms: t1 - t0, cached } as const;
   } catch (e: any) {
     const t1 = global.performance ? global.performance.now() : Date.now();
     return { ok: false, ms: t1 - t0, error: e?.message ?? String(e) } as const;
@@ -154,6 +152,9 @@ export default function App() {
   const [running, setRunning] = React.useState(false);
   const [showSheet, setShowSheet] = React.useState(false);
   const [prices, setPrices] = React.useState<Array<{ id: string; usd: number }>>([]);
+  const [prefetchInfo, setPrefetchInfo] = React.useState<string>('');
+  const PREFETCH_URL = 'https://httpbin.org/uuid';
+  const PREFETCH_KEY = 'uuid';
 
   const loadPrices = React.useCallback(async () => {
     console.log('Loading crypto prices from coingecko start');
@@ -189,8 +190,8 @@ export default function App() {
             nitroMs: n.ms,
             errorBuiltin: b.ok ? undefined : b.error,
             errorNitro: n.ok ? undefined : n.error,
-            cacheableBuiltin: b.ok ? b.cacheable : undefined,
-            cacheableNitro: n.ok ? n.cacheable : undefined,
+            cachedBuiltin: b.ok ? b.cached : undefined,
+            cachedNitro: n.ok ? n.cached : undefined,
           };
         })
       );
@@ -198,8 +199,8 @@ export default function App() {
       const okRows = out.filter((r) => r.errorBuiltin == null && r.errorNitro == null);
       const avgBAll = trimmedAverage(okRows.map((r) => r.builtinMs));
       const avgNAll = trimmedAverage(okRows.map((r) => r.nitroMs));
-      const avgBNC = trimmedAverage(okRows.filter(r => r.cacheableBuiltin === false).map((r) => r.builtinMs));
-      const avgNNC = trimmedAverage(okRows.filter(r => r.cacheableNitro === false).map((r) => r.nitroMs));
+      const avgBNC = trimmedAverage(okRows.filter(r => r.cachedBuiltin === false).map((r) => r.builtinMs));
+      const avgNNC = trimmedAverage(okRows.filter(r => r.cachedNitro === false).map((r) => r.nitroMs));
       setAvgBuiltinAll(avgBAll);
       setAvgNitroAll(avgNAll);
       setAvgBuiltinNC(avgBNC);
@@ -222,6 +223,61 @@ export default function App() {
         <View style={{ width: 12 }} />
         <Button title="Show Crypto Prices" onPress={() => { setShowSheet(true); loadPrices(); }} />
       </View>
+      <View style={[styles.actions, { marginTop: 0 }] }>
+        <Button
+          title="Prefetch UUID (Android)"
+          onPress={async () => {
+            try {
+              await prefetch(PREFETCH_URL, { headers: { prefetchKey: PREFETCH_KEY } });
+              setPrefetchInfo('Prefetch started');
+            } catch (e: any) {
+              setPrefetchInfo(`Prefetch error: ${e?.message ?? String(e)}`);
+            }
+          }}
+        />
+        <View style={{ width: 12 }} />
+        <Button
+          title="Fetch Prefetched"
+          onPress={async () => {
+            try {
+              const res = await nitroFetch(PREFETCH_URL, { headers: { prefetchKey: PREFETCH_KEY } });
+              const text = await res.text();
+              const pref = res.headers.get('nitroPrefetched');
+              setPrefetchInfo(`Fetched. nitroPrefetched=${pref ?? 'null'} len=${text.length}`);
+            } catch (e: any) {
+              setPrefetchInfo(`Fetch error: ${e?.message ?? String(e)}`);
+            }
+          }}
+        />
+      </View>
+      <View style={[styles.actions, { marginTop: 0 }] }>
+        <Button
+          title="Schedule Auto-Prefetch (MMKV)"
+          onPress={async () => {
+            try {
+              await prefetchOnAppStart(PREFETCH_URL, { prefetchKey: PREFETCH_KEY });
+              setPrefetchInfo('Scheduled in MMKV (Android)');
+            } catch (e: any) {
+              setPrefetchInfo(`Schedule error: ${e?.message ?? String(e)}`);
+            }
+          }}
+        />
+        <View style={{ width: 12 }} />
+        <Button
+          title="Clear Auto-Prefetch"
+          onPress={async () => {
+            try {
+              await removeAllFromAutoprefetch();
+              setPrefetchInfo('Cleared auto-prefetch queue');
+            } catch (e: any) {
+              setPrefetchInfo(`Clear error: ${e?.message ?? String(e)}`);
+            }
+          }}
+        />
+      </View>
+      {!!prefetchInfo && (
+        <Text style={{ textAlign: 'center', marginBottom: 8 }}>{prefetchInfo}</Text>
+      )}
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         {rows == null ? (
           <Text>Measuring…</Text>
@@ -231,7 +287,7 @@ export default function App() {
               <Text style={[styles.cell, styles.url]}>URL</Text>
               <Text style={styles.cell}>Built-in (ms)</Text>
               <Text style={styles.cell}>Nitro (ms)</Text>
-              <Text style={styles.cell}>Cacheable B/N</Text>
+              <Text style={styles.cell}>Cache B/N</Text>
             </View>
             {rows.map((r) => {
               const builtinWins = r.builtinMs < r.nitroMs;
@@ -248,8 +304,8 @@ export default function App() {
                     {r.errorNitro ? 'Err' : Number.isFinite(r.nitroMs) ? r.nitroMs.toFixed(1) : '—'}
                   </Text>
                   <Text style={styles.cell}>
-                    {r.cacheableBuiltin == null ? '?' : r.cacheableBuiltin ? 'B✓' : 'B✗'}{' '}
-                    {r.cacheableNitro == null ? '?' : r.cacheableNitro ? 'N✓' : 'N✗'}
+                    {r.cachedBuiltin == null ? '?' : r.cachedBuiltin ? 'B✓' : 'B✗'}{' '}
+                    {r.cachedNitro == null ? '?' : r.cachedNitro ? 'N✓' : 'N✗'}
                   </Text>
                 </View>
               );

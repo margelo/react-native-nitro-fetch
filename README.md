@@ -1,57 +1,113 @@
+<p align="center">
+  <img src="./assets/satellite-logo.svg" alt="Nitro Fetch Satellite Logo" width="120" height="120" />
+</p>
+
 # react-native-nitro-fetch
 
-Awesome Fetch :)
+Nitro-powered fetch for React Native. Android uses Chromium Cronet (via `org.chromium.net:cronet-embedded`); iOS currently falls back to the built-in fetch. Includes helpers for background prefetching and off-thread parsing with worklets.
 
 ## Installation
 
-
 ```sh
 npm install react-native-nitro-fetch react-native-nitro-modules
-
-> `react-native-nitro-modules` is required as this library relies on [Nitro Modules](https://nitro.margelo.com/).
 ```
 
+- `react-native-nitro-modules` is required as this library relies on Nitro Modules. Rebuild your app after installing.
 
-## Usage
-
+## Quick Start
 
 ```ts
-import { fetch, NitroFetch } from 'react-native-nitro-fetch';
+import { fetch } from 'react-native-nitro-fetch';
 
-// Drop-in replacement for global fetch; env is created internally
 const res = await fetch('https://httpbin.org/get');
 const json = await res.json();
-
-// Direct native access (singleton instance): create a client once
-// const client = NitroFetch.createClient();
-// await client.request({ url: 'https://httpbin.org/get' });
 ```
 
-Notes
+## Features
 
-- This package exposes a Nitro-backed fetch shim designed to be replaced by a Cronet C API implementation.
-- Today it falls back to the platform fetch if the native module isn’t present; once Cronet is wired, calls go fully native.
+- Nitro-backed `fetch`: drop-in replacement for global fetch.
+- Android Cronet: fast HTTP stack via `org.chromium.net:cronet-embedded` (already wired in `android/build.gradle`).
+- Prefetch: start a background request tied to a `prefetchKey` and serve it later.
+- Android auto-prefetch: enqueue requests to MMKV so they warm up on next app start.
+- Worklets helper: run mapping/parsing off the JS thread with `react-native-worklets-core`.
 
-Roadmap (Cronet integration)
+## Why Cronet
 
-- Android: link Cronet C API, initialize an engine, implement request() in native, bridge via Nitro.
-- iOS: link Cronet for iOS, mirror Android API and behavior.
-- Streaming: add request handles and chunk events to support Response.body streaming.
- - Env module: provide `NitroEnv` to native to locate cache directory for Cronet cache, downloads, etc.
+- Performance: Enables HTTP/2 multiplexing and QUIC/HTTP/3, reducing latency and avoiding head‑of‑line blocking.
+- Efficiency: Advanced connection management, TLS/ALPN, Brotli, and robust on‑disk caching.
+- Battle‑tested: Built on Chromium’s networking stack (the same tech behind Chrome) and widely adopted across the ecosystem, including the Flutter community.
 
-Android Cronet setup
+## Usage Examples
 
-- Ensure you have sufficient disk space (>30GB) and build tools installed (Ninja, Python, Java, Android NDK).
-- Run the helper script to build Cronet and copy headers/libs into `android/cronet`:
-  - `scripts/prepare_cronet_android.sh --checkout /absolute/path/to/chromium --arch arm64-v8a`
-- Build the library; CMake auto-detects `android/cronet/include` and `android/cronet/libs/<abi>` and links Cronet.
+- Basic fetch (drop-in replacement):
 
+```ts
+import { fetch } from 'react-native-nitro-fetch';
+const res = await fetch('https://jsonplaceholder.typicode.com/todos/1');
+console.log(await res.json());
+```
+
+- Prefetch and consume (Android or JS fallback):
+
+```ts
+import { fetch, prefetch } from 'react-native-nitro-fetch';
+
+await prefetch('https://httpbin.org/uuid', { headers: { prefetchKey: 'uuid' } });
+const res = await fetch('https://httpbin.org/uuid', { headers: { prefetchKey: 'uuid' } });
+console.log('prefetched header:', res.headers.get('nitroPrefetched'));
+```
+
+- Schedule auto-prefetch on Android (requires `react-native-mmkv` in your app):
+
+```ts
+import { prefetchOnAppStart } from 'react-native-nitro-fetch';
+await prefetchOnAppStart('https://httpbin.org/uuid', { prefetchKey: 'uuid' });
+```
+
+- Off-thread parsing with worklets:
+
+```ts
+import { nitroFetchOnWorklet } from 'react-native-nitro-fetch';
+
+const map = (payload: { bodyString?: string }) => {
+  'worklet';
+  return JSON.parse(payload.bodyString ?? '{}');
+};
+
+const data = await nitroFetchOnWorklet('https://httpbin.org/get', undefined, map, { preferBytes: false });
+```
+
+## Platform Notes
+
+- Android: Uses Cronet Java API; no extra setup needed beyond install and rebuild. Cronet engine is initialized once and enables HTTP/2, QUIC, Brotli, and disk cache.
+- iOS: Currently uses the built-in fetch path; Cronet integration is planned.
+
+## Limitations & Alternatives
+
+- HTTP streaming: Not supported yet. For streaming responses today, use Expo’s `expo-fetch`. Streaming is on the roadmap.
+- WebSockets: Not supported. For high‑performance sockets and binary streams, consider `react-native-fast-io`.
+
+## Documentation
+
+- Getting Started: `docs/getting-started.md`
+- API Reference: `docs/api.md`
+- Android Details: `docs/android.md`
+- iOS Details: `docs/ios.md`
+- Prefetch & Auto-Prefetch: `docs/prefetch.md`
+- Worklets: `docs/worklets.md`
+- Troubleshooting: `docs/troubleshooting.md`
+- Cronet (Android) notes: `docs/cronet-android.md`
+- Cronet (iOS) notes: `docs/cronet-ios.md`
+
+## Work With Margelo
+
+Need top‑notch React Native help or custom networking solutions? Reach out to Margelo: hello@margelo.com
 
 ## Contributing
 
-- [Development workflow](CONTRIBUTING.md#development-workflow)
-- [Sending a pull request](CONTRIBUTING.md#sending-a-pull-request)
-- [Code of conduct](CODE_OF_CONDUCT.md)
+- Development workflow: `CONTRIBUTING.md#development-workflow`
+- Sending a pull request: `CONTRIBUTING.md#sending-a-pull-request`
+- Code of conduct: `CODE_OF_CONDUCT.md`
 
 ## License
 

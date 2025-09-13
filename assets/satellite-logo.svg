@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Nitro Fetch Satellite Logo">
+  <defs>
+    <linearGradient id="g1" x1="30" y1="20" x2="226" y2="236" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6C5CE7"/>
+      <stop offset="1" stop-color="#00C2FF"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(128 128) rotate(90) scale(118)">
+      <stop stop-color="#00C2FF" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#00C2FF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Glow background -->
+  <circle cx="128" cy="128" r="118" fill="url(#glow)"/>
+
+  <!-- Orbital ring -->
+  <circle cx="128" cy="128" r="104" stroke="url(#g1)" stroke-width="2.5" opacity="0.6"/>
+  <circle cx="128" cy="128" r="84" stroke="url(#g1)" stroke-width="2" opacity="0.35" stroke-dasharray="6 10"/>
+
+  <!-- Satellite body -->
+  <g filter="url(#shadow)">
+    <rect x="112" y="108" width="32" height="40" rx="4" fill="url(#g1)"/>
+    <!-- Solar panels -->
+    <rect x="78" y="110" width="30" height="36" rx="3" fill="#0F172A" opacity="0.85" stroke="#6C5CE7" stroke-width="1.5"/>
+    <rect x="148" y="110" width="30" height="36" rx="3" fill="#0F172A" opacity="0.85" stroke="#00C2FF" stroke-width="1.5"/>
+    <!-- Panel grid lines -->
+    <g opacity="0.6" stroke="#6C5CE7" stroke-width="1">
+      <path d="M88 118 H 98"/>
+      <path d="M88 126 H 98"/>
+      <path d="M88 134 H 98"/>
+    </g>
+    <g opacity="0.6" stroke="#00C2FF" stroke-width="1">
+      <path d="M160 118 H 170"/>
+      <path d="M160 126 H 170"/>
+      <path d="M160 134 H 170"/>
+    </g>
+  </g>
+
+  <!-- Dish and signal -->
+  <g transform="translate(128 96) rotate(-25)">
+    <path d="M0 0 L 16 10 L 6 20 Z" fill="#0F172A" stroke="url(#g1)" stroke-width="1.5"/>
+    <circle cx="0" cy="0" r="3" fill="#6C5CE7"/>
+    <path d="M24 8 C 36 12, 44 20, 48 32" stroke="#00C2FF" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M22 16 C 32 20, 40 28, 44 38" stroke="#6C5CE7" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.7"/>
+  </g>
+
+  <!-- Stars -->
+  <g fill="#E2E8F0" opacity="0.8">
+    <circle cx="52" cy="66" r="1.5"/>
+    <circle cx="204" cy="82" r="1.5"/>
+    <circle cx="182" cy="46" r="1.2"/>
+    <circle cx="64" cy="184" r="1.2"/>
+    <circle cx="198" cy="176" r="1.2"/>
+  </g>
+
+  <!-- Title arc dot -->
+  <circle cx="128" cy="24" r="3" fill="#6C5CE7"/>
+</svg>
+
