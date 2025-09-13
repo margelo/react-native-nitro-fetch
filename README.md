@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/satellite-logo.svg" alt="Nitro Fetch Satellite Logo" width="120" height="120" />
+  <img src="./assets/logo.png" alt="Nitro Fetch Logo" width="200" />
 </p>
 
 # react-native-nitro-fetch
