@@ -1,7 +1,34 @@
 import Foundation
+import NitroModules
 
-@objc
 final class NitroFetchClient: HybridNitroFetchClientSpec {
+  func request(req: NitroRequest) throws -> Promise<NitroResponse> {
+    let promise = Promise<NitroResponse>.init()
+    Task {
+      do {
+        let response = try await NitroFetchClient.requestStatic(req)
+        promise.resolve(withResult: response)
+      } catch {
+        promise.reject(withError: error)
+      }
+    }
+    return promise
+  }
+  
+  func prefetch(req: NitroRequest) throws -> Promise<Void> {
+    let promise = Promise<Void>.init()
+    Task {
+      do {
+        try await NitroFetchClient.prefetchStatic(req)
+        promise.resolve(withResult: ())
+      } catch {
+        promise.reject(withError: error)
+      }
+      
+    }
+    return promise
+  }
+  
   // Shared URLSession for static operations
   private static let session: URLSession = {
     let config = URLSessionConfiguration.default
@@ -12,7 +39,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     return URLSession(configuration: config)
   }()
 
-  private func findPrefetchKey(_ req: NitroRequest) -> String? {
+  private static func findPrefetchKey(_ req: NitroRequest) -> String? {
     guard let headers = req.headers else { return nil }
     for h in headers {
       if h.key.caseInsensitiveCompare("prefetchKey") == .orderedSame {
@@ -22,19 +49,9 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     return nil
   }
 
-  // Instance override delegates to static implementation.
-  override func request(_ req: NitroRequest) async throws -> NitroResponse {
-    return try await NitroFetchClient.requestStatic(req)
-  }
-
-  // Instance override delegates to static implementation.
-  override func prefetch(_ req: NitroRequest) async throws {
-    try await NitroFetchClient.prefetchStatic(req)
-  }
-
   // MARK: - Static API usable from native bootstrap
 
-  @objc
+
   public class func requestStatic(_ req: NitroRequest) async throws -> NitroResponse {
     if let key = findPrefetchKey(req) {
       // If a prefetched result is fresh, return immediately
@@ -87,7 +104,6 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     return res
   }
 
-  @objc
   public class func prefetchStatic(_ req: NitroRequest) async throws {
     guard let key = findPrefetchKey(req) else {
       throw NSError(domain: "NitroFetch", code: -2, userInfo: [NSLocalizedDescriptionKey: "prefetch: missing 'prefetchKey' header"])
@@ -132,13 +148,17 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       }
     }
   }
+  
+  private static func reqToHttpMethod(_ req: NitroRequest) -> String? {
+    return req.method?.stringValue
+  }
 
   private static func buildURLRequest(_ req: NitroRequest) throws -> (URLRequest, URL?) {
     guard let url = URL(string: req.url) else {
       throw NSError(domain: "NitroFetch", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid URL: \(req.url)"])
     }
     var r = URLRequest(url: url)
-    if let m = req.method?.rawValue { r.httpMethod = m }
+    if let m = req.method?.rawValue { r.httpMethod = reqToHttpMethod(req) }
     if let headers = req.headers {
       for h in headers { r.addValue(h.value, forHTTPHeaderField: h.key) }
     }

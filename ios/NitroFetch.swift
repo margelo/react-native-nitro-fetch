@@ -1,9 +1,9 @@
 import Foundation
 
-@objc
 final class NitroFetch: HybridNitroFetchSpec {
-  override func createClient() -> NitroFetchClient {
+  func createClient() throws -> (any HybridNitroFetchClientSpec) {
     return NitroFetchClient()
   }
+  
 }
 

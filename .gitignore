@@ -83,4 +83,4 @@ ios/generated
 android/generated
 
 # React Native Nitro Modules
-nitrogen/
+#nitrogen/
