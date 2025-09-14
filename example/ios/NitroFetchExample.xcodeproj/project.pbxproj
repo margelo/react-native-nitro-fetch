@@ -276,6 +276,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = nitrofetch.example;
 				PRODUCT_NAME = NitroFetchExample;
+				SWIFT_OBJC_INTEROP_MODE = objc;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -304,6 +305,7 @@
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = nitrofetch.example;
 				PRODUCT_NAME = NitroFetchExample;
+				SWIFT_OBJC_INTEROP_MODE = objc;
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
