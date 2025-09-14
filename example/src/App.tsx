@@ -225,7 +225,7 @@ export default function App() {
       </View>
       <View style={[styles.actions, { marginTop: 0 }] }>
         <Button
-          title="Prefetch UUID (Android)"
+          title="Prefetch UUID"
           onPress={async () => {
             try {
               await prefetch(PREFETCH_URL, { headers: { prefetchKey: PREFETCH_KEY } });
