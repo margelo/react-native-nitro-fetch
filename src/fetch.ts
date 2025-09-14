@@ -218,7 +218,6 @@ export async function prefetchOnAppStart(
   input: RequestInfo | URL,
   init?: RequestInit & { prefetchKey?: string }
 ): Promise<void> {
-  // No-op on iOS
   // Resolve request and prefetchKey
   const req = buildNitroRequest(input, init);
   const fromHeader = req.headers?.find(h => h.key.toLowerCase() === 'prefetchkey')?.value;

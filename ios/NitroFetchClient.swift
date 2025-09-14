@@ -67,6 +67,31 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
                              bodyString: cached.bodyString,
                              bodyBytes: cached.bodyBytes)
       }
+
+      // If a prefetch is already pending, await and reuse its result
+      if FetchCache.getPending(key) {
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<NitroResponse, Error>) in
+          FetchCache.addPending(key) { result in
+            switch result {
+            case .success(let res):
+              // Mirror Android: mark response as coming from prefetch
+              var headers = res.headers ?? []
+              headers.append(NitroHeader(key: "nitroPrefetched", value: "true"))
+              let wrapped = NitroResponse(url: res.url,
+                                          status: res.status,
+                                          statusText: res.statusText,
+                                          ok: res.ok,
+                                          redirected: res.redirected,
+                                          headers: headers,
+                                          bodyString: res.bodyString,
+                                          bodyBytes: res.bodyBytes)
+              continuation.resume(returning: wrapped)
+            case .failure(let err):
+              continuation.resume(throwing: err)
+            }
+          }
+        }
+      }
     }
 
     let (urlRequest, finalURL) = try buildURLRequest(req)
@@ -95,11 +120,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       bodyBytes: nil
     )
 
-    if let key = findPrefetchKey(req) {
-      // If this request was a prefetched one (or consumer of it), mark as prefetched if we had a pending prefetch
-      // and store the fresh result for a short time to be reused.
-      FetchCache.complete(key, with: .success(res))
-    }
+    // Do not write to cache here; only prefetch should populate the cache
 
     return res
   }
