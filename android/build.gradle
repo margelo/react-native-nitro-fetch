@@ -126,10 +126,6 @@ dependencies {
 configurations {
   cronetAar
 }
-tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
-  kotlinOptions {
-    languageVersion = "2.2"
-  }
-}
+
 
 // No automatic fetching of Cronet headers/libs; library uses Cronet Java API only.

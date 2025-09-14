@@ -28,14 +28,24 @@ object AutoPrefetcher {
         // Ensure prefetchKey header is present
         headersList.add("prefetchKey" to prefetchKey)
 
-        val req = NitroRequest().apply {
-          this.url = url
-          this.headers = headersList.toTypedArray()
-        }
+        val headerObjs = headersList.map { (k, v) -> NitroHeader(k, v) }.toTypedArray()
+        val req = NitroRequest(
+          url = url,
+          method = null,
+          headers = headerObjs,
+          bodyString = null,
+          bodyBytes = null,
+          timeoutMs = null,
+          followRedirects = null
+        )
 
         // If already pending or fresh, skip starting a new one
-        FetchCache.getPending(prefetchKey)?.let { continue }
-        FetchCache.getResultIfFresh(prefetchKey, 5_000L)?.let { continue }
+        if (FetchCache.getPending(prefetchKey) != null) {
+          continue
+        }
+        if (FetchCache.getResultIfFresh(prefetchKey, 5_000L) != null) {
+          continue
+        }
 
         val future = CompletableFuture<NitroResponse>()
         FetchCache.setPending(prefetchKey, future)
@@ -79,4 +89,3 @@ object AutoPrefetcher {
     } catch (_: Throwable) { null }
   }
 }
-
