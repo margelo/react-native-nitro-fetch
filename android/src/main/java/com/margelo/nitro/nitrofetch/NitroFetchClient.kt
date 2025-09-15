@@ -1,5 +1,6 @@
 package com.margelo.nitro.nitrofetch
 
+import android.util.Log
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.core.ArrayBuffer
 import com.margelo.nitro.core.Promise

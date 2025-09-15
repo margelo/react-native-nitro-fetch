@@ -16,7 +16,6 @@ object FetchCache {
     // Cleanup: remove pending entry when completed
     future.whenComplete { _, _ ->
       pending.remove(key)
-      results.remove(key)
     }
   }
 
