@@ -1,6 +1,6 @@
 import Foundation
 
-@objc
+@objc(NitroAutoPrefetcher)
 public final class NitroAutoPrefetcher: NSObject {
   private static var initialized = false
   private static let queueKey = "nitrofetch_autoprefetch_queue"
@@ -72,4 +72,10 @@ public final class NitroAutoPrefetcher: NSObject {
     }
     return nil
   }
+}
+
+// Expose a C-ABI symbol the ObjC++ file can call
+@_cdecl("NitroStartSwift")
+public func NitroStartSwift() {
+  NitroAutoPrefetcher.prefetchOnStart()
 }
