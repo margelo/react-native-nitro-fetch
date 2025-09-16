@@ -43,12 +43,14 @@ function normalizeBody(body: BodyInit | null | undefined): { bodyString?: string
   if (ArrayBuffer.isView(body)) {
     const view = body as ArrayBufferView;
     // Pass a copy/slice of the underlying bytes without base64
+    //@ts-ignore
     return { bodyBytes: view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength) };
   }
   // TODO: Blob/FormData support can be added later
   throw new Error('Unsupported body type for nitro fetch');
 }
 
+// @ts-ignore
 function pairsToHeaders(pairs: NitroHeader[]): Headers {
   'worklet';
   const h = new Headers();
@@ -131,7 +133,6 @@ async function nitroFetchRaw(input: RequestInfo | URL, init?: RequestInit): Prom
   const req = buildNitroRequest(input, init);
   ensureClient();
   if (!client || typeof (client as any).request !== 'function') throw new Error('NitroFetch client not available');
-  // @ts-expect-error runtime hybrid object
   const res: NitroResponse = await client.request(req);
   return res;
 }
@@ -208,7 +209,6 @@ export async function prefetch(input: RequestInfo | URL, init?: RequestInit): Pr
   // Ensure client and call native prefetch
   ensureClient();
   if (!client || typeof (client as any).prefetch !== 'function') return;
-  // @ts-expect-error hybrid object
   await client.prefetch(req);
 }
 

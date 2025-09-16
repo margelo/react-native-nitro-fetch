@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "description": "Awesome Fetch :)",
   "main": "./lib/module/index.js",
+  "module": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
+  "react-native": "src/index",
+  "source": "./src/index",
   "exports": {
     ".": {
       "source": "./src/index.tsx",
