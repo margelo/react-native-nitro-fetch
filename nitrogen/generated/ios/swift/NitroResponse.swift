@@ -18,7 +18,7 @@ public extension NitroResponse {
   /**
    * Create a new instance of `NitroResponse`.
    */
-  init(url: String, status: Double, statusText: String, ok: Bool, redirected: Bool, headers: [NitroHeader], bodyString: String?, bodyBytes: ArrayBuffer?) {
+  init(url: String, status: Double, statusText: String, ok: Bool, redirected: Bool, headers: [NitroHeader], bodyString: String?, bodyBytes: String?) {
     self.init(std.string(url), status, std.string(statusText), ok, redirected, { () -> bridge.std__vector_NitroHeader_ in
       var __vector = bridge.create_std__vector_NitroHeader_(headers.count)
       for __item in headers {
@@ -31,9 +31,9 @@ public extension NitroResponse {
       } else {
         return .init()
       }
-    }(), { () -> bridge.std__optional_std__shared_ptr_ArrayBuffer__ in
+    }(), { () -> bridge.std__optional_std__string_ in
       if let __unwrappedValue = bodyBytes {
-        return bridge.create_std__optional_std__shared_ptr_ArrayBuffer__(__unwrappedValue.getArrayBuffer())
+        return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
       } else {
         return .init()
       }
@@ -136,16 +136,23 @@ public extension NitroResponse {
     }
   }
   
-  var bodyBytes: ArrayBuffer? {
+  var bodyBytes: String? {
     @inline(__always)
     get {
-      return  nil //self.__bodyBytes.value
+      return { () -> String? in
+        if bridge.has_value_std__optional_std__string_(self.__bodyBytes) {
+          let __unwrapped = bridge.get_std__optional_std__string_(self.__bodyBytes)
+          return String(__unwrapped)
+        } else {
+          return nil
+        }
+      }()
     }
     @inline(__always)
     set {
-      self.__bodyBytes = { () -> bridge.std__optional_std__shared_ptr_ArrayBuffer__ in
+      self.__bodyBytes = { () -> bridge.std__optional_std__string_ in
         if let __unwrappedValue = newValue {
-          return bridge.create_std__optional_std__shared_ptr_ArrayBuffer__(__unwrappedValue.getArrayBuffer())
+          return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
         } else {
           return .init()
         }

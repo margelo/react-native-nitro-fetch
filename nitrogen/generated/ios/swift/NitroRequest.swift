@@ -18,7 +18,7 @@ public extension NitroRequest {
   /**
    * Create a new instance of `NitroRequest`.
    */
-  init(url: String, method: NitroRequestMethod?, headers: [NitroHeader]?, bodyString: String?, bodyBytes: ArrayBuffer?, timeoutMs: Double?, followRedirects: Bool?) {
+  init(url: String, method: NitroRequestMethod?, headers: [NitroHeader]?, bodyString: String?, bodyBytes: String?, timeoutMs: Double?, followRedirects: Bool?) {
     self.init(std.string(url), { () -> bridge.std__optional_NitroRequestMethod_ in
       if let __unwrappedValue = method {
         return bridge.create_std__optional_NitroRequestMethod_(__unwrappedValue)
@@ -43,9 +43,9 @@ public extension NitroRequest {
       } else {
         return .init()
       }
-    }(), { () -> bridge.std__optional_std__shared_ptr_ArrayBuffer__ in
+    }(), { () -> bridge.std__optional_std__string_ in
       if let __unwrappedValue = bodyBytes {
-        return bridge.create_std__optional_std__shared_ptr_ArrayBuffer__(__unwrappedValue.getArrayBuffer())
+        return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
       } else {
         return .init()
       }
@@ -146,16 +146,23 @@ public extension NitroRequest {
     }
   }
   
-  var bodyBytes: ArrayBuffer? {
+  var bodyBytes: String? {
     @inline(__always)
     get {
-      return nil //self.__bodyBytes.value
+      return { () -> String? in
+        if bridge.has_value_std__optional_std__string_(self.__bodyBytes) {
+          let __unwrapped = bridge.get_std__optional_std__string_(self.__bodyBytes)
+          return String(__unwrapped)
+        } else {
+          return nil
+        }
+      }()
     }
     @inline(__always)
     set {
-      self.__bodyBytes = { () -> bridge.std__optional_std__shared_ptr_ArrayBuffer__ in
+      self.__bodyBytes = { () -> bridge.std__optional_std__string_ in
         if let __unwrappedValue = newValue {
-          return bridge.create_std__optional_std__shared_ptr_ArrayBuffer__(__unwrappedValue.getArrayBuffer())
+          return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
         } else {
           return .init()
         }

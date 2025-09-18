@@ -6,6 +6,10 @@
 
 Nitro-powered fetch for React Native. Android uses Chromium Cronet (via `org.chromium.net:cronet-embedded`); iOS currently falls back to the built-in fetch. Includes helpers for background prefetching and off-thread parsing with worklets.
 
+## Project Status
+
+This library is currently in alpha. You can adopt it in production, but you may face counter-intuitive api, poor docs or bugs.
+
 ## Installation
 
 ```sh
@@ -90,7 +94,7 @@ const map = (payload: { bodyString?: string }) => {
   return JSON.parse(payload.bodyString ?? '{}');
 };
 
-const data = await nitroFetchOnWorklet('https://httpbin.org/get', undefined, map, { preferBytes: false });
+const data = await nitroFetchOnWorklet('https://httpbin.org/get', undefined, map);
 ```
 
 ## Platform Notes

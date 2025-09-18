@@ -35,7 +35,7 @@ data class NitroRequest
     val bodyString: String?,
     @DoNotStrip
     @Keep
-    val bodyBytes: ArrayBuffer?,
+    val bodyBytes: String?,
     @DoNotStrip
     @Keep
     val timeoutMs: Double?,

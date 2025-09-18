@@ -44,7 +44,7 @@ data class NitroResponse
     val bodyString: String?,
     @DoNotStrip
     @Keep
-    val bodyBytes: ArrayBuffer?
+    val bodyBytes: String?
   ) {
   /* main constructor */
 }

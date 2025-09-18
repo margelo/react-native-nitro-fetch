@@ -11,8 +11,6 @@
 namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 // Forward declaration of `NitroHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroHeader; }
-// Forward declaration of `ArrayBuffer` to properly resolve imports.
-namespace NitroModules { class ArrayBuffer; }
 // Forward declaration of `NitroRequest` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroRequest; }
 // Forward declaration of `NitroRequestMethod` to properly resolve imports.
@@ -27,9 +25,6 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 #include <vector>
 #include "JNitroHeader.hpp"
 #include <optional>
-#include <NitroModules/ArrayBuffer.hpp>
-#include <NitroModules/JArrayBuffer.hpp>
-#include <NitroModules/JUnit.hpp>
 #include "NitroRequest.hpp"
 #include "JNitroRequest.hpp"
 #include "NitroRequestMethod.hpp"

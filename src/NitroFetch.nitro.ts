@@ -21,7 +21,7 @@ export interface NitroRequest {
   headers?: NitroHeader[];
   // Body as either UTF-8 string or raw bytes.
   bodyString?: string;
-  bodyBytes?: ArrayBuffer;
+  bodyBytes?:  string; //will be ArrayBuffer in future
   // Controls
   timeoutMs?: number;
   followRedirects?: boolean; // default true
@@ -36,7 +36,7 @@ export interface NitroResponse {
   headers: NitroHeader[];
   // Body as either UTF-8 string or raw bytes (first implementation target)
   bodyString?: string;
-  bodyBytes?: ArrayBuffer;
+  bodyBytes?: string; //will be ArrayBuffer in future
 }
 
 export interface NitroFetchClient

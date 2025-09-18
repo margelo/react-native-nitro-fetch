@@ -22,15 +22,12 @@
 namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 // Forward declaration of `NitroHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroHeader; }
-// Forward declaration of `ArrayBuffer` to properly resolve imports.
-namespace NitroModules { class ArrayBuffer; }
 
 #include <string>
 #include "NitroRequestMethod.hpp"
 #include <optional>
 #include "NitroHeader.hpp"
 #include <vector>
-#include <NitroModules/ArrayBuffer.hpp>
 
 namespace margelo::nitro::nitrofetch {
 
@@ -43,13 +40,13 @@ namespace margelo::nitro::nitrofetch {
     std::optional<NitroRequestMethod> method     SWIFT_PRIVATE;
     std::optional<std::vector<NitroHeader>> headers     SWIFT_PRIVATE;
     std::optional<std::string> bodyString     SWIFT_PRIVATE;
-    std::optional<std::shared_ptr<ArrayBuffer>> bodyBytes     SWIFT_PRIVATE;
+    std::optional<std::string> bodyBytes     SWIFT_PRIVATE;
     std::optional<double> timeoutMs     SWIFT_PRIVATE;
     std::optional<bool> followRedirects     SWIFT_PRIVATE;
 
   public:
     NitroRequest() = default;
-    explicit NitroRequest(std::string url, std::optional<NitroRequestMethod> method, std::optional<std::vector<NitroHeader>> headers, std::optional<std::string> bodyString, std::optional<std::shared_ptr<ArrayBuffer>> bodyBytes, std::optional<double> timeoutMs, std::optional<bool> followRedirects): url(url), method(method), headers(headers), bodyString(bodyString), bodyBytes(bodyBytes), timeoutMs(timeoutMs), followRedirects(followRedirects) {}
+    explicit NitroRequest(std::string url, std::optional<NitroRequestMethod> method, std::optional<std::vector<NitroHeader>> headers, std::optional<std::string> bodyString, std::optional<std::string> bodyBytes, std::optional<double> timeoutMs, std::optional<bool> followRedirects): url(url), method(method), headers(headers), bodyString(bodyString), bodyBytes(bodyBytes), timeoutMs(timeoutMs), followRedirects(followRedirects) {}
   };
 
 } // namespace margelo::nitro::nitrofetch
@@ -66,7 +63,7 @@ namespace margelo::nitro {
         JSIConverter<std::optional<margelo::nitro::nitrofetch::NitroRequestMethod>>::fromJSI(runtime, obj.getProperty(runtime, "method")),
         JSIConverter<std::optional<std::vector<margelo::nitro::nitrofetch::NitroHeader>>>::fromJSI(runtime, obj.getProperty(runtime, "headers")),
         JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, "bodyString")),
-        JSIConverter<std::optional<std::shared_ptr<ArrayBuffer>>>::fromJSI(runtime, obj.getProperty(runtime, "bodyBytes")),
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, "bodyBytes")),
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, "timeoutMs")),
         JSIConverter<std::optional<bool>>::fromJSI(runtime, obj.getProperty(runtime, "followRedirects"))
       );
@@ -77,7 +74,7 @@ namespace margelo::nitro {
       obj.setProperty(runtime, "method", JSIConverter<std::optional<margelo::nitro::nitrofetch::NitroRequestMethod>>::toJSI(runtime, arg.method));
       obj.setProperty(runtime, "headers", JSIConverter<std::optional<std::vector<margelo::nitro::nitrofetch::NitroHeader>>>::toJSI(runtime, arg.headers));
       obj.setProperty(runtime, "bodyString", JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.bodyString));
-      obj.setProperty(runtime, "bodyBytes", JSIConverter<std::optional<std::shared_ptr<ArrayBuffer>>>::toJSI(runtime, arg.bodyBytes));
+      obj.setProperty(runtime, "bodyBytes", JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.bodyBytes));
       obj.setProperty(runtime, "timeoutMs", JSIConverter<std::optional<double>>::toJSI(runtime, arg.timeoutMs));
       obj.setProperty(runtime, "followRedirects", JSIConverter<std::optional<bool>>::toJSI(runtime, arg.followRedirects));
       return obj;
@@ -91,7 +88,7 @@ namespace margelo::nitro {
       if (!JSIConverter<std::optional<margelo::nitro::nitrofetch::NitroRequestMethod>>::canConvert(runtime, obj.getProperty(runtime, "method"))) return false;
       if (!JSIConverter<std::optional<std::vector<margelo::nitro::nitrofetch::NitroHeader>>>::canConvert(runtime, obj.getProperty(runtime, "headers"))) return false;
       if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, "bodyString"))) return false;
-      if (!JSIConverter<std::optional<std::shared_ptr<ArrayBuffer>>>::canConvert(runtime, obj.getProperty(runtime, "bodyBytes"))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, "bodyBytes"))) return false;
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, "timeoutMs"))) return false;
       if (!JSIConverter<std::optional<bool>>::canConvert(runtime, obj.getProperty(runtime, "followRedirects"))) return false;
       return true;
