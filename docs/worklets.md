@@ -17,7 +17,7 @@ const data = await nitroFetchOnWorklet('https://httpbin.org/get', undefined, map
 
 Options
 
-- `preferBytes` (default `true`): when `true`, sends `bodyBytes` to the mapper; when `false`, sends `bodyString`.
+- `preferBytes` (default `false`): when `true`, sends `bodyBytes` to the mapper; when `false`, sends `bodyString`.
 - `runtimeName`: optional name for the created worklet runtime.
 
 Notes

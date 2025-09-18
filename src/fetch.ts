@@ -358,7 +358,7 @@ export async function nitroFetchOnWorklet<T>(
 ): Promise<T> {
  
   console.log('nitroFetchOnWorklet: starting');
-  const preferBytes = options?.preferBytes !== false; // default true
+  const preferBytes = options?.preferBytes === true; // default true
   console.log('nitroFetchOnWorklet: preferBytes:', preferBytes);
   let rt: any | undefined;
   let Worklets: any | undefined;

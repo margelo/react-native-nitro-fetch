@@ -19,7 +19,7 @@ const data = await res.json();
 
 - Runs the network request and then invokes `mapWorklet` on a worklet runtime (Android) or on JS as a fallback (iOS or when worklets not available).
 - `mapWorklet(payload)` receives `{ url, status, statusText, ok, redirected, headers, bodyBytes?, bodyString? }`.
-- `options.preferBytes` (default `true`) controls whether `bodyBytes` or `bodyString` is sent to the mapper.
+- `options.preferBytes` (default `false`) controls whether `bodyBytes` or `bodyString` is sent to the mapper.
 
 Example
 
