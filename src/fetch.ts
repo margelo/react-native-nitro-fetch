@@ -102,7 +102,7 @@ function buildNitroRequest(input: RequestInfo | URL, init?: RequestInit): NitroR
     method: (method?.toUpperCase() as any) ?? 'GET',
     headers,
     bodyString: normalized?.bodyString,
-    bodyBytes: normalized?.bodyBytes,
+    bodyBytes: "",//normalized?.bodyBytes,
     followRedirects: true,
   };
 }
@@ -127,7 +127,7 @@ async function nitroFetchRaw(input: RequestInfo | URL, init?: RequestInit): Prom
       headers,
       bodyBytes: bytes,
       bodyString: undefined,
-    } as NitroResponse;
+    } as any as NitroResponse; // bleee
   }
 
   const req = buildNitroRequest(input, init);
@@ -383,7 +383,7 @@ export async function nitroFetchOnWorklet<T>(
           const ok = res.ok;
           const redirected = res.redirected;
           const headersPairs: NitroHeader[] = res.headers;
-          const bodyBytes: ArrayBuffer | undefined = preferBytes ? res.bodyBytes : undefined;
+          const bodyBytes: ArrayBuffer | undefined = undefined; // preferBytes ? res.bodyBytes : undefined;
           const bodyString: string | undefined = preferBytes ? undefined : res.bodyString;
           const payload = { url, status, statusText, ok, redirected, headers: headersPairs, bodyBytes, bodyString };
           const out = map(payload);
