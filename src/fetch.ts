@@ -337,7 +337,6 @@ export async function nitroFetchOnWorklet<T>(
   mapWorklet: NitroWorkletMapper<T>,
   options?: { preferBytes?: boolean; runtimeName?: string }
 ): Promise<T> {
-
   console.log('nitroFetchOnWorklet: starting');
   const preferBytes = options?.preferBytes === true; // default true
   console.log('nitroFetchOnWorklet: preferBytes:', preferBytes);
