@@ -148,31 +148,12 @@ export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): 
 
   const res = await nitroFetchRaw(input, init);
 
-  const bytes = res.bodyBytes
-    ? new Uint8Array(res.bodyBytes)
-    : res.bodyString != null
-      ? new TextEncoder().encode(res.bodyString)
-      : new Uint8Array();
-
-  // If Response is available, construct a real Response object for compatibility
-  if (typeof Response !== 'undefined') {
-    const respInit: ResponseInit = {
-      status: res.status,
-      statusText: res.statusText,
-      headers: res.headers.reduce((acc, { key, value }) => {
-        acc[key] = value;
-        return acc;
-      }, {} as Record<string, string>),
-    };
-    // Prefer native bytes if available
-    return new Response(res.bodyBytes ?? bytes, respInit);
-  }
-
   // Fallback lightweight Response-like object (minimal methods)
   const headersObj = res.headers.reduce((acc, { key, value }) => {
         acc[key] = value;
         return acc;
       }, {} as Record<string, string>);
+
   const light: any = {
     url: res.url,
     ok: res.ok,
@@ -180,9 +161,9 @@ export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): 
     statusText: res.statusText,
     redirected: res.redirected,
     headers: headersObj,
-    arrayBuffer: async () => (res.bodyBytes ?? bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)),
-    text: async () => res.bodyString ?? new TextDecoder().decode(bytes),
-    json: async () => JSON.parse(res.bodyString ?? new TextDecoder().decode(bytes)),
+    arrayBuffer: async () => res.bodyBytes,
+    text: async () => res.bodyString,
+    json: async () => JSON.parse(res.bodyString ?? '{}'),
   };
   return light as Response;
 }
@@ -356,7 +337,6 @@ export async function nitroFetchOnWorklet<T>(
   mapWorklet: NitroWorkletMapper<T>,
   options?: { preferBytes?: boolean; runtimeName?: string }
 ): Promise<T> {
- 
   console.log('nitroFetchOnWorklet: starting');
   const preferBytes = options?.preferBytes === true; // default true
   console.log('nitroFetchOnWorklet: preferBytes:', preferBytes);
