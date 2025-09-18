@@ -129,6 +129,7 @@ Need top‑notch React Native help or custom networking solutions? Reach out to 
 
 - [Szymon Kapala](https://x.com/Turbo_Szymon)
 - [Alex Shumihin](https://x.com/pioner_dev)
+- [Ronald Goedeke](https://x.com/BubbleTroubl_rg)
 
 ## License
 
