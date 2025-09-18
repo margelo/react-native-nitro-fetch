@@ -125,6 +125,11 @@ Need top‑notch React Native help or custom networking solutions? Reach out to 
 - Sending a pull request: `CONTRIBUTING.md#sending-a-pull-request`
 - Code of conduct: `CODE_OF_CONDUCT.md`
 
+## Authors
+
+- [Szymon Kapala](https://x.com/Turbo_Szymon)
+- [Alex Shumihin](https://x.com/pioner_dev)
+
 ## License
 
 MIT
