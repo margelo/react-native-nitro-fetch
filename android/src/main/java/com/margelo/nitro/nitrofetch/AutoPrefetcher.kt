@@ -4,6 +4,8 @@ import android.app.Application
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.CompletableFuture
+import com.tencent.mmkv.MMKV;
+
 
 object AutoPrefetcher {
   @Volatile private var initialized = false
@@ -74,12 +76,12 @@ object AutoPrefetcher {
 
   private fun getMMKV(app: Application): Any? {
     return try {
-      val cls = Class.forName("com.tencent.mmkv.MMKV")
-      // Initialize if available
-      try { cls.getMethod("initialize", Application::class.java).invoke(null, app) } catch (_: Throwable) {}
-      // Get default instance
-      cls.getMethod("defaultMMKV").invoke(null)
-    } catch (_: Throwable) { null }
+      MMKV.initialize(app);
+
+      return MMKV.defaultMMKV()
+    } catch (_: Throwable) {
+      null
+    }
   }
 
   private fun invokeMMKVDecodeString(mmkv: Any, key: String): String? {
