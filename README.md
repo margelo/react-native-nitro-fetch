@@ -1,127 +1,136 @@
-<p align="center">
-  <img src="./assets/logo.png" alt="Nitro Fetch Logo" width="200" />
-</p>
+<a href="https://margelo.com">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/static/img/banner-nitro-modules-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="./docs/static/img/banner-nitro-modules-light.png" />
+    <img alt="Nitro Modules" src="./docs/static/img/banner-nitro-modules-light.png" />
+  </picture>
+</a>
 
-# react-native-nitro-fetch
+<br />
 
-Nitro-powered fetch for React Native. Android uses Chromium Cronet (via `org.chromium.net:cronet-embedded`); iOS currently falls back to the built-in fetch. Includes helpers for background prefetching and off-thread parsing with worklets.
+**react-native-nitro-fetch** is a general purpose network fetching library for React Native. It can be used as a drop-in replacement for the built-in `fetch(...)` method, as well as provide additional features like prefetching and workletized mappers.
 
-## Project Status
+## Features
 
-This library is currently in alpha. You can adopt it in production, but you may face counter-intuitive api, poor docs or bugs.
+- 🔧 Drop-in replacement for the built-in `fetch(...)` method
+- ⚡️ Fast HTTP stack using [Cronet](https://chromium.googlesource.com/chromium/src/+/lkgr/components/cronet/README.md) on Android, and [URLSession](https://developer.apple.com/documentation/Foundation/URLSession) on iOS
+- 💪 Supports [HTTP/2](https://en.wikipedia.org/wiki/HTTP/2), [QUIC](https://www.chromium.org/quic/), [Brotli](https://github.com/google/brotli), and disk cache
+- ⏰ Prefetching on app-startup for even faster initialization
+- 🧵 Worklet support for parallel data mapping without blocking the JS Thread
+- 🔥 Powered by [Nitro Modules](https://github.com/mrousavy/nitro)
 
 ## Installation
 
 ```sh
-npm install react-native-nitro-fetch react-native-nitro-modules
+npm i react-native-nitro-fetch react-native-nitro-modules
 ```
 
-- `react-native-nitro-modules` is required as this library relies on Nitro Modules. Rebuild your app after installing.
+> [Nitro Modules](https://github.com/mrousavy/nitro) requires react-native 0.75+ or higher
 
-## Quick Start
+## Usage
+
+To simply fetch data, import the `fetch(...)` method from `react-native-nitro-fetch`:
 
 ```ts
-import { fetch } from 'react-native-nitro-fetch';
+import { fetch } from 'react-native-nitro-fetch'
 
-const res = await fetch('https://httpbin.org/get');
-const json = await res.json();
+const res = await fetch('https://httpbin.org/get')
+const json = await res.json()
 ```
 
-## Features
+This can be used as a drop-in-replacement for the built-in `fetch(...)` method.
 
-- Nitro-backed `fetch`: drop-in replacement for global fetch.
-- Android Cronet: fast HTTP stack via `org.chromium.net:cronet-embedded` (already wired in `android/build.gradle`).
-- Prefetch: start a background request tied to a `prefetchKey` and serve it later.
-- Android auto-prefetch: enqueue requests to MMKV so they warm up on next app start.
-- Worklets helper: run mapping/parsing off the JS thread with `react-native-worklets-core`.
+### Prefetching in JS
 
-## Why Prefetch
-
-- Faster first paint of data: Prefetching lets you move network I/O earlier on the critical path so the screen can render with data sooner.
-- App start wins: With auto‑prefetch + MMKV, we can begin fetching immediately at process start. In our measurements on mid‑range Android devices (e.g., Samsung A16), this starts at least ~220 ms earlier than initiating the same request from JS after React is up.
-- UX hooks: Kick off prefetch on navigation intent (button press) and serve the result when the destination screen mounts.
-
-See `docs/prefetch.md` for patterns and examples.
-
-## Why Cronet
-
-- Performance: Enables HTTP/2 multiplexing and QUIC/HTTP/3, reducing latency and avoiding head‑of‑line blocking.
-- Efficiency: Advanced connection management, TLS/ALPN, Brotli, and robust on‑disk caching.
-- Battle‑tested: Built on Chromium’s networking stack (the same tech behind Chrome) and widely adopted across the ecosystem, including the Flutter community.
-
-## Philosophy
-
-- Nitro Fetch often outperforms built‑in fetch thanks to Cronet’s optimizations, but raw speed is not the primary goal.
-- The main goals are:
-  - High‑quality prefetching (including auto‑prefetch on app start)
-  - Enabling a multi‑threaded React Native architecture (e.g., off‑thread mapping with worklets)
-- Performance is a nice side‑effect.
-
-## Usage Examples
-
-- Basic fetch (drop-in replacement):
+You can prefetch a URL in JS, which keeps the result cached for the next actual `fetch(...)` call - this can be used shortly before navigating to a new screen to have results hot & ready:
 
 ```ts
-import { fetch } from 'react-native-nitro-fetch';
-const res = await fetch('https://jsonplaceholder.typicode.com/todos/1');
-console.log(await res.json());
+import { prefetch } from 'react-native-nitro-fetch'
+
+await prefetch('https://httpbin.org/uuid', {
+  headers: { prefetchKey: 'uuid' }
+})
 ```
 
-- Prefetch and consume (Android or JS fallback):
+Then, on the new screen that was navigated to:
 
 ```ts
-import { fetch, prefetch } from 'react-native-nitro-fetch';
+import { fetch } from 'react-native-nitro-fetch'
 
-await prefetch('https://httpbin.org/uuid', { headers: { prefetchKey: 'uuid' } });
-const res = await fetch('https://httpbin.org/uuid', { headers: { prefetchKey: 'uuid' } });
-console.log('prefetched header:', res.headers.get('nitroPrefetched'));
+const res = await fetch('https://httpbin.org/uuid', {
+  headers: { prefetchKey: 'uuid' }
+})
+console.log('prefetched header:', res.headers.get('nitroPrefetched'))
 ```
 
-- Schedule auto-prefetch on Android (requires `react-native-mmkv` in your app):
+### Prefetching for the next app launch
+
+Prefetching data on app launch (or _process start_) will make it hot & ready once your JS code actually runs. Call `prefetchOnAppStart(...)` to enqueue a prefetch for the **next** app start:
 
 ```ts
-import { prefetchOnAppStart } from 'react-native-nitro-fetch';
-await prefetchOnAppStart('https://httpbin.org/uuid', { prefetchKey: 'uuid' });
+import { prefetchOnAppStart } from 'react-native-nitro-fetch'
+
+await prefetchOnAppStart('https://httpbin.org/uuid', {
+  prefetchKey: 'uuid'
+})
 ```
 
-- Off-thread parsing with worklets:
+Then, once the app opens the next time, a call to `fetch(...)` might resolve faster since it will contain already cached results:
 
 ```ts
-import { nitroFetchOnWorklet } from 'react-native-nitro-fetch';
+import { fetch } from 'react-native-nitro-fetch'
 
-const map = (payload: { bodyString?: string }) => {
-  'worklet';
-  return JSON.parse(payload.bodyString ?? '{}');
-};
-
-const data = await nitroFetchOnWorklet('https://httpbin.org/get', undefined, map);
+const res = await fetch('https://httpbin.org/uuid', {
+  headers: { prefetchKey: 'uuid' }
+})
+console.log('prefetched header:', res.headers.get('nitroPrefetched'))
 ```
 
-## Platform Notes
+In our tests, prefetching alone yielded a **~220 ms** faster TTI (time-to-interactive) time! 🤯
 
-- Android: Uses Cronet Java API; no extra setup needed beyond install and rebuild. Cronet engine is initialized once and enables HTTP/2, QUIC, Brotli, and disk cache.
-- iOS: Uses a native `URLSession` client for requests and prefetch (in‑memory cache). Cronet integration is still planned for future releases.
+### Worklet Mapping
+
+Since Nitro Fetch is a [Nitro Module](https://nitro.margelo.com), it can be used from Worklets.
+This can be useful to parse data without blocking the main JS-Thread:
+
+```ts
+import { nitroFetchOnWorklet } from 'react-native-nitro-fetch'
+
+const data = await nitroFetchOnWorklet(
+  'https://httpbin.org/get',
+  undefined,
+  (payload) => {
+    'worklet'
+    return JSON.parse(payload.bodyString ?? '{}')
+  }
+)
+```
+
+## Project Status
+
+Nitro Fetch is currently in an alpha stage. You can adopt it in production, but keep in mind that the library and it's API is subject to change.
 
 ## Limitations & Alternatives
 
-- HTTP streaming: Not supported yet. For streaming responses today, use Expo’s `expo-fetch`. Streaming is on the roadmap.
-- WebSockets: Not supported. For high‑performance sockets and binary streams, consider `react-native-fast-io`.
+- [HTTP streaming](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) is not yet supported. As an alternative, use Expo's [expo-fetch](https://docs.expo.dev/versions/latest/sdk/expo/). Streaming is on the roadmap.
+- [WebSockets](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket) are not supported. For high‑performance sockets and binary streams, consider using [react-native-fast-io](https://github.com/callstackincubator/react-native-fast-io) by our friends at Callstack.
 
 ## Documentation
 
-- Getting Started: `docs/getting-started.md`
-- API Reference: `docs/api.md`
-- Android Details: `docs/android.md`
-- iOS Details: `docs/ios.md`
-- Prefetch & Auto-Prefetch: `docs/prefetch.md`
-- Worklets: `docs/worklets.md`
-- Troubleshooting: `docs/troubleshooting.md`
-- Cronet (Android) notes: `docs/cronet-android.md`
-- Cronet (iOS) notes: `docs/cronet-ios.md`
+- [Getting Started](docs/getting-started.md)
+- [API Reference](docs/api.md)
+- [Android Details](docs/android.md)
+- [iOS Details](docs/ios.md)
+- [Prefetch & Auto-Prefetch](docs/prefetch.md)
+- [Worklets](docs/worklets.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Cronet (Android) notes](docs/cronet-android.md)
+- [Cronet (iOS) notes](docs/cronet-ios.md)
 
-## Work With Margelo
+## Margelo
 
-Need top‑notch React Native help or custom networking solutions? Reach out to Margelo: hello@margelo.com
+Nitro Fetch is built with ❤️ by Margelo.
+We build fast and beautiful apps. Contact us at [margelo.com](https://margelo.com) for high-end consultancy services.
 
 ## Contributing
 
@@ -131,14 +140,12 @@ Need top‑notch React Native help or custom networking solutions? Reach out to 
 
 ## Authors
 
-- [Szymon Kapala](https://x.com/Turbo_Szymon)
-- [Alex Shumihin](https://x.com/pioner_dev)
-- [Ronald Goedeke](https://x.com/BubbleTroubl_rg)
+- [Szymon Kapala](https://github.com/Szymon20000)
+- [Alex Shumihin](https://github.com/pioner92)
+- [Ronald Goedeke](https://github.com/ronickg)
+- [Marc Rousavy](https://github.com/mrousavy)
 
 ## License
 
 MIT
 
----
-
-Made with [create-react-native-library](https://github.com/callstack/react-native-builder-bob)
