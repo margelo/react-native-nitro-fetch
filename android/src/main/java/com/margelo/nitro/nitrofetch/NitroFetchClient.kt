@@ -129,7 +129,7 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       val bodyStr = req.bodyString
       if ((bodyBytes != null) || !bodyStr.isNullOrEmpty()) {
         val body: ByteArray = when {
-          bodyBytes != null -> bodyBytes.getBuffer(true).toByteArray()
+          bodyBytes != null -> ByteArray(1);//bodyBytes.getBuffer(true).toByteArray()
           !bodyStr.isNullOrEmpty() -> bodyStr!!.toByteArray(Charsets.UTF_8)
           else -> ByteArray(0)
         }
