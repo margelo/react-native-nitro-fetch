@@ -235,6 +235,9 @@ export async function prefetchOnAppStart(
     } catch {
       arr = [];
     }
+    if (arr.some(e => e && e.prefetchKey === prefetchKey)) {
+      arr = arr.filter(e => e && e.prefetchKey !== prefetchKey);
+    }
     arr.push(entry);
     storage.set(KEY, JSON.stringify(arr));
   } catch (e) {
