@@ -1,7 +1,20 @@
 import React from 'react';
-import { Text, View, StyleSheet, Button, ScrollView, Modal, Pressable } from 'react-native';
-import { fetch as nitroFetch, nitroFetchOnWorklet, prefetch, prefetchOnAppStart, removeAllFromAutoprefetch } from 'react-native-nitro-fetch';
-
+import {
+  Text,
+  View,
+  StyleSheet,
+  Button,
+  ScrollView,
+  Modal,
+  Pressable,
+} from 'react-native';
+import {
+  fetch as nitroFetch,
+  nitroFetchOnWorklet,
+  prefetch,
+  prefetchOnAppStart,
+  removeAllFromAutoprefetch,
+} from 'react-native-nitro-fetch';
 
 type Row = {
   url: string;
@@ -117,10 +130,14 @@ function detectCached(headers: Headers): boolean {
   const hits = get('x-cache-hits');
   if (hits && Number(hits) > 0) return true;
   const combined = (
-    (get('x-cache') || '') + ' ' +
-    (get('x-cache-status') || '') + ' ' +
-    (get('x-cache-remote') || '') + ' ' +
-    (get('cf-cache-status') || '') + ' ' +
+    (get('x-cache') || '') +
+    ' ' +
+    (get('x-cache-status') || '') +
+    ' ' +
+    (get('x-cache-remote') || '') +
+    ' ' +
+    (get('cf-cache-status') || '') +
+    ' ' +
     (get('via') || '')
   ).toUpperCase();
   if (combined.includes('HIT') || combined.includes('REVALIDATED')) return true;
@@ -128,7 +145,15 @@ function detectCached(headers: Headers): boolean {
   return false;
 }
 
-async function measure(fn: (url: string) => Promise<Response>, url: string): Promise<{ ms: number } & ({ ok: true; cached: boolean } | { ok: false; error: string })> {
+async function measure(
+  fn: (url: string) => Promise<Response>,
+  url: string
+): Promise<
+  { ms: number } & (
+    | { ok: true; cached: boolean }
+    | { ok: false; error: string }
+  )
+> {
   const t0 = global.performance ? global.performance.now() : Date.now();
   try {
     const res = await fn(`${url}?timestamp=${performance.now()}`);
@@ -151,7 +176,9 @@ export default function App() {
   const [avgNitroNC, setAvgNitroNC] = React.useState<number | null>(null);
   const [running, setRunning] = React.useState(false);
   const [showSheet, setShowSheet] = React.useState(false);
-  const [prices, setPrices] = React.useState<Array<{ id: string; usd: number }>>([]);
+  const [prices, setPrices] = React.useState<
+    Array<{ id: string; usd: number }>
+  >([]);
   const [prefetchInfo, setPrefetchInfo] = React.useState<string>('');
   const PREFETCH_URL = 'https://httpbin.org/uuid';
   const PREFETCH_KEY = 'uuid';
@@ -159,7 +186,16 @@ export default function App() {
   const loadPrices = React.useCallback(async () => {
     console.log('Loading crypto prices from coingecko start');
     const ids = [
-      'bitcoin','ethereum','solana','dogecoin','litecoin','cardano','ripple','polkadot','chainlink','polygon-pos'
+      'bitcoin',
+      'ethereum',
+      'solana',
+      'dogecoin',
+      'litecoin',
+      'cardano',
+      'ripple',
+      'polkadot',
+      'chainlink',
+      'polygon-pos',
     ];
     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids.join(','))}&vs_currencies=usd`;
     const mapper = (payload: { bodyString?: string }) => {
@@ -171,7 +207,9 @@ export default function App() {
       return arr;
     };
     console.log('Loading crypto prices from coingecko');
-    const data = await nitroFetchOnWorklet(url, undefined, mapper, { preferBytes: false });
+    const data = await nitroFetchOnWorklet(url, undefined, mapper, {
+      preferBytes: false,
+    });
     console.log('Loaded crypto prices:', data);
     setPrices(data);
   }, []);
@@ -183,7 +221,10 @@ export default function App() {
       const urls = pickRandomUrls(50);
       const out = await Promise.all(
         urls.map(async (url): Promise<Row> => {
-          const [b, n] = await Promise.all([measure(global.fetch, url), measure(nitroFetch, url)]);
+          const [b, n] = await Promise.all([
+            measure(global.fetch, url),
+            measure(nitroFetch, url),
+          ]);
           return {
             url,
             builtinMs: b.ms,
@@ -196,16 +237,28 @@ export default function App() {
         })
       );
       setRows(out);
-      const okRows = out.filter((r) => r.errorBuiltin == null && r.errorNitro == null);
+      const okRows = out.filter(
+        (r) => r.errorBuiltin == null && r.errorNitro == null
+      );
       const avgBAll = trimmedAverage(okRows.map((r) => r.builtinMs));
       const avgNAll = trimmedAverage(okRows.map((r) => r.nitroMs));
-      const avgBNC = trimmedAverage(okRows.filter(r => r.cachedBuiltin === false).map((r) => r.builtinMs));
-      const avgNNC = trimmedAverage(okRows.filter(r => r.cachedNitro === false).map((r) => r.nitroMs));
+      const avgBNC = trimmedAverage(
+        okRows.filter((r) => r.cachedBuiltin === false).map((r) => r.builtinMs)
+      );
+      const avgNNC = trimmedAverage(
+        okRows.filter((r) => r.cachedNitro === false).map((r) => r.nitroMs)
+      );
       setAvgBuiltinAll(avgBAll);
       setAvgNitroAll(avgNAll);
       setAvgBuiltinNC(avgBNC);
       setAvgNitroNC(avgNNC);
-      console.log('trimmed avgs (all, not-cached)', avgBAll, avgNAll, avgBNC, avgNNC);
+      console.log(
+        'trimmed avgs (all, not-cached)',
+        avgBAll,
+        avgNAll,
+        avgBNC,
+        avgNNC
+      );
     } finally {
       setRunning(false);
     }
@@ -219,16 +272,28 @@ export default function App() {
     <View style={styles.container}>
       <Text style={styles.title}>Nitro vs Built-in Fetch</Text>
       <View style={styles.actions}>
-        <Button title={running ? 'Running…' : 'Run Again'} onPress={run} disabled={running} />
+        <Button
+          title={running ? 'Running…' : 'Run Again'}
+          onPress={run}
+          disabled={running}
+        />
         <View style={{ width: 12 }} />
-        <Button title="Show Crypto Prices" onPress={() => { setShowSheet(true); loadPrices(); }} />
+        <Button
+          title="Show Crypto Prices"
+          onPress={() => {
+            setShowSheet(true);
+            loadPrices();
+          }}
+        />
       </View>
-      <View style={[styles.actions, { marginTop: 0 }] }>
+      <View style={[styles.actions, { marginTop: 0 }]}>
         <Button
           title="Prefetch UUID"
           onPress={async () => {
             try {
-              await prefetch(PREFETCH_URL, { headers: { prefetchKey: PREFETCH_KEY } });
+              await prefetch(PREFETCH_URL, {
+                headers: { prefetchKey: PREFETCH_KEY },
+              });
               setPrefetchInfo('Prefetch started');
             } catch (e: any) {
               setPrefetchInfo(`Prefetch error: ${e?.message ?? String(e)}`);
@@ -240,22 +305,28 @@ export default function App() {
           title="Fetch Prefetched"
           onPress={async () => {
             try {
-              const res = await nitroFetch(PREFETCH_URL, { headers: { prefetchKey: PREFETCH_KEY } });
+              const res = await nitroFetch(PREFETCH_URL, {
+                headers: { prefetchKey: PREFETCH_KEY },
+              });
               const text = await res.text();
               const pref = res.headers.get('nitroPrefetched');
-              setPrefetchInfo(`Fetched. nitroPrefetched=${pref ?? 'null'} len=${text.length}`);
+              setPrefetchInfo(
+                `Fetched. nitroPrefetched=${pref ?? 'null'} len=${text.length}`
+              );
             } catch (e: any) {
               setPrefetchInfo(`Fetch error: ${e?.message ?? String(e)}`);
             }
           }}
         />
       </View>
-      <View style={[styles.actions, { marginTop: 0 }] }>
+      <View style={[styles.actions, { marginTop: 0 }]}>
         <Button
           title="Schedule Auto-Prefetch (MMKV)"
           onPress={async () => {
             try {
-              await prefetchOnAppStart(PREFETCH_URL, { prefetchKey: PREFETCH_KEY });
+              await prefetchOnAppStart(PREFETCH_URL, {
+                prefetchKey: PREFETCH_KEY,
+              });
               setPrefetchInfo('Scheduled in MMKV (Android)');
             } catch (e: any) {
               setPrefetchInfo(`Schedule error: ${e?.message ?? String(e)}`);
@@ -276,9 +347,14 @@ export default function App() {
         />
       </View>
       {!!prefetchInfo && (
-        <Text style={{ textAlign: 'center', marginBottom: 8 }}>{prefetchInfo}</Text>
+        <Text style={{ textAlign: 'center', marginBottom: 8 }}>
+          {prefetchInfo}
+        </Text>
       )}
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+      >
         {rows == null ? (
           <Text>Measuring…</Text>
         ) : (
@@ -297,14 +373,33 @@ export default function App() {
                   <Text style={[styles.cell, styles.url]} numberOfLines={1}>
                     {r.url}
                   </Text>
-                  <Text style={[styles.cell, builtinWins ? styles.winner : undefined]}>
-                    {r.errorBuiltin ? 'Err' : Number.isFinite(r.builtinMs) ? r.builtinMs.toFixed(1) : '—'}
+                  <Text
+                    style={[
+                      styles.cell,
+                      builtinWins ? styles.winner : undefined,
+                    ]}
+                  >
+                    {r.errorBuiltin
+                      ? 'Err'
+                      : Number.isFinite(r.builtinMs)
+                        ? r.builtinMs.toFixed(1)
+                        : '—'}
                   </Text>
-                  <Text style={[styles.cell, nitroWins ? styles.winner : undefined]}>
-                    {r.errorNitro ? 'Err' : Number.isFinite(r.nitroMs) ? r.nitroMs.toFixed(1) : '—'}
+                  <Text
+                    style={[styles.cell, nitroWins ? styles.winner : undefined]}
+                  >
+                    {r.errorNitro
+                      ? 'Err'
+                      : Number.isFinite(r.nitroMs)
+                        ? r.nitroMs.toFixed(1)
+                        : '—'}
                   </Text>
                   <Text style={styles.cell}>
-                    {r.cachedBuiltin == null ? '?' : r.cachedBuiltin ? 'B✓' : 'B✗'}{' '}
+                    {r.cachedBuiltin == null
+                      ? '?'
+                      : r.cachedBuiltin
+                        ? 'B✓'
+                        : 'B✗'}{' '}
                     {r.cachedNitro == null ? '?' : r.cachedNitro ? 'N✓' : 'N✗'}
                   </Text>
                 </View>
@@ -312,10 +407,14 @@ export default function App() {
             })}
             <View style={styles.footer}>
               <Text style={styles.avg}>
-                Built-in avg (all / not cached): {avgBuiltinAll != null ? avgBuiltinAll.toFixed(1) : '—'} ms / {avgBuiltinNC != null ? avgBuiltinNC.toFixed(1) : '—'} ms
+                Built-in avg (all / not cached):{' '}
+                {avgBuiltinAll != null ? avgBuiltinAll.toFixed(1) : '—'} ms /{' '}
+                {avgBuiltinNC != null ? avgBuiltinNC.toFixed(1) : '—'} ms
               </Text>
               <Text style={styles.avg}>
-                Nitro avg (all / not cached): {avgNitroAll != null ? avgNitroAll.toFixed(1) : '—'} ms / {avgNitroNC != null ? avgNitroNC.toFixed(1) : '—'} ms
+                Nitro avg (all / not cached):{' '}
+                {avgNitroAll != null ? avgNitroAll.toFixed(1) : '—'} ms /{' '}
+                {avgNitroNC != null ? avgNitroNC.toFixed(1) : '—'} ms
               </Text>
             </View>
           </>
@@ -342,7 +441,12 @@ export default function App() {
               prices.map((p) => (
                 <View key={p.id} style={styles.priceRow}>
                   <Text style={styles.priceId}>{p.id}</Text>
-                  <Text style={styles.priceVal}>${p.usd.toLocaleString(undefined, { maximumFractionDigits: 6 })}</Text>
+                  <Text style={styles.priceVal}>
+                    $
+                    {p.usd.toLocaleString(undefined, {
+                      maximumFractionDigits: 6,
+                    })}
+                  </Text>
                 </View>
               ))
             )}
@@ -357,7 +461,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: 48,
-
   },
   title: {
     fontSize: 18,
@@ -373,7 +476,7 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)'
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   sheet: {
     position: 'absolute',
