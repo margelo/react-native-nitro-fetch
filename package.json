@@ -58,9 +58,9 @@
   "author": "Szymon Kapala <szymon20000@gmail.com'> (https://x.com/Turbo_Szymon)",
   "license": "MIT",
   "bugs": {
-    "url": "http://google.com/issues"
+    "url": "https://github.com/margelo/react-native-nitro-fetch/issues"
   },
-  "homepage": "http://google.com#readme",
+  "homepage": "https://github.com/margelo/react-native-nitro-fetch#readme",
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
