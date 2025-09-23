@@ -10,10 +10,10 @@ export type NitroRequestMethod =
   | 'DELETE'
   | 'OPTIONS';
 
-export interface NitroHeader  {
+export interface NitroHeader {
   key: string;
   value: string;
-};
+}
 export interface NitroRequest {
   url: string;
   method?: NitroRequestMethod;
@@ -21,7 +21,7 @@ export interface NitroRequest {
   headers?: NitroHeader[];
   // Body as either UTF-8 string or raw bytes.
   bodyString?: string;
-  bodyBytes?:  string; //will be ArrayBuffer in future
+  bodyBytes?: string; //will be ArrayBuffer in future
   // Controls
   timeoutMs?: number;
   followRedirects?: boolean; // default true
@@ -40,7 +40,7 @@ export interface NitroResponse {
 }
 
 export interface NitroFetchClient
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin'; }> {
+  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
   // Client-binded request that uses the env configured at creation.
   request(req: NitroRequest): Promise<NitroResponse>;
   // Start a prefetch for a given request; expects a header `prefetchKey`.
@@ -48,7 +48,7 @@ export interface NitroFetchClient
 }
 
 export interface NitroFetch
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin'; }> {
+  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
   // Create a client bound to a given environment (e.g., cache dir).
   createClient(): NitroFetchClient;
 
