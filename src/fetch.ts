@@ -102,7 +102,8 @@ function buildNitroRequest(input: RequestInfo | URL, init?: RequestInit): NitroR
     method: (method?.toUpperCase() as any) ?? 'GET',
     headers,
     bodyString: normalized?.bodyString,
-    bodyBytes: "",//normalized?.bodyBytes,
+    // Only include bodyBytes when provided to avoid signaling upload data unintentionally
+    bodyBytes: undefined as any,
     followRedirects: true,
   };
 }
@@ -139,12 +140,6 @@ async function nitroFetchRaw(input: RequestInfo | URL, init?: RequestInit): Prom
 
 export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   'worklet';
-  // If native implementation is not present yet, fallback to global fetch
-  const hasNative = typeof (NitroFetchHybrid as any)?.createClient === 'function';
-  if (!hasNative) {
-    // @ts-ignore: global fetch exists in RN
-    return fetch(input as any, init);
-  }
 
   const res = await nitroFetchRaw(input, init);
 
@@ -154,17 +149,23 @@ export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): 
         return acc;
       }, {} as Record<string, string>);
 
-  const light: any = {
+  const bodyBytes = res.bodyBytes;
+  const bodyString = res.bodyString;
+
+  const makeLight = (): any => ({
     url: res.url,
     ok: res.ok,
     status: res.status,
     statusText: res.statusText,
     redirected: res.redirected,
-    headers: headersObj,
-    arrayBuffer: async () => res.bodyBytes,
-    text: async () => res.bodyString,
-    json: async () => JSON.parse(res.bodyString ?? '{}'),
-  };
+    headers: { ...headersObj },
+    arrayBuffer: async () => bodyBytes,
+    text: async () => bodyString,
+    json: async () => JSON.parse(bodyString ?? '{}'),
+    clone: () => makeLight(),
+  });
+
+  const light: any = makeLight();
   return light as Response;
 }
 
