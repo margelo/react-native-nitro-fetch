@@ -2408,7 +2408,7 @@ DEPENDENCIES:
   - fmt (from `../../node_modules/react-native/third-party-podspecs/fmt.podspec`)
   - glog (from `../../node_modules/react-native/third-party-podspecs/glog.podspec`)
   - hermes-engine (from `../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
-  - NitroFetch (from `../../package`)
+  - NitroFetch (from `../../node_modules/react-native-nitro-fetch`)
   - NitroModules (from `../../node_modules/react-native-nitro-modules`)
   - RCT-Folly (from `../../node_modules/react-native/third-party-podspecs/RCT-Folly.podspec`)
   - RCTDeprecation (from `../../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -2500,7 +2500,7 @@ EXTERNAL SOURCES:
     :podspec: "../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-2025-07-07-RNv0.81.0-e0fc67142ec0763c6b6153ca2bf96df815539782
   NitroFetch:
-    :path: "../../package"
+    :path: "../../node_modules/react-native-nitro-fetch"
   NitroModules:
     :path: "../../node_modules/react-native-nitro-modules"
   RCT-Folly:
@@ -2716,4 +2716,4 @@ SPEC CHECKSUMS:
 
 PODFILE CHECKSUM: 709af4b3fd9758044c5ffe392d6f84807c66572a
 
-COCOAPODS: 1.15.2
+COCOAPODS: 1.16.2
