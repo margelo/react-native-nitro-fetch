@@ -22,11 +22,16 @@ export default defineConfig([
       'react/react-in-jsx-scope': 'off',
       'prettier/prettier': 'error',
     },
+    languageOptions: {
+      parserOptions: {
+        requireConfigFile: false,
+      }
+    }
   },
   {
     ignores: [
       'node_modules/',
-      'lib/',
+      'package/lib/',
       '**/metro.config.js',
       '**/react-native.config.js',
       '**/babel.config.js',
