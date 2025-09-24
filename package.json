@@ -13,7 +13,7 @@
   "scripts": {
     "example": "bun --cwd example",
     "test": "jest",
-    "typecheck": "tsc",
+    "typecheck": "bun --cwd package tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
     "prepare": "bun --cwd package bob build",
