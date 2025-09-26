@@ -4,11 +4,11 @@
     "build:android": {
       "env": ["ORG_GRADLE_PROJECT_newArchEnabled"],
       "inputs": [
-        "package.json",
-        "android",
+        "package/package.json",
+        "package/android",
         "!android/build",
-        "src/*.ts",
-        "src/*.tsx",
+        "package/src/*.ts",
+        "package/src/*.tsx",
         "example/package.json",
         "example/android",
         "!example/android/.gradle",
@@ -20,11 +20,11 @@
     "build:ios": {
       "env": ["RCT_NEW_ARCH_ENABLED"],
       "inputs": [
-        "package.json",
-        "*.podspec",
-        "ios",
-        "src/*.ts",
-        "src/*.tsx",
+        "package/package.json",
+        "package/*.podspec",
+        "package/ios",
+        "package/src/*.ts",
+        "package/src/*.tsx",
         "example/package.json",
         "example/ios",
         "!example/ios/build",

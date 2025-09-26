@@ -21,7 +21,12 @@ function headersToPairs(headers?: HeadersInit): NitroHeader[] | undefined {
     for (const entry of headers as any[]) {
       if (Array.isArray(entry) && entry.length >= 2) {
         pairs.push({ key: String(entry[0]), value: String(entry[1]) });
-      } else if (entry && typeof entry === 'object' && 'key' in entry && 'value' in entry) {
+      } else if (
+        entry &&
+        typeof entry === 'object' &&
+        'key' in entry &&
+        'value' in entry
+      ) {
         pairs.push(entry as NitroHeader);
       }
     }
@@ -34,28 +39,28 @@ function headersToPairs(headers?: HeadersInit): NitroHeader[] | undefined {
   return pairs;
 }
 
-function normalizeBody(body: BodyInit | null | undefined): { bodyString?: string; bodyBytes?: ArrayBuffer } | undefined {
+function normalizeBody(
+  body: BodyInit | null | undefined
+): { bodyString?: string; bodyBytes?: ArrayBuffer } | undefined {
   'worklet';
   if (body == null) return undefined;
   if (typeof body === 'string') return { bodyString: body };
   if (body instanceof URLSearchParams) return { bodyString: body.toString() };
-  if (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer) return { bodyBytes: body };
+  if (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer)
+    return { bodyBytes: body };
   if (ArrayBuffer.isView(body)) {
     const view = body as ArrayBufferView;
     // Pass a copy/slice of the underlying bytes without base64
-    //@ts-ignore
-    return { bodyBytes: view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength) };
+    return {
+      //@ts-ignore
+      bodyBytes: view.buffer.slice(
+        view.byteOffset,
+        view.byteOffset + view.byteLength
+      ),
+    };
   }
   // TODO: Blob/FormData support can be added later
   throw new Error('Unsupported body type for nitro fetch');
-}
-
-// @ts-ignore
-function pairsToHeaders(pairs: NitroHeader[]): Headers {
-  'worklet';
-  const h = new Headers();
-  for (const { key, value } of pairs) h.append(key, value);
-  return h;
 }
 
 const NitroFetchHybrid: NitroFetchModule = NitroFetchSingleton;
@@ -73,7 +78,10 @@ function ensureClient() {
   return client;
 }
 
-function buildNitroRequest(input: RequestInfo | URL, init?: RequestInit): NitroRequest {
+function buildNitroRequest(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): NitroRequest {
   'worklet';
   let url: string;
   let method: string | undefined;
@@ -108,9 +116,13 @@ function buildNitroRequest(input: RequestInfo | URL, init?: RequestInit): NitroR
   };
 }
 
-async function nitroFetchRaw(input: RequestInfo | URL, init?: RequestInit): Promise<NitroResponse> {
+async function nitroFetchRaw(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<NitroResponse> {
   'worklet';
-  const hasNative = typeof (NitroFetchHybrid as any)?.createClient === 'function';
+  const hasNative =
+    typeof (NitroFetchHybrid as any)?.createClient === 'function';
   if (!hasNative) {
     // Fallback path not supported for raw; use global fetch and synthesize minimal shape
     // @ts-ignore: global fetch exists in RN
@@ -133,21 +145,28 @@ async function nitroFetchRaw(input: RequestInfo | URL, init?: RequestInit): Prom
 
   const req = buildNitroRequest(input, init);
   ensureClient();
-  if (!client || typeof (client as any).request !== 'function') throw new Error('NitroFetch client not available');
+  if (!client || typeof (client as any).request !== 'function')
+    throw new Error('NitroFetch client not available');
   const res: NitroResponse = await client.request(req);
   return res;
 }
 
-export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+export async function nitroFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> {
   'worklet';
 
   const res = await nitroFetchRaw(input, init);
 
   // Fallback lightweight Response-like object (minimal methods)
-  const headersObj = res.headers.reduce((acc, { key, value }) => {
-        acc[key] = value;
-        return acc;
-      }, {} as Record<string, string>);
+  const headersObj = res.headers.reduce(
+    (acc, { key, value }) => {
+      acc[key] = value;
+      return acc;
+    },
+    {} as Record<string, string>
+  );
 
   const bodyBytes = res.bodyBytes;
   const bodyString = res.bodyString;
@@ -170,22 +189,31 @@ export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): 
 }
 
 // Start a native prefetch. Requires a `prefetchKey` header on the request.
-export async function prefetch(input: RequestInfo | URL, init?: RequestInit): Promise<void> {
+export async function prefetch(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<void> {
   // If native implementation is not present yet, do nothing
-  const hasNative = typeof (NitroFetchHybrid as any)?.createClient === 'function';
+  const hasNative =
+    typeof (NitroFetchHybrid as any)?.createClient === 'function';
   if (!hasNative) return;
 
   // Build NitroRequest and ensure prefetchKey header exists
   const req = buildNitroRequest(input, init);
-  const hasKey = req.headers?.some(h => h.key.toLowerCase() === 'prefetchkey') ?? false;
+  const hasKey =
+    req.headers?.some((h) => h.key.toLowerCase() === 'prefetchkey') ?? false;
   // Also support passing prefetchKey via non-standard field on init
   const fromInit = (init as any)?.prefetchKey as string | undefined;
   if (!hasKey && fromInit) {
-    req.headers = (req.headers ?? []).concat([{ key: 'prefetchKey', value: fromInit }]);
+    req.headers = (req.headers ?? []).concat([
+      { key: 'prefetchKey', value: fromInit },
+    ]);
   }
-  const finalHasKey = req.headers?.some(h => h.key.toLowerCase() === 'prefetchkey');
+  const finalHasKey = req.headers?.some(
+    (h) => h.key.toLowerCase() === 'prefetchkey'
+  );
   if (!finalHasKey) {
-    throw new Error('prefetch requires a \"prefetchKey\" header');
+    throw new Error('prefetch requires a "prefetchKey" header');
   }
 
   // Ensure client and call native prefetch
@@ -202,18 +230,25 @@ export async function prefetchOnAppStart(
 ): Promise<void> {
   // Resolve request and prefetchKey
   const req = buildNitroRequest(input, init);
-  const fromHeader = req.headers?.find(h => h.key.toLowerCase() === 'prefetchkey')?.value;
+  const fromHeader = req.headers?.find(
+    (h) => h.key.toLowerCase() === 'prefetchkey'
+  )?.value;
   const fromInit = (init as any)?.prefetchKey as string | undefined;
   const prefetchKey = fromHeader ?? fromInit;
   if (!prefetchKey) {
-    throw new Error('prefetchOnAppStart requires a "prefetchKey" (header or init.prefetchKey)');
+    throw new Error(
+      'prefetchOnAppStart requires a "prefetchKey" (header or init.prefetchKey)'
+    );
   }
 
   // Convert headers to a plain object for storage
-  const headersObj = (req.headers ?? []).reduce((acc, { key, value }) => {
-    acc[String(key)] = String(value);
-    return acc;
-  }, {} as Record<string, string>);
+  const headersObj = (req.headers ?? []).reduce(
+    (acc, { key, value }) => {
+      acc[String(key)] = String(value);
+      return acc;
+    },
+    {} as Record<string, string>
+  );
 
   const entry = {
     url: req.url,
@@ -224,7 +259,7 @@ export async function prefetchOnAppStart(
   // Write or append to MMKV queue
   try {
     // Dynamically require to keep it optional for consumers
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+
     const { MMKV } = require('react-native-mmkv');
     const storage = new MMKV(); // default instance matches Android's defaultMMKV
     const KEY = 'nitrofetch_autoprefetch_queue';
@@ -236,21 +271,25 @@ export async function prefetchOnAppStart(
     } catch {
       arr = [];
     }
-    if (arr.some(e => e && e.prefetchKey === prefetchKey)) {
-      arr = arr.filter(e => e && e.prefetchKey !== prefetchKey);
+    if (arr.some((e) => e && e.prefetchKey === prefetchKey)) {
+      arr = arr.filter((e) => e && e.prefetchKey !== prefetchKey);
     }
     arr.push(entry);
     storage.set(KEY, JSON.stringify(arr));
   } catch (e) {
-    console.warn('react-native-mmkv not available; prefetchOnAppStart is a no-op', e);
+    console.warn(
+      'react-native-mmkv not available; prefetchOnAppStart is a no-op',
+      e
+    );
   }
 }
 
 // Remove one entry (by prefetchKey) from the auto-prefetch queue in MMKV.
-export async function removeFromAutoPrefetch(prefetchKey: string): Promise<void> {
+export async function removeFromAutoPrefetch(
+  prefetchKey: string
+): Promise<void> {
   // No-op on iOS
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { MMKV } = require('react-native-mmkv');
     const storage = new MMKV();
     const KEY = 'nitrofetch_autoprefetch_queue';
@@ -273,14 +312,16 @@ export async function removeFromAutoPrefetch(prefetchKey: string): Promise<void>
       storage.set(KEY, JSON.stringify(next));
     }
   } catch (e) {
-    console.warn('react-native-mmkv not available; removeFromAutoPrefetch is a no-op', e);
+    console.warn(
+      'react-native-mmkv not available; removeFromAutoPrefetch is a no-op',
+      e
+    );
   }
 }
 
 // Remove all entries from the auto-prefetch queue in MMKV.
 export async function removeAllFromAutoprefetch(): Promise<void> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { MMKV } = require('react-native-mmkv');
     const storage = new MMKV();
     const KEY = 'nitrofetch_autoprefetch_queue';
@@ -290,7 +331,10 @@ export async function removeAllFromAutoprefetch(): Promise<void> {
       storage.set(KEY, JSON.stringify([]));
     }
   } catch (e) {
-    console.warn('react-native-mmkv not available; removeAllFromAutoprefetch is a no-op', e);
+    console.warn(
+      'react-native-mmkv not available; removeAllFromAutoprefetch is a no-op',
+      e
+    );
   }
 }
 
@@ -311,7 +355,6 @@ let WorkletsRef: any | undefined;
 function ensureWorkletRuntime(name = 'nitro-fetch'): any | undefined {
   console.log('ensuring worklet runtime');
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Worklets } = require('react-native-worklets-core');
     nitroRuntime = nitroRuntime ?? Worklets.createRuntime(name);
     console.log('nitroRuntime:', !!nitroRuntime);
@@ -325,7 +368,7 @@ function ensureWorkletRuntime(name = 'nitro-fetch'): any | undefined {
 function getWorklets(): any | undefined {
   try {
     if (WorkletsRef) return WorkletsRef;
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+
     const { Worklets } = require('react-native-worklets-core');
     WorkletsRef = Worklets;
     return WorkletsRef;
@@ -388,8 +431,19 @@ export async function nitroFetchOnWorklet<T>(
           const redirected = res.redirected;
           const headersPairs: NitroHeader[] = res.headers;
           const bodyBytes: ArrayBuffer | undefined = undefined; // preferBytes ? res.bodyBytes : undefined;
-          const bodyString: string | undefined = preferBytes ? undefined : res.bodyString;
-          const payload = { url, status, statusText, ok, redirected, headers: headersPairs, bodyBytes, bodyString };
+          const bodyString: string | undefined = preferBytes
+            ? undefined
+            : res.bodyString;
+          const payload = {
+            url,
+            status,
+            statusText,
+            ok,
+            redirected,
+            headers: headersPairs,
+            bodyBytes,
+            bodyString,
+          };
           const out = map(payload);
           // Resolve back on JS thread
           Worklets.runOnJS(resolve)(out as any);

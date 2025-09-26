@@ -1,3 +1,4 @@
+/* eslint-disable react-native/no-inline-styles */
 import React from 'react';
 import {
   Text,
@@ -266,7 +267,7 @@ export default function App() {
 
   React.useEffect(() => {
     run();
-  }, []);
+  }, [run]);
 
   return (
     <View style={styles.container}>

@@ -1,68 +1,24 @@
 {
-  "name": "react-native-nitro-fetch",
+  "name": "react-native-nitro-fetch-monorepo",
+  "packageManager": "bun@1.2.22",
+  "private": true,
   "version": "0.1.3",
   "description": "Awesome Fetch :)",
-  "main": "./lib/module/index.js",
-  "module": "./lib/module/index.js",
-  "types": "./lib/typescript/src/index.d.ts",
-  "react-native": "src/index",
-  "source": "./src/index",
-  "exports": {
-    ".": {
-      "source": "./src/index.tsx",
-      "types": "./lib/typescript/src/index.d.ts",
-      "default": "./lib/module/index.js"
-    },
-    "./package.json": "./package.json"
-  },
-  "files": [
-    "src",
-    "lib",
-    "android",
-    "ios",
-    "cpp",
-    "nitrogen",
-    "nitro.json",
-    "*.podspec",
-    "react-native.config.js",
-    "!ios/build",
-    "!android/build",
-    "!android/gradle",
-    "!android/gradlew",
-    "!android/gradlew.bat",
-    "!android/local.properties",
-    "!**/__tests__",
-    "!**/__fixtures__",
-    "!**/__mocks__",
-    "!**/.*"
+  "author": "Szymon Kapala <szymon20000@gmail.com'> (https://x.com/Turbo_Szymon)",
+  "workspaces": [
+    "example",
+    "package"
   ],
+  "repository": "https://github.com/margelo/react-native-nitro-fetch.git",
   "scripts": {
-    "example": "yarn workspace react-native-nitro-fetch-example",
+    "example": "bun --cwd example",
     "test": "jest",
-    "typecheck": "tsc",
+    "typecheck": "bun --cwd package tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
-    "prepare": "bob build",
-    "nitrogen": "nitro-codegen",
+    "prepare": "bun --cwd package bob build",
+    "nitrogen": "bun --cwd package nitrogen",
     "release": "release-it --only-version"
-  },
-  "keywords": [
-    "react-native",
-    "ios",
-    "android"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+http://google.com.git"
-  },
-  "author": "Szymon Kapala <szymon20000@gmail.com'> (https://x.com/Turbo_Szymon)",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/margelo/react-native-nitro-fetch/issues"
-  },
-  "homepage": "https://github.com/margelo/react-native-nitro-fetch#readme",
-  "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^19.6.0",
@@ -91,28 +47,6 @@
     "turbo": "^1.10.7",
     "typescript": "^5.8.3"
   },
-  "peerDependencies": {
-    "react": "*",
-    "react-native": "*",
-    "react-native-nitro-modules": "^0.29.2",
-    "react-native-worklets-core": "^1.6.0"
-  },
-  "peerDependenciesMeta": {
-    "react-native-worklets-core": {
-      "optional": true
-    }
-  },
-  "workspaces": [
-    "example"
-  ],
-  "packageManager": "yarn@3.6.1",
-  "jest": {
-    "preset": "react-native",
-    "modulePathIgnorePatterns": [
-      "<rootDir>/example/node_modules",
-      "<rootDir>/lib/"
-    ]
-  },
   "commitlint": {
     "extends": [
       "@commitlint/config-conventional"
@@ -124,7 +58,7 @@
       "tagName": "v${version}"
     },
     "npm": {
-      "publish": true
+      "publish": false
     },
     "github": {
       "release": true
@@ -143,35 +77,5 @@
     "tabWidth": 2,
     "trailingComma": "es5",
     "useTabs": false
-  },
-  "react-native-builder-bob": {
-    "source": "src",
-    "output": "lib",
-    "targets": [
-      [
-        "custom",
-        {
-          "script": "nitrogen",
-          "clean": "nitrogen/"
-        }
-      ],
-      [
-        "module",
-        {
-          "esm": true
-        }
-      ],
-      [
-        "typescript",
-        {
-          "project": "tsconfig.build.json"
-        }
-      ]
-    ]
-  },
-  "create-react-native-library": {
-    "languages": "kotlin-swift",
-    "type": "nitro-module",
-    "version": "0.53.0"
   }
 }
