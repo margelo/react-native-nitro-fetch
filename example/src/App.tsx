@@ -202,8 +202,22 @@ export default function App() {
       'worklet';
       const txt = payload.bodyString ?? '';
       const json = JSON.parse(txt) as Record<string, { usd: number }>;
-      const arr = Object.entries(json).map(([id, v]) => ({ id, usd: v.usd }));
-      arr.sort((a, b) => a.id.localeCompare(b.id));
+      const entries = Object.entries(json);
+      const arr = [];
+      for (let i = 0; i < entries.length; ++i) {
+        const entry = entries[i];
+        arr.push({ id: entry[0], usd: entry[1].usd });
+      }
+      // Manual sort (localeCompare not available in worklets, use plain compare)
+      for (let i = 0; i < arr.length - 1; ++i) {
+        for (let j = i + 1; j < arr.length; ++j) {
+          if (arr[i].id > arr[j].id) {
+            const tmp = arr[i];
+            arr[i] = arr[j];
+            arr[j] = tmp;
+          }
+        }
+      }
       return arr;
     };
     console.log('Loading crypto prices from coingecko');

@@ -4,7 +4,7 @@ import type {
   NitroRequest,
   NitroResponse,
 } from './NitroFetch.nitro';
-import { NitroFetch as NitroFetchSingleton } from './NitroInstances';
+import { boxedNitroFetch, NitroFetch as NitroFetchSingleton } from './NitroInstances';
 
 // No base64: pass strings/ArrayBuffers directly
 
@@ -109,7 +109,6 @@ function buildNitroRequest(input: RequestInfo | URL, init?: RequestInit): NitroR
 }
 
 async function nitroFetchRaw(input: RequestInfo | URL, init?: RequestInit): Promise<NitroResponse> {
-  'worklet';
   const hasNative = typeof (NitroFetchHybrid as any)?.createClient === 'function';
   if (!hasNative) {
     // Fallback path not supported for raw; use global fetch and synthesize minimal shape
@@ -138,8 +137,44 @@ async function nitroFetchRaw(input: RequestInfo | URL, init?: RequestInit): Prom
   return res;
 }
 
+export function nitroFetchRawSync(input: RequestInfo | URL, init?: RequestInit): NitroResponse {
+  "worklet";
+  const unboxedNitroFetch = boxedNitroFetch.unbox();
+  const hasNative = typeof (unboxedNitroFetch as any)?.createClient === 'function';
+  console.log('nitroFetchRawSync: hasNative:', hasNative);
+  if (!hasNative) {
+    // Fallback path not supported for raw; use global fetch and synthesize minimal shape
+    // @ts-ignore: global fetch exists in RN
+    return fetch(input as any, init).then(res => {
+      const url = (res as any).url ?? String(input);
+      return res.arrayBuffer().then(bytes => {
+        const headers: NitroHeader[] = [];
+        res.headers.forEach((v, k) => headers.push({ key: k, value: v }));
+        return {
+          url,
+          status: res.status,
+          statusText: res.statusText,
+          ok: res.ok,
+          redirected: (res as any).redirected ?? false,
+          headers,
+          bodyBytes: bytes,
+          bodyString: undefined,
+        } as any as NitroResponse; // bleee
+      });
+    });
+  }
+  console.log('nitroFetchRawSync: qerqrq:', hasNative);
+
+  const req = buildNitroRequest(input, init);
+  console.log('nitroFetchRawSync: client:', req);
+  const client = unboxedNitroFetch.createClient();
+  if (!client || typeof (client as any).request !== 'function') {
+    throw new Error('NitroFetch client not available');
+  }
+  return client.requestSync(req);
+}
+
 export async function nitroFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
-  'worklet';
 
   const res = await nitroFetchRaw(input, init);
 
@@ -313,7 +348,7 @@ function ensureWorkletRuntime(name = 'nitro-fetch'): any | undefined {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { Worklets } = require('react-native-worklets-core');
-    nitroRuntime = nitroRuntime ?? Worklets.createRuntime(name);
+    nitroRuntime = nitroRuntime ?? Worklets.createContext(name);
     console.log('nitroRuntime:', !!nitroRuntime);
     return nitroRuntime;
   } catch {
@@ -356,7 +391,7 @@ export async function nitroFetchOnWorklet<T>(
   }
 
   // Fallback: if runtime is not available, do the work on JS
-  if (!rt || !Worklets || typeof rt.run !== 'function') {
+  if (!rt || !Worklets || typeof rt.runAsync !== 'function') {
     console.warn('nitroFetchOnWorklet: no runtime, mapping on JS thread');
     const res = await nitroFetchRaw(input, init);
     const payload = {
@@ -372,36 +407,31 @@ export async function nitroFetchOnWorklet<T>(
     return mapWorklet(payload as any);
   }
 
-  return await new Promise<T>((resolve, reject) => {
-    try {
-      console.log('nitroFetchOnWorklet: about to call rt.run');
-      rt.run(async (map: NitroWorkletMapper<T>) => {
-        'worklet';
-        try {
-          console.log('nitroFetchOnWorklet: running fetch on worklet thread');
-          const res = await nitroFetchRaw(input, init);
-          console.log('nitroFetchOnWorklet: fetch completed');
-          const url = res.url;
-          const status = res.status;
-          const statusText = res.statusText;
-          const ok = res.ok;
-          const redirected = res.redirected;
-          const headersPairs: NitroHeader[] = res.headers;
-          const bodyBytes: ArrayBuffer | undefined = undefined; // preferBytes ? res.bodyBytes : undefined;
-          const bodyString: string | undefined = preferBytes ? undefined : res.bodyString;
-          const payload = { url, status, statusText, ok, redirected, headers: headersPairs, bodyBytes, bodyString };
-          const out = map(payload);
-          // Resolve back on JS thread
-          Worklets.runOnJS(resolve)(out as any);
-        } catch (e) {
-          Worklets.runOnJS(reject)(e as any);
-        }
-      }, mapWorklet as any);
-    } catch (e) {
-      console.error('nitroFetchOnWorklet: rt.run failed', e);
-      reject(e);
-    }
-  });
+  console.log('nitroFetchOnWorklet: running on worklet thread');
+  try{
+    const result = await rt.runAsync(() => {
+      "worklet";
+      const res = nitroFetchRawSync(input, init);
+      const payload = {
+        url: res.url,
+        status: res.status,
+        statusText: res.statusText,
+        ok: res.ok,
+        redirected: res.redirected,
+        headers: res.headers,
+        bodyBytes: preferBytes ? res.bodyBytes : undefined,
+        bodyString: preferBytes ? undefined : res.bodyString,
+      } as const;
+
+      return mapWorklet(payload as any);
+      
+    });
+    return result;
+  } catch (e) {
+    console.error('nitroFetchOnWorklet: error:', e);
+    throw e;
+  }
+  
 }
 
 export const x = ensureWorkletRuntime();

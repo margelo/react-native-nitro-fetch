@@ -252,5 +252,56 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
     return promise
   }
 
+  override fun requestSync(req: NitroRequest): NitroResponse {
+    // Try to serve from prefetch cache first
+    val key = findPrefetchKey(req)
+    if (key != null) {
+      // If a fresh prefetched result exists (<=5s old), return it immediately
+      FetchCache.getResultIfFresh(key, 5_000L)?.let { cached ->
+        val newHeaders = (cached.headers?.toMutableList() ?: mutableListOf())
+        newHeaders.add(NitroHeader("nitroPrefetched", "true"))
+        return NitroResponse(
+          url = cached.url,
+          status = cached.status,
+          statusText = cached.statusText,
+          ok = cached.ok,
+          redirected = cached.redirected,
+          headers = newHeaders.toTypedArray(),
+          bodyString = cached.bodyString,
+          bodyBytes = cached.bodyBytes
+        )
+      }
+    }
+
+    // For synchronous requests, we need to block until the request completes
+    val latch = java.util.concurrent.CountDownLatch(1)
+    var result: NitroResponse? = null
+    var error: Throwable? = null
+
+    fetch(
+      req,
+      onSuccess = { res ->
+        result = res
+        latch.countDown()
+      },
+      onFail = { err ->
+        error = err
+        latch.countDown()
+      }
+    )
+
+    try {
+      latch.await()
+    } catch (e: InterruptedException) {
+      throw RuntimeException("Request was interrupted", e)
+    }
+
+    if (error != null) {
+      throw RuntimeException("Request failed", error)
+    }
+
+    return result ?: throw RuntimeException("Request completed but no result was returned")
+  }
+
 
 }

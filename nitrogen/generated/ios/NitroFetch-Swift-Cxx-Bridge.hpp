@@ -253,6 +253,15 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return Result<std::shared_ptr<Promise<void>>>::withError(error);
   }
   
+  // pragma MARK: Result<NitroResponse>
+  using Result_NitroResponse_ = Result<NitroResponse>;
+  inline Result_NitroResponse_ create_Result_NitroResponse_(const NitroResponse& value) noexcept {
+    return Result<NitroResponse>::withValue(value);
+  }
+  inline Result_NitroResponse_ create_Result_NitroResponse_(const std::exception_ptr& error) noexcept {
+    return Result<NitroResponse>::withError(error);
+  }
+  
   // pragma MARK: std::shared_ptr<HybridNitroFetchSpec>
   /**
    * Specialized version of `std::shared_ptr<HybridNitroFetchSpec>`.
