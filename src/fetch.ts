@@ -141,29 +141,9 @@ export function nitroFetchRawSync(input: RequestInfo | URL, init?: RequestInit):
   "worklet";
   const unboxedNitroFetch = boxedNitroFetch.unbox();
   const hasNative = typeof (unboxedNitroFetch as any)?.createClient === 'function';
-  console.log('nitroFetchRawSync: hasNative:', hasNative);
   if (!hasNative) {
-    // Fallback path not supported for raw; use global fetch and synthesize minimal shape
-    // @ts-ignore: global fetch exists in RN
-    return fetch(input as any, init).then(res => {
-      const url = (res as any).url ?? String(input);
-      return res.arrayBuffer().then(bytes => {
-        const headers: NitroHeader[] = [];
-        res.headers.forEach((v, k) => headers.push({ key: k, value: v }));
-        return {
-          url,
-          status: res.status,
-          statusText: res.statusText,
-          ok: res.ok,
-          redirected: (res as any).redirected ?? false,
-          headers,
-          bodyBytes: bytes,
-          bodyString: undefined,
-        } as any as NitroResponse; // bleee
-      });
-    });
+    throw new Error('NitroFetch client not available');
   }
-  console.log('nitroFetchRawSync: qerqrq:', hasNative);
 
   const req = buildNitroRequest(input, init);
   console.log('nitroFetchRawSync: client:', req);
