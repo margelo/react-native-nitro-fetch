@@ -14,7 +14,7 @@
 
 - 🔧 Drop-in replacement for the built-in `fetch(...)` method
 - ⚡️ Fast HTTP stack using [Cronet](https://chromium.googlesource.com/chromium/src/+/lkgr/components/cronet/README.md) on Android, and [URLSession](https://developer.apple.com/documentation/Foundation/URLSession) on iOS
-- 💪 Supports [HTTP/2](https://en.wikipedia.org/wiki/HTTP/2), [QUIC](https://www.chromium.org/quic/), [Brotli](https://github.com/google/brotli), and disk cache
+- 💪 Supports HTTP/1, HTTP/2 and [HTTP/3](https://en.wikipedia.org/wiki/HTTP/3) over [QUIC](https://www.chromium.org/quic/), [Brotli](https://github.com/google/brotli), and disk cache
 - ⏰ Prefetching on app-startup for even faster initialization
 - 🧵 Worklet support for parallel data mapping without blocking the JS Thread
 - 🔥 Powered by [Nitro Modules](https://github.com/mrousavy/nitro)
