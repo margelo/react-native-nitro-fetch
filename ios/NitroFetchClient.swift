@@ -29,6 +29,20 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     return promise
   }
   
+  func getNetworkQualityEstimate() throws -> NetworkQualityEstimate {
+    // NQE is not supported on iOS yet - requires Cronet integration
+    NSLog("[NitroFetch] Network Quality Estimator (NQE) is not supported on iOS yet. It will be available once iOS uses Cronet.")
+    
+    // Return empty estimate
+    return NetworkQualityEstimate(
+      downstreamThroughputKbps: nil,
+      upstreamThroughputKbps: nil,
+      httpRttMs: nil,
+      transportRttMs: nil,
+      effectiveConnectionType: "unknown"
+    )
+  }
+  
   // Shared URLSession for static operations
   private static let session: URLSession = {
     let config = URLSessionConfiguration.default

@@ -39,12 +39,32 @@ export interface NitroResponse {
   bodyBytes?: string; //will be ArrayBuffer in future
 }
 
+export enum EffectiveConnectionType {
+  UNKNOWN = 'unknown',
+  OFFLINE = 'offline',
+  SLOW_2G = 'slow-2G',
+  TWO_G = '2G',
+  THREE_G = '3G',
+  FOUR_G = '4G',
+  WIFI = 'wifi',
+}
+
+export interface NetworkQualityEstimate {
+  downstreamThroughputKbps?: number;
+  upstreamThroughputKbps?: number;
+  httpRttMs?: number;
+  transportRttMs?: number;
+  effectiveConnectionType?: EffectiveConnectionType;
+}
+
 export interface NitroFetchClient
   extends HybridObject<{ ios: 'swift'; android: 'kotlin'; }> {
   // Client-binded request that uses the env configured at creation.
   request(req: NitroRequest): Promise<NitroResponse>;
   // Start a prefetch for a given request; expects a header `prefetchKey`.
   prefetch(req: NitroRequest): Promise<void>;
+  // Get network quality estimate from Cronet (Android only, uses Network Quality Estimator)
+  getNetworkQualityEstimate(): NetworkQualityEstimate;
 }
 
 export interface NitroFetch

@@ -14,6 +14,7 @@ import {
   prefetch,
   prefetchOnAppStart,
   removeAllFromAutoprefetch,
+  getNetworkQualityEstimate,
 } from 'react-native-nitro-fetch';
 
 type Row = {
@@ -185,6 +186,12 @@ export default function App() {
 
   const loadPrices = React.useCallback(async () => {
     console.log('Loading crypto prices from coingecko start');
+    try{
+      const networkQuality = await getNetworkQualityEstimate();
+      console.log('Network quality:', networkQuality);
+    } catch (e: any) {
+      console.error('Error getting network quality:', e);
+    }
     const ids = [
       'bitcoin',
       'ethereum',

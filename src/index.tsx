@@ -5,8 +5,11 @@ export {
   prefetchOnAppStart,
   removeFromAutoPrefetch,
   removeAllFromAutoprefetch,
+  getNetworkQualityEstimate,
 } from './fetch';
 export type { NitroRequest, NitroResponse } from './fetch';
+export type { NetworkQualityEstimate } from './NitroFetch.nitro';
+export { EffectiveConnectionType } from './NitroFetch.nitro';
 export { NitroFetch } from './NitroInstances';
 import './fetch';
 

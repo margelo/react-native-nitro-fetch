@@ -146,4 +146,16 @@ open class HybridNitroFetchClientSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
     }
   }
+  
+  @inline(__always)
+  public final func getNetworkQualityEstimate() -> bridge.Result_NetworkQualityEstimate_ {
+    do {
+      let __result = try self.__implementation.getNetworkQualityEstimate()
+      let __resultCpp = __result
+      return bridge.create_Result_NetworkQualityEstimate_(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_NetworkQualityEstimate_(__exceptionPtr)
+    }
+  }
 }

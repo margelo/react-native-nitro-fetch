@@ -16,6 +16,7 @@ public protocol HybridNitroFetchClientSpec_protocol: HybridObject {
   // Methods
   func request(req: NitroRequest) throws -> Promise<NitroResponse>
   func prefetch(req: NitroRequest) throws -> Promise<Void>
+  func getNetworkQualityEstimate() throws -> NetworkQualityEstimate
 }
 
 /// See ``HybridNitroFetchClientSpec``

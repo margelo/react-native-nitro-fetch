@@ -252,5 +252,50 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
     return promise
   }
 
+  override fun getNetworkQualityEstimate(): NetworkQualityEstimate {
+    try {
+      // Note: NQE values are based on observations from actual network requests.
+      // Values update as the app makes network calls and Cronet learns about network conditions.
+      
+      // Get RTT estimates (in milliseconds, -1 if unknown)
+      val httpRttMs = engine.httpRttMs
+      val transportRttMs = engine.transportRttMs
+
+      // Get throughput estimates (in kbps, -1 if unknown)
+      val downstreamKbps = engine.downstreamThroughputKbps
+
+      // Get effective connection type
+      val effectiveConnectionType = when (engine.effectiveConnectionType) {
+        CronetEngine.EFFECTIVE_CONNECTION_TYPE_UNKNOWN -> EffectiveConnectionType.UNKNOWN
+        CronetEngine.EFFECTIVE_CONNECTION_TYPE_OFFLINE -> EffectiveConnectionType.OFFLINE
+        CronetEngine.EFFECTIVE_CONNECTION_TYPE_SLOW_2G -> EffectiveConnectionType.SLOW_2G
+        CronetEngine.EFFECTIVE_CONNECTION_TYPE_2G -> EffectiveConnectionType._2G
+        CronetEngine.EFFECTIVE_CONNECTION_TYPE_3G -> EffectiveConnectionType._3G
+        CronetEngine.EFFECTIVE_CONNECTION_TYPE_4G -> EffectiveConnectionType._4G
+        else -> EffectiveConnectionType.UNKNOWN
+      }
+
+      Log.i("NitroFetchClient", "NQESnapshot - httpRtt: ${httpRttMs}ms, transportRtt: ${transportRttMs}ms, downstream: ${downstreamKbps}kbps, effectiveType: ${effectiveConnectionType}")
+
+      return NetworkQualityEstimate(
+        downstreamThroughputKbps = if (downstreamKbps != -1) downstreamKbps.toDouble() else null,
+        upstreamThroughputKbps = null, // Cronet doesn't provide upstream throughput
+        httpRttMs = if (httpRttMs != -1) httpRttMs.toDouble() else null,
+        transportRttMs = if (transportRttMs != -1) transportRttMs.toDouble() else null,
+        effectiveConnectionType = effectiveConnectionType
+      )
+    } catch (e: Exception) {
+      Log.e("NitroFetchClient", "Error getting network quality estimate", e)
+      // Return empty estimate on error
+      return NetworkQualityEstimate(
+        downstreamThroughputKbps = null,
+        upstreamThroughputKbps = null,
+        httpRttMs = null,
+        transportRttMs = null,
+        effectiveConnectionType = EffectiveConnectionType.UNKNOWN
+      )
+    }
+  }
+
 
 }

@@ -44,6 +44,7 @@ class NitroFetch : HybridNitroFetchSpec() {
         val nativeProvider = providers.firstOrNull { it.name.contains("Native", ignoreCase = true) }
 
         val cacheDir = File(app.cacheDir, "nitrofetch_cronet_cache").apply { mkdirs() }
+        
         val builder = (nativeProvider?.createBuilder() ?: CronetEngine.Builder(app))
           .enableHttp2(true)
           .enableQuic(true)
@@ -51,6 +52,12 @@ class NitroFetch : HybridNitroFetchSpec() {
           .setStoragePath(cacheDir.absolutePath)
           .enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISK, 50 * 1024 * 1024)
           .setUserAgent("NitroFetch/0.1")
+          .enableNetworkQualityEstimator(true)
+        
+        // Note: NQE experimental options can be configured via setExperimentalOptions() if needed:
+        // val nqeOptions = """{"NetworkQualityEstimator":{"effective_connection_type_algorithm":"TransportRTTAndDownstreamThroughput"}}"""
+        // builder.setExperimentalOptions(nqeOptions)
+        // This requires Cronet 119+ or embedded Cronet with the method available
 
 
         // --- Optional debugging knobs (uncomment temporarily) ---

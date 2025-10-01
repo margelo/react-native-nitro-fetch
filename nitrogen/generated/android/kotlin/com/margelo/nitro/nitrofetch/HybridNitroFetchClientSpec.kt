@@ -47,6 +47,10 @@ abstract class HybridNitroFetchClientSpec: HybridObject() {
   @DoNotStrip
   @Keep
   abstract fun prefetch(req: NitroRequest): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getNetworkQualityEstimate(): NetworkQualityEstimate
 
   private external fun initHybrid(): HybridData
 
