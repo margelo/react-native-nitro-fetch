@@ -18,11 +18,10 @@
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
 
-// Forward declaration of `EffectiveConnectionType` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { enum class EffectiveConnectionType; }
+
 
 #include <optional>
-#include "EffectiveConnectionType.hpp"
+#include <string>
 
 namespace margelo::nitro::nitrofetch {
 
@@ -35,11 +34,11 @@ namespace margelo::nitro::nitrofetch {
     std::optional<double> upstreamThroughputKbps     SWIFT_PRIVATE;
     std::optional<double> httpRttMs     SWIFT_PRIVATE;
     std::optional<double> transportRttMs     SWIFT_PRIVATE;
-    std::optional<EffectiveConnectionType> effectiveConnectionType     SWIFT_PRIVATE;
+    std::optional<std::string> effectiveConnectionType     SWIFT_PRIVATE;
 
   public:
     NetworkQualityEstimate() = default;
-    explicit NetworkQualityEstimate(std::optional<double> downstreamThroughputKbps, std::optional<double> upstreamThroughputKbps, std::optional<double> httpRttMs, std::optional<double> transportRttMs, std::optional<EffectiveConnectionType> effectiveConnectionType): downstreamThroughputKbps(downstreamThroughputKbps), upstreamThroughputKbps(upstreamThroughputKbps), httpRttMs(httpRttMs), transportRttMs(transportRttMs), effectiveConnectionType(effectiveConnectionType) {}
+    explicit NetworkQualityEstimate(std::optional<double> downstreamThroughputKbps, std::optional<double> upstreamThroughputKbps, std::optional<double> httpRttMs, std::optional<double> transportRttMs, std::optional<std::string> effectiveConnectionType): downstreamThroughputKbps(downstreamThroughputKbps), upstreamThroughputKbps(upstreamThroughputKbps), httpRttMs(httpRttMs), transportRttMs(transportRttMs), effectiveConnectionType(effectiveConnectionType) {}
   };
 
 } // namespace margelo::nitro::nitrofetch
@@ -56,7 +55,7 @@ namespace margelo::nitro {
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, "upstreamThroughputKbps")),
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, "httpRttMs")),
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, "transportRttMs")),
-        JSIConverter<std::optional<margelo::nitro::nitrofetch::EffectiveConnectionType>>::fromJSI(runtime, obj.getProperty(runtime, "effectiveConnectionType"))
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, "effectiveConnectionType"))
       );
     }
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::nitrofetch::NetworkQualityEstimate& arg) {
@@ -65,7 +64,7 @@ namespace margelo::nitro {
       obj.setProperty(runtime, "upstreamThroughputKbps", JSIConverter<std::optional<double>>::toJSI(runtime, arg.upstreamThroughputKbps));
       obj.setProperty(runtime, "httpRttMs", JSIConverter<std::optional<double>>::toJSI(runtime, arg.httpRttMs));
       obj.setProperty(runtime, "transportRttMs", JSIConverter<std::optional<double>>::toJSI(runtime, arg.transportRttMs));
-      obj.setProperty(runtime, "effectiveConnectionType", JSIConverter<std::optional<margelo::nitro::nitrofetch::EffectiveConnectionType>>::toJSI(runtime, arg.effectiveConnectionType));
+      obj.setProperty(runtime, "effectiveConnectionType", JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.effectiveConnectionType));
       return obj;
     }
     static inline bool canConvert(jsi::Runtime& runtime, const jsi::Value& value) {
@@ -77,7 +76,7 @@ namespace margelo::nitro {
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, "upstreamThroughputKbps"))) return false;
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, "httpRttMs"))) return false;
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, "transportRttMs"))) return false;
-      if (!JSIConverter<std::optional<margelo::nitro::nitrofetch::EffectiveConnectionType>>::canConvert(runtime, obj.getProperty(runtime, "effectiveConnectionType"))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, "effectiveConnectionType"))) return false;
       return true;
     }
   };

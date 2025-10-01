@@ -8,8 +8,6 @@
 #pragma once
 
 // Forward declarations of C++ defined types
-// Forward declaration of `EffectiveConnectionType` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { enum class EffectiveConnectionType; }
 // Forward declaration of `HybridNitroFetchClientSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchClientSpec; }
 // Forward declaration of `HybridNitroFetchSpec` to properly resolve imports.
@@ -26,7 +24,6 @@ namespace margelo::nitro::nitrofetch { struct NitroRequest; }
 namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 
 // Include C++ defined types
-#include "EffectiveConnectionType.hpp"
 #include "HybridNitroFetchClientSpec.hpp"
 #include "HybridNitroFetchSpec.hpp"
 #include "NetworkQualityEstimate.hpp"

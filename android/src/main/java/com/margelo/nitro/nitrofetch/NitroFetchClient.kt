@@ -266,13 +266,13 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
 
       // Get effective connection type
       val effectiveConnectionType = when (engine.effectiveConnectionType) {
-        CronetEngine.EFFECTIVE_CONNECTION_TYPE_UNKNOWN -> EffectiveConnectionType.UNKNOWN
-        CronetEngine.EFFECTIVE_CONNECTION_TYPE_OFFLINE -> EffectiveConnectionType.OFFLINE
-        CronetEngine.EFFECTIVE_CONNECTION_TYPE_SLOW_2G -> EffectiveConnectionType.SLOW_2G
-        CronetEngine.EFFECTIVE_CONNECTION_TYPE_2G -> EffectiveConnectionType._2G
-        CronetEngine.EFFECTIVE_CONNECTION_TYPE_3G -> EffectiveConnectionType._3G
-        CronetEngine.EFFECTIVE_CONNECTION_TYPE_4G -> EffectiveConnectionType._4G
-        else -> EffectiveConnectionType.UNKNOWN
+        CronetEngine.EFFECTIVE_CONNECTION_TYPE_UNKNOWN -> "unknown"
+        CronetEngine.EFFECTIVE_CONNECTION_TYPE_OFFLINE -> "offline"
+        CronetEngine.EFFECTIVE_CONNECTION_TYPE_SLOW_2G -> "slow-2G"
+        CronetEngine.EFFECTIVE_CONNECTION_TYPE_2G -> "2G"
+        CronetEngine.EFFECTIVE_CONNECTION_TYPE_3G -> "3G"
+        CronetEngine.EFFECTIVE_CONNECTION_TYPE_4G -> "4G"
+        else -> "unknown"
       }
 
       Log.i("NitroFetchClient", "NQESnapshot - httpRtt: ${httpRttMs}ms, transportRtt: ${transportRttMs}ms, downstream: ${downstreamKbps}kbps, effectiveType: ${effectiveConnectionType}")
@@ -292,7 +292,7 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         upstreamThroughputKbps = null,
         httpRttMs = null,
         transportRttMs = null,
-        effectiveConnectionType = EffectiveConnectionType.UNKNOWN
+        effectiveConnectionType = "unknown"
       )
     }
   }

@@ -39,22 +39,12 @@ export interface NitroResponse {
   bodyBytes?: string; //will be ArrayBuffer in future
 }
 
-export enum EffectiveConnectionType {
-  UNKNOWN = 'unknown',
-  OFFLINE = 'offline',
-  SLOW_2G = 'slow-2G',
-  TWO_G = '2G',
-  THREE_G = '3G',
-  FOUR_G = '4G',
-  WIFI = 'wifi',
-}
-
 export interface NetworkQualityEstimate {
   downstreamThroughputKbps?: number;
   upstreamThroughputKbps?: number;
   httpRttMs?: number;
   transportRttMs?: number;
-  effectiveConnectionType?: EffectiveConnectionType;
+  effectiveConnectionType?: string;
 }
 
 export interface NitroFetchClient

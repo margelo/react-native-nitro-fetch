@@ -10,9 +10,8 @@
 #include <fbjni/fbjni.h>
 #include "NetworkQualityEstimate.hpp"
 
-#include "EffectiveConnectionType.hpp"
-#include "JEffectiveConnectionType.hpp"
 #include <optional>
+#include <string>
 
 namespace margelo::nitro::nitrofetch {
 
@@ -41,14 +40,14 @@ namespace margelo::nitro::nitrofetch {
       jni::local_ref<jni::JDouble> httpRttMs = this->getFieldValue(fieldHttpRttMs);
       static const auto fieldTransportRttMs = clazz->getField<jni::JDouble>("transportRttMs");
       jni::local_ref<jni::JDouble> transportRttMs = this->getFieldValue(fieldTransportRttMs);
-      static const auto fieldEffectiveConnectionType = clazz->getField<JEffectiveConnectionType>("effectiveConnectionType");
-      jni::local_ref<JEffectiveConnectionType> effectiveConnectionType = this->getFieldValue(fieldEffectiveConnectionType);
+      static const auto fieldEffectiveConnectionType = clazz->getField<jni::JString>("effectiveConnectionType");
+      jni::local_ref<jni::JString> effectiveConnectionType = this->getFieldValue(fieldEffectiveConnectionType);
       return NetworkQualityEstimate(
         downstreamThroughputKbps != nullptr ? std::make_optional(downstreamThroughputKbps->value()) : std::nullopt,
         upstreamThroughputKbps != nullptr ? std::make_optional(upstreamThroughputKbps->value()) : std::nullopt,
         httpRttMs != nullptr ? std::make_optional(httpRttMs->value()) : std::nullopt,
         transportRttMs != nullptr ? std::make_optional(transportRttMs->value()) : std::nullopt,
-        effectiveConnectionType != nullptr ? std::make_optional(effectiveConnectionType->toCpp()) : std::nullopt
+        effectiveConnectionType != nullptr ? std::make_optional(effectiveConnectionType->toStdString()) : std::nullopt
       );
     }
 
@@ -63,7 +62,7 @@ namespace margelo::nitro::nitrofetch {
         value.upstreamThroughputKbps.has_value() ? jni::JDouble::valueOf(value.upstreamThroughputKbps.value()) : nullptr,
         value.httpRttMs.has_value() ? jni::JDouble::valueOf(value.httpRttMs.value()) : nullptr,
         value.transportRttMs.has_value() ? jni::JDouble::valueOf(value.transportRttMs.value()) : nullptr,
-        value.effectiveConnectionType.has_value() ? JEffectiveConnectionType::fromCpp(value.effectiveConnectionType.value()) : nullptr
+        value.effectiveConnectionType.has_value() ? jni::make_jstring(value.effectiveConnectionType.value()) : nullptr
       );
     }
   };

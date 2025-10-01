@@ -35,7 +35,7 @@ data class NetworkQualityEstimate
     val transportRttMs: Double?,
     @DoNotStrip
     @Keep
-    val effectiveConnectionType: EffectiveConnectionType?
+    val effectiveConnectionType: String?
   ) {
   /* main constructor */
 }

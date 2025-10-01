@@ -8,8 +8,6 @@
 #pragma once
 
 // Forward declarations of C++ defined types
-// Forward declaration of `EffectiveConnectionType` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { enum class EffectiveConnectionType; }
 // Forward declaration of `HybridNitroFetchClientSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchClientSpec; }
 // Forward declaration of `HybridNitroFetchSpec` to properly resolve imports.
@@ -30,7 +28,6 @@ namespace NitroFetch { class HybridNitroFetchClientSpec_cxx; }
 namespace NitroFetch { class HybridNitroFetchSpec_cxx; }
 
 // Include C++ defined types
-#include "EffectiveConnectionType.hpp"
 #include "HybridNitroFetchClientSpec.hpp"
 #include "HybridNitroFetchSpec.hpp"
 #include "NetworkQualityEstimate.hpp"
@@ -227,21 +224,6 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   Func_void create_Func_void(void* _Nonnull swiftClosureWrapper) noexcept;
   inline Func_void_Wrapper wrap_Func_void(Func_void value) noexcept {
     return Func_void_Wrapper(std::move(value));
-  }
-  
-  // pragma MARK: std::optional<EffectiveConnectionType>
-  /**
-   * Specialized version of `std::optional<EffectiveConnectionType>`.
-   */
-  using std__optional_EffectiveConnectionType_ = std::optional<EffectiveConnectionType>;
-  inline std::optional<EffectiveConnectionType> create_std__optional_EffectiveConnectionType_(const EffectiveConnectionType& value) noexcept {
-    return std::optional<EffectiveConnectionType>(value);
-  }
-  inline bool has_value_std__optional_EffectiveConnectionType_(const std::optional<EffectiveConnectionType>& optional) noexcept {
-    return optional.has_value();
-  }
-  inline EffectiveConnectionType get_std__optional_EffectiveConnectionType_(const std::optional<EffectiveConnectionType>& optional) noexcept {
-    return *optional;
   }
   
   // pragma MARK: std::shared_ptr<HybridNitroFetchClientSpec>

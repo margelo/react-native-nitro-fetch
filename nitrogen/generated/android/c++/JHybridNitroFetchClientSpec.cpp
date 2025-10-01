@@ -13,8 +13,6 @@ namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 namespace margelo::nitro::nitrofetch { struct NitroHeader; }
 // Forward declaration of `NetworkQualityEstimate` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NetworkQualityEstimate; }
-// Forward declaration of `EffectiveConnectionType` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { enum class EffectiveConnectionType; }
 // Forward declaration of `NitroRequest` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroRequest; }
 // Forward declaration of `NitroRequestMethod` to properly resolve imports.
@@ -31,8 +29,6 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 #include <optional>
 #include "NetworkQualityEstimate.hpp"
 #include "JNetworkQualityEstimate.hpp"
-#include "EffectiveConnectionType.hpp"
-#include "JEffectiveConnectionType.hpp"
 #include "NitroRequest.hpp"
 #include "JNitroRequest.hpp"
 #include "NitroRequestMethod.hpp"

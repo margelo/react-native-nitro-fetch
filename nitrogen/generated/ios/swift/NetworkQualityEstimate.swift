@@ -18,7 +18,7 @@ public extension NetworkQualityEstimate {
   /**
    * Create a new instance of `NetworkQualityEstimate`.
    */
-  init(downstreamThroughputKbps: Double?, upstreamThroughputKbps: Double?, httpRttMs: Double?, transportRttMs: Double?, effectiveConnectionType: EffectiveConnectionType?) {
+  init(downstreamThroughputKbps: Double?, upstreamThroughputKbps: Double?, httpRttMs: Double?, transportRttMs: Double?, effectiveConnectionType: String?) {
     self.init({ () -> bridge.std__optional_double_ in
       if let __unwrappedValue = downstreamThroughputKbps {
         return bridge.create_std__optional_double_(__unwrappedValue)
@@ -43,9 +43,9 @@ public extension NetworkQualityEstimate {
       } else {
         return .init()
       }
-    }(), { () -> bridge.std__optional_EffectiveConnectionType_ in
+    }(), { () -> bridge.std__optional_std__string_ in
       if let __unwrappedValue = effectiveConnectionType {
-        return bridge.create_std__optional_EffectiveConnectionType_(__unwrappedValue)
+        return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
       } else {
         return .init()
       }
@@ -120,16 +120,23 @@ public extension NetworkQualityEstimate {
     }
   }
   
-  var effectiveConnectionType: EffectiveConnectionType? {
+  var effectiveConnectionType: String? {
     @inline(__always)
     get {
-      return self.__effectiveConnectionType.value
+      return { () -> String? in
+        if bridge.has_value_std__optional_std__string_(self.__effectiveConnectionType) {
+          let __unwrapped = bridge.get_std__optional_std__string_(self.__effectiveConnectionType)
+          return String(__unwrapped)
+        } else {
+          return nil
+        }
+      }()
     }
     @inline(__always)
     set {
-      self.__effectiveConnectionType = { () -> bridge.std__optional_EffectiveConnectionType_ in
+      self.__effectiveConnectionType = { () -> bridge.std__optional_std__string_ in
         if let __unwrappedValue = newValue {
-          return bridge.create_std__optional_EffectiveConnectionType_(__unwrappedValue)
+          return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
         } else {
           return .init()
         }
