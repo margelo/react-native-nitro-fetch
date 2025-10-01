@@ -11,6 +11,8 @@
 namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 // Forward declaration of `NitroHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroHeader; }
+// Forward declaration of `NetworkQualityEstimate` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct NetworkQualityEstimate; }
 // Forward declaration of `NitroRequest` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroRequest; }
 // Forward declaration of `NitroRequestMethod` to properly resolve imports.
@@ -25,6 +27,8 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 #include <vector>
 #include "JNitroHeader.hpp"
 #include <optional>
+#include "NetworkQualityEstimate.hpp"
+#include "JNetworkQualityEstimate.hpp"
 #include "NitroRequest.hpp"
 #include "JNitroRequest.hpp"
 #include "NitroRequestMethod.hpp"
@@ -86,6 +90,11 @@ namespace margelo::nitro::nitrofetch {
       });
       return __promise;
     }();
+  }
+  NetworkQualityEstimate JHybridNitroFetchClientSpec::getNetworkQualityEstimate() {
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JNetworkQualityEstimate>()>("getNetworkQualityEstimate");
+    auto __result = method(_javaPart);
+    return __result->toCpp();
   }
 
 } // namespace margelo::nitro::nitrofetch

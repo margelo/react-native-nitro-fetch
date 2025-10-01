@@ -20,6 +20,8 @@ namespace margelo::nitro::nitrofetch { struct NitroHeader; }
 namespace margelo::nitro::nitrofetch { struct NitroRequest; }
 // Forward declaration of `NitroRequestMethod` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
+// Forward declaration of `NetworkQualityEstimate` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct NetworkQualityEstimate; }
 
 #include "NitroResponse.hpp"
 #include <NitroModules/Promise.hpp>
@@ -29,6 +31,7 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 #include <optional>
 #include "NitroRequest.hpp"
 #include "NitroRequestMethod.hpp"
+#include "NetworkQualityEstimate.hpp"
 
 #include "NitroFetch-Swift-Cxx-Umbrella.hpp"
 
@@ -81,6 +84,14 @@ namespace margelo::nitro::nitrofetch {
     }
     inline std::shared_ptr<Promise<void>> prefetch(const NitroRequest& req) override {
       auto __result = _swiftPart.prefetch(req);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline NetworkQualityEstimate getNetworkQualityEstimate() override {
+      auto __result = _swiftPart.getNetworkQualityEstimate();
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

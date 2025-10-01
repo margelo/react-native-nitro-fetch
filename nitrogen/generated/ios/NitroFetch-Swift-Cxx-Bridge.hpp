@@ -12,6 +12,8 @@
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchClientSpec; }
 // Forward declaration of `HybridNitroFetchSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchSpec; }
+// Forward declaration of `NetworkQualityEstimate` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct NetworkQualityEstimate; }
 // Forward declaration of `NitroHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroHeader; }
 // Forward declaration of `NitroRequestMethod` to properly resolve imports.
@@ -28,6 +30,7 @@ namespace NitroFetch { class HybridNitroFetchSpec_cxx; }
 // Include C++ defined types
 #include "HybridNitroFetchClientSpec.hpp"
 #include "HybridNitroFetchSpec.hpp"
+#include "NetworkQualityEstimate.hpp"
 #include "NitroHeader.hpp"
 #include "NitroRequestMethod.hpp"
 #include "NitroResponse.hpp"
@@ -251,6 +254,15 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_void___ create_Result_std__shared_ptr_Promise_void___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<void>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<NetworkQualityEstimate>
+  using Result_NetworkQualityEstimate_ = Result<NetworkQualityEstimate>;
+  inline Result_NetworkQualityEstimate_ create_Result_NetworkQualityEstimate_(const NetworkQualityEstimate& value) noexcept {
+    return Result<NetworkQualityEstimate>::withValue(value);
+  }
+  inline Result_NetworkQualityEstimate_ create_Result_NetworkQualityEstimate_(const std::exception_ptr& error) noexcept {
+    return Result<NetworkQualityEstimate>::withError(error);
   }
   
   // pragma MARK: std::shared_ptr<HybridNitroFetchSpec>

@@ -294,6 +294,22 @@ export async function removeAllFromAutoprefetch(): Promise<void> {
   }
 }
 
+// Get network quality estimate from Cronet's Network Quality Estimator
+export function getNetworkQualityEstimate() {
+  const hasNative = typeof (NitroFetchHybrid as any)?.createClient === 'function';
+  if (!hasNative) {
+    throw new Error('NitroFetch native module not available');
+  }
+  
+  // Create a fresh client to get the latest network quality estimate
+  const freshClient = NitroFetchHybrid.createClient();
+  if (!freshClient || typeof (freshClient as any).getNetworkQualityEstimate !== 'function') {
+    throw new Error('getNetworkQualityEstimate not supported');
+  }
+  
+  return freshClient.getNetworkQualityEstimate();
+}
+
 // Optional off-thread processing using react-native-worklets-core
 export type NitroWorkletMapper<T> = (payload: {
   url: string;

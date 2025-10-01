@@ -17,10 +17,13 @@
 namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 // Forward declaration of `NitroRequest` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroRequest; }
+// Forward declaration of `NetworkQualityEstimate` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct NetworkQualityEstimate; }
 
 #include "NitroResponse.hpp"
 #include <NitroModules/Promise.hpp>
 #include "NitroRequest.hpp"
+#include "NetworkQualityEstimate.hpp"
 
 namespace margelo::nitro::nitrofetch {
 
@@ -55,6 +58,7 @@ namespace margelo::nitro::nitrofetch {
       // Methods
       virtual std::shared_ptr<Promise<NitroResponse>> request(const NitroRequest& req) = 0;
       virtual std::shared_ptr<Promise<void>> prefetch(const NitroRequest& req) = 0;
+      virtual NetworkQualityEstimate getNetworkQualityEstimate() = 0;
 
     protected:
       // Hybrid Setup
