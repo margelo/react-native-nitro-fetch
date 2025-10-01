@@ -55,6 +55,7 @@ namespace margelo::nitro::nitrofetch {
     // Methods
     std::shared_ptr<Promise<NitroResponse>> request(const NitroRequest& req) override;
     std::shared_ptr<Promise<void>> prefetch(const NitroRequest& req) override;
+    NitroResponse requestSync(const NitroRequest& req) override;
 
   private:
     friend HybridBase;

@@ -29,6 +29,34 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     return promise
   }
   
+  func requestSync(req: NitroRequest) throws -> NitroResponse {
+    // For synchronous requests, we need to block until the request completes
+    let semaphore = DispatchSemaphore(value: 0)
+    var result: NitroResponse?
+    var error: Error?
+    
+    Task {
+      do {
+        result = try await NitroFetchClient.requestStatic(req)
+      } catch let err {
+        error = err
+      }
+      semaphore.signal()
+    }
+    
+    semaphore.wait()
+    
+    if let error = error {
+      throw error
+    }
+    
+    guard let result = result else {
+      throw NSError(domain: "NitroFetch", code: -1, userInfo: [NSLocalizedDescriptionKey: "Request completed but no result was returned"])
+    }
+    
+    return result
+  }
+  
   // Shared URLSession for static operations
   private static let session: URLSession = {
     let config = URLSessionConfiguration.default

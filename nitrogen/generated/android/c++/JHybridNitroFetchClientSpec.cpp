@@ -87,5 +87,10 @@ namespace margelo::nitro::nitrofetch {
       return __promise;
     }();
   }
+  NitroResponse JHybridNitroFetchClientSpec::requestSync(const NitroRequest& req) {
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JNitroResponse>(jni::alias_ref<JNitroRequest> /* req */)>("requestSync");
+    auto __result = method(_javaPart, JNitroRequest::fromCpp(req));
+    return __result->toCpp();
+  }
 
 } // namespace margelo::nitro::nitrofetch

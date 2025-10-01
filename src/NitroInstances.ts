@@ -6,3 +6,4 @@ export const NitroFetch: NitroFetchType =
   NitroModules.createHybridObject<NitroFetchType>('NitroFetch');
 
 
+export const boxedNitroFetch = NitroModules.box(NitroFetch);
