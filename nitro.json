@@ -15,6 +15,9 @@
     "NitroFetchClient": {
       "kotlin": "NitroFetchClient",
       "swift": "NitroFetchClient"
+    },
+    "NitroTextEncoding": {
+      "cpp": "HybridTextEncoding"
     }
   },
   "ignorePaths": ["node_modules"]

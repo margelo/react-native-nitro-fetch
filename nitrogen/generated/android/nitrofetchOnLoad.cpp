@@ -18,6 +18,7 @@
 #include "JHybridNitroFetchClientSpec.hpp"
 #include "JHybridNitroFetchSpec.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
+#include "HybridTextEncoding.hpp"
 
 namespace margelo::nitro::nitrofetch {
 
@@ -46,6 +47,15 @@ int initialize(JavaVM* vm) {
         static DefaultConstructableObject<JHybridNitroFetchClientSpec::javaobject> object("com/margelo/nitro/nitrofetch/NitroFetchClient");
         auto instance = object.create();
         return instance->cthis()->shared();
+      }
+    );
+    HybridObjectRegistry::registerHybridObjectConstructor(
+      "NitroTextEncoding",
+      []() -> std::shared_ptr<HybridObject> {
+        static_assert(std::is_default_constructible_v<HybridTextEncoding>,
+                      "The HybridObject \"HybridTextEncoding\" is not default-constructible! "
+                      "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
+        return std::make_shared<HybridTextEncoding>();
       }
     );
   });

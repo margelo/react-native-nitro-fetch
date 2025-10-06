@@ -15,6 +15,7 @@ import {
   prefetchOnAppStart,
   removeAllFromAutoprefetch,
 } from 'react-native-nitro-fetch';
+import TestScreen from './Tests';
 
 type Row = {
   url: string;
@@ -176,6 +177,7 @@ export default function App() {
   const [avgNitroNC, setAvgNitroNC] = React.useState<number | null>(null);
   const [running, setRunning] = React.useState(false);
   const [showSheet, setShowSheet] = React.useState(false);
+  const [testMode, setTestMode] = React.useState(true);
   const [prices, setPrices] = React.useState<
     Array<{ id: string; usd: number }>
   >([]);
@@ -268,6 +270,10 @@ export default function App() {
     run();
   }, []);
 
+  if (testMode) {
+    return <TestScreen />;
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Nitro vs Built-in Fetch</Text>
@@ -284,6 +290,11 @@ export default function App() {
             setShowSheet(true);
             loadPrices();
           }}
+        />
+        <View style={{ width: 12 }} />
+        <Button
+          title={!testMode ? 'Enable Test Mode' : 'Disable Test Mode'}
+          onPress={() => setTestMode((prev) => !prev)}
         />
       </View>
       <View style={[styles.actions, { marginTop: 0 }]}>

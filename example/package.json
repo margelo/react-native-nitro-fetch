@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@react-native/new-app-screen": "0.81.0",
+    "chai": "^6.2.0",
+    "event-target-polyfill": "^0.0.4",
     "react": "19.1.0",
     "react-native": "0.81.0",
     "react-native-nitro-modules": "^0.29.2",
@@ -19,6 +21,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@babel/plugin-transform-class-static-block": "^7.28.3",
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
     "@react-native-community/cli": "20.0.0",
@@ -27,7 +30,9 @@
     "@react-native/babel-preset": "0.81.0",
     "@react-native/metro-config": "0.81.0",
     "@react-native/typescript-config": "0.81.0",
+    "@types/chai": "^5.2.2",
     "@types/react": "^19.1.0",
+    "babel-plugin-module-resolver": "^5.0.2",
     "react-native-builder-bob": "^0.40.13",
     "react-native-monorepo-config": "^0.1.9"
   },
