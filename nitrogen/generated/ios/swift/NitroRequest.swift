@@ -27,13 +27,9 @@ public extension NitroRequest {
       }
     }(), { () -> bridge.std__optional_std__vector_NitroHeader__ in
       if let __unwrappedValue = headers {
-        return bridge.create_std__optional_std__vector_NitroHeader__({ () -> bridge.std__vector_NitroHeader_ in
-          var __vector = bridge.create_std__vector_NitroHeader_(__unwrappedValue.count)
-          for __item in __unwrappedValue {
-            __vector.push_back(__item)
-          }
-          return __vector
-        }())
+        return bridge.create_std__optional_std__vector_NitroHeader__(__unwrappedValue.withUnsafeBufferPointer { __pointer -> bridge.std__vector_NitroHeader_ in
+          return bridge.copy_std__vector_NitroHeader_(__pointer.baseAddress!, __unwrappedValue.count)
+        })
       } else {
         return .init()
       }
@@ -98,7 +94,11 @@ public extension NitroRequest {
       return { () -> [NitroHeader]? in
         if bridge.has_value_std__optional_std__vector_NitroHeader__(self.__headers) {
           let __unwrapped = bridge.get_std__optional_std__vector_NitroHeader__(self.__headers)
-          return __unwrapped.map({ __item in __item })
+          return { () -> [NitroHeader] in
+            let __data = bridge.get_data_std__vector_NitroHeader_(__unwrapped)
+            let __size = __unwrapped.size()
+            return Array(UnsafeBufferPointer(start: __data, count: __size))
+          }()
         } else {
           return nil
         }
@@ -108,13 +108,9 @@ public extension NitroRequest {
     set {
       self.__headers = { () -> bridge.std__optional_std__vector_NitroHeader__ in
         if let __unwrappedValue = newValue {
-          return bridge.create_std__optional_std__vector_NitroHeader__({ () -> bridge.std__vector_NitroHeader_ in
-            var __vector = bridge.create_std__vector_NitroHeader_(__unwrappedValue.count)
-            for __item in __unwrappedValue {
-              __vector.push_back(__item)
-            }
-            return __vector
-          }())
+          return bridge.create_std__optional_std__vector_NitroHeader__(__unwrappedValue.withUnsafeBufferPointer { __pointer -> bridge.std__vector_NitroHeader_ in
+            return bridge.copy_std__vector_NitroHeader_(__pointer.baseAddress!, __unwrappedValue.count)
+          })
         } else {
           return .init()
         }

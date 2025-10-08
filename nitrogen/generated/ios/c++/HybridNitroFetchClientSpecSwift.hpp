@@ -72,7 +72,7 @@ namespace margelo::nitro::nitrofetch {
   public:
     // Methods
     inline std::shared_ptr<Promise<NitroResponse>> request(const NitroRequest& req) override {
-      auto __result = _swiftPart.request(req);
+      auto __result = _swiftPart.request(std::forward<decltype(req)>(req));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
@@ -80,7 +80,7 @@ namespace margelo::nitro::nitrofetch {
       return __value;
     }
     inline std::shared_ptr<Promise<void>> prefetch(const NitroRequest& req) override {
-      auto __result = _swiftPart.prefetch(req);
+      auto __result = _swiftPart.prefetch(std::forward<decltype(req)>(req));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
