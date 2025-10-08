@@ -13,7 +13,6 @@ const textDecoder = new TextDecoder();
 export class FetchResponse {
   private _nativeResponse: NitroResponse;
   private _bodyStream: ReadableStream<Uint8Array> | null = null;
-  private _streamLocked = false;
 
   constructor(nativeResponse: NitroResponse) {
     this._nativeResponse = nativeResponse;
@@ -47,14 +46,13 @@ export class FetchResponse {
   }
 
   get bodyUsed(): boolean {
-    return this._streamLocked;
+    return this._nativeResponse.bodyUsed;
   }
 
   get body(): ReadableStream<Uint8Array> | null {
     if (this._bodyStream === null) {
       this._bodyStream = new ReadableStream<Uint8Array>({
         start: (controller) => {
-          this._streamLocked = true;
           this._nativeResponse.stream({
             onData: (chunk: ArrayBuffer) => {
               controller.enqueue(new Uint8Array(chunk));
@@ -72,13 +70,18 @@ export class FetchResponse {
         },
       });
     }
+
     return this._bodyStream;
   }
 
   private async _consumeBody(): Promise<Uint8Array> {
+    if (this._nativeResponse.bodyUsed) {
+      throw new TypeError('Body has already been consumed');
+    }
+
     const stream = this.body;
     if (stream === null) {
-      throw new TypeError('Body has already been used');
+      throw new TypeError('Response body is not available');
     }
 
     const reader = stream.getReader();
@@ -152,7 +155,6 @@ export async function fetch(
 ): Promise<FetchResponse> {
   const client = NitroFetch.createClient();
 
-  // Convert headers from RequestInit format to NitroHeader[] format
   let headers: Array<{ key: string; value: string }> | undefined;
   if (options?.headers) {
     const headersObj =
@@ -165,6 +167,7 @@ export async function fetch(
       value: String(value),
     }));
   }
+
   const request = {
     url,
     method: (options?.method as any) || 'GET',

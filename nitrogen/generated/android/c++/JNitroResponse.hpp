@@ -56,6 +56,8 @@ namespace margelo::nitro::nitrofetch {
       jboolean redirected = this->getFieldValue(fieldRedirected);
       static const auto fieldHeaders = clazz->getField<jni::JArrayClass<JNitroHeader>>("headers");
       jni::local_ref<jni::JArrayClass<JNitroHeader>> headers = this->getFieldValue(fieldHeaders);
+      static const auto fieldBodyUsed = clazz->getField<jboolean>("bodyUsed");
+      jboolean bodyUsed = this->getFieldValue(fieldBodyUsed);
       static const auto fieldStream = clazz->getField<JFunc_void_StreamCallbacks::javaobject>("stream");
       jni::local_ref<JFunc_void_StreamCallbacks::javaobject> stream = this->getFieldValue(fieldStream);
       static const auto fieldCancel = clazz->getField<JFunc_void::javaobject>("cancel");
@@ -76,6 +78,7 @@ namespace margelo::nitro::nitrofetch {
           }
           return __vector;
         }(),
+        static_cast<bool>(bodyUsed),
         [&]() -> std::function<void(const StreamCallbacks& /* callbacks */)> {
           if (stream->isInstanceOf(JFunc_void_StreamCallbacks_cxx::javaClassStatic())) [[likely]] {
             auto downcast = jni::static_ref_cast<JFunc_void_StreamCallbacks_cxx::javaobject>(stream);
@@ -122,6 +125,7 @@ namespace margelo::nitro::nitrofetch {
           }
           return __array;
         }(),
+        value.bodyUsed,
         JFunc_void_StreamCallbacks_cxx::fromCpp(value.stream),
         JFunc_void_cxx::fromCpp(value.cancel)
       );

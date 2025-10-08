@@ -15,12 +15,12 @@ import java.util.concurrent.atomic.AtomicReference
 
 // Response state management
 private enum class StreamState {
-  NOT_STARTED,    // Initial state
-  BUFFERING,      // Response received, accumulating data in sink
-  STREAMING,      // JS called stream(), actively sending chunks
-  COMPLETED,      // All data received
-  CANCELLED,      // Stream cancelled
-  ERROR           // Error occurred
+  NOT_STARTED,
+  BUFFERING,
+  STREAMING,
+  COMPLETED,
+  CANCELLED,
+  ERROR
 }
 
 @DoNotStrip
@@ -58,7 +58,14 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       var streamCallbacks: StreamCallbacks? = null
       val streamState = AtomicReference(StreamState.NOT_STARTED)
       val cancelled = AtomicBoolean(false)
-      var urlRequest: UrlRequest? = null
+      val stateLock = Any() // Shared lock for all state transitions
+
+      fun toArrayBuffer(bytes: ByteArray): ArrayBuffer {
+        val directBuffer = ByteBuffer.allocateDirect(bytes.size)
+        directBuffer.put(bytes)
+        directBuffer.flip()
+        return ArrayBuffer(directBuffer)
+      }
 
       val callback = object : UrlRequest.Callback() {
         private val buffer = ByteBuffer.allocateDirect(BUFFER_SIZE)
@@ -85,8 +92,7 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
             NitroHeader(entry.key, entry.value)
           }.toTypedArray()
 
-          // Start reading immediately BEFORE returning response
-          // This ensures we're always in BUFFERING state for the first chunks
+          // Start reading immediately
           if (!cancelled.get()) {
             buffer.clear()
             request.read(buffer)
@@ -100,45 +106,45 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
             ok = info.httpStatusCode in 200..299,
             redirected = info.urlChain.size > 1,
             headers = headers,
+            bodyUsed = sink.bodyUsed,
             stream = { callbacks ->
-              synchronized(this) {
+              synchronized(stateLock) {
                 if (streamState.get() == StreamState.STREAMING) {
                   callbacks.onError("Stream already started")
-                  return@NitroResponse
-                }
+                } else {
+                  // ✅ Mark body as used when stream starts
+                  sink.markAsUsed()
+                  streamCallbacks = callbacks
 
-                streamCallbacks = callbacks
-
-                // Flush any buffered data from the sink
-                val bufferedData = sink.finalize()
-                if (bufferedData != null && bufferedData.isNotEmpty()) {
-                  Log.d(TAG, "Flushing ${bufferedData.size} bytes from sink")
-                  val directBuffer = ByteBuffer.allocateDirect(bufferedData.size)
-                  directBuffer.put(bufferedData)
-                  directBuffer.flip()
-                  val arrayBuffer = ArrayBuffer(directBuffer)
-                  callbacks.onData(arrayBuffer)
-                }
-
-                // Check if we already completed while buffering
-                when (streamState.get()) {
-                  StreamState.COMPLETED -> {
-                    Log.d(TAG, "Stream started but already completed")
-                    callbacks.onComplete()
-                    return@NitroResponse
-                  }
-                  StreamState.ERROR -> {
-                    callbacks.onError("Request failed")
-                    return@NitroResponse
-                  }
-                  StreamState.CANCELLED -> {
-                    callbacks.onError("Request cancelled")
-                    return@NitroResponse
-                  }
-                  else -> {
-                    // Transition to streaming mode
+                  // Transition to STREAMING state BEFORE finalizing sink
+                  // This prevents race condition where onReadCompleted tries to append to finalized sink
+                  val currentState = streamState.get()
+                  if (currentState == StreamState.BUFFERING) {
                     streamState.set(StreamState.STREAMING)
-                    // Reads are already happening in the background
+                  }
+
+                  // Flush buffered data
+                  val bufferedData = sink.drainAndFinalize()
+                  if (bufferedData != null && bufferedData.isNotEmpty()) {
+                    Log.d(TAG, "Flushing ${bufferedData.size} bytes from sink")
+                    callbacks.onData(toArrayBuffer(bufferedData))
+                  }
+
+                  // Check if already completed
+                  when (currentState) {
+                    StreamState.COMPLETED -> {
+                      Log.d(TAG, "Stream started but already completed")
+                      callbacks.onComplete()
+                    }
+                    StreamState.ERROR -> {
+                      callbacks.onError("Request failed")
+                    }
+                    StreamState.CANCELLED -> {
+                      callbacks.onError("Request cancelled")
+                    }
+                    else -> {
+                      // State already set above
+                    }
                   }
                 }
               }
@@ -146,13 +152,13 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
             cancel = {
               if (cancelled.compareAndSet(false, true)) {
                 streamState.set(StreamState.CANCELLED)
+                sink.clear()
                 request.cancel()
                 streamCallbacks?.onError("Request cancelled")
               }
             }
           )
 
-          // Return response to JS (now reads are already in progress)
           onSuccess(response)
         }
 
@@ -165,54 +171,43 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
             return
           }
 
-          synchronized(this) {
+          synchronized(stateLock) {
             try {
               byteBuffer.flip()
 
               if (!byteBuffer.hasRemaining()) {
-                // No data, continue reading
                 byteBuffer.clear()
                 request.read(byteBuffer)
                 return
               }
 
-              // Convert to byte array once
               val data = ByteArray(byteBuffer.remaining())
               byteBuffer.get(data)
 
               when (streamState.get()) {
                 StreamState.BUFFERING -> {
-                  // JS hasn't started streaming yet - buffer the data
                   sink.appendBufferBody(data)
                   Log.v(TAG, "Buffered ${data.size} bytes (total: ${sink.getQueuedSize()})")
                 }
 
                 StreamState.STREAMING -> {
-                  // Streaming active - send directly to JS
                   val callbacks = streamCallbacks
                   if (callbacks != null) {
-                    // Create a direct ByteBuffer for ArrayBuffer
-                    val directBuffer = ByteBuffer.allocateDirect(data.size)
-                    directBuffer.put(data)
-                    directBuffer.flip()
-                    val arrayBuffer = ArrayBuffer(directBuffer)
-                    callbacks.onData(arrayBuffer)
+                    callbacks.onData(toArrayBuffer(data))
                   } else {
                     Log.e(TAG, "Streaming state but no callbacks!")
                   }
                 }
 
                 StreamState.CANCELLED, StreamState.ERROR, StreamState.COMPLETED -> {
-                  // Don't process more data
                   return
                 }
 
                 StreamState.NOT_STARTED -> {
-                  Log.e(TAG, "Received data in NOT_STARTED state - shouldn't happen")
+                  Log.e(TAG, "Received data in NOT_STARTED state")
                 }
               }
 
-              // Continue reading
               byteBuffer.clear()
               request.read(byteBuffer)
             } catch (t: Throwable) {
@@ -224,26 +219,23 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         }
 
         override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) {
-          synchronized(this) {
+          synchronized(stateLock) {
             Log.d(TAG, "Request succeeded in state: ${streamState.get()}")
 
             when (streamState.get()) {
               StreamState.STREAMING -> {
-                // Actively streaming - notify completion
+                streamState.set(StreamState.COMPLETED)
                 streamCallbacks?.onComplete()
               }
               StreamState.BUFFERING -> {
-                // JS hasn't started streaming yet - mark as completed
-                // When JS calls stream(), it will get the buffered data
-                // and immediate completion
                 Log.d(TAG, "Completed while buffering (${sink.getQueuedSize()} bytes queued)")
+                streamState.set(StreamState.COMPLETED)
               }
               else -> {
                 Log.w(TAG, "Request completed in unexpected state: ${streamState.get()}")
+                streamState.set(StreamState.COMPLETED)
               }
             }
-
-            streamState.set(StreamState.COMPLETED)
           }
         }
 
@@ -252,9 +244,10 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
           info: UrlResponseInfo?,
           error: CronetException
         ) {
-          synchronized(this) {
+          synchronized(stateLock) {
             Log.e(TAG, "Request failed: ${error.message}", error)
             streamState.set(StreamState.ERROR)
+            sink.clear()
 
             val callbacks = streamCallbacks
             if (callbacks != null) {
@@ -266,9 +259,10 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         }
 
         override fun onCanceled(request: UrlRequest, info: UrlResponseInfo?) {
-          synchronized(this) {
+          synchronized(stateLock) {
             Log.d(TAG, "Request canceled")
             streamState.set(StreamState.CANCELLED)
+            sink.clear()
 
             val callbacks = streamCallbacks
             if (callbacks != null) {
@@ -284,13 +278,11 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       val method = req.method?.name ?: "GET"
       builder.setHttpMethod(method)
 
-      // Add headers
       req.headers?.forEach { header ->
         builder.addHeader(header.key, header.value)
       }
 
-      urlRequest = builder.build()
-      urlRequest?.start()
+      builder.build().start()
     }
   }
 
@@ -309,7 +301,6 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
     fetch(
       req,
       onSuccess = { response ->
-        // Start streaming but don't process chunks
         response.stream(StreamCallbacks(
           onData = { chunk ->
             // Discard chunks for prefetch

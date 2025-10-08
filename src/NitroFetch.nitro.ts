@@ -40,6 +40,7 @@ export interface NitroResponse {
   readonly ok: boolean;
   readonly redirected: boolean;
   readonly headers: NitroHeader[];
+  readonly bodyUsed: boolean;
 
   // Instead of readChunk(), we set up a stream with callbacks
   stream(callbacks: StreamCallbacks): void;

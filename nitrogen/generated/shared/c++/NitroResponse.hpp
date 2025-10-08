@@ -42,12 +42,13 @@ namespace margelo::nitro::nitrofetch {
     bool ok     SWIFT_PRIVATE;
     bool redirected     SWIFT_PRIVATE;
     std::vector<NitroHeader> headers     SWIFT_PRIVATE;
+    bool bodyUsed     SWIFT_PRIVATE;
     std::function<void(const StreamCallbacks& /* callbacks */)> stream     SWIFT_PRIVATE;
     std::function<void()> cancel     SWIFT_PRIVATE;
 
   public:
     NitroResponse() = default;
-    explicit NitroResponse(std::string url, double status, std::string statusText, bool ok, bool redirected, std::vector<NitroHeader> headers, std::function<void(const StreamCallbacks& /* callbacks */)> stream, std::function<void()> cancel): url(url), status(status), statusText(statusText), ok(ok), redirected(redirected), headers(headers), stream(stream), cancel(cancel) {}
+    explicit NitroResponse(std::string url, double status, std::string statusText, bool ok, bool redirected, std::vector<NitroHeader> headers, bool bodyUsed, std::function<void(const StreamCallbacks& /* callbacks */)> stream, std::function<void()> cancel): url(url), status(status), statusText(statusText), ok(ok), redirected(redirected), headers(headers), bodyUsed(bodyUsed), stream(stream), cancel(cancel) {}
   };
 
 } // namespace margelo::nitro::nitrofetch
@@ -66,6 +67,7 @@ namespace margelo::nitro {
         JSIConverter<bool>::fromJSI(runtime, obj.getProperty(runtime, "ok")),
         JSIConverter<bool>::fromJSI(runtime, obj.getProperty(runtime, "redirected")),
         JSIConverter<std::vector<margelo::nitro::nitrofetch::NitroHeader>>::fromJSI(runtime, obj.getProperty(runtime, "headers")),
+        JSIConverter<bool>::fromJSI(runtime, obj.getProperty(runtime, "bodyUsed")),
         JSIConverter<std::function<void(const margelo::nitro::nitrofetch::StreamCallbacks&)>>::fromJSI(runtime, obj.getProperty(runtime, "stream")),
         JSIConverter<std::function<void()>>::fromJSI(runtime, obj.getProperty(runtime, "cancel"))
       );
@@ -78,6 +80,7 @@ namespace margelo::nitro {
       obj.setProperty(runtime, "ok", JSIConverter<bool>::toJSI(runtime, arg.ok));
       obj.setProperty(runtime, "redirected", JSIConverter<bool>::toJSI(runtime, arg.redirected));
       obj.setProperty(runtime, "headers", JSIConverter<std::vector<margelo::nitro::nitrofetch::NitroHeader>>::toJSI(runtime, arg.headers));
+      obj.setProperty(runtime, "bodyUsed", JSIConverter<bool>::toJSI(runtime, arg.bodyUsed));
       obj.setProperty(runtime, "stream", JSIConverter<std::function<void(const margelo::nitro::nitrofetch::StreamCallbacks&)>>::toJSI(runtime, arg.stream));
       obj.setProperty(runtime, "cancel", JSIConverter<std::function<void()>>::toJSI(runtime, arg.cancel));
       return obj;
@@ -93,6 +96,7 @@ namespace margelo::nitro {
       if (!JSIConverter<bool>::canConvert(runtime, obj.getProperty(runtime, "ok"))) return false;
       if (!JSIConverter<bool>::canConvert(runtime, obj.getProperty(runtime, "redirected"))) return false;
       if (!JSIConverter<std::vector<margelo::nitro::nitrofetch::NitroHeader>>::canConvert(runtime, obj.getProperty(runtime, "headers"))) return false;
+      if (!JSIConverter<bool>::canConvert(runtime, obj.getProperty(runtime, "bodyUsed"))) return false;
       if (!JSIConverter<std::function<void(const margelo::nitro::nitrofetch::StreamCallbacks&)>>::canConvert(runtime, obj.getProperty(runtime, "stream"))) return false;
       if (!JSIConverter<std::function<void()>>::canConvert(runtime, obj.getProperty(runtime, "cancel"))) return false;
       return true;

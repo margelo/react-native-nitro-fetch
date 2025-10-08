@@ -1,65 +1,61 @@
 package com.margelo.nitro.nitrofetch
 
-import java.nio.ByteBuffer
+import java.io.ByteArrayOutputStream
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
+import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * A buffer that accumulates response body data before streaming starts.
- * This allows the native side to receive and queue data while JS is still
- * setting up the stream, preventing backpressure issues.
- */
 internal class ResponseSink {
-  private val bodyQueue: MutableList<ByteArray> = mutableListOf()
+  private val lock = ReentrantLock()
+  private val bodyBuffer = ByteArrayOutputStream()
+
+  @Volatile
   private var isFinalized = false
 
-  var bodyUsed = false
-    private set
+  private val bodyUsedAtomic = AtomicBoolean(false)
+  val bodyUsed: Boolean
+    get() = bodyUsedAtomic.get()
 
-  /**
-   * Append data to the queue. Called when streaming hasn't started yet.
-   */
-  @Synchronized
   fun appendBufferBody(data: ByteArray) {
-    if (isFinalized) {
-      throw IllegalStateException("Cannot append to finalized sink")
+    lock.withLock {
+      check(!isFinalized) { "Cannot append to finalized sink" }
+      bodyBuffer.write(data)
     }
-    bodyUsed = true
-    bodyQueue.add(data)
   }
 
-  /**
-   * Finalize and return all queued data as a single array.
-   * This is called when JS starts streaming - we flush everything we've accumulated.
-   */
-  @Synchronized
-  fun finalize(): ByteArray? {
-    if (bodyQueue.isEmpty()) {
+  fun drainAndFinalize(): ByteArray? {
+    lock.withLock {
+      if (isFinalized) {
+        return null
+      }
+
+      val result = if (bodyBuffer.size() > 0) {
+        bodyBuffer.toByteArray()
+      } else {
+        null
+      }
+
+      bodyBuffer.reset()
       isFinalized = true
-      return null
+      return result
     }
-
-    val totalSize = bodyQueue.sumOf { it.size }
-    val result = ByteBuffer.allocate(totalSize)
-
-    for (chunk in bodyQueue) {
-      result.put(chunk)
-    }
-
-    bodyQueue.clear()
-    bodyUsed = true
-    isFinalized = true
-
-    return result.array()
   }
 
-  /**
-   * Get current queue size (for debugging/monitoring)
-   */
-  @Synchronized
-  fun getQueuedSize(): Int = bodyQueue.sumOf { it.size }
+  fun markAsUsed() {
+    bodyUsedAtomic.set(true)
+  }
 
-  /**
-   * Check if sink has been finalized
-   */
-  @Synchronized
-  fun isFinalized(): Boolean = isFinalized
+  fun clear() {
+    lock.withLock {
+      bodyBuffer.reset()
+      isFinalized = true
+    }
+  }
+
+  fun getQueuedSize(): Int {
+    lock.withLock {
+      return bodyBuffer.size()
+    }
+  }
+
 }

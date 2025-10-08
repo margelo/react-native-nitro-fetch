@@ -18,10 +18,10 @@ public extension NitroResponse {
   /**
    * Create a new instance of `NitroResponse`.
    */
-  init(url: String, status: Double, statusText: String, ok: Bool, redirected: Bool, headers: [NitroHeader], stream: @escaping (_ callbacks: StreamCallbacks) -> Void, cancel: @escaping () -> Void) {
+  init(url: String, status: Double, statusText: String, ok: Bool, redirected: Bool, headers: [NitroHeader], bodyUsed: Bool, stream: @escaping (_ callbacks: StreamCallbacks) -> Void, cancel: @escaping () -> Void) {
     self.init(std.string(url), status, std.string(statusText), ok, redirected, headers.withUnsafeBufferPointer { __pointer -> bridge.std__vector_NitroHeader_ in
       return bridge.copy_std__vector_NitroHeader_(__pointer.baseAddress!, headers.count)
-    }, { () -> bridge.Func_void_StreamCallbacks in
+    }, bodyUsed, { () -> bridge.Func_void_StreamCallbacks in
       let __closureWrapper = Func_void_StreamCallbacks(stream)
       return bridge.create_Func_void_StreamCallbacks(__closureWrapper.toUnsafe())
     }(), { () -> bridge.Func_void in
@@ -99,6 +99,17 @@ public extension NitroResponse {
       self.__headers = newValue.withUnsafeBufferPointer { __pointer -> bridge.std__vector_NitroHeader_ in
         return bridge.copy_std__vector_NitroHeader_(__pointer.baseAddress!, newValue.count)
       }
+    }
+  }
+  
+  var bodyUsed: Bool {
+    @inline(__always)
+    get {
+      return self.__bodyUsed
+    }
+    @inline(__always)
+    set {
+      self.__bodyUsed = newValue
     }
   }
   
