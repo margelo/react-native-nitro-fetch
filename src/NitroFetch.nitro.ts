@@ -46,14 +46,6 @@ export interface NitroResponse {
   cancel(): void;
 }
 
-export interface TextDecodeOptions {
-  stream?: boolean;
-}
-
-export interface TextDecoderOptions {
-  fatal?: boolean;
-  ignoreBOM?: boolean;
-}
 export interface NitroFetchClient
   extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
   // Client-binded request that uses the env configured at creation.
@@ -69,15 +61,4 @@ export interface NitroFetch
 
   // Optional future: global abort/teardown
   // shutdown(): void;
-}
-export interface NitroTextDecoder
-  extends HybridObject<{ ios: 'c++'; android: 'c++' }> {
-  readonly encoding: string;
-  readonly fatal: boolean;
-  readonly ignoreBOM: boolean;
-  decode(input?: ArrayBuffer, options?: TextDecodeOptions): string;
-}
-export interface NitroTextEncoding
-  extends HybridObject<{ ios: 'c++'; android: 'c++' }> {
-  createDecoder(label?: string, options?: TextDecoderOptions): NitroTextDecoder;
 }
