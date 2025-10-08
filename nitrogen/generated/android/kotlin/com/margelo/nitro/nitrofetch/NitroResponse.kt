@@ -41,10 +41,14 @@ data class NitroResponse
     val headers: Array<NitroHeader>,
     @DoNotStrip
     @Keep
-    val bodyString: String?,
+    val stream: Func_void_StreamCallbacks,
     @DoNotStrip
     @Keep
-    val bodyBytes: String?
+    val cancel: Func_void
   ) {
-  /* main constructor */
+  /**
+   * Initialize a new instance of `NitroResponse` from Kotlin.
+   */
+  constructor(url: String, status: Double, statusText: String, ok: Boolean, redirected: Boolean, headers: Array<NitroHeader>, stream: (callbacks: StreamCallbacks) -> Unit, cancel: () -> Unit)
+       : this(url, status, statusText, ok, redirected, headers, Func_void_StreamCallbacks_java(stream), Func_void_java(cancel))
 }

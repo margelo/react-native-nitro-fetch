@@ -3,7 +3,6 @@ package com.margelo.nitro.nitrofetch
 import android.app.Application
 import org.json.JSONArray
 import org.json.JSONObject
-import java.util.concurrent.CompletableFuture
 import com.tencent.mmkv.MMKV;
 
 
@@ -41,31 +40,15 @@ object AutoPrefetcher {
           followRedirects = null
         )
 
-        // If already pending or fresh, skip starting a new one
-        if (FetchCache.getPending(prefetchKey) != null) {
-          continue
+        // Use the NitroFetchClient's prefetch method which handles caching properly
+        try {
+          val engine = NitroFetch.getEngine()
+          val executor = NitroFetch.ioExecutor
+          val client = NitroFetchClient(engine, executor)
+          client.prefetch(req)
+        } catch (_: Throwable) {
+          // Ignore prefetch errors - best effort
         }
-        if (FetchCache.getResultIfFresh(prefetchKey, 5_000L) != null) {
-          continue
-        }
-
-        val future = CompletableFuture<NitroResponse>()
-        FetchCache.setPending(prefetchKey, future)
-        NitroFetchClient.fetch(req,
-          onSuccess = { res ->
-            try {
-              FetchCache.complete(prefetchKey, res)
-              future.complete(res)
-            } catch (t: Throwable) {
-              FetchCache.completeExceptionally(prefetchKey, t)
-              future.completeExceptionally(t)
-            }
-          },
-          onFail = { err ->
-            FetchCache.completeExceptionally(prefetchKey, err)
-            future.completeExceptionally(err)
-          }
-        )
       }
     } catch (_: Throwable) {
       // ignore – prefetch-on-start is best-effort

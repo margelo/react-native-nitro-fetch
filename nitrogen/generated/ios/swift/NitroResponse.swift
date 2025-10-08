@@ -18,21 +18,15 @@ public extension NitroResponse {
   /**
    * Create a new instance of `NitroResponse`.
    */
-  init(url: String, status: Double, statusText: String, ok: Bool, redirected: Bool, headers: [NitroHeader], bodyString: String?, bodyBytes: String?) {
+  init(url: String, status: Double, statusText: String, ok: Bool, redirected: Bool, headers: [NitroHeader], stream: @escaping (_ callbacks: StreamCallbacks) -> Void, cancel: @escaping () -> Void) {
     self.init(std.string(url), status, std.string(statusText), ok, redirected, headers.withUnsafeBufferPointer { __pointer -> bridge.std__vector_NitroHeader_ in
       return bridge.copy_std__vector_NitroHeader_(__pointer.baseAddress!, headers.count)
-    }, { () -> bridge.std__optional_std__string_ in
-      if let __unwrappedValue = bodyString {
-        return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
-      } else {
-        return .init()
-      }
-    }(), { () -> bridge.std__optional_std__string_ in
-      if let __unwrappedValue = bodyBytes {
-        return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
-      } else {
-        return .init()
-      }
+    }, { () -> bridge.Func_void_StreamCallbacks in
+      let __closureWrapper = Func_void_StreamCallbacks(stream)
+      return bridge.create_Func_void_StreamCallbacks(__closureWrapper.toUnsafe())
+    }(), { () -> bridge.Func_void in
+      let __closureWrapper = Func_void(cancel)
+      return bridge.create_Func_void(__closureWrapper.toUnsafe())
     }())
   }
 
@@ -108,50 +102,40 @@ public extension NitroResponse {
     }
   }
   
-  var bodyString: String? {
+  var stream: (_ callbacks: StreamCallbacks) -> Void {
     @inline(__always)
     get {
-      return { () -> String? in
-        if bridge.has_value_std__optional_std__string_(self.__bodyString) {
-          let __unwrapped = bridge.get_std__optional_std__string_(self.__bodyString)
-          return String(__unwrapped)
-        } else {
-          return nil
+      return { () -> (StreamCallbacks) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_StreamCallbacks(self.__stream)
+        return { (__callbacks: StreamCallbacks) -> Void in
+          __wrappedFunction.call(__callbacks)
         }
       }()
     }
     @inline(__always)
     set {
-      self.__bodyString = { () -> bridge.std__optional_std__string_ in
-        if let __unwrappedValue = newValue {
-          return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
-        } else {
-          return .init()
-        }
+      self.__stream = { () -> bridge.Func_void_StreamCallbacks in
+        let __closureWrapper = Func_void_StreamCallbacks(newValue)
+        return bridge.create_Func_void_StreamCallbacks(__closureWrapper.toUnsafe())
       }()
     }
   }
   
-  var bodyBytes: String? {
+  var cancel: () -> Void {
     @inline(__always)
     get {
-      return { () -> String? in
-        if bridge.has_value_std__optional_std__string_(self.__bodyBytes) {
-          let __unwrapped = bridge.get_std__optional_std__string_(self.__bodyBytes)
-          return String(__unwrapped)
-        } else {
-          return nil
+      return { () -> () -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void(self.__cancel)
+        return { () -> Void in
+          __wrappedFunction.call()
         }
       }()
     }
     @inline(__always)
     set {
-      self.__bodyBytes = { () -> bridge.std__optional_std__string_ in
-        if let __unwrappedValue = newValue {
-          return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
-        } else {
-          return .init()
-        }
+      self.__cancel = { () -> bridge.Func_void in
+        let __closureWrapper = Func_void(newValue)
+        return bridge.create_Func_void(__closureWrapper.toUnsafe())
       }()
     }
   }

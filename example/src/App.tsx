@@ -1,21 +1,7 @@
 import React from 'react';
-import {
-  Text,
-  View,
-  StyleSheet,
-  Button,
-  ScrollView,
-  Modal,
-  Pressable,
-} from 'react-native';
-import {
-  fetch as nitroFetch,
-  nitroFetchOnWorklet,
-  prefetch,
-  prefetchOnAppStart,
-  removeAllFromAutoprefetch,
-} from 'react-native-nitro-fetch';
-import TestScreen from './Tests';
+import { Button, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { fetch as nitroFetch } from 'react-native-nitro-fetch';
+import { fetchStreamedData } from './stream';
 
 type Row = {
   url: string;
@@ -176,47 +162,9 @@ export default function App() {
   const [avgBuiltinNC, setAvgBuiltinNC] = React.useState<number | null>(null);
   const [avgNitroNC, setAvgNitroNC] = React.useState<number | null>(null);
   const [running, setRunning] = React.useState(false);
-  const [showSheet, setShowSheet] = React.useState(false);
-  const [testMode, setTestMode] = React.useState(true);
-  const [prices, setPrices] = React.useState<
-    Array<{ id: string; usd: number }>
-  >([]);
-  const [prefetchInfo, setPrefetchInfo] = React.useState<string>('');
-  const PREFETCH_URL = 'https://httpbin.org/uuid';
-  const PREFETCH_KEY = 'uuid';
+  const [result, setResult] = React.useState<string>('');
 
-  const loadPrices = React.useCallback(async () => {
-    console.log('Loading crypto prices from coingecko start');
-    const ids = [
-      'bitcoin',
-      'ethereum',
-      'solana',
-      'dogecoin',
-      'litecoin',
-      'cardano',
-      'ripple',
-      'polkadot',
-      'chainlink',
-      'polygon-pos',
-    ];
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids.join(','))}&vs_currencies=usd`;
-    const mapper = (payload: { bodyString?: string }) => {
-      'worklet';
-      const txt = payload.bodyString ?? '';
-      const json = JSON.parse(txt) as Record<string, { usd: number }>;
-      const arr = Object.entries(json).map(([id, v]) => ({ id, usd: v.usd }));
-      arr.sort((a, b) => a.id.localeCompare(b.id));
-      return arr;
-    };
-    console.log('Loading crypto prices from coingecko');
-    const data = await nitroFetchOnWorklet(url, undefined, mapper, {
-      preferBytes: false,
-    });
-    console.log('Loaded crypto prices:', data);
-    setPrices(data);
-  }, []);
-
-  const run = React.useCallback(async () => {
+  const runCandidatesTest = React.useCallback(async () => {
     if (running) return;
     setRunning(true);
     try {
@@ -266,108 +214,87 @@ export default function App() {
     }
   }, [running]);
 
-  React.useEffect(() => {
-    run();
-  }, []);
-
-  if (testMode) {
-    return <TestScreen />;
-  }
-
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Nitro vs Built-in Fetch</Text>
       <View style={styles.actions}>
         <Button
-          title={running ? 'Running…' : 'Run Again'}
-          onPress={run}
+          title={running ? 'Running…' : 'Run CANDIDATES Test'}
+          onPress={runCandidatesTest}
           disabled={running}
         />
-        <View style={{ width: 12 }} />
         <Button
-          title="Show Crypto Prices"
-          onPress={() => {
-            setShowSheet(true);
-            loadPrices();
-          }}
-        />
-        <View style={{ width: 12 }} />
-        <Button
-          title={!testMode ? 'Enable Test Mode' : 'Disable Test Mode'}
-          onPress={() => setTestMode((prev) => !prev)}
-        />
-      </View>
-      <View style={[styles.actions, { marginTop: 0 }]}>
-        <Button
-          title="Prefetch UUID"
+          title={'test fetch'}
           onPress={async () => {
             try {
-              await prefetch(PREFETCH_URL, {
-                headers: { prefetchKey: PREFETCH_KEY },
-              });
-              setPrefetchInfo('Prefetch started');
-            } catch (e: any) {
-              setPrefetchInfo(`Prefetch error: ${e?.message ?? String(e)}`);
-            }
-          }}
-        />
-        <View style={{ width: 12 }} />
-        <Button
-          title="Fetch Prefetched"
-          onPress={async () => {
-            try {
-              const res = await nitroFetch(PREFETCH_URL, {
-                headers: { prefetchKey: PREFETCH_KEY },
-              });
-              const text = await res.text();
-              const pref = res.headers.get('nitroPrefetched');
-              setPrefetchInfo(
-                `Fetched. nitroPrefetched=${pref ?? 'null'} len=${text.length}`
+              const res = await nitroFetch(
+                'https://jsonplaceholder.typicode.com/posts/3'
               );
-            } catch (e: any) {
-              setPrefetchInfo(`Fetch error: ${e?.message ?? String(e)}`);
+              const json = await res.json();
+              console.log('JSON:', json);
+            } catch (err) {
+              console.log('Error:', err);
             }
           }}
+          disabled={running}
+        />
+        <Button
+          title="Run Stream Test"
+          onPress={async () => {
+            // await fetchStreamedData({
+            //   onData: (data) => {
+            //     console.log('Received:', data);
+            //   },
+            //   onStreamComplete: () => console.log('Done!'),
+            // });
+            // const end = performance.now();
+            // console.log(`Streaming took ${end - start}ms`);
+            // setElapsedTime(end - start);
+            const totalStart = performance.now();
+            const times: number[] = [];
+
+            for (let i = 0; i < 30; i++) {
+              const start = performance.now();
+              await fetchStreamedData();
+              const end = performance.now();
+              const duration = end - start;
+              times.push(duration);
+              console.log(
+                `Stream test ${i + 1}/100 took ${duration.toFixed(2)}ms`
+              );
+            }
+
+            const totalEnd = performance.now();
+            const totalDuration = totalEnd - totalStart;
+            const avgDuration = times.reduce((a, b) => a + b, 0) / times.length;
+            const minDuration = Math.min(...times);
+            const maxDuration = Math.max(...times);
+
+            console.log('='.repeat(50));
+            console.log(
+              `Completed 100 stream tests in ${totalDuration.toFixed(2)}ms`
+            );
+            console.log(`Average: ${avgDuration.toFixed(2)}ms`);
+            console.log(`Min: ${minDuration.toFixed(2)}ms`);
+            console.log(`Max: ${maxDuration.toFixed(2)}ms`);
+            console.log('='.repeat(50));
+            setResult(
+              [
+                `Average: ${avgDuration.toFixed(2)}ms`,
+                `Min: ${minDuration.toFixed(2)}ms`,
+                `Max: ${maxDuration.toFixed(2)}ms`,
+              ].join('\n')
+            );
+          }}
+          disabled={running}
         />
       </View>
-      <View style={[styles.actions, { marginTop: 0 }]}>
-        <Button
-          title="Schedule Auto-Prefetch (MMKV)"
-          onPress={async () => {
-            try {
-              await prefetchOnAppStart(PREFETCH_URL, {
-                prefetchKey: PREFETCH_KEY,
-              });
-              setPrefetchInfo('Scheduled in MMKV (Android)');
-            } catch (e: any) {
-              setPrefetchInfo(`Schedule error: ${e?.message ?? String(e)}`);
-            }
-          }}
-        />
-        <View style={{ width: 12 }} />
-        <Button
-          title="Clear Auto-Prefetch"
-          onPress={async () => {
-            try {
-              await removeAllFromAutoprefetch();
-              setPrefetchInfo('Cleared auto-prefetch queue');
-            } catch (e: any) {
-              setPrefetchInfo(`Clear error: ${e?.message ?? String(e)}`);
-            }
-          }}
-        />
-      </View>
-      {!!prefetchInfo && (
-        <Text style={{ textAlign: 'center', marginBottom: 8 }}>
-          {prefetchInfo}
-        </Text>
-      )}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
       >
         {rows == null ? (
-          <Text>Measuring…</Text>
+          <Text style={styles.placeholder}>{result}</Text>
         ) : (
           <>
             <View style={styles.headerRow}>
@@ -431,39 +358,6 @@ export default function App() {
           </>
         )}
       </ScrollView>
-      <Modal
-        visible={showSheet}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowSheet(false)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setShowSheet(false)}>
-          <View />
-        </Pressable>
-        <View style={styles.sheet}>
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Crypto Prices (USD)</Text>
-            <Button title="Close" onPress={() => setShowSheet(false)} />
-          </View>
-          <ScrollView style={{ maxHeight: 360 }}>
-            {prices.length === 0 ? (
-              <Text style={{ padding: 12 }}>Loading…</Text>
-            ) : (
-              prices.map((p) => (
-                <View key={p.id} style={styles.priceRow}>
-                  <Text style={styles.priceId}>{p.id}</Text>
-                  <Text style={styles.priceVal}>
-                    $
-                    {p.usd.toLocaleString(undefined, {
-                      maximumFractionDigits: 6,
-                    })}
-                  </Text>
-                </View>
-              ))
-            )}
-          </ScrollView>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -483,50 +377,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 12,
+    gap: 12,
   },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    paddingBottom: 24,
-  },
-  sheetHeader: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#eee',
-  },
-  sheetTitle: {
+  placeholder: {
+    textAlign: 'center',
+    marginTop: 24,
     fontSize: 16,
-    fontWeight: '600',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#f1f1f1',
-  },
-  priceId: {
-    fontSize: 14,
-  },
-  priceVal: {
-    fontSize: 14,
-    fontVariant: ['tabular-nums'],
+    color: '#666',
   },
   scroll: {
     flex: 1,
@@ -567,9 +425,5 @@ const styles = StyleSheet.create({
   avg: {
     textAlign: 'center',
     fontSize: 16,
-  },
-  error: {
-    color: 'red',
-    marginLeft: 8,
   },
 });

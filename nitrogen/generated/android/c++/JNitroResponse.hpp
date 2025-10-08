@@ -10,9 +10,18 @@
 #include <fbjni/fbjni.h>
 #include "NitroResponse.hpp"
 
+#include "JFunc_void.hpp"
+#include "JFunc_void_StreamCallbacks.hpp"
+#include "JFunc_void_std__shared_ptr_ArrayBuffer_.hpp"
+#include "JFunc_void_std__string.hpp"
 #include "JNitroHeader.hpp"
+#include "JStreamCallbacks.hpp"
 #include "NitroHeader.hpp"
-#include <optional>
+#include "StreamCallbacks.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
+#include <NitroModules/JArrayBuffer.hpp>
+#include <NitroModules/JUnit.hpp>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -47,10 +56,10 @@ namespace margelo::nitro::nitrofetch {
       jboolean redirected = this->getFieldValue(fieldRedirected);
       static const auto fieldHeaders = clazz->getField<jni::JArrayClass<JNitroHeader>>("headers");
       jni::local_ref<jni::JArrayClass<JNitroHeader>> headers = this->getFieldValue(fieldHeaders);
-      static const auto fieldBodyString = clazz->getField<jni::JString>("bodyString");
-      jni::local_ref<jni::JString> bodyString = this->getFieldValue(fieldBodyString);
-      static const auto fieldBodyBytes = clazz->getField<jni::JString>("bodyBytes");
-      jni::local_ref<jni::JString> bodyBytes = this->getFieldValue(fieldBodyBytes);
+      static const auto fieldStream = clazz->getField<JFunc_void_StreamCallbacks::javaobject>("stream");
+      jni::local_ref<JFunc_void_StreamCallbacks::javaobject> stream = this->getFieldValue(fieldStream);
+      static const auto fieldCancel = clazz->getField<JFunc_void::javaobject>("cancel");
+      jni::local_ref<JFunc_void::javaobject> cancel = this->getFieldValue(fieldCancel);
       return NitroResponse(
         url->toStdString(),
         status,
@@ -67,8 +76,28 @@ namespace margelo::nitro::nitrofetch {
           }
           return __vector;
         }(),
-        bodyString != nullptr ? std::make_optional(bodyString->toStdString()) : std::nullopt,
-        bodyBytes != nullptr ? std::make_optional(bodyBytes->toStdString()) : std::nullopt
+        [&]() -> std::function<void(const StreamCallbacks& /* callbacks */)> {
+          if (stream->isInstanceOf(JFunc_void_StreamCallbacks_cxx::javaClassStatic())) [[likely]] {
+            auto downcast = jni::static_ref_cast<JFunc_void_StreamCallbacks_cxx::javaobject>(stream);
+            return downcast->cthis()->getFunction();
+          } else {
+            auto streamRef = jni::make_global(stream);
+            return [streamRef](StreamCallbacks callbacks) -> void {
+              return streamRef->invoke(callbacks);
+            };
+          }
+        }(),
+        [&]() -> std::function<void()> {
+          if (cancel->isInstanceOf(JFunc_void_cxx::javaClassStatic())) [[likely]] {
+            auto downcast = jni::static_ref_cast<JFunc_void_cxx::javaobject>(cancel);
+            return downcast->cthis()->getFunction();
+          } else {
+            auto cancelRef = jni::make_global(cancel);
+            return [cancelRef]() -> void {
+              return cancelRef->invoke();
+            };
+          }
+        }()
       );
     }
 
@@ -93,8 +122,8 @@ namespace margelo::nitro::nitrofetch {
           }
           return __array;
         }(),
-        value.bodyString.has_value() ? jni::make_jstring(value.bodyString.value()) : nullptr,
-        value.bodyBytes.has_value() ? jni::make_jstring(value.bodyBytes.value()) : nullptr
+        JFunc_void_StreamCallbacks_cxx::fromCpp(value.stream),
+        JFunc_void_cxx::fromCpp(value.cancel)
       );
     }
   };

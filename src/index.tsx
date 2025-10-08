@@ -1,22 +1,13 @@
-export {
-  nitroFetch as fetch,
-  nitroFetchOnWorklet,
-  prefetch,
-  prefetchOnAppStart,
-  removeFromAutoPrefetch,
-  removeAllFromAutoprefetch,
-} from './fetch';
-export type { NitroRequest, NitroResponse } from './fetch';
-export { NitroFetch } from './NitroInstances';
+import 'web-streams-polyfill/polyfill';
 import { NitroModules } from 'react-native-nitro-modules';
-import './fetch';
-import {
+import type {
   NitroTextDecoder,
   NitroTextEncoding,
   TextDecodeOptions,
   TextDecoderOptions,
 } from './NitroFetch.nitro';
 
+export * from './fetch';
 // Keep legacy export to avoid breaking any local tests/usages during scaffolding.
 // Will be removed once native Cronet path is ready.
 export function multiply(a: number, b: number): number {

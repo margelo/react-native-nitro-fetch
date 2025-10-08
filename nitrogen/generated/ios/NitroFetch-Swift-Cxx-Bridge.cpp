@@ -14,6 +14,38 @@
 
 namespace margelo::nitro::nitrofetch::bridge::swift {
 
+  // pragma MARK: std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>
+  Func_void_std__shared_ptr_ArrayBuffer_ create_Func_void_std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_std__shared_ptr_ArrayBuffer_::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::shared_ptr<ArrayBuffer>& chunk) mutable -> void {
+      swiftClosure.call(ArrayBufferHolder(chunk));
+    };
+  }
+  
+  // pragma MARK: std::function<void()>
+  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)]() mutable -> void {
+      swiftClosure.call();
+    };
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* error */)>
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_std__string::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::string& error) mutable -> void {
+      swiftClosure.call(error);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const StreamCallbacks& /* callbacks */)>
+  Func_void_StreamCallbacks create_Func_void_StreamCallbacks(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_StreamCallbacks::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const StreamCallbacks& callbacks) mutable -> void {
+      swiftClosure.call(callbacks);
+    };
+  }
+  
   // pragma MARK: std::function<void(const NitroResponse& /* result */)>
   Func_void_NitroResponse create_Func_void_NitroResponse(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = NitroFetch::Func_void_NitroResponse::fromUnsafe(swiftClosureWrapper);
@@ -27,14 +59,6 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     auto swiftClosure = NitroFetch::Func_void_std__exception_ptr::fromUnsafe(swiftClosureWrapper);
     return [swiftClosure = std::move(swiftClosure)](const std::exception_ptr& error) mutable -> void {
       swiftClosure.call(error);
-    };
-  }
-  
-  // pragma MARK: std::function<void()>
-  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = NitroFetch::Func_void::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)]() mutable -> void {
-      swiftClosure.call();
     };
   }
   

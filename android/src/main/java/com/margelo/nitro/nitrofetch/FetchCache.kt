@@ -1,17 +1,33 @@
 package com.margelo.nitro.nitrofetch
 
+import com.margelo.nitro.core.ArrayBuffer
+import org.chromium.net.UrlResponseInfo
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
 
-data class CachedEntry(val response: NitroResponse, val timestampMs: Long)
+/**
+ * Cached response data - stores the raw bytes and metadata, not the NitroResponse object
+ * (since NitroResponse contains function callbacks that can't be cached)
+ */
+data class CachedResponseData(
+  val url: String,
+  val status: Int,
+  val statusText: String,
+  val ok: Boolean,
+  val redirected: Boolean,
+  val headers: Array<NitroHeader>,
+  val bodyBytes: ByteArray,
+  val timestampMs: Long
+)
 
 object FetchCache {
-  private val pending = ConcurrentHashMap<String, CompletableFuture<NitroResponse>>()
-  private val results = ConcurrentHashMap<String, CachedEntry>()
+  private val pending = ConcurrentHashMap<String, CompletableFuture<CachedResponseData>>()
+  private val results = ConcurrentHashMap<String, CachedResponseData>()
 
-  fun getPending(key: String): CompletableFuture<NitroResponse>? = pending[key]
+  fun getPending(key: String): CompletableFuture<CachedResponseData>? = pending[key]
 
-  fun setPending(key: String, future: CompletableFuture<NitroResponse>) {
+  fun setPending(key: String, future: CompletableFuture<CachedResponseData>) {
     pending[key] = future
     // Cleanup: remove pending entry when completed
     future.whenComplete { _, _ ->
@@ -19,8 +35,8 @@ object FetchCache {
     }
   }
 
-  fun complete(key: String, value: NitroResponse) {
-    results[key] = CachedEntry(value, System.currentTimeMillis())
+  fun complete(key: String, value: CachedResponseData) {
+    results[key] = value
     pending[key]?.complete(value)
     pending.remove(key)
   }
@@ -30,15 +46,20 @@ object FetchCache {
     pending.remove(key)
   }
 
-  fun getResult(key: String): NitroResponse? {
-    val entry = results.remove(key) ?: return null
-    return entry.response
+  fun getResult(key: String): CachedResponseData? {
+    return results.remove(key)
   }
 
-  fun getResultIfFresh(key: String, maxAgeMs: Long): NitroResponse? {
-    val entry = results.remove(key) ?: return null
+  fun getResultIfFresh(key: String, maxAgeMs: Long): CachedResponseData? {
+    val entry = results[key] ?: return null
     val age = System.currentTimeMillis() - entry.timestampMs
-    return if (age <= maxAgeMs) entry.response else null
+    return if (age <= maxAgeMs) {
+      results.remove(key) // Remove after use
+      entry
+    } else {
+      results.remove(key) // Remove stale entry
+      null
+    }
   }
 
   fun clear() {

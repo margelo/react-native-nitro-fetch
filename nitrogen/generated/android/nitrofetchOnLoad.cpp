@@ -16,6 +16,10 @@
 #include <NitroModules/HybridObjectRegistry.hpp>
 
 #include "JHybridNitroFetchClientSpec.hpp"
+#include "JFunc_void_StreamCallbacks.hpp"
+#include "JFunc_void_std__shared_ptr_ArrayBuffer_.hpp"
+#include "JFunc_void.hpp"
+#include "JFunc_void_std__string.hpp"
 #include "JHybridNitroFetchSpec.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
 #include "HybridTextEncoding.hpp"
@@ -30,6 +34,10 @@ int initialize(JavaVM* vm) {
   return facebook::jni::initialize(vm, [] {
     // Register native JNI methods
     margelo::nitro::nitrofetch::JHybridNitroFetchClientSpec::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_StreamCallbacks_cxx::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_std__shared_ptr_ArrayBuffer__cxx::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_cxx::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_std__string_cxx::registerNatives();
     margelo::nitro::nitrofetch::JHybridNitroFetchSpec::registerNatives();
 
     // Register Nitro Hybrid Objects

@@ -10,11 +10,12 @@ import org.chromium.net.UrlRequest
 import org.chromium.net.UrlResponseInfo
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicBoolean
 
 fun ByteBuffer.toByteArray(): ByteArray {
-  // duplicate to avoid modifying the original buffer's position
   val dup = this.duplicate()
-  dup.clear() // sets position=0, limit=capacity
+  // Don't call clear()! We want to preserve the position and limit
+  // that were set by flip() to get only the actual data read
   val arr = ByteArray(dup.remaining())
   dup.get(arr)
   return arr
@@ -23,17 +24,10 @@ fun ByteBuffer.toByteArray(): ByteArray {
 @DoNotStrip
 class NitroFetchClient(private val engine: CronetEngine, private val executor: Executor) : HybridNitroFetchClientSpec() {
 
-  private fun findPrefetchKey(req: NitroRequest): String? {
-    val h = req.headers ?: return null
-    for (pair in h) {
-      val k = pair.key
-      val v = pair.value
-      if (k.equals("prefetchKey", ignoreCase = true)) return v
-    }
-    return null
-  }
-
   companion object {
+    private const val TAG = "NitroFetchClient"
+    private const val BUFFER_SIZE = 64 * 1024
+
     @JvmStatic
     fun fetch(
       req: NitroRequest,
@@ -57,154 +51,170 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       onFail: (Throwable) -> Unit
     ) {
       val url = req.url
+
+      // Streaming state
+      var streamCallbacks: StreamCallbacks? = null
+      val streamingStarted = AtomicBoolean(false)
+      val cancelled = AtomicBoolean(false)
+      var urlRequest: UrlRequest? = null
+
       val callback = object : UrlRequest.Callback() {
-        private val buffer = ByteBuffer.allocateDirect(16 * 1024)
-        private val out = java.io.ByteArrayOutputStream()
+        private val buffer = ByteBuffer.allocateDirect(BUFFER_SIZE)
+        private var responseInfo: UrlResponseInfo? = null
 
-        override fun onRedirectReceived(request: UrlRequest, info: UrlResponseInfo, newLocationUrl: String) {
-          request.followRedirect()
-        }
-
-        override fun onResponseStarted(request: UrlRequest, info: UrlResponseInfo) {
-          buffer.clear()
-          request.read(buffer)
-        }
-
-        override fun onReadCompleted(request: UrlRequest, info: UrlResponseInfo, byteBuffer: ByteBuffer) {
-          byteBuffer.flip()
-          val bytes = ByteArray(byteBuffer.remaining())
-          byteBuffer.get(bytes)
-          out.write(bytes)
-          byteBuffer.clear()
-          request.read(byteBuffer)
-        }
-
-        override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) {
-          try {
-            val headersArr: Array<NitroHeader> =
-              info.allHeadersAsList.map { NitroHeader(it.key, it.value) }.toTypedArray()
-            val status = info.httpStatusCode
-            val bytes = out.toByteArray()
-            val contentType = info.allHeaders["Content-Type"] ?: info.allHeaders["content-type"]
-            val charset = run {
-              val ct = contentType ?: ""
-              val m = Regex("charset=([A-Za-z0-9_\\-:.]+)", RegexOption.IGNORE_CASE).find(ct.toString())
-              try {
-                if (m != null) java.nio.charset.Charset.forName(m.groupValues[1]) else Charsets.UTF_8
-              } catch (_: Throwable) {
-                Charsets.UTF_8
-              }
-            }
-            val bodyStr = try { String(bytes, charset) } catch (_: Throwable) { String(bytes, Charsets.UTF_8) }
-            val res = NitroResponse(
-              url = info.url,
-              status = status.toDouble(),
-              statusText = info.httpStatusText ?: "",
-              ok = status in 200..299,
-              redirected = info.url != url,
-              headers = headersArr,
-              bodyString = bodyStr,
-              bodyBytes = null
-            )
-            onSuccess(res)
-          } catch (t: Throwable) {
-            onFail(t)
+        override fun onRedirectReceived(
+          request: UrlRequest,
+          info: UrlResponseInfo,
+          newLocationUrl: String
+        ) {
+          if (req.followRedirects == false) {
+            request.cancel()
+          } else {
+            request.followRedirect()
           }
         }
 
-        override fun onFailed(request: UrlRequest, info: UrlResponseInfo?, error: CronetException) {
-          onFail(RuntimeException("Cronet failed: ${error.message}", error))
+        override fun onResponseStarted(request: UrlRequest, info: UrlResponseInfo) {
+          responseInfo = info
+
+          // Convert headers
+          val headers = info.allHeadersAsList.map { entry ->
+            NitroHeader(entry.key, entry.value)
+          }.toTypedArray()
+
+          // Create the response object immediately with streaming capabilities
+          val response = NitroResponse(
+            url = info.url,
+            status = info.httpStatusCode.toDouble(),
+            statusText = info.httpStatusText ?: "",
+            ok = info.httpStatusCode in 200..299,
+            redirected = info.urlChain.size > 1,
+            headers = headers,
+            stream = { callbacks ->
+              if (streamingStarted.getAndSet(true)) {
+                callbacks.onError("Stream already started")
+                return@NitroResponse
+              }
+
+              streamCallbacks = callbacks
+
+              // Start reading if not cancelled
+              if (!cancelled.get()) {
+                buffer.clear()
+                request.read(buffer)
+              }
+            },
+            cancel = {
+              if (cancelled.compareAndSet(false, true)) {
+                request.cancel()
+                streamCallbacks?.onError("Request cancelled")
+              }
+            }
+          )
+
+          // Return response immediately (before body is read)
+          // NOTE: We don't start reading here - we wait for JS to call stream()
+          onSuccess(response)
+        }
+
+        override fun onReadCompleted(
+          request: UrlRequest,
+          info: UrlResponseInfo,
+          byteBuffer: ByteBuffer
+        ) {
+          if (cancelled.get()) {
+            return
+          }
+
+          val callbacks = streamCallbacks
+          if (callbacks == null) {
+            // This can happen if Cronet tries to read before JS has called stream()
+            // We shouldn't have started reading yet, but handle it gracefully
+            Log.e(TAG, "onReadCompleted called but stream() hasn't been called yet - this shouldn't happen!")
+            request.cancel()
+            return
+          }
+
+          try {
+            // Flip to set limit to current position and position to 0
+            byteBuffer.flip()
+
+            if (byteBuffer.hasRemaining()) {
+              // Copy data efficiently: allocate new buffer of exact size and use bulk put
+              val size = byteBuffer.remaining()
+              val copy = ByteBuffer.allocateDirect(size)
+              copy.put(byteBuffer)
+              copy.flip()
+
+              // Wrap in ArrayBuffer
+              val arrayBuffer = ArrayBuffer(copy)
+              callbacks.onData(arrayBuffer)
+            }
+
+            // Reuse the same buffer for next read
+            byteBuffer.clear()
+            request.read(byteBuffer)
+          } catch (t: Throwable) {
+            Log.e(TAG, "Error processing chunk", t)
+            callbacks.onError(t.message ?: "Unknown error")
+          }
+        }
+
+        override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) {
+          val callbacks = streamCallbacks
+          if (callbacks != null) {
+            // Streaming mode - notify completion
+            callbacks.onComplete()
+          } else {
+            // No streaming was initiated - this shouldn't normally happen
+            // since we call stream() in the JS side, but handle it gracefully
+            Log.w(TAG, "Request completed without streaming being started")
+          }
+        }
+
+        override fun onFailed(
+          request: UrlRequest,
+          info: UrlResponseInfo?,
+          error: CronetException
+        ) {
+          Log.e(TAG, "Request failed: ${error.message}", error)
+
+          val callbacks = streamCallbacks
+          if (callbacks != null) {
+            callbacks.onError(error.message ?: "Request failed")
+          } else {
+            onFail(error)
+          }
         }
 
         override fun onCanceled(request: UrlRequest, info: UrlResponseInfo?) {
-          onFail(RuntimeException("Cronet canceled"))
+          Log.d(TAG, "Request canceled")
+
+          val callbacks = streamCallbacks
+          if (callbacks != null) {
+            callbacks.onError("Request canceled")
+          } else {
+            onFail(Exception("Request canceled"))
+          }
         }
       }
 
       val builder = engine.newUrlRequestBuilder(url, callback, executor)
       val method = req.method?.name ?: "GET"
       builder.setHttpMethod(method)
-      req.headers?.forEach { (k, v) -> builder.addHeader(k, v) }
-      val bodyBytes = req.bodyBytes
-      val bodyStr = req.bodyString
-      if ((bodyBytes != null) || !bodyStr.isNullOrEmpty()) {
-        val body: ByteArray = when {
-          bodyBytes != null -> ByteArray(1);//bodyBytes.getBuffer(true).toByteArray()
-          !bodyStr.isNullOrEmpty() -> bodyStr!!.toByteArray(Charsets.UTF_8)
-          else -> ByteArray(0)
-        }
-        val provider = object : org.chromium.net.UploadDataProvider() {
-          private var pos = 0
-          override fun getLength(): Long = body.size.toLong()
-          override fun read(uploadDataSink: org.chromium.net.UploadDataSink, byteBuffer: ByteBuffer) {
-            val remaining = body.size - pos
-            val toWrite = minOf(byteBuffer.remaining(), remaining)
-            byteBuffer.put(body, pos, toWrite)
-            pos += toWrite
-            uploadDataSink.onReadSucceeded(false)
-          }
-          override fun rewind(uploadDataSink: org.chromium.net.UploadDataSink) {
-            pos = 0
-            uploadDataSink.onRewindSucceeded()
-          }
-        }
-        builder.setUploadDataProvider(provider, executor)
+
+      // Add headers
+      req.headers?.forEach { header ->
+        builder.addHeader(header.key, header.value)
       }
-      val request = builder.build()
-      request.start()
+
+      urlRequest = builder.build()
+      urlRequest?.start()
     }
   }
 
   override fun request(req: NitroRequest): Promise<NitroResponse> {
     val promise = Promise<NitroResponse>()
-    // Try to serve from prefetch cache/pending first
-    val key = findPrefetchKey(req)
-    if (key != null) {
-      // If a prefetch is currently pending, wait for it
-      FetchCache.getPending(key)?.let { fut ->
-        fun withPrefetchedHeader(res: NitroResponse): NitroResponse {
-          val newHeaders = (res.headers?.toMutableList() ?: mutableListOf())
-          newHeaders.add(NitroHeader("nitroPrefetched", "true"))
-          return NitroResponse(
-            url = res.url,
-            status = res.status,
-            statusText = res.statusText,
-            ok = res.ok,
-            redirected = res.redirected,
-            headers = newHeaders.toTypedArray(),
-            bodyString = res.bodyString,
-            bodyBytes = res.bodyBytes
-          )
-        }
-        fut.whenComplete { res, err ->
-          if (err != null) {
-            promise.reject(err)
-          } else if (res != null) {
-            promise.resolve(withPrefetchedHeader(res))
-          } else {
-            promise.reject(IllegalStateException("Prefetch pending returned null result"))
-          }
-        }
-        return promise
-      }
-      // If a fresh prefetched result exists (<=5s old), return it immediately
-      FetchCache.getResultIfFresh(key, 5_000L)?.let { cached ->
-        val newHeaders = (cached.headers?.toMutableList() ?: mutableListOf())
-        newHeaders.add(NitroHeader("nitroPrefetched", "true"))
-        val wrapped = NitroResponse(
-          url = cached.url,
-          status = cached.status,
-          statusText = cached.statusText,
-          ok = cached.ok,
-          redirected = cached.redirected,
-          headers = newHeaders.toTypedArray(),
-          bodyString = cached.bodyString,
-          bodyBytes = cached.bodyBytes
-        )
-        promise.resolve(wrapped)
-        return promise
-      }
-    }
     fetch(
       req,
       onSuccess = { promise.resolve(it) },
@@ -215,42 +225,28 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
 
   override fun prefetch(req: NitroRequest): Promise<Unit> {
     val promise = Promise<Unit>()
-    val key = findPrefetchKey(req)
-    if (key.isNullOrEmpty()) {
-      promise.reject(IllegalArgumentException("prefetch: missing 'prefetchKey' header"))
-      return promise
-    }
-    // If already have a fresh result, resolve immediately
-    FetchCache.getResultIfFresh(key, 5_000L)?.let {
-      promise.resolve(Unit)
-      return promise
-    }
-    // If already pending, resolve when it's done
-    FetchCache.getPending(key)?.let { fut ->
-      fut.whenComplete { _, err -> if (err != null) promise.reject(err) else promise.resolve(Unit) }
-      return promise
-    }
-    // Start new prefetch
-    val future = java.util.concurrent.CompletableFuture<NitroResponse>()
-    FetchCache.setPending(key, future)
+    // Prefetch: just make the request and discard the body
     fetch(
       req,
-      onSuccess = { res ->
-        try {
-          FetchCache.complete(key, res)
-          promise.resolve(Unit)
-        } catch (t: Throwable) {
-          FetchCache.completeExceptionally(key, t)
-          promise.reject(t)
-        }
+      onSuccess = { response ->
+        // Start streaming but don't process chunks
+        response.stream(StreamCallbacks(
+          onData = { chunk ->
+            // Discard chunks for prefetch
+          },
+          onComplete = {
+            promise.resolve(Unit)
+          },
+          onError = { error ->
+            Log.e(TAG, "Prefetch error: $error")
+            promise.reject(Exception(error))
+          }
+        ))
       },
-      onFail = { err ->
-        FetchCache.completeExceptionally(key, err)
-        promise.reject(err)
+      onFail = { error ->
+        promise.reject(error)
       }
     )
     return promise
   }
-
-
 }

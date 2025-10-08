@@ -40,9 +40,14 @@ abstract class HybridNitroFetchClientSpec: HybridObject() {
   
 
   // Methods
+  abstract fun request(req: NitroRequest): Promise<NitroResponse>
+  
   @DoNotStrip
   @Keep
-  abstract fun request(req: NitroRequest): Promise<NitroResponse>
+  private fun request_cxx(req: NitroRequest): Promise<NitroResponse> {
+    val __result = request(req)
+    return __result
+  }
   
   @DoNotStrip
   @Keep

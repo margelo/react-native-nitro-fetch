@@ -27,16 +27,23 @@ export interface NitroRequest {
   followRedirects?: boolean; // default true
 }
 
+export interface StreamCallbacks {
+  onData: (chunk: ArrayBuffer) => void;
+  onComplete: () => void;
+  onError: (error: string) => void;
+}
+
 export interface NitroResponse {
-  url: string; // final URL after redirects
-  status: number;
-  statusText: string;
-  ok: boolean;
-  redirected: boolean;
-  headers: NitroHeader[];
-  // Body as either UTF-8 string or raw bytes (first implementation target)
-  bodyString?: string;
-  bodyBytes?: string; //will be ArrayBuffer in future
+  readonly url: string;
+  readonly status: number;
+  readonly statusText: string;
+  readonly ok: boolean;
+  readonly redirected: boolean;
+  readonly headers: NitroHeader[];
+
+  // Instead of readChunk(), we set up a stream with callbacks
+  stream(callbacks: StreamCallbacks): void;
+  cancel(): void;
 }
 
 export interface TextDecodeOptions {

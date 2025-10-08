@@ -16,6 +16,12 @@ namespace NitroFetch { class HybridNitroFetchClientSpec_cxx; }
 namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 // Forward declaration of `NitroHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroHeader; }
+// Forward declaration of `StreamCallbacks` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct StreamCallbacks; }
+// Forward declaration of `ArrayBuffer` to properly resolve imports.
+namespace NitroModules { class ArrayBuffer; }
+// Forward declaration of `ArrayBufferHolder` to properly resolve imports.
+namespace NitroModules { class ArrayBufferHolder; }
 // Forward declaration of `NitroRequest` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroRequest; }
 // Forward declaration of `NitroRequestMethod` to properly resolve imports.
@@ -26,9 +32,13 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 #include <string>
 #include "NitroHeader.hpp"
 #include <vector>
-#include <optional>
+#include "StreamCallbacks.hpp"
+#include <functional>
+#include <NitroModules/ArrayBuffer.hpp>
+#include <NitroModules/ArrayBufferHolder.hpp>
 #include "NitroRequest.hpp"
 #include "NitroRequestMethod.hpp"
+#include <optional>
 
 #include "NitroFetch-Swift-Cxx-Umbrella.hpp"
 

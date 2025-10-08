@@ -8,6 +8,10 @@
 #pragma once
 
 // Forward declarations of C++ defined types
+// Forward declaration of `ArrayBufferHolder` to properly resolve imports.
+namespace NitroModules { class ArrayBufferHolder; }
+// Forward declaration of `ArrayBuffer` to properly resolve imports.
+namespace NitroModules { class ArrayBuffer; }
 // Forward declaration of `HybridNitroFetchClientSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchClientSpec; }
 // Forward declaration of `HybridNitroFetchSpec` to properly resolve imports.
@@ -18,6 +22,8 @@ namespace margelo::nitro::nitrofetch { struct NitroHeader; }
 namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 // Forward declaration of `NitroResponse` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroResponse; }
+// Forward declaration of `StreamCallbacks` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct StreamCallbacks; }
 
 // Forward declarations of Swift defined types
 // Forward declaration of `HybridNitroFetchClientSpec_cxx` to properly resolve imports.
@@ -31,6 +37,9 @@ namespace NitroFetch { class HybridNitroFetchSpec_cxx; }
 #include "NitroHeader.hpp"
 #include "NitroRequestMethod.hpp"
 #include "NitroResponse.hpp"
+#include "StreamCallbacks.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
+#include <NitroModules/ArrayBufferHolder.hpp>
 #include <NitroModules/FastVectorCopy.hpp>
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/PromiseHolder.hpp>
@@ -60,19 +69,92 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return vector.data();
   }
   
-  // pragma MARK: std::optional<std::string>
+  // pragma MARK: std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>
   /**
-   * Specialized version of `std::optional<std::string>`.
+   * Specialized version of `std::function<void(const std::shared_ptr<ArrayBuffer>&)>`.
    */
-  using std__optional_std__string_ = std::optional<std::string>;
-  inline std::optional<std::string> create_std__optional_std__string_(const std::string& value) noexcept {
-    return std::optional<std::string>(value);
+  using Func_void_std__shared_ptr_ArrayBuffer_ = std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::shared_ptr<ArrayBuffer>& / * chunk * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__shared_ptr_ArrayBuffer__Wrapper final {
+  public:
+    explicit Func_void_std__shared_ptr_ArrayBuffer__Wrapper(std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>&& func): _function(std::make_unique<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>(std::move(func))) {}
+    inline void call(ArrayBufferHolder chunk) const noexcept {
+      _function->operator()(chunk.getArrayBuffer());
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__shared_ptr_ArrayBuffer_ create_Func_void_std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__shared_ptr_ArrayBuffer__Wrapper wrap_Func_void_std__shared_ptr_ArrayBuffer_(Func_void_std__shared_ptr_ArrayBuffer_ value) noexcept {
+    return Func_void_std__shared_ptr_ArrayBuffer__Wrapper(std::move(value));
   }
-  inline bool has_value_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
-    return optional.has_value();
+  
+  // pragma MARK: std::function<void()>
+  /**
+   * Specialized version of `std::function<void()>`.
+   */
+  using Func_void = std::function<void()>;
+  /**
+   * Wrapper class for a `std::function<void()>`, this can be used from Swift.
+   */
+  class Func_void_Wrapper final {
+  public:
+    explicit Func_void_Wrapper(std::function<void()>&& func): _function(std::make_unique<std::function<void()>>(std::move(func))) {}
+    inline void call() const noexcept {
+      _function->operator()();
+    }
+  private:
+    std::unique_ptr<std::function<void()>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_Wrapper wrap_Func_void(Func_void value) noexcept {
+    return Func_void_Wrapper(std::move(value));
   }
-  inline std::string get_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
-    return *optional;
+  
+  // pragma MARK: std::function<void(const std::string& /* error */)>
+  /**
+   * Specialized version of `std::function<void(const std::string&)>`.
+   */
+  using Func_void_std__string = std::function<void(const std::string& /* error */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::string& / * error * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__string_Wrapper final {
+  public:
+    explicit Func_void_std__string_Wrapper(std::function<void(const std::string& /* error */)>&& func): _function(std::make_unique<std::function<void(const std::string& /* error */)>>(std::move(func))) {}
+    inline void call(std::string error) const noexcept {
+      _function->operator()(error);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::string& /* error */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__string_Wrapper wrap_Func_void_std__string(Func_void_std__string value) noexcept {
+    return Func_void_std__string_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void(const StreamCallbacks& /* callbacks */)>
+  /**
+   * Specialized version of `std::function<void(const StreamCallbacks&)>`.
+   */
+  using Func_void_StreamCallbacks = std::function<void(const StreamCallbacks& /* callbacks */)>;
+  /**
+   * Wrapper class for a `std::function<void(const StreamCallbacks& / * callbacks * /)>`, this can be used from Swift.
+   */
+  class Func_void_StreamCallbacks_Wrapper final {
+  public:
+    explicit Func_void_StreamCallbacks_Wrapper(std::function<void(const StreamCallbacks& /* callbacks */)>&& func): _function(std::make_unique<std::function<void(const StreamCallbacks& /* callbacks */)>>(std::move(func))) {}
+    inline void call(StreamCallbacks callbacks) const noexcept {
+      _function->operator()(callbacks);
+    }
+  private:
+    std::unique_ptr<std::function<void(const StreamCallbacks& /* callbacks */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_StreamCallbacks create_Func_void_StreamCallbacks(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_StreamCallbacks_Wrapper wrap_Func_void_StreamCallbacks(Func_void_StreamCallbacks value) noexcept {
+    return Func_void_StreamCallbacks_Wrapper(std::move(value));
   }
   
   // pragma MARK: std::shared_ptr<Promise<NitroResponse>>
@@ -161,6 +243,21 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return *optional;
   }
   
+  // pragma MARK: std::optional<std::string>
+  /**
+   * Specialized version of `std::optional<std::string>`.
+   */
+  using std__optional_std__string_ = std::optional<std::string>;
+  inline std::optional<std::string> create_std__optional_std__string_(const std::string& value) noexcept {
+    return std::optional<std::string>(value);
+  }
+  inline bool has_value_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline std::string get_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
+    return *optional;
+  }
+  
   // pragma MARK: std::optional<double>
   /**
    * Specialized version of `std::optional<double>`.
@@ -201,28 +298,6 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   }
   inline PromiseHolder<void> wrap_std__shared_ptr_Promise_void__(std::shared_ptr<Promise<void>> promise) noexcept {
     return PromiseHolder<void>(std::move(promise));
-  }
-  
-  // pragma MARK: std::function<void()>
-  /**
-   * Specialized version of `std::function<void()>`.
-   */
-  using Func_void = std::function<void()>;
-  /**
-   * Wrapper class for a `std::function<void()>`, this can be used from Swift.
-   */
-  class Func_void_Wrapper final {
-  public:
-    explicit Func_void_Wrapper(std::function<void()>&& func): _function(std::make_unique<std::function<void()>>(std::move(func))) {}
-    inline void call() const noexcept {
-      _function->operator()();
-    }
-  private:
-    std::unique_ptr<std::function<void()>> _function;
-  } SWIFT_NONCOPYABLE;
-  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept;
-  inline Func_void_Wrapper wrap_Func_void(Func_void value) noexcept {
-    return Func_void_Wrapper(std::move(value));
   }
   
   // pragma MARK: std::shared_ptr<HybridNitroFetchClientSpec>

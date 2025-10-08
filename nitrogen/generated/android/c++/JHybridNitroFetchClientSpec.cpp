@@ -11,6 +11,10 @@
 namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 // Forward declaration of `NitroHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroHeader; }
+// Forward declaration of `StreamCallbacks` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct StreamCallbacks; }
+// Forward declaration of `ArrayBuffer` to properly resolve imports.
+namespace NitroModules { class ArrayBuffer; }
 // Forward declaration of `NitroRequest` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroRequest; }
 // Forward declaration of `NitroRequestMethod` to properly resolve imports.
@@ -24,10 +28,20 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 #include "NitroHeader.hpp"
 #include <vector>
 #include "JNitroHeader.hpp"
-#include <optional>
+#include "StreamCallbacks.hpp"
+#include <functional>
+#include "JFunc_void_StreamCallbacks.hpp"
+#include "JStreamCallbacks.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
+#include "JFunc_void_std__shared_ptr_ArrayBuffer_.hpp"
+#include <NitroModules/JArrayBuffer.hpp>
+#include <NitroModules/JUnit.hpp>
+#include "JFunc_void.hpp"
+#include "JFunc_void_std__string.hpp"
 #include "NitroRequest.hpp"
 #include "JNitroRequest.hpp"
 #include "NitroRequestMethod.hpp"
+#include <optional>
 #include "JNitroRequestMethod.hpp"
 
 namespace margelo::nitro::nitrofetch {
@@ -57,7 +71,7 @@ namespace margelo::nitro::nitrofetch {
 
   // Methods
   std::shared_ptr<Promise<NitroResponse>> JHybridNitroFetchClientSpec::request(const NitroRequest& req) {
-    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<JNitroRequest> /* req */)>("request");
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<JNitroRequest> /* req */)>("request_cxx");
     auto __result = method(_javaPart, JNitroRequest::fromCpp(req));
     return [&]() {
       auto __promise = Promise<NitroResponse>::create();

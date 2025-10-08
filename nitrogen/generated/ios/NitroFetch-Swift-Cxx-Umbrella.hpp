@@ -8,6 +8,8 @@
 #pragma once
 
 // Forward declarations of C++ defined types
+// Forward declaration of `ArrayBuffer` to properly resolve imports.
+namespace NitroModules { class ArrayBuffer; }
 // Forward declaration of `HybridNitroFetchClientSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchClientSpec; }
 // Forward declaration of `HybridNitroFetchSpec` to properly resolve imports.
@@ -20,6 +22,8 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 namespace margelo::nitro::nitrofetch { struct NitroRequest; }
 // Forward declaration of `NitroResponse` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroResponse; }
+// Forward declaration of `StreamCallbacks` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct StreamCallbacks; }
 
 // Include C++ defined types
 #include "HybridNitroFetchClientSpec.hpp"
@@ -28,9 +32,12 @@ namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 #include "NitroRequest.hpp"
 #include "NitroRequestMethod.hpp"
 #include "NitroResponse.hpp"
+#include "StreamCallbacks.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/Result.hpp>
 #include <exception>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
