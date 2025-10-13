@@ -9,7 +9,6 @@ import com.facebook.react.ReactNativeHost
 import com.facebook.react.ReactPackage
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.facebook.react.defaults.DefaultReactNativeHost
-import com.margelo.nitro.nitrofetch.AutoPrefetcher
 
 class MainApplication : Application(), ReactApplication {
 
@@ -34,8 +33,6 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
-    // Best-effort auto prefetch when engine initializes (app start)
-    try { AutoPrefetcher.prefetchOnStart(this) } catch (_: Throwable) {}
     loadReactNative(this)
   }
 }

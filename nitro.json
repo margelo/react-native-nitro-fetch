@@ -8,13 +8,17 @@
     "androidCxxLibName": "nitrofetch"
   },
   "autolinking": {
-    "NitroFetch": {
-      "kotlin": "NitroFetch",
-      "swift": "NitroFetch"
+    "NitroCronet": {
+      "kotlin": "NitroCronet"
     },
-    "NitroFetchClient": {
-      "kotlin": "NitroFetchClient",
-      "swift": "NitroFetchClient"
+    "CronetEngine": {
+      "kotlin": "CronetEngine"
+    },
+    "UrlRequest": {
+      "kotlin": "UrlRequest"
+    },
+    "UrlRequestBuilder": {
+      "kotlin": "UrlRequestBuilder"
     },
     "NitroTextEncoding": {
       "cpp": "HybridTextEncoding"

@@ -15,8 +15,15 @@
 #include <fbjni/fbjni.h>
 #include <NitroModules/HybridObjectRegistry.hpp>
 
-#include "JHybridNitroFetchClientSpec.hpp"
-#include "JHybridNitroFetchSpec.hpp"
+#include "JHybridUrlRequestSpec.hpp"
+#include "JHybridUrlRequestBuilderSpec.hpp"
+#include "JHybridCronetEngineSpec.hpp"
+#include "JFunc_void_UrlResponseInfo_std__string.hpp"
+#include "JFunc_void_UrlResponseInfo.hpp"
+#include "JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_.hpp"
+#include "JFunc_void_std__optional_UrlResponseInfo__CronetException.hpp"
+#include "JFunc_void_std__optional_UrlResponseInfo_.hpp"
+#include "JHybridNitroCronetSpec.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
 #include "HybridTextEncoding.hpp"
 
@@ -29,22 +36,45 @@ int initialize(JavaVM* vm) {
 
   return facebook::jni::initialize(vm, [] {
     // Register native JNI methods
-    margelo::nitro::nitrofetch::JHybridNitroFetchClientSpec::registerNatives();
-    margelo::nitro::nitrofetch::JHybridNitroFetchSpec::registerNatives();
+    margelo::nitro::nitrofetch::JHybridUrlRequestSpec::registerNatives();
+    margelo::nitro::nitrofetch::JHybridUrlRequestBuilderSpec::registerNatives();
+    margelo::nitro::nitrofetch::JHybridCronetEngineSpec::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_std__string_cxx::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_cxx::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__cxx::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_std__optional_UrlResponseInfo__CronetException_cxx::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_std__optional_UrlResponseInfo__cxx::registerNatives();
+    margelo::nitro::nitrofetch::JHybridNitroCronetSpec::registerNatives();
 
     // Register Nitro Hybrid Objects
     HybridObjectRegistry::registerHybridObjectConstructor(
-      "NitroFetch",
+      "NitroCronet",
       []() -> std::shared_ptr<HybridObject> {
-        static DefaultConstructableObject<JHybridNitroFetchSpec::javaobject> object("com/margelo/nitro/nitrofetch/NitroFetch");
+        static DefaultConstructableObject<JHybridNitroCronetSpec::javaobject> object("com/margelo/nitro/nitrofetch/NitroCronet");
         auto instance = object.create();
         return instance->cthis()->shared();
       }
     );
     HybridObjectRegistry::registerHybridObjectConstructor(
-      "NitroFetchClient",
+      "CronetEngine",
       []() -> std::shared_ptr<HybridObject> {
-        static DefaultConstructableObject<JHybridNitroFetchClientSpec::javaobject> object("com/margelo/nitro/nitrofetch/NitroFetchClient");
+        static DefaultConstructableObject<JHybridCronetEngineSpec::javaobject> object("com/margelo/nitro/nitrofetch/CronetEngine");
+        auto instance = object.create();
+        return instance->cthis()->shared();
+      }
+    );
+    HybridObjectRegistry::registerHybridObjectConstructor(
+      "UrlRequest",
+      []() -> std::shared_ptr<HybridObject> {
+        static DefaultConstructableObject<JHybridUrlRequestSpec::javaobject> object("com/margelo/nitro/nitrofetch/UrlRequest");
+        auto instance = object.create();
+        return instance->cthis()->shared();
+      }
+    );
+    HybridObjectRegistry::registerHybridObjectConstructor(
+      "UrlRequestBuilder",
+      []() -> std::shared_ptr<HybridObject> {
+        static DefaultConstructableObject<JHybridUrlRequestBuilderSpec::javaobject> object("com/margelo/nitro/nitrofetch/UrlRequestBuilder");
         auto instance = object.create();
         return instance->cthis()->shared();
       }

@@ -1,3 +1,4 @@
+import React from 'react';
 import { useState } from 'react';
 import {
   ScrollView,
@@ -11,6 +12,7 @@ import './tests/custom';
 import './tests/web';
 import type { TestResult, TestResults } from './types';
 import { TestsContext } from './utils';
+import { fetchStreamedData } from './stream';
 
 interface Stats {
   suites: number;
@@ -107,61 +109,6 @@ const runSpeedTests = async (): Promise<SpeedTestResult[]> => {
 
   return speedResults;
 };
-// const runSpeedTests = async (): Promise<SpeedTestResult[]> => {
-//   const speedResults: SpeedTestResult[] = [];
-
-//   // Create a large text to encode (10MB of repeated text)
-//   const testText =
-//     'Hello, World! 🌍 Testing UTF-8 encoding with emoji! 🚀 '.repeat(200000);
-//   const encoder = new TextEncoder();
-//   const encoded = encoder.encode(testText);
-
-//   // Test 1: Nitro Text Encoding (no stream)
-//   const nitroDecoder1 = new NitroTextDecoder('utf-8');
-//   const start1 = performance.now();
-//   nitroDecoder1.decode(encoded);
-//   const duration1 = performance.now() - start1;
-//   speedResults.push({
-//     name: 'Nitro TextDecoder (no stream)',
-//     duration: duration1,
-//     size: encoded.byteLength,
-//   });
-
-//   // Test 2: Nitro Text Encoding (stream=true)
-//   const nitroDecoder2 = new NitroTextDecoder('utf-8');
-//   const start2 = performance.now();
-//   nitroDecoder2.decode(encoded, { stream: true });
-//   const duration2 = performance.now() - start2;
-//   speedResults.push({
-//     name: 'Nitro TextDecoder (stream=true)',
-//     duration: duration2,
-//     size: encoded.byteLength,
-//   });
-
-//   // Test 3: react-native-fast-encoder (no stream)
-//   const fastEncoder = new FastTextEncoder();
-//   const start3 = performance.now();
-//   fastEncoder.decode(encoded);
-//   const duration3 = performance.now() - start3;
-//   speedResults.push({
-//     name: 'react-native-fast-encoder (no stream)',
-//     duration: duration3,
-//     size: encoded.byteLength,
-//   });
-
-//   // Test 4: react-native-fast-encoder (stream=true)
-//   const fastEncoder2 = new FastTextEncoder();
-//   const start4 = performance.now();
-//   fastEncoder2.decode(encoded, { stream: true });
-//   const duration4 = performance.now() - start4;
-//   speedResults.push({
-//     name: 'react-native-fast-encoder (stream=true)',
-//     duration: duration4,
-//     size: encoded.byteLength,
-//   });
-
-//   return speedResults;
-// };
 
 export default function TestScreen() {
   const [results, setResults] = useState<TestResults>({});

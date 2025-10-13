@@ -8,65 +8,115 @@
 #include "NitroFetch-Swift-Cxx-Bridge.hpp"
 
 // Include C++ implementation defined types
-#include "HybridNitroFetchClientSpecSwift.hpp"
-#include "HybridNitroFetchSpecSwift.hpp"
+#include "HybridCronetEngineSpecSwift.hpp"
+#include "HybridNitroCronetSpecSwift.hpp"
+#include "HybridUrlRequestBuilderSpecSwift.hpp"
+#include "HybridUrlRequestSpecSwift.hpp"
 #include "NitroFetch-Swift-Cxx-Umbrella.hpp"
 
 namespace margelo::nitro::nitrofetch::bridge::swift {
 
-  // pragma MARK: std::function<void(const NitroResponse& /* result */)>
-  Func_void_NitroResponse create_Func_void_NitroResponse(void* _Nonnull swiftClosureWrapper) noexcept {
-    auto swiftClosure = NitroFetch::Func_void_NitroResponse::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)](const NitroResponse& result) mutable -> void {
-      swiftClosure.call(result);
-    };
+  // pragma MARK: std::shared_ptr<HybridUrlRequestSpec>
+  std::shared_ptr<HybridUrlRequestSpec> create_std__shared_ptr_HybridUrlRequestSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+    NitroFetch::HybridUrlRequestSpec_cxx swiftPart = NitroFetch::HybridUrlRequestSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::nitrofetch::HybridUrlRequestSpecSwift>(swiftPart);
   }
-  
-  // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>
-  Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* _Nonnull swiftClosureWrapper) noexcept {
-    auto swiftClosure = NitroFetch::Func_void_std__exception_ptr::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)](const std::exception_ptr& error) mutable -> void {
-      swiftClosure.call(error);
-    };
-  }
-  
-  // pragma MARK: std::function<void()>
-  Func_void create_Func_void(void* _Nonnull swiftClosureWrapper) noexcept {
-    auto swiftClosure = NitroFetch::Func_void::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)]() mutable -> void {
-      swiftClosure.call();
-    };
-  }
-  
-  // pragma MARK: std::shared_ptr<HybridNitroFetchClientSpec>
-  std::shared_ptr<HybridNitroFetchClientSpec> create_std__shared_ptr_HybridNitroFetchClientSpec_(void* _Nonnull swiftUnsafePointer) noexcept {
-    NitroFetch::HybridNitroFetchClientSpec_cxx swiftPart = NitroFetch::HybridNitroFetchClientSpec_cxx::fromUnsafe(swiftUnsafePointer);
-    return std::make_shared<margelo::nitro::nitrofetch::HybridNitroFetchClientSpecSwift>(swiftPart);
-  }
-  void* _Nonnull get_std__shared_ptr_HybridNitroFetchClientSpec_(std__shared_ptr_HybridNitroFetchClientSpec_ cppType) noexcept {
-    std::shared_ptr<margelo::nitro::nitrofetch::HybridNitroFetchClientSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::nitrofetch::HybridNitroFetchClientSpecSwift>(cppType);
+  void* NON_NULL get_std__shared_ptr_HybridUrlRequestSpec_(std__shared_ptr_HybridUrlRequestSpec_ cppType) noexcept {
+    std::shared_ptr<margelo::nitro::nitrofetch::HybridUrlRequestSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::nitrofetch::HybridUrlRequestSpecSwift>(cppType);
     #ifdef NITRO_DEBUG
     if (swiftWrapper == nullptr) [[unlikely]] {
-      throw std::runtime_error("Class \"HybridNitroFetchClientSpec\" is not implemented in Swift!");
+      throw std::runtime_error("Class \"HybridUrlRequestSpec\" is not implemented in Swift!");
     }
     #endif
-    NitroFetch::HybridNitroFetchClientSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    NitroFetch::HybridUrlRequestSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
     return swiftPart.toUnsafe();
   }
   
-  // pragma MARK: std::shared_ptr<HybridNitroFetchSpec>
-  std::shared_ptr<HybridNitroFetchSpec> create_std__shared_ptr_HybridNitroFetchSpec_(void* _Nonnull swiftUnsafePointer) noexcept {
-    NitroFetch::HybridNitroFetchSpec_cxx swiftPart = NitroFetch::HybridNitroFetchSpec_cxx::fromUnsafe(swiftUnsafePointer);
-    return std::make_shared<margelo::nitro::nitrofetch::HybridNitroFetchSpecSwift>(swiftPart);
+  // pragma MARK: std::shared_ptr<HybridUrlRequestBuilderSpec>
+  std::shared_ptr<HybridUrlRequestBuilderSpec> create_std__shared_ptr_HybridUrlRequestBuilderSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+    NitroFetch::HybridUrlRequestBuilderSpec_cxx swiftPart = NitroFetch::HybridUrlRequestBuilderSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::nitrofetch::HybridUrlRequestBuilderSpecSwift>(swiftPart);
   }
-  void* _Nonnull get_std__shared_ptr_HybridNitroFetchSpec_(std__shared_ptr_HybridNitroFetchSpec_ cppType) noexcept {
-    std::shared_ptr<margelo::nitro::nitrofetch::HybridNitroFetchSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::nitrofetch::HybridNitroFetchSpecSwift>(cppType);
+  void* NON_NULL get_std__shared_ptr_HybridUrlRequestBuilderSpec_(std__shared_ptr_HybridUrlRequestBuilderSpec_ cppType) noexcept {
+    std::shared_ptr<margelo::nitro::nitrofetch::HybridUrlRequestBuilderSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::nitrofetch::HybridUrlRequestBuilderSpecSwift>(cppType);
     #ifdef NITRO_DEBUG
     if (swiftWrapper == nullptr) [[unlikely]] {
-      throw std::runtime_error("Class \"HybridNitroFetchSpec\" is not implemented in Swift!");
+      throw std::runtime_error("Class \"HybridUrlRequestBuilderSpec\" is not implemented in Swift!");
     }
     #endif
-    NitroFetch::HybridNitroFetchSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    NitroFetch::HybridUrlRequestBuilderSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    return swiftPart.toUnsafe();
+  }
+  
+  // pragma MARK: std::function<void(const UrlResponseInfo& /* info */, const std::string& /* newLocationUrl */)>
+  Func_void_UrlResponseInfo_std__string create_Func_void_UrlResponseInfo_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_UrlResponseInfo_std__string::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const UrlResponseInfo& info, const std::string& newLocationUrl) mutable -> void {
+      swiftClosure.call(info, newLocationUrl);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const UrlResponseInfo& /* info */)>
+  Func_void_UrlResponseInfo create_Func_void_UrlResponseInfo(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_UrlResponseInfo::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const UrlResponseInfo& info) mutable -> void {
+      swiftClosure.call(info);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>
+  Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_ create_Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const UrlResponseInfo& info, const std::shared_ptr<ArrayBuffer>& byteBuffer) mutable -> void {
+      swiftClosure.call(info, ArrayBufferHolder(byteBuffer));
+    };
+  }
+  
+  // pragma MARK: std::function<void(const std::optional<UrlResponseInfo>& /* info */, const CronetException& /* error */)>
+  Func_void_std__optional_UrlResponseInfo__CronetException create_Func_void_std__optional_UrlResponseInfo__CronetException(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_std__optional_UrlResponseInfo__CronetException::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::optional<UrlResponseInfo>& info, const CronetException& error) mutable -> void {
+      swiftClosure.call(info, error);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const std::optional<UrlResponseInfo>& /* info */)>
+  Func_void_std__optional_UrlResponseInfo_ create_Func_void_std__optional_UrlResponseInfo_(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_std__optional_UrlResponseInfo_::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::optional<UrlResponseInfo>& info) mutable -> void {
+      swiftClosure.call(info);
+    };
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridCronetEngineSpec>
+  std::shared_ptr<HybridCronetEngineSpec> create_std__shared_ptr_HybridCronetEngineSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+    NitroFetch::HybridCronetEngineSpec_cxx swiftPart = NitroFetch::HybridCronetEngineSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::nitrofetch::HybridCronetEngineSpecSwift>(swiftPart);
+  }
+  void* NON_NULL get_std__shared_ptr_HybridCronetEngineSpec_(std__shared_ptr_HybridCronetEngineSpec_ cppType) noexcept {
+    std::shared_ptr<margelo::nitro::nitrofetch::HybridCronetEngineSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::nitrofetch::HybridCronetEngineSpecSwift>(cppType);
+    #ifdef NITRO_DEBUG
+    if (swiftWrapper == nullptr) [[unlikely]] {
+      throw std::runtime_error("Class \"HybridCronetEngineSpec\" is not implemented in Swift!");
+    }
+    #endif
+    NitroFetch::HybridCronetEngineSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    return swiftPart.toUnsafe();
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridNitroCronetSpec>
+  std::shared_ptr<HybridNitroCronetSpec> create_std__shared_ptr_HybridNitroCronetSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+    NitroFetch::HybridNitroCronetSpec_cxx swiftPart = NitroFetch::HybridNitroCronetSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::nitrofetch::HybridNitroCronetSpecSwift>(swiftPart);
+  }
+  void* NON_NULL get_std__shared_ptr_HybridNitroCronetSpec_(std__shared_ptr_HybridNitroCronetSpec_ cppType) noexcept {
+    std::shared_ptr<margelo::nitro::nitrofetch::HybridNitroCronetSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::nitrofetch::HybridNitroCronetSpecSwift>(cppType);
+    #ifdef NITRO_DEBUG
+    if (swiftWrapper == nullptr) [[unlikely]] {
+      throw std::runtime_error("Class \"HybridNitroCronetSpec\" is not implemented in Swift!");
+    }
+    #endif
+    NitroFetch::HybridNitroCronetSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
     return swiftPart.toUnsafe();
   }
 

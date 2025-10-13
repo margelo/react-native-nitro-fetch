@@ -7,11 +7,9 @@
 
 #import <Foundation/Foundation.h>
 #import <NitroModules/HybridObjectRegistry.hpp>
-#import "NitroFetch-Swift-Cxx-Umbrella.hpp"
+
 #import <type_traits>
 
-#include "HybridNitroFetchSpecSwift.hpp"
-#include "HybridNitroFetchClientSpecSwift.hpp"
 #include "HybridTextEncoding.hpp"
 
 @interface NitroFetchAutolinking : NSObject
@@ -23,20 +21,6 @@
   using namespace margelo::nitro;
   using namespace margelo::nitro::nitrofetch;
 
-  HybridObjectRegistry::registerHybridObjectConstructor(
-    "NitroFetch",
-    []() -> std::shared_ptr<HybridObject> {
-      std::shared_ptr<HybridNitroFetchSpec> hybridObject = NitroFetch::NitroFetchAutolinking::createNitroFetch();
-      return hybridObject;
-    }
-  );
-  HybridObjectRegistry::registerHybridObjectConstructor(
-    "NitroFetchClient",
-    []() -> std::shared_ptr<HybridObject> {
-      std::shared_ptr<HybridNitroFetchClientSpec> hybridObject = NitroFetch::NitroFetchAutolinking::createNitroFetchClient();
-      return hybridObject;
-    }
-  );
   HybridObjectRegistry::registerHybridObjectConstructor(
     "NitroTextEncoding",
     []() -> std::shared_ptr<HybridObject> {
