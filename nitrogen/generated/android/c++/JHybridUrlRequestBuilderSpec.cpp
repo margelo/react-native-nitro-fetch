@@ -9,11 +9,32 @@
 
 // Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
+// Forward declaration of `UploadDataProvider` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UploadDataProvider; }
+// Forward declaration of `UploadDataSink` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UploadDataSink; }
+// Forward declaration of `ArrayBuffer` to properly resolve imports.
+namespace NitroModules { class ArrayBuffer; }
 
 #include <memory>
 #include "HybridUrlRequestSpec.hpp"
 #include "JHybridUrlRequestSpec.hpp"
 #include <string>
+#include "UploadDataProvider.hpp"
+#include "JUploadDataProvider.hpp"
+#include "UploadDataSink.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
+#include <functional>
+#include "JFunc_void_UploadDataSink_std__shared_ptr_ArrayBuffer_.hpp"
+#include "JUploadDataSink.hpp"
+#include "JFunc_void_bool.hpp"
+#include "JFunc_void_std__string.hpp"
+#include "JFunc_void.hpp"
+#include <NitroModules/JArrayBuffer.hpp>
+#include <NitroModules/JUnit.hpp>
+#include "JFunc_void_UploadDataSink.hpp"
+#include <variant>
+#include "JVariant_String_ArrayBuffer.hpp"
 
 namespace margelo::nitro::nitrofetch {
 
@@ -48,6 +69,14 @@ namespace margelo::nitro::nitrofetch {
   void JHybridUrlRequestBuilderSpec::addHeader(const std::string& name, const std::string& value) {
     static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* name */, jni::alias_ref<jni::JString> /* value */)>("addHeader");
     method(_javaPart, jni::make_jstring(name), jni::make_jstring(value));
+  }
+  void JHybridUrlRequestBuilderSpec::setUploadDataProvider(const UploadDataProvider& provider) {
+    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JUploadDataProvider> /* provider */)>("setUploadDataProvider");
+    method(_javaPart, JUploadDataProvider::fromCpp(provider));
+  }
+  void JHybridUrlRequestBuilderSpec::setUploadBody(const std::variant<std::string, std::shared_ptr<ArrayBuffer>>& body) {
+    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JVariant_String_ArrayBuffer> /* body */)>("setUploadBody");
+    method(_javaPart, JVariant_String_ArrayBuffer::fromCpp(body));
   }
   void JHybridUrlRequestBuilderSpec::disableCache() {
     static const auto method = javaClassStatic()->getMethod<void()>("disableCache");

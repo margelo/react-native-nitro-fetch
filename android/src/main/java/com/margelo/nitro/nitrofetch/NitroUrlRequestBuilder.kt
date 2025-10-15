@@ -97,6 +97,108 @@ class NitroUrlRequestBuilder(
     builder.addHeader(name, value)
   }
 
+  override fun setUploadBody(body: Variant_String_ArrayBuffer) {
+    val bodyBytes: ByteArray = when (body) {
+      is Variant_String_ArrayBuffer.First -> body.value.toByteArray(Charsets.UTF_8)
+      is Variant_String_ArrayBuffer.Second -> {
+        val buffer = body.value.getBuffer(copyIfNeeded = true)
+        val bytes = ByteArray(buffer.remaining())
+        buffer.get(bytes)
+        bytes
+      }
+    }
+
+    val provider = object : org.chromium.net.UploadDataProvider() {
+      private var position = 0
+
+      override fun getLength(): Long = bodyBytes.size.toLong()
+
+      override fun read(uploadDataSink: org.chromium.net.UploadDataSink, byteBuffer: ByteBuffer) {
+        val remaining = bodyBytes.size - position
+        val toWrite = minOf(byteBuffer.remaining(), remaining)
+
+        if (toWrite > 0) {
+          byteBuffer.put(bodyBytes, position, toWrite)
+          position += toWrite
+        }
+
+        // Always pass false - Cronet determines completion by comparing uploaded bytes with getLength()
+        uploadDataSink.onReadSucceeded(false)
+      }
+
+      override fun rewind(uploadDataSink: org.chromium.net.UploadDataSink) {
+        position = 0
+        uploadDataSink.onRewindSucceeded()
+      }
+    }
+
+    builder.setUploadDataProvider(provider, executor)
+  }
+
+  override fun setUploadDataProvider(provider: UploadDataProvider) {
+    val cronetProvider = object : org.chromium.net.UploadDataProvider() {
+      private var uploadedSoFar: Long = 0
+
+      override fun getLength(): Long {
+        return provider.length.toLong()
+      }
+
+      override fun read(uploadDataSink: org.chromium.net.UploadDataSink, byteBuffer: ByteBuffer) {
+        // Calculate how many bytes to write in this chunk
+        val remaining = (provider.length - uploadedSoFar).toInt()
+        val bufferCapacity = byteBuffer.remaining()
+        val bytesToWrite = minOf(bufferCapacity, remaining)
+
+        val nitroSink = UploadDataSink(
+          onReadSucceeded = { finalChunk ->
+            // Update ByteBuffer position to reflect the data written
+            byteBuffer.position(byteBuffer.position() + bytesToWrite)
+            uploadedSoFar += bytesToWrite
+            uploadDataSink.onReadSucceeded(finalChunk)
+          },
+          onReadError = { error ->
+            uploadDataSink.onReadError(Exception(error))
+          },
+          onRewindSucceeded = {
+            uploadDataSink.onRewindSucceeded()
+          },
+          onRewindError = { error ->
+            uploadDataSink.onRewindError(Exception(error))
+          }
+        )
+
+        // Create ArrayBuffer from ByteBuffer - this wraps the buffer at current position
+        val arrayBuffer = ArrayBuffer(byteBuffer)
+
+        // Call JavaScript provider - it will write data to the ArrayBuffer
+        provider.read(nitroSink, arrayBuffer)
+      }
+
+      override fun rewind(uploadDataSink: org.chromium.net.UploadDataSink) {
+        uploadedSoFar = 0
+
+        val nitroSink = UploadDataSink(
+          onReadSucceeded = { finalChunk ->
+            uploadDataSink.onRewindSucceeded()
+          },
+          onReadError = { error ->
+            uploadDataSink.onRewindError(Exception(error))
+          },
+          onRewindSucceeded = {
+            uploadDataSink.onRewindSucceeded()
+          },
+          onRewindError = { error ->
+            uploadDataSink.onRewindError(Exception(error))
+          }
+        )
+
+        provider.rewind(nitroSink)
+      }
+    }
+
+    builder.setUploadDataProvider(cronetProvider, executor)
+  }
+
   override fun disableCache() {
     builder.disableCache()
   }

@@ -55,6 +55,8 @@ namespace margelo::nitro::nitrofetch {
     // Methods
     void setHttpMethod(const std::string& httpMethod) override;
     void addHeader(const std::string& name, const std::string& value) override;
+    void setUploadDataProvider(const UploadDataProvider& provider) override;
+    void setUploadBody(const std::variant<std::string, std::shared_ptr<ArrayBuffer>>& body) override;
     void disableCache() override;
     void setPriority(double priority) override;
     void allowDirectExecutor() override;

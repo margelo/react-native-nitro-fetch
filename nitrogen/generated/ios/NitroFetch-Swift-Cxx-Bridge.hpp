@@ -32,6 +32,8 @@ namespace margelo::nitro::nitrofetch { class HybridQuicExceptionSpec; }
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestBuilderSpec; }
 // Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
+// Forward declaration of `UploadDataSink` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UploadDataSink; }
 // Forward declaration of `UrlResponseInfo` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 
@@ -66,6 +68,7 @@ namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 #include "HybridQuicExceptionSpec.hpp"
 #include "HybridUrlRequestBuilderSpec.hpp"
 #include "HybridUrlRequestSpec.hpp"
+#include "UploadDataSink.hpp"
 #include "UrlResponseInfo.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/ArrayBufferHolder.hpp>
@@ -77,6 +80,7 @@ namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 /**
@@ -113,6 +117,145 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   }
   inline Result_bool_ create_Result_bool_(const std::exception_ptr& error) noexcept {
     return Result<bool>::withError(error);
+  }
+  
+  // pragma MARK: std::function<void(bool /* finalChunk */)>
+  /**
+   * Specialized version of `std::function<void(bool)>`.
+   */
+  using Func_void_bool = std::function<void(bool /* finalChunk */)>;
+  /**
+   * Wrapper class for a `std::function<void(bool / * finalChunk * /)>`, this can be used from Swift.
+   */
+  class Func_void_bool_Wrapper final {
+  public:
+    explicit Func_void_bool_Wrapper(std::function<void(bool /* finalChunk */)>&& func): _function(std::make_unique<std::function<void(bool /* finalChunk */)>>(std::move(func))) {}
+    inline void call(bool finalChunk) const noexcept {
+      _function->operator()(finalChunk);
+    }
+  private:
+    std::unique_ptr<std::function<void(bool /* finalChunk */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_bool create_Func_void_bool(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_bool_Wrapper wrap_Func_void_bool(Func_void_bool value) noexcept {
+    return Func_void_bool_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* error */)>
+  /**
+   * Specialized version of `std::function<void(const std::string&)>`.
+   */
+  using Func_void_std__string = std::function<void(const std::string& /* error */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::string& / * error * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__string_Wrapper final {
+  public:
+    explicit Func_void_std__string_Wrapper(std::function<void(const std::string& /* error */)>&& func): _function(std::make_unique<std::function<void(const std::string& /* error */)>>(std::move(func))) {}
+    inline void call(std::string error) const noexcept {
+      _function->operator()(error);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::string& /* error */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__string_Wrapper wrap_Func_void_std__string(Func_void_std__string value) noexcept {
+    return Func_void_std__string_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void()>
+  /**
+   * Specialized version of `std::function<void()>`.
+   */
+  using Func_void = std::function<void()>;
+  /**
+   * Wrapper class for a `std::function<void()>`, this can be used from Swift.
+   */
+  class Func_void_Wrapper final {
+  public:
+    explicit Func_void_Wrapper(std::function<void()>&& func): _function(std::make_unique<std::function<void()>>(std::move(func))) {}
+    inline void call() const noexcept {
+      _function->operator()();
+    }
+  private:
+    std::unique_ptr<std::function<void()>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_Wrapper wrap_Func_void(Func_void value) noexcept {
+    return Func_void_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void(const UploadDataSink& /* uploadDataSink */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>
+  /**
+   * Specialized version of `std::function<void(const UploadDataSink&, const std::shared_ptr<ArrayBuffer>&)>`.
+   */
+  using Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer_ = std::function<void(const UploadDataSink& /* uploadDataSink */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>;
+  /**
+   * Wrapper class for a `std::function<void(const UploadDataSink& / * uploadDataSink * /, const std::shared_ptr<ArrayBuffer>& / * byteBuffer * /)>`, this can be used from Swift.
+   */
+  class Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer__Wrapper final {
+  public:
+    explicit Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer__Wrapper(std::function<void(const UploadDataSink& /* uploadDataSink */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>&& func): _function(std::make_unique<std::function<void(const UploadDataSink& /* uploadDataSink */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>>(std::move(func))) {}
+    inline void call(UploadDataSink uploadDataSink, ArrayBufferHolder byteBuffer) const noexcept {
+      _function->operator()(uploadDataSink, byteBuffer.getArrayBuffer());
+    }
+  private:
+    std::unique_ptr<std::function<void(const UploadDataSink& /* uploadDataSink */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer_ create_Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer__Wrapper wrap_Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer_(Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer_ value) noexcept {
+    return Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer__Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void(const UploadDataSink& /* uploadDataSink */)>
+  /**
+   * Specialized version of `std::function<void(const UploadDataSink&)>`.
+   */
+  using Func_void_UploadDataSink = std::function<void(const UploadDataSink& /* uploadDataSink */)>;
+  /**
+   * Wrapper class for a `std::function<void(const UploadDataSink& / * uploadDataSink * /)>`, this can be used from Swift.
+   */
+  class Func_void_UploadDataSink_Wrapper final {
+  public:
+    explicit Func_void_UploadDataSink_Wrapper(std::function<void(const UploadDataSink& /* uploadDataSink */)>&& func): _function(std::make_unique<std::function<void(const UploadDataSink& /* uploadDataSink */)>>(std::move(func))) {}
+    inline void call(UploadDataSink uploadDataSink) const noexcept {
+      _function->operator()(uploadDataSink);
+    }
+  private:
+    std::unique_ptr<std::function<void(const UploadDataSink& /* uploadDataSink */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_UploadDataSink create_Func_void_UploadDataSink(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_UploadDataSink_Wrapper wrap_Func_void_UploadDataSink(Func_void_UploadDataSink value) noexcept {
+    return Func_void_UploadDataSink_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::variant<std::string, std::shared_ptr<ArrayBuffer>>
+  /**
+   * Wrapper struct for `std::variant<std::string, std::shared_ptr<ArrayBuffer>>`.
+   * std::variant cannot be used in Swift because of a Swift bug.
+   * Not even specializing it works. So we create a wrapper struct.
+   */
+  struct std__variant_std__string__std__shared_ptr_ArrayBuffer__ {
+    std::variant<std::string, std::shared_ptr<ArrayBuffer>> variant;
+    std__variant_std__string__std__shared_ptr_ArrayBuffer__(std::variant<std::string, std::shared_ptr<ArrayBuffer>> variant): variant(variant) { }
+    operator std::variant<std::string, std::shared_ptr<ArrayBuffer>>() const noexcept {
+      return variant;
+    }
+    inline size_t index() const noexcept {
+      return variant.index();
+    }
+    inline std::string get_0() const noexcept {
+      return std::get<0>(variant);
+    }
+    inline std::shared_ptr<ArrayBuffer> get_1() const noexcept {
+      return std::get<1>(variant);
+    }
+  };
+  inline std__variant_std__string__std__shared_ptr_ArrayBuffer__ create_std__variant_std__string__std__shared_ptr_ArrayBuffer__(const std::string& value) noexcept {
+    return std__variant_std__string__std__shared_ptr_ArrayBuffer__(value);
+  }
+  inline std__variant_std__string__std__shared_ptr_ArrayBuffer__ create_std__variant_std__string__std__shared_ptr_ArrayBuffer__(const std::shared_ptr<ArrayBuffer>& value) noexcept {
+    return std__variant_std__string__std__shared_ptr_ArrayBuffer__(value);
   }
   
   // pragma MARK: std::shared_ptr<HybridUrlRequestBuilderSpec>

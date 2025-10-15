@@ -14,7 +14,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     }
     return promise
   }
-  
+
   func prefetch(req: NitroRequest) throws -> Promise<Void> {
     let promise = Promise<Void>.init()
     Task {
@@ -24,11 +24,11 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       } catch {
         promise.reject(withError: error)
       }
-      
+
     }
     return promise
   }
-  
+
   // Shared URLSession for static operations
   private static let session: URLSession = {
     let config = URLSessionConfiguration.default
@@ -169,7 +169,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       }
     }
   }
-  
+
   private static func reqToHttpMethod(_ req: NitroRequest) -> String? {
     return req.method?.stringValue
   }
@@ -183,7 +183,11 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     if let headers = req.headers {
       for h in headers { r.addValue(h.value, forHTTPHeaderField: h.key) }
     }
-    if let s = req.bodyString {
+    // Handle body - prefer bodyBytes over bodyString
+    if let bodyBytes = req.bodyBytes {
+      let buffer = bodyBytes.getBuffer(copyIfNeeded: true)
+      r.httpBody = Data(buffer: buffer)
+    } else if let s = req.bodyString {
       r.httpBody = s.data(using: .utf8)
     }
     if let t = req.timeoutMs, t > 0 { r.timeoutInterval = TimeInterval(t) / 1000.0 }

@@ -50,6 +50,14 @@ abstract class HybridUrlRequestBuilderSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun setUploadDataProvider(provider: UploadDataProvider): Unit
+  
+  @DoNotStrip
+  @Keep
+  abstract fun setUploadBody(body: Variant_String_ArrayBuffer): Unit
+  
+  @DoNotStrip
+  @Keep
   abstract fun disableCache(): Unit
   
   @DoNotStrip

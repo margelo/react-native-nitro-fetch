@@ -520,6 +520,100 @@ export default function App() {
         >
           <Text style={styles.buttonText}>🔍 Test Stream</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.cacheTestButton]}
+          onPress={async () => {
+            setTesting(true);
+            try {
+              const testData = {
+                message: 'Hello from React Native!',
+                timestamp: Date.now(),
+                data: Array.from({ length: 100 }, (_, i) => ({
+                  id: i,
+                  value: Math.random(),
+                })),
+              };
+              const bodyString = JSON.stringify(testData);
+
+              console.log(
+                'Testing POST with body:',
+                bodyString.length,
+                'bytes'
+              );
+
+              // Test Native Fetch
+              const nativeStart = performance.now();
+              const nativeResponse = await fetch(`${SERVER_URL}/echo`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: bodyString,
+              });
+              const nativeData = await nativeResponse.json();
+              const nativeDuration = performance.now() - nativeStart;
+
+              console.log('Native POST Response:', nativeData);
+
+              await new Promise((resolve) => setTimeout(resolve, 100));
+
+              // Test Nitro Fetch
+              const nitroStart = performance.now();
+              const nitroResponse = await nitroFetch(`${SERVER_URL}/echo`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: bodyString,
+              });
+              const nitroData = await nitroResponse.json();
+              const nitroDuration = performance.now() - nitroStart;
+
+              console.log('Nitro POST Response:', nitroData);
+
+              const result: TestResult = {
+                endpoint: '📤 POST /echo',
+                nativeDuration: nativeDuration,
+                nitroDuration: nitroDuration,
+                dataSize: `${bodyString.length}B`,
+              };
+
+              if (
+                nativeData.success &&
+                nitroData.success &&
+                nativeData.receivedBytes === bodyString.length &&
+                nitroData.receivedBytes === bodyString.length
+              ) {
+                console.log('✅ POST test successful!');
+                setResults((prev) => [result, ...prev]);
+              } else {
+                console.error('❌ POST test failed');
+                setResults((prev) => [
+                  { ...result, error: 'Mismatch' },
+                  ...prev,
+                ]);
+              }
+            } catch (error: any) {
+              console.error('❌ POST test error:', error);
+              setResults((prev) => [
+                {
+                  endpoint: '📤 POST /echo',
+                  nativeDuration: 0,
+                  nitroDuration: 0,
+                  dataSize: 'Error',
+                  error: error.message,
+                },
+                ...prev,
+              ]);
+            } finally {
+              setTesting(false);
+            }
+          }}
+          disabled={testing}
+        >
+          <Text style={styles.buttonText}>📤 Test POST Body</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.resultsContainer}>

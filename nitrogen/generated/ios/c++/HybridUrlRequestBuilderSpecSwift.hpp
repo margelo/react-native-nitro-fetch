@@ -12,10 +12,24 @@
 // Forward declaration of `HybridUrlRequestBuilderSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridUrlRequestBuilderSpec_cxx; }
 
+// Forward declaration of `UploadDataProvider` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UploadDataProvider; }
+// Forward declaration of `UploadDataSink` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UploadDataSink; }
+// Forward declaration of `ArrayBuffer` to properly resolve imports.
+namespace NitroModules { class ArrayBuffer; }
+// Forward declaration of `ArrayBufferHolder` to properly resolve imports.
+namespace NitroModules { class ArrayBufferHolder; }
 // Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
 
 #include <string>
+#include "UploadDataProvider.hpp"
+#include "UploadDataSink.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
+#include <functional>
+#include <NitroModules/ArrayBufferHolder.hpp>
+#include <variant>
 #include <memory>
 #include "HybridUrlRequestSpec.hpp"
 
@@ -68,6 +82,18 @@ namespace margelo::nitro::nitrofetch {
     }
     inline void addHeader(const std::string& name, const std::string& value) override {
       auto __result = _swiftPart.addHeader(name, value);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline void setUploadDataProvider(const UploadDataProvider& provider) override {
+      auto __result = _swiftPart.setUploadDataProvider(std::forward<decltype(provider)>(provider));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline void setUploadBody(const std::variant<std::string, std::shared_ptr<ArrayBuffer>>& body) override {
+      auto __result = _swiftPart.setUploadBody(body);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

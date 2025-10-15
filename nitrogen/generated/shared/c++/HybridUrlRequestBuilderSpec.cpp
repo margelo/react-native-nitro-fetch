@@ -16,6 +16,8 @@ namespace margelo::nitro::nitrofetch {
     registerHybrids(this, [](Prototype& prototype) {
       prototype.registerHybridMethod("setHttpMethod", &HybridUrlRequestBuilderSpec::setHttpMethod);
       prototype.registerHybridMethod("addHeader", &HybridUrlRequestBuilderSpec::addHeader);
+      prototype.registerHybridMethod("setUploadDataProvider", &HybridUrlRequestBuilderSpec::setUploadDataProvider);
+      prototype.registerHybridMethod("setUploadBody", &HybridUrlRequestBuilderSpec::setUploadBody);
       prototype.registerHybridMethod("disableCache", &HybridUrlRequestBuilderSpec::disableCache);
       prototype.registerHybridMethod("setPriority", &HybridUrlRequestBuilderSpec::setPriority);
       prototype.registerHybridMethod("allowDirectExecutor", &HybridUrlRequestBuilderSpec::allowDirectExecutor);

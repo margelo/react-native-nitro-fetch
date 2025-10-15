@@ -47,6 +47,7 @@ target_sources(
   # Android-specific Nitrogen C++ sources
   ../nitrogen/generated/android/c++/JHybridUrlRequestSpec.cpp
   ../nitrogen/generated/android/c++/JHybridUrlRequestBuilderSpec.cpp
+  ../nitrogen/generated/android/c++/JVariant_String_ArrayBuffer.cpp
   ../nitrogen/generated/android/c++/JHybridCronetEngineSpec.cpp
   ../nitrogen/generated/android/c++/JHybridNitroCronetSpec.cpp
   ../nitrogen/generated/android/c++/JHybridCronetExceptionSpec.cpp

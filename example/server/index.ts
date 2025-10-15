@@ -107,6 +107,7 @@ const server = Bun.serve({
             endpoints: {
               '/': 'This documentation',
               '/health': 'Health check endpoint',
+              '/echo': 'POST endpoint - echoes back the request body',
               '/data/:size':
                 'Download text data (sizes: 1kb, 10kb, 100kb, 1mb, 10mb, 50mb, 100mb)',
               '/json/:size':
@@ -140,6 +141,30 @@ const server = Bun.serve({
         {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Echo POST endpoint - returns back what was sent
+    if (path === '/echo' && req.method === 'POST') {
+      const body = await req.text();
+      const contentType = req.headers.get('content-type') || 'text/plain';
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          receivedBytes: body.length,
+          contentType: contentType,
+          body: body,
+          timestamp: Date.now(),
+        }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'X-Received-Bytes': body.length.toString(),
+          },
         }
       );
     }

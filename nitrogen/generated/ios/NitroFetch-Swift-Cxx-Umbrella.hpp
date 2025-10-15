@@ -30,6 +30,10 @@ namespace margelo::nitro::nitrofetch { class HybridQuicExceptionSpec; }
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestBuilderSpec; }
 // Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
+// Forward declaration of `UploadDataProvider` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UploadDataProvider; }
+// Forward declaration of `UploadDataSink` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UploadDataSink; }
 // Forward declaration of `UrlRequestCallback` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct UrlRequestCallback; }
 // Forward declaration of `UrlResponseInfo` to properly resolve imports.
@@ -46,6 +50,8 @@ namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 #include "HybridQuicExceptionSpec.hpp"
 #include "HybridUrlRequestBuilderSpec.hpp"
 #include "HybridUrlRequestSpec.hpp"
+#include "UploadDataProvider.hpp"
+#include "UploadDataSink.hpp"
 #include "UrlRequestCallback.hpp"
 #include "UrlResponseInfo.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
@@ -56,6 +62,7 @@ namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 // C++ helpers for Swift

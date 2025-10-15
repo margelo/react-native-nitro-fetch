@@ -235,6 +235,22 @@ export function fetch(
         });
       }
 
+      // Handle request body if provided
+      if (options?.body) {
+        if (typeof options.body === 'string') {
+          builder.setUploadBody(options.body);
+        } else if (options.body instanceof ArrayBuffer) {
+          builder.setUploadBody(options.body);
+        } else {
+          // Uint8Array - convert to ArrayBuffer
+          const arrayBuffer = options.body.buffer.slice(
+            options.body.byteOffset,
+            options.body.byteOffset + options.body.byteLength
+          ) as ArrayBuffer;
+          builder.setUploadBody(arrayBuffer);
+        }
+      }
+
       request = builder.build();
       request.start();
     });

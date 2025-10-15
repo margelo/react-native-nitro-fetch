@@ -37,6 +37,46 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return swiftPart.toUnsafe();
   }
   
+  // pragma MARK: std::function<void(bool /* finalChunk */)>
+  Func_void_bool create_Func_void_bool(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_bool::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](bool finalChunk) mutable -> void {
+      swiftClosure.call(finalChunk);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* error */)>
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_std__string::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::string& error) mutable -> void {
+      swiftClosure.call(error);
+    };
+  }
+  
+  // pragma MARK: std::function<void()>
+  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)]() mutable -> void {
+      swiftClosure.call();
+    };
+  }
+  
+  // pragma MARK: std::function<void(const UploadDataSink& /* uploadDataSink */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>
+  Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer_ create_Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer_::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const UploadDataSink& uploadDataSink, const std::shared_ptr<ArrayBuffer>& byteBuffer) mutable -> void {
+      swiftClosure.call(uploadDataSink, ArrayBufferHolder(byteBuffer));
+    };
+  }
+  
+  // pragma MARK: std::function<void(const UploadDataSink& /* uploadDataSink */)>
+  Func_void_UploadDataSink create_Func_void_UploadDataSink(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_UploadDataSink::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const UploadDataSink& uploadDataSink) mutable -> void {
+      swiftClosure.call(uploadDataSink);
+    };
+  }
+  
   // pragma MARK: std::shared_ptr<HybridUrlRequestBuilderSpec>
   std::shared_ptr<HybridUrlRequestBuilderSpec> create_std__shared_ptr_HybridUrlRequestBuilderSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
     NitroFetch::HybridUrlRequestBuilderSpec_cxx swiftPart = NitroFetch::HybridUrlRequestBuilderSpec_cxx::fromUnsafe(swiftUnsafePointer);
