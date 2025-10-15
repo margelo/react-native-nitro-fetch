@@ -29,7 +29,8 @@
     "@react-native/typescript-config": "0.81.0",
     "@types/react": "^19.1.0",
     "react-native-builder-bob": "^0.40.13",
-    "react-native-monorepo-config": "^0.1.9"
+    "react-native-monorepo-config": "^0.1.9",
+    "react-native-nitro-fetch": "*"
   },
   "engines": {
     "node": ">=18"
