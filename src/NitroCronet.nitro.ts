@@ -1,4 +1,5 @@
 import type { HybridObject } from 'react-native-nitro-modules';
+import type { CronetException } from './NitroCronetException.nitro';
 
 export interface HttpHeader {
   key: string;
@@ -9,20 +10,13 @@ export interface UrlResponseInfo {
   url: string;
   httpStatusCode: number;
   httpStatusText: string;
-  allHeaders: Record<string, string>; // Nitro doesn't support Map, use Record
+  allHeaders: Record<string, string>;
   allHeadersAsList: HttpHeader[];
   urlChain: string[];
   negotiatedProtocol: string;
   proxyServer: string;
   receivedByteCount: number;
   wasCached: boolean; // useful to know
-}
-
-export interface CronetException {
-  message: string;
-  // Note: errorCode, internalErrorCode, and immediatelyRetryable are only available
-  // in specific Cronet exception subclasses (NetworkException, QuicException, etc.)
-  // and cannot be reliably accessed from the base CronetException class
 }
 
 export interface UrlRequestCallback {
@@ -50,7 +44,6 @@ export interface UrlRequestBuilder
   disableCache(): void;
   setPriority(priority: number): void; // 0=IDLE, 1=LOWEST, 2=LOW, 3=MEDIUM, 4=HIGHEST
   allowDirectExecutor(): void;
-
   build(): UrlRequest;
 }
 export interface CronetEngine
@@ -60,20 +53,14 @@ export interface CronetEngine
     callback: UrlRequestCallback
     // executor?: Executor
   ): UrlRequestBuilder;
-
   shutdown(): void;
-
   getVersionString(): string;
-
   startNetLogToFile(fileName: string, logAll: boolean): void;
-
   stopNetLog(): void;
 }
 export interface NitroCronet
   extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
   getEngine(): CronetEngine;
-
   createEngine(): CronetEngine;
-
   shutdownAll(): void;
 }

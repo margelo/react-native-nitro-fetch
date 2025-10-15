@@ -1,13 +1,9 @@
 package com.margelo.nitro.nitrofetch
 
-import android.util.Log
 import com.facebook.proguard.annotations.DoNotStrip
 import org.chromium.net.CronetEngine as CronetEngineNative
 import java.util.concurrent.Executor as JavaExecutor
 
-/**
- * Nitro wrapper for Cronet's engine.
- */
 @DoNotStrip
 class NitroCronetEngine(
   private val engine: CronetEngineNative,
@@ -27,11 +23,7 @@ class NitroCronetEngine(
   }
 
   override fun shutdown() {
-    try {
-      engine.shutdown()
-    } catch (t: Throwable) {
-      Log.e(TAG, "Error shutting down engine", t)
-    }
+    engine.shutdown()
   }
 
   override fun getVersionString(): String {
@@ -39,22 +31,10 @@ class NitroCronetEngine(
   }
 
   override fun startNetLogToFile(fileName: String, logAll: Boolean) {
-    try {
-      engine.startNetLogToFile(fileName, logAll)
-    } catch (t: Throwable) {
-      Log.e(TAG, "Error starting NetLog", t)
-    }
+    engine.startNetLogToFile(fileName, logAll)
   }
 
   override fun stopNetLog() {
-    try {
-      engine.stopNetLog()
-    } catch (t: Throwable) {
-      Log.e(TAG, "Error stopping NetLog", t)
-    }
-  }
-
-  companion object {
-    private const val TAG = "NitroCronetEngine"
+    engine.stopNetLog()
   }
 }

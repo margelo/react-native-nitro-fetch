@@ -35,7 +35,7 @@ data class UrlRequestCallback
     val onSucceeded: Func_void_UrlResponseInfo,
     @DoNotStrip
     @Keep
-    val onFailed: Func_void_std__optional_UrlResponseInfo__CronetException,
+    val onFailed: Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_,
     @DoNotStrip
     @Keep
     val onCanceled: Func_void_std__optional_UrlResponseInfo_
@@ -43,6 +43,6 @@ data class UrlRequestCallback
   /**
    * Initialize a new instance of `UrlRequestCallback` from Kotlin.
    */
-  constructor(onRedirectReceived: (info: UrlResponseInfo, newLocationUrl: String) -> Unit, onResponseStarted: (info: UrlResponseInfo) -> Unit, onReadCompleted: (info: UrlResponseInfo, byteBuffer: ArrayBuffer) -> Unit, onSucceeded: (info: UrlResponseInfo) -> Unit, onFailed: (info: UrlResponseInfo?, error: CronetException) -> Unit, onCanceled: (info: UrlResponseInfo?) -> Unit)
-       : this(Func_void_UrlResponseInfo_std__string_java(onRedirectReceived), Func_void_UrlResponseInfo_java(onResponseStarted), Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__java(onReadCompleted), Func_void_UrlResponseInfo_java(onSucceeded), Func_void_std__optional_UrlResponseInfo__CronetException_java(onFailed), Func_void_std__optional_UrlResponseInfo__java(onCanceled))
+  constructor(onRedirectReceived: (info: UrlResponseInfo, newLocationUrl: String) -> Unit, onResponseStarted: (info: UrlResponseInfo) -> Unit, onReadCompleted: (info: UrlResponseInfo, byteBuffer: ArrayBuffer) -> Unit, onSucceeded: (info: UrlResponseInfo) -> Unit, onFailed: (info: UrlResponseInfo?, error: HybridCronetExceptionSpec) -> Unit, onCanceled: (info: UrlResponseInfo?) -> Unit)
+       : this(Func_void_UrlResponseInfo_std__string_java(onRedirectReceived), Func_void_UrlResponseInfo_java(onResponseStarted), Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__java(onReadCompleted), Func_void_UrlResponseInfo_java(onSucceeded), Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec__java(onFailed), Func_void_std__optional_UrlResponseInfo__java(onCanceled))
 }

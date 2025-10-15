@@ -4,9 +4,6 @@ import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.core.ArrayBuffer
 import org.chromium.net.UrlRequest as CronetUrlRequest
 
-/**
- * Nitro wrapper for Cronet's UrlRequest.
- */
 @DoNotStrip
 class NitroUrlRequest(
   private val cronetRequest: CronetUrlRequest

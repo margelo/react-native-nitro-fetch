@@ -24,8 +24,8 @@ namespace margelo::nitro::nitrofetch { struct HttpHeader; }
 namespace NitroModules { class ArrayBuffer; }
 // Forward declaration of `ArrayBufferHolder` to properly resolve imports.
 namespace NitroModules { class ArrayBufferHolder; }
-// Forward declaration of `CronetException` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct CronetException; }
+// Forward declaration of `HybridCronetExceptionSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridCronetExceptionSpec; }
 
 #include <memory>
 #include "HybridUrlRequestBuilderSpec.hpp"
@@ -39,7 +39,7 @@ namespace margelo::nitro::nitrofetch { struct CronetException; }
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/ArrayBufferHolder.hpp>
 #include <optional>
-#include "CronetException.hpp"
+#include "HybridCronetExceptionSpec.hpp"
 
 #include "NitroFetch-Swift-Cxx-Umbrella.hpp"
 

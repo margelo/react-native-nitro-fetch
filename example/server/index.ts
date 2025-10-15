@@ -1,0 +1,415 @@
+const PORT = 3000;
+
+// Helper to generate random data
+function generateRandomData(sizeInBytes: number): string {
+  const chars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < sizeInBytes; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+// Helper to generate binary data
+function generateBinaryData(sizeInBytes: number): Uint8Array {
+  const data = new Uint8Array(sizeInBytes);
+  for (let i = 0; i < sizeInBytes; i++) {
+    data[i] = Math.floor(Math.random() * 256);
+  }
+  return data;
+}
+
+// Helper to generate JSON objects
+function generateLargeJSON(numItems: number) {
+  return {
+    timestamp: Date.now(),
+    items: Array.from({ length: numItems }, (_, i) => ({
+      id: i,
+      name: `Item ${i}`,
+      description: `This is a description for item ${i}`,
+      value: Math.random() * 1000,
+      tags: ['tag1', 'tag2', 'tag3'],
+      metadata: {
+        created: new Date().toISOString(),
+        updated: new Date().toISOString(),
+        version: 1,
+      },
+    })),
+  };
+}
+
+const server = Bun.serve({
+  port: PORT,
+  async fetch(req) {
+    const url = new URL(req.url);
+    const path = url.pathname;
+
+    // Check if client wants caching (by absence of cache-busting headers/params)
+    const clientWantsCache =
+      !url.searchParams.has('_') && // No cache-busting param
+      req.headers.get('cache-control') !==
+        'no-cache, no-store, must-revalidate';
+
+    // Helper to get headers (with or without caching)
+    const getHeaders = (
+      cacheable: boolean = clientWantsCache
+    ): Record<string, string> => {
+      const uniqueId = `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+      if (cacheable) {
+        // Allow caching
+        return {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Expose-Headers':
+            'X-Request-Id, X-Request-Time, X-Cacheable, X-Fresh-Response, X-Generation-Time, X-Data-Size, X-Item-Count, X-Delay, X-Chunk-Count, X-Chunk-Delay, ETag, Last-Modified',
+          'Cache-Control': 'public, max-age=3600',
+          'ETag': `"${uniqueId}"`,
+          'Last-Modified': new Date().toUTCString(),
+          'X-Cacheable': 'true',
+          'X-Request-Id': uniqueId,
+          'X-Request-Time': new Date().toISOString(),
+        };
+      } else {
+        // Prevent caching
+        return {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Expose-Headers':
+            'X-Request-Id, X-Request-Time, X-Cacheable, X-Fresh-Response, X-Generation-Time, X-Data-Size, X-Item-Count, X-Delay, X-Chunk-Count, X-Chunk-Delay',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'X-Request-Id': uniqueId,
+          'X-Server-Time': new Date().toISOString(),
+          'X-Fresh-Response': 'true',
+          'Age': '0',
+        };
+      }
+    };
+
+    const corsHeaders = getHeaders();
+
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: corsHeaders });
+    }
+
+    // Root endpoint - API documentation
+    if (path === '/' || path === '/api') {
+      return new Response(
+        JSON.stringify(
+          {
+            message: 'NitroFetch Speed Test API',
+            endpoints: {
+              '/': 'This documentation',
+              '/health': 'Health check endpoint',
+              '/data/:size':
+                'Download text data (sizes: 1kb, 10kb, 100kb, 1mb, 10mb, 50mb, 100mb)',
+              '/json/:size':
+                'JSON response (sizes: small, medium, large, xlarge)',
+              '/binary/:size':
+                'Binary data download (sizes: 1kb, 100kb, 1mb, 10mb, 50mb)',
+              '/stream/:chunks/:delay':
+                'Streaming response (chunks: number of chunks, delay: ms between chunks)',
+              '/delay/:ms': 'Delayed response (ms: milliseconds to delay)',
+              '/headers': 'Returns request headers as JSON',
+              '/status/:code': 'Returns specified HTTP status code',
+              '/image': 'Returns a random image (simulated)',
+              '/chunked': 'Chunked transfer encoding response',
+              '/large-headers': 'Response with many custom headers',
+            },
+          },
+          null,
+          2
+        ),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Health check
+    if (path === '/health') {
+      return new Response(
+        JSON.stringify({ status: 'ok', timestamp: Date.now() }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Text data endpoints
+    if (path.startsWith('/data/')) {
+      const size = path.split('/')[2];
+      const sizeMap: Record<string, number> = {
+        '1kb': 1024,
+        '10kb': 10 * 1024,
+        '100kb': 100 * 1024,
+        '1mb': 1024 * 1024,
+        '10mb': 10 * 1024 * 1024,
+        '50mb': 50 * 1024 * 1024,
+        '100mb': 100 * 1024 * 1024,
+      };
+
+      const bytes = sizeMap[size.toLowerCase()];
+      if (!bytes) {
+        return new Response(
+          'Invalid size. Use: 1kb, 10kb, 100kb, 1mb, 10mb, 50mb, 100mb',
+          {
+            status: 400,
+            headers: corsHeaders,
+          }
+        );
+      }
+
+      const startTime = Date.now();
+      const data = generateRandomData(bytes);
+      const generationTime = Date.now() - startTime;
+
+      return new Response(data, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/plain',
+          'Content-Length': bytes.toString(),
+          'X-Generation-Time': `${generationTime}ms`,
+          'X-Data-Size': size,
+        },
+      });
+    }
+
+    // Cacheable test endpoint (100 KB of data)
+    if (path === '/cacheable/test') {
+      const data = generateRandomData(100 * 1024); // 100 KB
+      const headers = getHeaders(true); // Always allow caching for this endpoint
+
+      return new Response(data, {
+        status: 200,
+        headers: {
+          ...headers,
+          'Content-Type': 'text/plain',
+          'Content-Length': (100 * 1024).toString(),
+        },
+      });
+    }
+
+    // JSON endpoints
+    if (path.startsWith('/json/')) {
+      const size = path.split('/')[2];
+      const sizeMap: Record<string, number> = {
+        small: 10,
+        medium: 100,
+        large: 1000,
+        xlarge: 10000,
+      };
+
+      const numItems = sizeMap[size.toLowerCase()];
+      if (!numItems) {
+        return new Response('Invalid size. Use: small, medium, large, xlarge', {
+          status: 400,
+          headers: corsHeaders,
+        });
+      }
+
+      const data = generateLargeJSON(numItems);
+      const json = JSON.stringify(data);
+
+      return new Response(json, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Content-Length': json.length.toString(),
+          'X-Item-Count': numItems.toString(),
+        },
+      });
+    }
+
+    // Binary data endpoints
+    if (path.startsWith('/binary/')) {
+      const size = path.split('/')[2];
+      const sizeMap: Record<string, number> = {
+        '1kb': 1024,
+        '100kb': 100 * 1024,
+        '1mb': 1024 * 1024,
+        '10mb': 10 * 1024 * 1024,
+        '50mb': 50 * 1024 * 1024,
+      };
+
+      const bytes = sizeMap[size.toLowerCase()];
+      if (!bytes) {
+        return new Response('Invalid size. Use: 1kb, 100kb, 1mb, 10mb, 50mb', {
+          status: 400,
+          headers: corsHeaders,
+        });
+      }
+
+      const data = generateBinaryData(bytes);
+
+      return new Response(data, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/octet-stream',
+          'Content-Length': bytes.toString(),
+          'Content-Disposition': `attachment; filename="data-${size}.bin"`,
+        },
+      });
+    }
+
+    // Streaming endpoint
+    if (path.startsWith('/stream/')) {
+      const parts = path.split('/');
+      const chunks = parseInt(parts[2]) || 10;
+      const delay = parseInt(parts[3]) || 100;
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          for (let i = 0; i < chunks; i++) {
+            const chunk = `Chunk ${i + 1}/${chunks}\n`;
+            controller.enqueue(new TextEncoder().encode(chunk));
+            if (i < chunks - 1) {
+              await Bun.sleep(delay);
+            }
+          }
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/plain',
+          'Transfer-Encoding': 'chunked',
+          'X-Chunk-Count': chunks.toString(),
+          'X-Chunk-Delay': `${delay}ms`,
+        },
+      });
+    }
+
+    // Delayed response
+    if (path.startsWith('/delay/')) {
+      const ms = parseInt(path.split('/')[2]) || 1000;
+      await Bun.sleep(ms);
+
+      return new Response(
+        JSON.stringify({
+          message: `Response delayed by ${ms}ms`,
+          timestamp: Date.now(),
+        }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'X-Delay': `${ms}ms`,
+          },
+        }
+      );
+    }
+
+    // Headers endpoint
+    if (path === '/headers') {
+      const headers: Record<string, string> = {};
+      req.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+
+      return new Response(JSON.stringify({ headers }, null, 2), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Status code endpoint
+    if (path.startsWith('/status/')) {
+      const code = parseInt(path.split('/')[2]) || 200;
+      return new Response(
+        JSON.stringify({ status: code, message: `Status code ${code}` }),
+        {
+          status: code,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // Image endpoint (simulated)
+    if (path === '/image') {
+      const size = 1024 * 1024; // 1MB image
+      const imageData = generateBinaryData(size);
+
+      return new Response(imageData, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'image/jpeg',
+          'Content-Length': size.toString(),
+        },
+      });
+    }
+
+    // Chunked transfer encoding
+    if (path === '/chunked') {
+      const chunks = [
+        'First chunk of data\n',
+        'Second chunk of data\n',
+        'Third chunk of data\n',
+        'Final chunk of data\n',
+      ];
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          for (const chunk of chunks) {
+            controller.enqueue(new TextEncoder().encode(chunk));
+            await Bun.sleep(100);
+          }
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/plain',
+          'Transfer-Encoding': 'chunked',
+        },
+      });
+    }
+
+    // Large headers endpoint
+    if (path === '/large-headers') {
+      const customHeaders: Record<string, string> = { ...corsHeaders };
+      for (let i = 0; i < 50; i++) {
+        customHeaders[`X-Custom-Header-${i}`] =
+          `Value-${i}-${generateRandomData(100)}`;
+      }
+
+      return new Response(
+        JSON.stringify({ message: 'Response with many headers' }),
+        {
+          status: 200,
+          headers: { ...customHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    // 404 for unknown endpoints
+    return new Response('Not Found', {
+      status: 404,
+      headers: corsHeaders,
+    });
+  },
+});
+
+console.log(
+  `🚀 NitroFetch Speed Test Server running at http://localhost:${PORT}`
+);
+console.log(`📚 API Documentation: http://localhost:${PORT}/api`);

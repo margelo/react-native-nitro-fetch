@@ -37,6 +37,11 @@ target_sources(
   ../nitrogen/generated/shared/c++/HybridUrlRequestBuilderSpec.cpp
   ../nitrogen/generated/shared/c++/HybridCronetEngineSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNitroCronetSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridCronetExceptionSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridNetworkExceptionSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridQuicExceptionSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridCallbackExceptionSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridInlineExecutionProhibitedExceptionSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNitroTextDecoderSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNitroTextEncodingSpec.cpp
   # Android-specific Nitrogen C++ sources
@@ -44,6 +49,11 @@ target_sources(
   ../nitrogen/generated/android/c++/JHybridUrlRequestBuilderSpec.cpp
   ../nitrogen/generated/android/c++/JHybridCronetEngineSpec.cpp
   ../nitrogen/generated/android/c++/JHybridNitroCronetSpec.cpp
+  ../nitrogen/generated/android/c++/JHybridCronetExceptionSpec.cpp
+  ../nitrogen/generated/android/c++/JHybridNetworkExceptionSpec.cpp
+  ../nitrogen/generated/android/c++/JHybridQuicExceptionSpec.cpp
+  ../nitrogen/generated/android/c++/JHybridCallbackExceptionSpec.cpp
+  ../nitrogen/generated/android/c++/JHybridInlineExecutionProhibitedExceptionSpec.cpp
 )
 
 # From node_modules/react-native/ReactAndroid/cmake-utils/folly-flags.cmake

@@ -24,8 +24,6 @@ class NitroCronet : HybridNitroCronetSpec() {
   }
 
   override fun createEngine(): HybridCronetEngineSpec {
-    // For now, return the singleton engine
-    // Could be extended to support multiple engines with different configs
     return getEngine()
   }
 
@@ -33,8 +31,6 @@ class NitroCronet : HybridNitroCronetSpec() {
     synchronized(this) {
       try {
         engineRef?.shutdown()
-      } catch (t: Throwable) {
-        Log.e(TAG, "Error shutting down engine", t)
       } finally {
         engineRef = null
       }
@@ -47,9 +43,6 @@ class NitroCronet : HybridNitroCronetSpec() {
     @Volatile
     private var engineRef: CronetEngine? = null
 
-    /**
-     * Shared I/O executor for Cronet operations.
-     */
     val ioExecutor: Executor by lazy {
       val cores = Runtime.getRuntime().availableProcessors().coerceAtLeast(2)
       Executors.newFixedThreadPool(cores) { r ->
@@ -60,9 +53,6 @@ class NitroCronet : HybridNitroCronetSpec() {
       }
     }
 
-    /**
-     * Get or create the singleton Cronet engine.
-     */
     fun getOrCreateCronetEngine(): CronetEngine {
       engineRef?.let { return it }
       synchronized(this) {
@@ -71,11 +61,8 @@ class NitroCronet : HybridNitroCronetSpec() {
         val app = currentApplication() ?: initialApplication()
           ?: throw IllegalStateException("NitroCronet: Application not available")
 
-        // Log available providers and prefer the Native one
         val providers = CronetProvider.getAllProviders(app)
-        providers.forEach {
-          Log.i(TAG, "Cronet provider: ${it.name} v=${it.version}")
-        }
+
         val nativeProvider = providers.firstOrNull {
           it.name.contains("Native", ignoreCase = true)
         }
@@ -90,7 +77,6 @@ class NitroCronet : HybridNitroCronetSpec() {
           .setUserAgent("NitroCronet/1.0")
 
         val engine = builder.build()
-        Log.i(TAG, "CronetEngine initialized. Provider=${nativeProvider?.name ?: "Default"} Cache=${cacheDir.absolutePath}")
         engineRef = engine
         return engine
       }

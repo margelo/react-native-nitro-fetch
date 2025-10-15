@@ -29,7 +29,7 @@ interface FetchStreamOptions {
 
 export async function fetchStreamedData(options: FetchStreamOptions = {}) {
   const {
-    url = 'http://10.0.2.2:3000/stream',
+    url = 'http://192.168.1.157:3000/stream',
     headers = {},
     body,
     signal,
@@ -39,7 +39,7 @@ export async function fetchStreamedData(options: FetchStreamOptions = {}) {
 
   try {
     console.log('Fetching stream...');
-    const response = await fetch('http://10.0.2.2:3000/stream');
+    const response = await fetch(url);
 
     console.log('Response:', response);
 

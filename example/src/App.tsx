@@ -9,6 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import { fetch as nitroFetch } from 'react-native-nitro-fetch';
+import { fetchStreamedData } from './stream';
 
 // Update this to your computer's local IP address
 // You can find it by running: ipconfig getifaddr en0 (macOS) or ipconfig (Windows)
@@ -432,6 +433,92 @@ export default function App() {
           disabled={testing}
         >
           <Text style={styles.buttonText}>🔍 Test Cache Verification</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.cacheTestButton]}
+          onPress={async () => {
+            setTesting(true);
+            try {
+              const totalStart = performance.now();
+              const times: number[] = [];
+              let dataCount = 0;
+
+              for (let i = 0; i < 15; i++) {
+                const start = performance.now();
+                let itemCount = 0;
+                await fetchStreamedData({
+                  onData: () => {
+                    itemCount++;
+                  },
+                });
+                const end = performance.now();
+                const duration = end - start;
+                times.push(duration);
+                if (i === 0) dataCount = itemCount;
+
+                // Add each individual run to results
+                const runResult: TestResult = {
+                  endpoint: `🌊 Stream #${i + 1}`,
+                  nativeDuration: 0,
+                  nitroDuration: duration,
+                  dataSize: `${itemCount} items`,
+                };
+                setResults((prev) => [runResult, ...prev]);
+              }
+
+              const totalEnd = performance.now();
+              const totalDuration = totalEnd - totalStart;
+              const avgDuration =
+                times.reduce((a, b) => a + b, 0) / times.length;
+              const minDuration = Math.min(...times);
+              const maxDuration = Math.max(...times);
+
+              // Add summary results to the UI
+              const summaryResults: TestResult[] = [
+                {
+                  endpoint: '📊 Stream - Average',
+                  nativeDuration: 0,
+                  nitroDuration: avgDuration,
+                  dataSize: `${dataCount} items`,
+                },
+                {
+                  endpoint: '📊 Stream - Min',
+                  nativeDuration: 0,
+                  nitroDuration: minDuration,
+                  dataSize: `${dataCount} items`,
+                },
+                {
+                  endpoint: '📊 Stream - Max',
+                  nativeDuration: 0,
+                  nitroDuration: maxDuration,
+                  dataSize: `${dataCount} items`,
+                },
+                {
+                  endpoint: '📊 Stream - Total',
+                  nativeDuration: 0,
+                  nitroDuration: totalDuration,
+                  dataSize: `15 runs`,
+                },
+              ];
+
+              setResults((prev) => [...summaryResults, ...prev]);
+
+              console.log('='.repeat(50));
+              console.log(
+                `Completed 15 stream tests in ${totalDuration.toFixed(2)}ms`
+              );
+              console.log(`Average: ${avgDuration.toFixed(2)}ms`);
+              console.log(`Min: ${minDuration.toFixed(2)}ms`);
+              console.log(`Max: ${maxDuration.toFixed(2)}ms`);
+              console.log('='.repeat(50));
+            } finally {
+              setTesting(false);
+            }
+          }}
+          disabled={testing}
+        >
+          <Text style={styles.buttonText}>🔍 Test Stream</Text>
         </TouchableOpacity>
       </View>
 

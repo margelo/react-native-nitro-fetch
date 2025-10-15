@@ -22,15 +22,16 @@
 namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 // Forward declaration of `ArrayBuffer` to properly resolve imports.
 namespace NitroModules { class ArrayBuffer; }
-// Forward declaration of `CronetException` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct CronetException; }
+// Forward declaration of `HybridCronetExceptionSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridCronetExceptionSpec; }
 
 #include "UrlResponseInfo.hpp"
 #include <string>
 #include <functional>
 #include <NitroModules/ArrayBuffer.hpp>
 #include <optional>
-#include "CronetException.hpp"
+#include <memory>
+#include "HybridCronetExceptionSpec.hpp"
 
 namespace margelo::nitro::nitrofetch {
 
@@ -43,12 +44,12 @@ namespace margelo::nitro::nitrofetch {
     std::function<void(const UrlResponseInfo& /* info */)> onResponseStarted     SWIFT_PRIVATE;
     std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)> onReadCompleted     SWIFT_PRIVATE;
     std::function<void(const UrlResponseInfo& /* info */)> onSucceeded     SWIFT_PRIVATE;
-    std::function<void(const std::optional<UrlResponseInfo>& /* info */, const CronetException& /* error */)> onFailed     SWIFT_PRIVATE;
+    std::function<void(const std::optional<UrlResponseInfo>& /* info */, const std::shared_ptr<HybridCronetExceptionSpec>& /* error */)> onFailed     SWIFT_PRIVATE;
     std::function<void(const std::optional<UrlResponseInfo>& /* info */)> onCanceled     SWIFT_PRIVATE;
 
   public:
     UrlRequestCallback() = default;
-    explicit UrlRequestCallback(std::function<void(const UrlResponseInfo& /* info */, const std::string& /* newLocationUrl */)> onRedirectReceived, std::function<void(const UrlResponseInfo& /* info */)> onResponseStarted, std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)> onReadCompleted, std::function<void(const UrlResponseInfo& /* info */)> onSucceeded, std::function<void(const std::optional<UrlResponseInfo>& /* info */, const CronetException& /* error */)> onFailed, std::function<void(const std::optional<UrlResponseInfo>& /* info */)> onCanceled): onRedirectReceived(onRedirectReceived), onResponseStarted(onResponseStarted), onReadCompleted(onReadCompleted), onSucceeded(onSucceeded), onFailed(onFailed), onCanceled(onCanceled) {}
+    explicit UrlRequestCallback(std::function<void(const UrlResponseInfo& /* info */, const std::string& /* newLocationUrl */)> onRedirectReceived, std::function<void(const UrlResponseInfo& /* info */)> onResponseStarted, std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)> onReadCompleted, std::function<void(const UrlResponseInfo& /* info */)> onSucceeded, std::function<void(const std::optional<UrlResponseInfo>& /* info */, const std::shared_ptr<HybridCronetExceptionSpec>& /* error */)> onFailed, std::function<void(const std::optional<UrlResponseInfo>& /* info */)> onCanceled): onRedirectReceived(onRedirectReceived), onResponseStarted(onResponseStarted), onReadCompleted(onReadCompleted), onSucceeded(onSucceeded), onFailed(onFailed), onCanceled(onCanceled) {}
   };
 
 } // namespace margelo::nitro::nitrofetch
@@ -65,7 +66,7 @@ namespace margelo::nitro {
         JSIConverter<std::function<void(const margelo::nitro::nitrofetch::UrlResponseInfo&)>>::fromJSI(runtime, obj.getProperty(runtime, "onResponseStarted")),
         JSIConverter<std::function<void(const margelo::nitro::nitrofetch::UrlResponseInfo&, const std::shared_ptr<ArrayBuffer>&)>>::fromJSI(runtime, obj.getProperty(runtime, "onReadCompleted")),
         JSIConverter<std::function<void(const margelo::nitro::nitrofetch::UrlResponseInfo&)>>::fromJSI(runtime, obj.getProperty(runtime, "onSucceeded")),
-        JSIConverter<std::function<void(const std::optional<margelo::nitro::nitrofetch::UrlResponseInfo>&, const margelo::nitro::nitrofetch::CronetException&)>>::fromJSI(runtime, obj.getProperty(runtime, "onFailed")),
+        JSIConverter<std::function<void(const std::optional<margelo::nitro::nitrofetch::UrlResponseInfo>&, const std::shared_ptr<margelo::nitro::nitrofetch::HybridCronetExceptionSpec>&)>>::fromJSI(runtime, obj.getProperty(runtime, "onFailed")),
         JSIConverter<std::function<void(const std::optional<margelo::nitro::nitrofetch::UrlResponseInfo>&)>>::fromJSI(runtime, obj.getProperty(runtime, "onCanceled"))
       );
     }
@@ -75,7 +76,7 @@ namespace margelo::nitro {
       obj.setProperty(runtime, "onResponseStarted", JSIConverter<std::function<void(const margelo::nitro::nitrofetch::UrlResponseInfo&)>>::toJSI(runtime, arg.onResponseStarted));
       obj.setProperty(runtime, "onReadCompleted", JSIConverter<std::function<void(const margelo::nitro::nitrofetch::UrlResponseInfo&, const std::shared_ptr<ArrayBuffer>&)>>::toJSI(runtime, arg.onReadCompleted));
       obj.setProperty(runtime, "onSucceeded", JSIConverter<std::function<void(const margelo::nitro::nitrofetch::UrlResponseInfo&)>>::toJSI(runtime, arg.onSucceeded));
-      obj.setProperty(runtime, "onFailed", JSIConverter<std::function<void(const std::optional<margelo::nitro::nitrofetch::UrlResponseInfo>&, const margelo::nitro::nitrofetch::CronetException&)>>::toJSI(runtime, arg.onFailed));
+      obj.setProperty(runtime, "onFailed", JSIConverter<std::function<void(const std::optional<margelo::nitro::nitrofetch::UrlResponseInfo>&, const std::shared_ptr<margelo::nitro::nitrofetch::HybridCronetExceptionSpec>&)>>::toJSI(runtime, arg.onFailed));
       obj.setProperty(runtime, "onCanceled", JSIConverter<std::function<void(const std::optional<margelo::nitro::nitrofetch::UrlResponseInfo>&)>>::toJSI(runtime, arg.onCanceled));
       return obj;
     }
@@ -88,7 +89,7 @@ namespace margelo::nitro {
       if (!JSIConverter<std::function<void(const margelo::nitro::nitrofetch::UrlResponseInfo&)>>::canConvert(runtime, obj.getProperty(runtime, "onResponseStarted"))) return false;
       if (!JSIConverter<std::function<void(const margelo::nitro::nitrofetch::UrlResponseInfo&, const std::shared_ptr<ArrayBuffer>&)>>::canConvert(runtime, obj.getProperty(runtime, "onReadCompleted"))) return false;
       if (!JSIConverter<std::function<void(const margelo::nitro::nitrofetch::UrlResponseInfo&)>>::canConvert(runtime, obj.getProperty(runtime, "onSucceeded"))) return false;
-      if (!JSIConverter<std::function<void(const std::optional<margelo::nitro::nitrofetch::UrlResponseInfo>&, const margelo::nitro::nitrofetch::CronetException&)>>::canConvert(runtime, obj.getProperty(runtime, "onFailed"))) return false;
+      if (!JSIConverter<std::function<void(const std::optional<margelo::nitro::nitrofetch::UrlResponseInfo>&, const std::shared_ptr<margelo::nitro::nitrofetch::HybridCronetExceptionSpec>&)>>::canConvert(runtime, obj.getProperty(runtime, "onFailed"))) return false;
       if (!JSIConverter<std::function<void(const std::optional<margelo::nitro::nitrofetch::UrlResponseInfo>&)>>::canConvert(runtime, obj.getProperty(runtime, "onCanceled"))) return false;
       return true;
     }

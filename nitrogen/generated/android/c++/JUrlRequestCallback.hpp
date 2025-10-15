@@ -10,21 +10,22 @@
 #include <fbjni/fbjni.h>
 #include "UrlRequestCallback.hpp"
 
-#include "CronetException.hpp"
 #include "HttpHeader.hpp"
-#include "JCronetException.hpp"
+#include "HybridCronetExceptionSpec.hpp"
 #include "JFunc_void_UrlResponseInfo.hpp"
 #include "JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_.hpp"
 #include "JFunc_void_UrlResponseInfo_std__string.hpp"
 #include "JFunc_void_std__optional_UrlResponseInfo_.hpp"
-#include "JFunc_void_std__optional_UrlResponseInfo__CronetException.hpp"
+#include "JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_.hpp"
 #include "JHttpHeader.hpp"
+#include "JHybridCronetExceptionSpec.hpp"
 #include "JUrlResponseInfo.hpp"
 #include "UrlResponseInfo.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/JArrayBuffer.hpp>
 #include <NitroModules/JUnit.hpp>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -57,8 +58,8 @@ namespace margelo::nitro::nitrofetch {
       jni::local_ref<JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_::javaobject> onReadCompleted = this->getFieldValue(fieldOnReadCompleted);
       static const auto fieldOnSucceeded = clazz->getField<JFunc_void_UrlResponseInfo::javaobject>("onSucceeded");
       jni::local_ref<JFunc_void_UrlResponseInfo::javaobject> onSucceeded = this->getFieldValue(fieldOnSucceeded);
-      static const auto fieldOnFailed = clazz->getField<JFunc_void_std__optional_UrlResponseInfo__CronetException::javaobject>("onFailed");
-      jni::local_ref<JFunc_void_std__optional_UrlResponseInfo__CronetException::javaobject> onFailed = this->getFieldValue(fieldOnFailed);
+      static const auto fieldOnFailed = clazz->getField<JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_::javaobject>("onFailed");
+      jni::local_ref<JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_::javaobject> onFailed = this->getFieldValue(fieldOnFailed);
       static const auto fieldOnCanceled = clazz->getField<JFunc_void_std__optional_UrlResponseInfo_::javaobject>("onCanceled");
       jni::local_ref<JFunc_void_std__optional_UrlResponseInfo_::javaobject> onCanceled = this->getFieldValue(fieldOnCanceled);
       return UrlRequestCallback(
@@ -106,13 +107,13 @@ namespace margelo::nitro::nitrofetch {
             };
           }
         }(),
-        [&]() -> std::function<void(const std::optional<UrlResponseInfo>& /* info */, const CronetException& /* error */)> {
-          if (onFailed->isInstanceOf(JFunc_void_std__optional_UrlResponseInfo__CronetException_cxx::javaClassStatic())) [[likely]] {
-            auto downcast = jni::static_ref_cast<JFunc_void_std__optional_UrlResponseInfo__CronetException_cxx::javaobject>(onFailed);
+        [&]() -> std::function<void(const std::optional<UrlResponseInfo>& /* info */, const std::shared_ptr<HybridCronetExceptionSpec>& /* error */)> {
+          if (onFailed->isInstanceOf(JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec__cxx::javaClassStatic())) [[likely]] {
+            auto downcast = jni::static_ref_cast<JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec__cxx::javaobject>(onFailed);
             return downcast->cthis()->getFunction();
           } else {
             auto onFailedRef = jni::make_global(onFailed);
-            return [onFailedRef](std::optional<UrlResponseInfo> info, CronetException error) -> void {
+            return [onFailedRef](std::optional<UrlResponseInfo> info, std::shared_ptr<HybridCronetExceptionSpec> error) -> void {
               return onFailedRef->invoke(info,error);
             };
           }
@@ -142,7 +143,7 @@ namespace margelo::nitro::nitrofetch {
         JFunc_void_UrlResponseInfo_cxx::fromCpp(value.onResponseStarted),
         JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__cxx::fromCpp(value.onReadCompleted),
         JFunc_void_UrlResponseInfo_cxx::fromCpp(value.onSucceeded),
-        JFunc_void_std__optional_UrlResponseInfo__CronetException_cxx::fromCpp(value.onFailed),
+        JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec__cxx::fromCpp(value.onFailed),
         JFunc_void_std__optional_UrlResponseInfo__cxx::fromCpp(value.onCanceled)
       );
     }

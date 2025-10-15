@@ -17,8 +17,8 @@ namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 namespace margelo::nitro::nitrofetch { struct HttpHeader; }
 // Forward declaration of `ArrayBuffer` to properly resolve imports.
 namespace NitroModules { class ArrayBuffer; }
-// Forward declaration of `CronetException` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct CronetException; }
+// Forward declaration of `HybridCronetExceptionSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridCronetExceptionSpec; }
 
 #include <memory>
 #include "HybridUrlRequestBuilderSpec.hpp"
@@ -40,9 +40,9 @@ namespace margelo::nitro::nitrofetch { struct CronetException; }
 #include <NitroModules/JArrayBuffer.hpp>
 #include <NitroModules/JUnit.hpp>
 #include <optional>
-#include "CronetException.hpp"
-#include "JFunc_void_std__optional_UrlResponseInfo__CronetException.hpp"
-#include "JCronetException.hpp"
+#include "HybridCronetExceptionSpec.hpp"
+#include "JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_.hpp"
+#include "JHybridCronetExceptionSpec.hpp"
 #include "JFunc_void_std__optional_UrlResponseInfo_.hpp"
 
 namespace margelo::nitro::nitrofetch {

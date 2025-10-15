@@ -1,6 +1,5 @@
 package com.margelo.nitro.nitrofetch
 
-import android.util.Log
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.core.ArrayBuffer
 import org.chromium.net.CronetEngine
@@ -10,9 +9,6 @@ import org.chromium.net.CronetException as CronetNativeException
 import java.nio.ByteBuffer
 import java.util.concurrent.Executor as JavaExecutor
 
-/**
- * Nitro wrapper for Cronet's UrlRequest.Builder.
- */
 @DoNotStrip
 class NitroUrlRequestBuilder(
   private val engine: CronetEngine,
@@ -24,7 +20,6 @@ class NitroUrlRequestBuilder(
   private val builder: CronetUrlRequest.Builder
 
   init {
-    // Create the Cronet callback wrapper
     val cronetCallback = object : CronetUrlRequest.Callback() {
 
       override fun onRedirectReceived(
@@ -32,24 +27,16 @@ class NitroUrlRequestBuilder(
         info: CronetUrlResponseInfo,
         newLocationUrl: String
       ) {
-        try {
-          val nitroInfo = info.toNitro()
-          callback.onRedirectReceived(nitroInfo, newLocationUrl)
-        } catch (t: Throwable) {
-          Log.e(TAG, "Error in onRedirectReceived", t)
-        }
+        val nitroInfo = info.toNitro()
+        callback.onRedirectReceived(nitroInfo, newLocationUrl)
       }
 
       override fun onResponseStarted(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo
       ) {
-        try {
-          val nitroInfo = info.toNitro()
-          callback.onResponseStarted(nitroInfo)
-        } catch (t: Throwable) {
-          Log.e(TAG, "Error in onResponseStarted", t)
-        }
+        val nitroInfo = info.toNitro()
+        callback.onResponseStarted(nitroInfo)
       }
 
       override fun onReadCompleted(
@@ -57,37 +44,27 @@ class NitroUrlRequestBuilder(
         info: CronetUrlResponseInfo,
         byteBuffer: ByteBuffer
       ) {
-        try {
-          byteBuffer.flip()
-          val size = byteBuffer.remaining()
+        byteBuffer.flip()
+        val size = byteBuffer.remaining()
 
-          // Create a new direct ByteBuffer and copy the data
-          val directBuffer = ByteBuffer.allocateDirect(size)
-          directBuffer.put(byteBuffer)
-          directBuffer.flip()
+        val directBuffer = ByteBuffer.allocateDirect(size)
+        directBuffer.put(byteBuffer)
+        directBuffer.flip()
 
-          // Create ArrayBuffer from the direct ByteBuffer
-          val arrayBuffer = ArrayBuffer(directBuffer)
-          val nitroInfo = info.toNitro()
+        val arrayBuffer = ArrayBuffer(directBuffer)
+        val nitroInfo = info.toNitro()
 
-          callback.onReadCompleted(nitroInfo, arrayBuffer)
+        callback.onReadCompleted(nitroInfo, arrayBuffer)
 
-          byteBuffer.clear()
-        } catch (t: Throwable) {
-          Log.e(TAG, "Error in onReadCompleted", t)
-        }
+        byteBuffer.clear()
       }
 
       override fun onSucceeded(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo
       ) {
-        try {
-          val nitroInfo = info.toNitro()
-          callback.onSucceeded(nitroInfo)
-        } catch (t: Throwable) {
-          Log.e(TAG, "Error in onSucceeded", t)
-        }
+        val nitroInfo = info.toNitro()
+        callback.onSucceeded(nitroInfo)
       }
 
       override fun onFailed(
@@ -95,25 +72,17 @@ class NitroUrlRequestBuilder(
         info: CronetUrlResponseInfo?,
         error: CronetNativeException
       ) {
-        try {
-          val nitroInfo = info?.toNitro()
-          val nitroError = error.toNitro()
-          callback.onFailed(nitroInfo, nitroError)
-        } catch (t: Throwable) {
-          Log.e(TAG, "Error in onFailed", t)
-        }
+        val nitroInfo = info?.toNitro()
+        val nitroError = error.toNitro()
+        callback.onFailed(nitroInfo, nitroError)
       }
 
       override fun onCanceled(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo?
       ) {
-        try {
-          val nitroInfo = info?.toNitro()
-          callback.onCanceled(nitroInfo)
-        } catch (t: Throwable) {
-          Log.e(TAG, "Error in onCanceled", t)
-        }
+        val nitroInfo = info?.toNitro()
+        callback.onCanceled(nitroInfo)
       }
     }
 
@@ -151,9 +120,5 @@ class NitroUrlRequestBuilder(
   override fun build(): HybridUrlRequestSpec {
     val cronetRequest = builder.build()
     return NitroUrlRequest(cronetRequest)
-  }
-
-  companion object {
-    private const val TAG = "NitroUrlRequestBuilder"
   }
 }
