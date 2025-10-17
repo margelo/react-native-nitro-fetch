@@ -17,6 +17,8 @@ namespace margelo::nitro::nitrofetch {
       prototype.registerHybridMethod("getEngine", &HybridNitroCronetSpec::getEngine);
       prototype.registerHybridMethod("createEngine", &HybridNitroCronetSpec::createEngine);
       prototype.registerHybridMethod("shutdownAll", &HybridNitroCronetSpec::shutdownAll);
+      prototype.registerHybridMethod("prefetch", &HybridNitroCronetSpec::prefetch);
+      prototype.registerHybridMethod("consumeNativePrefetch", &HybridNitroCronetSpec::consumeNativePrefetch);
     });
   }
 

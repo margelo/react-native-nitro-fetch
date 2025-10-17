@@ -34,6 +34,7 @@
 #include "JHybridQuicExceptionSpec.hpp"
 #include "JHybridCallbackExceptionSpec.hpp"
 #include "JHybridInlineExecutionProhibitedExceptionSpec.hpp"
+#include "JHybridNitroFetchCacheSpec.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
 #include "HybridTextEncoding.hpp"
 
@@ -65,6 +66,7 @@ int initialize(JavaVM* vm) {
     margelo::nitro::nitrofetch::JHybridQuicExceptionSpec::registerNatives();
     margelo::nitro::nitrofetch::JHybridCallbackExceptionSpec::registerNatives();
     margelo::nitro::nitrofetch::JHybridInlineExecutionProhibitedExceptionSpec::registerNatives();
+    margelo::nitro::nitrofetch::JHybridNitroFetchCacheSpec::registerNatives();
 
     // Register Nitro Hybrid Objects
     HybridObjectRegistry::registerHybridObjectConstructor(

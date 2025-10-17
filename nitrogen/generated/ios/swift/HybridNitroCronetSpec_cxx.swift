@@ -149,4 +149,75 @@ open class HybridNitroCronetSpec_cxx {
       return bridge.create_Result_void_(__exceptionPtr)
     }
   }
+  
+  @inline(__always)
+  public final func prefetch(url: std.string, httpMethod: std.string, headers: bridge.std__unordered_map_std__string__std__string_, body: bridge.std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___, maxAge: Double) -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.prefetch(url: String(url), httpMethod: String(httpMethod), headers: { () -> Dictionary<String, String> in
+        var __dictionary = Dictionary<String, String>(minimumCapacity: headers.size())
+        let __keys = bridge.get_std__unordered_map_std__string__std__string__keys(headers)
+        for __key in __keys {
+          let __value = bridge.get_std__unordered_map_std__string__std__string__value(headers, __key)
+          __dictionary[String(__key)] = String(__value)
+        }
+        return __dictionary
+      }(), body: { () -> Variant_String_ArrayBuffer? in
+        if bridge.has_value_std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___(body) {
+          let __unwrapped = bridge.get_std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___(body)
+          return { () -> Variant_String_ArrayBuffer in
+            let __variant = bridge.std__variant_std__string__std__shared_ptr_ArrayBuffer__(__unwrapped)
+            switch __variant.index() {
+              case 0:
+                let __actual = __variant.get_0()
+                return .first(String(__actual))
+              case 1:
+                let __actual = __variant.get_1()
+                return .second(ArrayBuffer(__actual))
+              default:
+                fatalError("Variant can never have index \(__variant.index())!")
+            }
+          }()
+        } else {
+          return nil
+        }
+      }(), maxAge: maxAge)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func consumeNativePrefetch(prefetchKey: std.string) -> bridge.Result_std__shared_ptr_Promise_std__optional_CachedFetchResponse____ {
+    do {
+      let __result = try self.__implementation.consumeNativePrefetch(prefetchKey: String(prefetchKey))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_std__optional_CachedFetchResponse___ in
+        let __promise = bridge.create_std__shared_ptr_Promise_std__optional_CachedFetchResponse___()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_std__optional_CachedFetchResponse___(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve({ () -> bridge.std__optional_CachedFetchResponse_ in
+              if let __unwrappedValue = __result {
+                return bridge.create_std__optional_CachedFetchResponse_(__unwrappedValue)
+              } else {
+                return .init()
+              }
+            }()) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_std__optional_CachedFetchResponse____(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_std__optional_CachedFetchResponse____(__exceptionPtr)
+    }
+  }
 }

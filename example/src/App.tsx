@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { fetch as nitroFetch } from 'react-native-nitro-fetch';
 import { fetchStreamedData } from './stream';
+import TestScreen from './Tests';
 
 // Update this to your computer's local IP address
 // You can find it by running: ipconfig getifaddr en0 (macOS) or ipconfig (Windows)
@@ -37,6 +38,8 @@ export default function App() {
   const [seenRequestIds, setSeenRequestIds] = React.useState<Set<string>>(
     new Set()
   );
+
+  return <TestScreen />;
 
   // Helper function to check if response was cached
   const isCached = (response: Response): boolean => {

@@ -10199,6 +10199,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-native-mmkv@npm:^3.0.0":
+  version: 3.3.3
+  resolution: "react-native-mmkv@npm:3.3.3"
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 2f4f6ba36f2c00a1374cd3c0303207e7c0a0b7b2504c4f1986a423a3d8295eb817299fc1ca11e37c425df60648c5a0d02be882f1890924167724775433dd2598
+  languageName: node
+  linkType: hard
+
 "react-native-monorepo-config@npm:^0.1.8, react-native-monorepo-config@npm:^0.1.9":
   version: 0.1.10
   resolution: "react-native-monorepo-config@npm:0.1.10"
@@ -10232,6 +10242,7 @@ __metadata:
     react: 19.1.0
     react-native: 0.81.0
     react-native-builder-bob: ^0.40.13
+    react-native-mmkv: ^3.0.0
     react-native-monorepo-config: ^0.1.9
     react-native-nitro-modules: ^0.29.2
     react-native-safe-area-context: ^5.5.2
@@ -10272,9 +10283,12 @@ __metadata:
   peerDependencies:
     react: "*"
     react-native: "*"
+    react-native-mmkv: ">=3.0.0"
     react-native-nitro-modules: ^0.29.2
     react-native-worklets-core: ^1.6.0
   peerDependenciesMeta:
+    react-native-mmkv:
+      optional: true
     react-native-worklets-core:
       optional: true
   languageName: unknown

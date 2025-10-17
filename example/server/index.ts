@@ -108,6 +108,8 @@ const server = Bun.serve({
               '/': 'This documentation',
               '/health': 'Health check endpoint',
               '/echo': 'POST endpoint - echoes back the request body',
+              '/echo-headers': 'Returns request headers in response body',
+              '/utf8': 'UTF-8 test endpoint with emojis and special characters',
               '/data/:size':
                 'Download text data (sizes: 1kb, 10kb, 100kb, 1mb, 10mb, 50mb, 100mb)',
               '/json/:size':
@@ -350,6 +352,40 @@ const server = Bun.serve({
       return new Response(JSON.stringify({ headers }, null, 2), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Echo headers endpoint - returns headers in response body
+    if (path === '/echo-headers') {
+      const headers: Record<string, string> = {};
+      req.headers.forEach((value, key) => {
+        headers[key] = value;
+      });
+
+      return new Response(JSON.stringify(headers, null, 2), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // UTF-8 test endpoint with emojis
+    if (path === '/utf8') {
+      const utf8Content = {
+        message: 'UTF-8 test with emoji support 🎉',
+        emojis: '😀 😃 😄 😁 🚀 ⚡ 💻 🔥 ✨ 🌟',
+        special: 'Héllo Wörld! Ñoño café',
+        chinese: '你好世界',
+        japanese: 'こんにちは世界',
+        arabic: 'مرحبا بالعالم',
+        symbols: '€ £ ¥ ₹ © ® ™',
+      };
+
+      return new Response(JSON.stringify(utf8Content, null, 2), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json; charset=utf-8',
+        },
       });
     }
 

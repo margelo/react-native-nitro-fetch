@@ -12,6 +12,10 @@
 namespace NitroModules { class ArrayBufferHolder; }
 // Forward declaration of `ArrayBuffer` to properly resolve imports.
 namespace NitroModules { class ArrayBuffer; }
+// Forward declaration of `CachedFetchResponse` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct CachedFetchResponse; }
+// Forward declaration of `CachedPrefetchResponse` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct CachedPrefetchResponse; }
 // Forward declaration of `HttpHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct HttpHeader; }
 // Forward declaration of `HybridCallbackExceptionSpec` to properly resolve imports.
@@ -26,6 +30,8 @@ namespace margelo::nitro::nitrofetch { class HybridInlineExecutionProhibitedExce
 namespace margelo::nitro::nitrofetch { class HybridNetworkExceptionSpec; }
 // Forward declaration of `HybridNitroCronetSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroCronetSpec; }
+// Forward declaration of `HybridNitroFetchCacheSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridNitroFetchCacheSpec; }
 // Forward declaration of `HybridQuicExceptionSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridQuicExceptionSpec; }
 // Forward declaration of `HybridUrlRequestBuilderSpec` to properly resolve imports.
@@ -50,6 +56,8 @@ namespace NitroFetch { class HybridInlineExecutionProhibitedExceptionSpec_cxx; }
 namespace NitroFetch { class HybridNetworkExceptionSpec_cxx; }
 // Forward declaration of `HybridNitroCronetSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridNitroCronetSpec_cxx; }
+// Forward declaration of `HybridNitroFetchCacheSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridNitroFetchCacheSpec_cxx; }
 // Forward declaration of `HybridQuicExceptionSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridQuicExceptionSpec_cxx; }
 // Forward declaration of `HybridUrlRequestBuilderSpec_cxx` to properly resolve imports.
@@ -58,6 +66,8 @@ namespace NitroFetch { class HybridUrlRequestBuilderSpec_cxx; }
 namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 
 // Include C++ defined types
+#include "CachedFetchResponse.hpp"
+#include "CachedPrefetchResponse.hpp"
 #include "HttpHeader.hpp"
 #include "HybridCallbackExceptionSpec.hpp"
 #include "HybridCronetEngineSpec.hpp"
@@ -65,6 +75,7 @@ namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 #include "HybridInlineExecutionProhibitedExceptionSpec.hpp"
 #include "HybridNetworkExceptionSpec.hpp"
 #include "HybridNitroCronetSpec.hpp"
+#include "HybridNitroFetchCacheSpec.hpp"
 #include "HybridQuicExceptionSpec.hpp"
 #include "HybridUrlRequestBuilderSpec.hpp"
 #include "HybridUrlRequestSpec.hpp"
@@ -73,6 +84,8 @@ namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/ArrayBufferHolder.hpp>
 #include <NitroModules/FastVectorCopy.hpp>
+#include <NitroModules/Promise.hpp>
+#include <NitroModules/PromiseHolder.hpp>
 #include <NitroModules/Result.hpp>
 #include <exception>
 #include <functional>
@@ -494,6 +507,104 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return Result<std::string>::withError(error);
   }
   
+  // pragma MARK: std::shared_ptr<Promise<void>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<void>>`.
+   */
+  using std__shared_ptr_Promise_void__ = std::shared_ptr<Promise<void>>;
+  inline std::shared_ptr<Promise<void>> create_std__shared_ptr_Promise_void__() noexcept {
+    return Promise<void>::create();
+  }
+  inline PromiseHolder<void> wrap_std__shared_ptr_Promise_void__(std::shared_ptr<Promise<void>> promise) noexcept {
+    return PromiseHolder<void>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>
+  /**
+   * Specialized version of `std::function<void(const std::exception_ptr&)>`.
+   */
+  using Func_void_std__exception_ptr = std::function<void(const std::exception_ptr& /* error */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::exception_ptr& / * error * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__exception_ptr_Wrapper final {
+  public:
+    explicit Func_void_std__exception_ptr_Wrapper(std::function<void(const std::exception_ptr& /* error */)>&& func): _function(std::make_unique<std::function<void(const std::exception_ptr& /* error */)>>(std::move(func))) {}
+    inline void call(std::exception_ptr error) const noexcept {
+      _function->operator()(error);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::exception_ptr& /* error */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__exception_ptr_Wrapper wrap_Func_void_std__exception_ptr(Func_void_std__exception_ptr value) noexcept {
+    return Func_void_std__exception_ptr_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>
+  /**
+   * Specialized version of `std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>`.
+   */
+  using std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___ = std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>;
+  inline std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>> create_std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___(const std::variant<std::string, std::shared_ptr<ArrayBuffer>>& value) noexcept {
+    return std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>(value);
+  }
+  inline bool has_value_std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___(const std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline std::variant<std::string, std::shared_ptr<ArrayBuffer>> get_std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___(const std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>& optional) noexcept {
+    return *optional;
+  }
+  
+  // pragma MARK: std::optional<CachedFetchResponse>
+  /**
+   * Specialized version of `std::optional<CachedFetchResponse>`.
+   */
+  using std__optional_CachedFetchResponse_ = std::optional<CachedFetchResponse>;
+  inline std::optional<CachedFetchResponse> create_std__optional_CachedFetchResponse_(const CachedFetchResponse& value) noexcept {
+    return std::optional<CachedFetchResponse>(value);
+  }
+  inline bool has_value_std__optional_CachedFetchResponse_(const std::optional<CachedFetchResponse>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline CachedFetchResponse get_std__optional_CachedFetchResponse_(const std::optional<CachedFetchResponse>& optional) noexcept {
+    return *optional;
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<std::optional<CachedFetchResponse>>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<std::optional<CachedFetchResponse>>>`.
+   */
+  using std__shared_ptr_Promise_std__optional_CachedFetchResponse___ = std::shared_ptr<Promise<std::optional<CachedFetchResponse>>>;
+  inline std::shared_ptr<Promise<std::optional<CachedFetchResponse>>> create_std__shared_ptr_Promise_std__optional_CachedFetchResponse___() noexcept {
+    return Promise<std::optional<CachedFetchResponse>>::create();
+  }
+  inline PromiseHolder<std::optional<CachedFetchResponse>> wrap_std__shared_ptr_Promise_std__optional_CachedFetchResponse___(std::shared_ptr<Promise<std::optional<CachedFetchResponse>>> promise) noexcept {
+    return PromiseHolder<std::optional<CachedFetchResponse>>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const std::optional<CachedFetchResponse>& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const std::optional<CachedFetchResponse>&)>`.
+   */
+  using Func_void_std__optional_CachedFetchResponse_ = std::function<void(const std::optional<CachedFetchResponse>& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::optional<CachedFetchResponse>& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__optional_CachedFetchResponse__Wrapper final {
+  public:
+    explicit Func_void_std__optional_CachedFetchResponse__Wrapper(std::function<void(const std::optional<CachedFetchResponse>& /* result */)>&& func): _function(std::make_unique<std::function<void(const std::optional<CachedFetchResponse>& /* result */)>>(std::move(func))) {}
+    inline void call(std::optional<CachedFetchResponse> result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::optional<CachedFetchResponse>& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__optional_CachedFetchResponse_ create_Func_void_std__optional_CachedFetchResponse_(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__optional_CachedFetchResponse__Wrapper wrap_Func_void_std__optional_CachedFetchResponse_(Func_void_std__optional_CachedFetchResponse_ value) noexcept {
+    return Func_void_std__optional_CachedFetchResponse__Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::shared_ptr<HybridNitroCronetSpec>
   /**
    * Specialized version of `std::shared_ptr<HybridNitroCronetSpec>`.
@@ -513,6 +624,24 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   }
   inline Result_std__shared_ptr_HybridCronetEngineSpec__ create_Result_std__shared_ptr_HybridCronetEngineSpec__(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<HybridCronetEngineSpec>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<void>>>
+  using Result_std__shared_ptr_Promise_void___ = Result<std::shared_ptr<Promise<void>>>;
+  inline Result_std__shared_ptr_Promise_void___ create_Result_std__shared_ptr_Promise_void___(const std::shared_ptr<Promise<void>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<void>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_void___ create_Result_std__shared_ptr_Promise_void___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<void>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<std::optional<CachedFetchResponse>>>>
+  using Result_std__shared_ptr_Promise_std__optional_CachedFetchResponse____ = Result<std::shared_ptr<Promise<std::optional<CachedFetchResponse>>>>;
+  inline Result_std__shared_ptr_Promise_std__optional_CachedFetchResponse____ create_Result_std__shared_ptr_Promise_std__optional_CachedFetchResponse____(const std::shared_ptr<Promise<std::optional<CachedFetchResponse>>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<std::optional<CachedFetchResponse>>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_std__optional_CachedFetchResponse____ create_Result_std__shared_ptr_Promise_std__optional_CachedFetchResponse____(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<std::optional<CachedFetchResponse>>>>::withError(error);
   }
   
   // pragma MARK: std::shared_ptr<HybridNetworkExceptionSpec>
@@ -589,5 +718,41 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   // pragma MARK: std::weak_ptr<HybridInlineExecutionProhibitedExceptionSpec>
   using std__weak_ptr_HybridInlineExecutionProhibitedExceptionSpec_ = std::weak_ptr<HybridInlineExecutionProhibitedExceptionSpec>;
   inline std__weak_ptr_HybridInlineExecutionProhibitedExceptionSpec_ weakify_std__shared_ptr_HybridInlineExecutionProhibitedExceptionSpec_(const std::shared_ptr<HybridInlineExecutionProhibitedExceptionSpec>& strong) noexcept { return strong; }
+  
+  // pragma MARK: std::optional<CachedPrefetchResponse>
+  /**
+   * Specialized version of `std::optional<CachedPrefetchResponse>`.
+   */
+  using std__optional_CachedPrefetchResponse_ = std::optional<CachedPrefetchResponse>;
+  inline std::optional<CachedPrefetchResponse> create_std__optional_CachedPrefetchResponse_(const CachedPrefetchResponse& value) noexcept {
+    return std::optional<CachedPrefetchResponse>(value);
+  }
+  inline bool has_value_std__optional_CachedPrefetchResponse_(const std::optional<CachedPrefetchResponse>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline CachedPrefetchResponse get_std__optional_CachedPrefetchResponse_(const std::optional<CachedPrefetchResponse>& optional) noexcept {
+    return *optional;
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridNitroFetchCacheSpec>
+  /**
+   * Specialized version of `std::shared_ptr<HybridNitroFetchCacheSpec>`.
+   */
+  using std__shared_ptr_HybridNitroFetchCacheSpec_ = std::shared_ptr<HybridNitroFetchCacheSpec>;
+  std::shared_ptr<HybridNitroFetchCacheSpec> create_std__shared_ptr_HybridNitroFetchCacheSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridNitroFetchCacheSpec_(std__shared_ptr_HybridNitroFetchCacheSpec_ cppType) noexcept;
+  
+  // pragma MARK: std::weak_ptr<HybridNitroFetchCacheSpec>
+  using std__weak_ptr_HybridNitroFetchCacheSpec_ = std::weak_ptr<HybridNitroFetchCacheSpec>;
+  inline std__weak_ptr_HybridNitroFetchCacheSpec_ weakify_std__shared_ptr_HybridNitroFetchCacheSpec_(const std::shared_ptr<HybridNitroFetchCacheSpec>& strong) noexcept { return strong; }
+  
+  // pragma MARK: Result<std::optional<CachedPrefetchResponse>>
+  using Result_std__optional_CachedPrefetchResponse__ = Result<std::optional<CachedPrefetchResponse>>;
+  inline Result_std__optional_CachedPrefetchResponse__ create_Result_std__optional_CachedPrefetchResponse__(const std::optional<CachedPrefetchResponse>& value) noexcept {
+    return Result<std::optional<CachedPrefetchResponse>>::withValue(value);
+  }
+  inline Result_std__optional_CachedPrefetchResponse__ create_Result_std__optional_CachedPrefetchResponse__(const std::exception_ptr& error) noexcept {
+    return Result<std::optional<CachedPrefetchResponse>>::withError(error);
+  }
 
 } // namespace margelo::nitro::nitrofetch::bridge::swift

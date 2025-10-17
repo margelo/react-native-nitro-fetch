@@ -17,6 +17,8 @@ public protocol HybridNitroCronetSpec_protocol: HybridObject {
   func getEngine() throws -> (any HybridCronetEngineSpec)
   func createEngine() throws -> (any HybridCronetEngineSpec)
   func shutdownAll() throws -> Void
+  func prefetch(url: String, httpMethod: String, headers: Dictionary<String, String>, body: Variant_String_ArrayBuffer?, maxAge: Double) throws -> Promise<Void>
+  func consumeNativePrefetch(prefetchKey: String) throws -> Promise<CachedFetchResponse?>
 }
 
 /// See ``HybridNitroCronetSpec``

@@ -14,9 +14,23 @@ namespace NitroFetch { class HybridNitroCronetSpec_cxx; }
 
 // Forward declaration of `HybridCronetEngineSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridCronetEngineSpec; }
+// Forward declaration of `ArrayBuffer` to properly resolve imports.
+namespace NitroModules { class ArrayBuffer; }
+// Forward declaration of `ArrayBufferHolder` to properly resolve imports.
+namespace NitroModules { class ArrayBufferHolder; }
+// Forward declaration of `CachedFetchResponse` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct CachedFetchResponse; }
 
 #include <memory>
 #include "HybridCronetEngineSpec.hpp"
+#include <NitroModules/Promise.hpp>
+#include <string>
+#include <unordered_map>
+#include <NitroModules/ArrayBuffer.hpp>
+#include <variant>
+#include <optional>
+#include <NitroModules/ArrayBufferHolder.hpp>
+#include "CachedFetchResponse.hpp"
 
 #include "NitroFetch-Swift-Cxx-Umbrella.hpp"
 
@@ -80,6 +94,22 @@ namespace margelo::nitro::nitrofetch {
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
+    }
+    inline std::shared_ptr<Promise<void>> prefetch(const std::string& url, const std::string& httpMethod, const std::unordered_map<std::string, std::string>& headers, const std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>& body, double maxAge) override {
+      auto __result = _swiftPart.prefetch(url, httpMethod, headers, body, std::forward<decltype(maxAge)>(maxAge));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<std::optional<CachedFetchResponse>>> consumeNativePrefetch(const std::string& prefetchKey) override {
+      auto __result = _swiftPart.consumeNativePrefetch(prefetchKey);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
     }
 
   private:

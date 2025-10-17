@@ -9,10 +9,26 @@
 
 // Forward declaration of `HybridCronetEngineSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridCronetEngineSpec; }
+// Forward declaration of `CachedFetchResponse` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct CachedFetchResponse; }
+// Forward declaration of `ArrayBuffer` to properly resolve imports.
+namespace NitroModules { class ArrayBuffer; }
 
 #include <memory>
 #include "HybridCronetEngineSpec.hpp"
 #include "JHybridCronetEngineSpec.hpp"
+#include <NitroModules/Promise.hpp>
+#include <NitroModules/JPromise.hpp>
+#include "CachedFetchResponse.hpp"
+#include <optional>
+#include "JCachedFetchResponse.hpp"
+#include <string>
+#include <unordered_map>
+#include <NitroModules/ArrayBuffer.hpp>
+#include <NitroModules/JArrayBuffer.hpp>
+#include <NitroModules/JUnit.hpp>
+#include <variant>
+#include "JVariant_String_ArrayBuffer.hpp"
 
 namespace margelo::nitro::nitrofetch {
 
@@ -53,6 +69,43 @@ namespace margelo::nitro::nitrofetch {
   void JHybridNitroCronetSpec::shutdownAll() {
     static const auto method = javaClassStatic()->getMethod<void()>("shutdownAll");
     method(_javaPart);
+  }
+  std::shared_ptr<Promise<void>> JHybridNitroCronetSpec::prefetch(const std::string& url, const std::string& httpMethod, const std::unordered_map<std::string, std::string>& headers, const std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>& body, double maxAge) {
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* url */, jni::alias_ref<jni::JString> /* httpMethod */, jni::alias_ref<jni::JMap<jni::JString, jni::JString>> /* headers */, jni::alias_ref<JVariant_String_ArrayBuffer> /* body */, double /* maxAge */)>("prefetch");
+    auto __result = method(_javaPart, jni::make_jstring(url), jni::make_jstring(httpMethod), [&]() -> jni::local_ref<jni::JMap<jni::JString, jni::JString>> {
+      auto __map = jni::JHashMap<jni::JString, jni::JString>::create(headers.size());
+      for (const auto& __entry : headers) {
+        __map->put(jni::make_jstring(__entry.first), jni::make_jstring(__entry.second));
+      }
+      return __map;
+    }(), body.has_value() ? JVariant_String_ArrayBuffer::fromCpp(body.value()) : nullptr, maxAge);
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<std::optional<CachedFetchResponse>>> JHybridNitroCronetSpec::consumeNativePrefetch(const std::string& prefetchKey) {
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* prefetchKey */)>("consumeNativePrefetch");
+    auto __result = method(_javaPart, jni::make_jstring(prefetchKey));
+    return [&]() {
+      auto __promise = Promise<std::optional<CachedFetchResponse>>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JCachedFetchResponse>(__boxedResult);
+        __promise->resolve(__result != nullptr ? std::make_optional(__result->toCpp()) : std::nullopt);
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
   }
 
 } // namespace margelo::nitro::nitrofetch

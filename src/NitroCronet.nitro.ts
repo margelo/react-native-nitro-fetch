@@ -73,9 +73,39 @@ export interface CronetEngine
   startNetLogToFile(fileName: string, logAll: boolean): void;
   stopNetLog(): void;
 }
+export interface CachedFetchResponse {
+  url: string;
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body: ArrayBuffer;
+}
+
 export interface NitroCronet
   extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
   getEngine(): CronetEngine;
   createEngine(): CronetEngine;
   shutdownAll(): void;
+
+  /**
+   * Start a prefetch request that will be stored in the native cache.
+   * The response will be available for consumption via prefetchKey.
+   * @param maxAge Maximum age in milliseconds for the cached response to be considered fresh
+   */
+  prefetch(
+    url: string,
+    httpMethod: string,
+    headers: Record<string, string>,
+    body: ArrayBuffer | string | undefined,
+    maxAge: number
+  ): Promise<void>;
+
+  /**
+   * Try to consume a prefetched response from the native cache.
+   * Returns a promise that resolves with the cached response if found and fresh,
+   * or waits for a pending prefetch to complete, or rejects if not available.
+   */
+  consumeNativePrefetch(
+    prefetchKey: string
+  ): Promise<CachedFetchResponse | undefined>;
 }

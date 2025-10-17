@@ -15,9 +15,20 @@
 
 // Forward declaration of `HybridCronetEngineSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridCronetEngineSpec; }
+// Forward declaration of `ArrayBuffer` to properly resolve imports.
+namespace NitroModules { class ArrayBuffer; }
+// Forward declaration of `CachedFetchResponse` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct CachedFetchResponse; }
 
 #include <memory>
 #include "HybridCronetEngineSpec.hpp"
+#include <NitroModules/Promise.hpp>
+#include <string>
+#include <unordered_map>
+#include <NitroModules/ArrayBuffer.hpp>
+#include <variant>
+#include <optional>
+#include "CachedFetchResponse.hpp"
 
 namespace margelo::nitro::nitrofetch {
 
@@ -53,6 +64,8 @@ namespace margelo::nitro::nitrofetch {
       virtual std::shared_ptr<HybridCronetEngineSpec> getEngine() = 0;
       virtual std::shared_ptr<HybridCronetEngineSpec> createEngine() = 0;
       virtual void shutdownAll() = 0;
+      virtual std::shared_ptr<Promise<void>> prefetch(const std::string& url, const std::string& httpMethod, const std::unordered_map<std::string, std::string>& headers, const std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>& body, double maxAge) = 0;
+      virtual std::shared_ptr<Promise<std::optional<CachedFetchResponse>>> consumeNativePrefetch(const std::string& prefetchKey) = 0;
 
     protected:
       // Hybrid Setup

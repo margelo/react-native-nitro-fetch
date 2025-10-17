@@ -42,6 +42,7 @@ target_sources(
   ../nitrogen/generated/shared/c++/HybridQuicExceptionSpec.cpp
   ../nitrogen/generated/shared/c++/HybridCallbackExceptionSpec.cpp
   ../nitrogen/generated/shared/c++/HybridInlineExecutionProhibitedExceptionSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridNitroFetchCacheSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNitroTextDecoderSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNitroTextEncodingSpec.cpp
   # Android-specific Nitrogen C++ sources
@@ -55,6 +56,7 @@ target_sources(
   ../nitrogen/generated/android/c++/JHybridQuicExceptionSpec.cpp
   ../nitrogen/generated/android/c++/JHybridCallbackExceptionSpec.cpp
   ../nitrogen/generated/android/c++/JHybridInlineExecutionProhibitedExceptionSpec.cpp
+  ../nitrogen/generated/android/c++/JHybridNitroFetchCacheSpec.cpp
 )
 
 # From node_modules/react-native/ReactAndroid/cmake-utils/folly-flags.cmake

@@ -10,6 +10,10 @@
 // Forward declarations of C++ defined types
 // Forward declaration of `ArrayBuffer` to properly resolve imports.
 namespace NitroModules { class ArrayBuffer; }
+// Forward declaration of `CachedFetchResponse` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct CachedFetchResponse; }
+// Forward declaration of `CachedPrefetchResponse` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct CachedPrefetchResponse; }
 // Forward declaration of `HttpHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct HttpHeader; }
 // Forward declaration of `HybridCallbackExceptionSpec` to properly resolve imports.
@@ -24,6 +28,8 @@ namespace margelo::nitro::nitrofetch { class HybridInlineExecutionProhibitedExce
 namespace margelo::nitro::nitrofetch { class HybridNetworkExceptionSpec; }
 // Forward declaration of `HybridNitroCronetSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroCronetSpec; }
+// Forward declaration of `HybridNitroFetchCacheSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridNitroFetchCacheSpec; }
 // Forward declaration of `HybridQuicExceptionSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridQuicExceptionSpec; }
 // Forward declaration of `HybridUrlRequestBuilderSpec` to properly resolve imports.
@@ -40,6 +46,8 @@ namespace margelo::nitro::nitrofetch { struct UrlRequestCallback; }
 namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 
 // Include C++ defined types
+#include "CachedFetchResponse.hpp"
+#include "CachedPrefetchResponse.hpp"
 #include "HttpHeader.hpp"
 #include "HybridCallbackExceptionSpec.hpp"
 #include "HybridCronetEngineSpec.hpp"
@@ -47,6 +55,7 @@ namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 #include "HybridInlineExecutionProhibitedExceptionSpec.hpp"
 #include "HybridNetworkExceptionSpec.hpp"
 #include "HybridNitroCronetSpec.hpp"
+#include "HybridNitroFetchCacheSpec.hpp"
 #include "HybridQuicExceptionSpec.hpp"
 #include "HybridUrlRequestBuilderSpec.hpp"
 #include "HybridUrlRequestSpec.hpp"
@@ -55,6 +64,7 @@ namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 #include "UrlRequestCallback.hpp"
 #include "UrlResponseInfo.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
+#include <NitroModules/Promise.hpp>
 #include <NitroModules/Result.hpp>
 #include <exception>
 #include <functional>
@@ -87,6 +97,8 @@ namespace NitroFetch { class HybridInlineExecutionProhibitedExceptionSpec_cxx; }
 namespace NitroFetch { class HybridNetworkExceptionSpec_cxx; }
 // Forward declaration of `HybridNitroCronetSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridNitroCronetSpec_cxx; }
+// Forward declaration of `HybridNitroFetchCacheSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridNitroFetchCacheSpec_cxx; }
 // Forward declaration of `HybridQuicExceptionSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridQuicExceptionSpec_cxx; }
 // Forward declaration of `HybridUrlRequestBuilderSpec_cxx` to properly resolve imports.
