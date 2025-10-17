@@ -199,6 +199,16 @@ const server = Bun.serve({
       const data = generateRandomData(bytes);
       const generationTime = Date.now() - startTime;
 
+      // Log server hit - if cached, this won't appear
+      const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
+      const cacheControl = req.headers.get('cache-control');
+      const isCacheBypassed =
+        cacheControl?.includes('no-cache') ||
+        cacheControl?.includes('no-store');
+      console.log(
+        `[${timestamp}] 🌐 SERVER HIT: /data/${size} ${url.search} ${isCacheBypassed ? '(cache bypassed)' : '(cacheable)'} - Generated in ${generationTime}ms`
+      );
+
       return new Response(data, {
         status: 200,
         headers: {
@@ -207,6 +217,47 @@ const server = Bun.serve({
           'Content-Length': bytes.toString(),
           'X-Generation-Time': `${generationTime}ms`,
           'X-Data-Size': size,
+        },
+      });
+    }
+
+    // Cache test endpoint - with detailed server logging
+    if (path === '/cache-test') {
+      const serverTimestamp = Date.now();
+      const requestId = `${serverTimestamp}-${Math.random().toString(36).substring(7)}`;
+      const logTimestamp = new Date().toISOString().split('T')[1].slice(0, -1);
+      const cacheControl = req.headers.get('cache-control');
+      const isCacheBypassed =
+        cacheControl?.includes('no-cache') ||
+        cacheControl?.includes('no-store');
+
+      // Clear server-side log - if you see this, the request HIT THE SERVER
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`[${logTimestamp}] 🔴 SERVER HIT: /cache-test`);
+      console.log(`  Request ID: ${requestId}`);
+      console.log(`-------${cacheControl}`);
+      console.log(
+        `  Status: ${isCacheBypassed ? '❌ CACHE BYPASSED' : '✅ CACHEABLE'}`
+      );
+      console.log(`  Query: ${url.search || '(none)'}`);
+      console.log(`${'='.repeat(80)}\n`);
+
+      const responseData = {
+        message: 'Cache test endpoint',
+        serverTimestamp,
+        requestId,
+        serverTime: new Date().toISOString(),
+        cacheable: !isCacheBypassed,
+        info: 'If you see the same requestId and serverTimestamp, the response was cached',
+      };
+
+      return new Response(JSON.stringify(responseData, null, 2), {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'X-Request-Id': requestId,
+          'X-Server-Timestamp': serverTimestamp.toString(),
         },
       });
     }
@@ -246,6 +297,16 @@ const server = Bun.serve({
 
       const data = generateLargeJSON(numItems);
       const json = JSON.stringify(data);
+
+      // Log server hit
+      const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
+      const cacheControl = req.headers.get('cache-control');
+      const isCacheBypassed =
+        cacheControl?.includes('no-cache') ||
+        cacheControl?.includes('no-store');
+      console.log(
+        `[${timestamp}] 🌐 SERVER HIT: /json/${size} ${url.search} ${isCacheBypassed ? '(cache bypassed)' : '(cacheable)'}`
+      );
 
       return new Response(json, {
         status: 200,
@@ -370,6 +431,16 @@ const server = Bun.serve({
 
     // UTF-8 test endpoint with emojis
     if (path === '/utf8') {
+      // Log server hit
+      const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
+      const cacheControl = req.headers.get('cache-control');
+      const isCacheBypassed =
+        cacheControl?.includes('no-cache') ||
+        cacheControl?.includes('no-store');
+      console.log(
+        `[${timestamp}] 🌐 SERVER HIT: /utf8 ${url.search} ${isCacheBypassed ? '(cache bypassed)' : '(cacheable)'}`
+      );
+
       const utf8Content = {
         message: 'UTF-8 test with emoji support 🎉',
         emojis: '😀 😃 😄 😁 🚀 ⚡ 💻 🔥 ✨ 🌟',

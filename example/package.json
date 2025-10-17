@@ -39,5 +39,8 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "react-native-nitro-fetch": {
+    "httpCache": false
   }
 }

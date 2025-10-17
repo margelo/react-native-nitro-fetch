@@ -463,6 +463,81 @@ export default function TestScreen() {
           </Text>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[styles.button, styles.cacheTestButton]}
+          onPress={async () => {
+            console.log('\n🧪 Starting Cache Test...\n');
+
+            const SERVER_URL = 'http://192.168.1.157:3000';
+            const testUrl = `${SERVER_URL}/cache-test`;
+
+            console.log('═══════════════════════════════════════════');
+            console.log('Test 1: Making cacheable requests (default)');
+            console.log('═══════════════════════════════════════════\n');
+
+            // Make 5 requests WITH cache (should hit server only once)
+            const testUrlCache = `${testUrl}`;
+            for (let i = 1; i <= 5; i++) {
+              const start = performance.now();
+              const response = await nitroFetch(testUrlCache, {
+                headers: { 'Cache-Control': 'cache' },
+              });
+              const duration = performance.now() - start;
+              const data = await response.json();
+
+              console.log(`Request ${i}: ${duration.toFixed(2)}ms`);
+              console.log(`  - Request ID: ${data.requestId}`);
+              console.log(`  - Server Timestamp: ${data.serverTimestamp}`);
+              console.log(`  - Cacheable: ${data.cacheable}`);
+              console.log('');
+
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }
+
+            console.log('\n═══════════════════════════════════════════');
+            console.log('Test 2: Making no-cache requests');
+            console.log('═══════════════════════════════════════════\n');
+
+            // Wait a bit
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // Make 5 requests with no-cache (should hit server every time)
+            for (let i = 1; i <= 5; i++) {
+              const start = performance.now();
+              const response = await nitroFetch(testUrl, {
+                cache: 'no-cache',
+                headers: { 'Cache-Control': 'no-cache' },
+              });
+              const duration = performance.now() - start;
+              const data = await response.json();
+
+              console.log(`Request ${i}: ${duration.toFixed(2)}ms`);
+              console.log(`  - Request ID: ${data.requestId}`);
+              console.log(`  - Server Timestamp: ${data.serverTimestamp}`);
+              console.log(`  - Cacheable: ${data.cacheable}`);
+              console.log('');
+
+              await new Promise((resolve) => setTimeout(resolve, 500));
+            }
+
+            console.log('═══════════════════════════════════════════');
+            console.log('✅ Cache Test Complete!');
+            console.log('═══════════════════════════════════════════');
+            console.log('Check the SERVER logs to see:');
+            console.log(
+              '  - Test 1 should show 1 server hit (cached after first)'
+            );
+            console.log('  - Test 2 should show 5 server hits (no-cache)');
+            console.log('═══════════════════════════════════════════\n');
+
+            alert(
+              '✅ Cache test complete!\n\nCheck the console logs on both CLIENT and SERVER to see the results.'
+            );
+          }}
+        >
+          <Text style={styles.buttonText}>🔍 Test Cache</Text>
+        </TouchableOpacity>
+
         <View style={styles.buttonRow}>
           <TouchableOpacity
             style={[styles.button, styles.prefetchButton, styles.halfButton]}
@@ -603,6 +678,9 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     backgroundColor: '#F44336', // Red for clear
+  },
+  cacheTestButton: {
+    backgroundColor: '#FF9800', // Orange for cache test
   },
   buttonRow: {
     flexDirection: 'row',

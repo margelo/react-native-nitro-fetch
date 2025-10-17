@@ -30,6 +30,90 @@ def getExtOrIntegerDefault(name) {
   return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["NitroFetch_" + name]).toInteger()
 }
 
+// Read configuration from package.json
+import groovy.json.JsonSlurper
+
+// Default configuration values
+def httpCacheEnabled = true
+def httpCacheSizeMB = 50
+def enableHttp2 = true
+def enableQuic = true
+def enableBrotli = true
+def userAgent = "NitroCronet/1.0"
+def storagePath = "nitro_cronet_cache"
+
+// Determine if this is a user app or example app
+def isUserApp = rootDir.absolutePath.contains("node_modules")
+def packageJsonFile
+
+if (isUserApp) {
+  // Start from the root + 1 level up and traverse upwards to find the first package.json
+  File currentDir = new File("$rootDir/../")
+  packageJsonFile = null
+
+  // Try to find package.json by traversing upwards
+  while (currentDir != null) {
+    File potential = new File(currentDir, "package.json")
+    if (potential.exists()) {
+      packageJsonFile = potential
+      break
+    }
+    currentDir = currentDir.parentFile
+  }
+} else {
+  packageJsonFile = new File("$rootDir/../package.json")
+}
+
+if (packageJsonFile != null && packageJsonFile.exists()) {
+  try {
+    def packageJson = new JsonSlurper().parseText(packageJsonFile.text)
+    def nitroFetchConfig = packageJson["react-native-nitro-fetch"]
+
+    if (nitroFetchConfig) {
+      println "[NITRO-FETCH] Detected react-native-nitro-fetch config from package.json at: " + packageJsonFile.absolutePath
+
+      if (nitroFetchConfig.containsKey("httpCache")) {
+        httpCacheEnabled = nitroFetchConfig["httpCache"]
+        println "[NITRO-FETCH]   HTTP Cache: " + (httpCacheEnabled ? "enabled ✓" : "disabled")
+      }
+
+      if (nitroFetchConfig.containsKey("httpCacheSizeMB")) {
+        httpCacheSizeMB = nitroFetchConfig["httpCacheSizeMB"]
+        println "[NITRO-FETCH]   HTTP Cache Size: ${httpCacheSizeMB} MB"
+      }
+
+      if (nitroFetchConfig.containsKey("enableHttp2")) {
+        enableHttp2 = nitroFetchConfig["enableHttp2"]
+        println "[NITRO-FETCH]   HTTP/2: " + (enableHttp2 ? "enabled ✓" : "disabled")
+      }
+
+      if (nitroFetchConfig.containsKey("enableQuic")) {
+        enableQuic = nitroFetchConfig["enableQuic"]
+        println "[NITRO-FETCH]   QUIC: " + (enableQuic ? "enabled ✓" : "disabled")
+      }
+
+      if (nitroFetchConfig.containsKey("enableBrotli")) {
+        enableBrotli = nitroFetchConfig["enableBrotli"]
+        println "[NITRO-FETCH]   Brotli: " + (enableBrotli ? "enabled ✓" : "disabled")
+      }
+
+      if (nitroFetchConfig.containsKey("userAgent")) {
+        userAgent = nitroFetchConfig["userAgent"]
+        println "[NITRO-FETCH]   User Agent: ${userAgent}"
+      }
+
+      if (nitroFetchConfig.containsKey("storagePath")) {
+        storagePath = nitroFetchConfig["storagePath"]
+        println "[NITRO-FETCH]   Storage Path: ${storagePath}"
+      }
+    }
+  } catch (Exception e) {
+    println "[NITRO-FETCH] Warning: Could not parse package.json: " + e.message
+  }
+} else {
+  println "[NITRO-FETCH] No package.json found, using default configuration"
+}
+
 android {
   namespace "com.margelo.nitro.nitrofetch"
 
@@ -38,6 +122,14 @@ android {
   defaultConfig {
     minSdkVersion getExtOrIntegerDefault("minSdkVersion")
     targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
+
+    buildConfigField "boolean", "HTTP_CACHE_ENABLED", "${httpCacheEnabled}"
+    buildConfigField "int", "HTTP_CACHE_SIZE_MB", "${httpCacheSizeMB}"
+    buildConfigField "boolean", "ENABLE_HTTP2", "${enableHttp2}"
+    buildConfigField "boolean", "ENABLE_QUIC", "${enableQuic}"
+    buildConfigField "boolean", "ENABLE_BROTLI", "${enableBrotli}"
+    buildConfigField "String", "USER_AGENT", "\"${userAgent}\""
+    buildConfigField "String", "STORAGE_PATH", "\"${storagePath}\""
 
     externalNativeBuild {
       cmake {

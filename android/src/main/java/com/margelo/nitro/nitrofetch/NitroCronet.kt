@@ -220,14 +220,21 @@ class NitroCronet : HybridNitroCronetSpec() {
           it.name.contains("Native", ignoreCase = true)
         }
 
-        val cacheDir = File(app.cacheDir, "nitro_cronet_cache").apply { mkdirs() }
+        val cacheDir = File(app.cacheDir, BuildConfig.STORAGE_PATH).apply { mkdirs() }
         val builder = (nativeProvider?.createBuilder() ?: CronetEngine.Builder(app))
-          .enableHttp2(true)
-          .enableQuic(true)
-          .enableBrotli(true)
+          .enableHttp2(BuildConfig.ENABLE_HTTP2)
+          .enableQuic(BuildConfig.ENABLE_QUIC)
+          .enableBrotli(BuildConfig.ENABLE_BROTLI)
           .setStoragePath(cacheDir.absolutePath)
-          .enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISK, 50 * 1024 * 1024)
-          .setUserAgent("NitroCronet/1.0")
+          .setUserAgent(BuildConfig.USER_AGENT)
+
+        // Configure HTTP cache based on BuildConfig
+        if (BuildConfig.HTTP_CACHE_ENABLED) {
+          val cacheSizeBytes = BuildConfig.HTTP_CACHE_SIZE_MB * 1024 * 1024
+          builder.enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISK, cacheSizeBytes.toLong())
+        } else {
+          builder.enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISABLED, 0)
+        }
 
         val engine = builder.build()
         engineRef = engine

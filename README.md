@@ -32,10 +32,10 @@ npm i react-native-nitro-fetch react-native-nitro-modules
 To simply fetch data, import the `fetch(...)` method from `react-native-nitro-fetch`:
 
 ```ts
-import { fetch } from 'react-native-nitro-fetch'
+import { fetch } from 'react-native-nitro-fetch';
 
-const res = await fetch('https://httpbin.org/get')
-const json = await res.json()
+const res = await fetch('https://httpbin.org/get');
+const json = await res.json();
 ```
 
 This can be used as a drop-in-replacement for the built-in `fetch(...)` method.
@@ -45,22 +45,22 @@ This can be used as a drop-in-replacement for the built-in `fetch(...)` method.
 You can prefetch a URL in JS, which keeps the result cached for the next actual `fetch(...)` call - this can be used shortly before navigating to a new screen to have results hot & ready:
 
 ```ts
-import { prefetch } from 'react-native-nitro-fetch'
+import { prefetch } from 'react-native-nitro-fetch';
 
 await prefetch('https://httpbin.org/uuid', {
-  headers: { prefetchKey: 'uuid' }
-})
+  headers: { prefetchKey: 'uuid' },
+});
 ```
 
 Then, on the new screen that was navigated to:
 
 ```ts
-import { fetch } from 'react-native-nitro-fetch'
+import { fetch } from 'react-native-nitro-fetch';
 
 const res = await fetch('https://httpbin.org/uuid', {
-  headers: { prefetchKey: 'uuid' }
-})
-console.log('prefetched header:', res.headers.get('nitroPrefetched'))
+  headers: { prefetchKey: 'uuid' },
+});
+console.log('prefetched header:', res.headers.get('nitroPrefetched'));
 ```
 
 ### Prefetching for the next app launch
@@ -68,22 +68,22 @@ console.log('prefetched header:', res.headers.get('nitroPrefetched'))
 Prefetching data on app launch (or _process start_) will make it hot & ready once your JS code actually runs. Call `prefetchOnAppStart(...)` to enqueue a prefetch for the **next** app start:
 
 ```ts
-import { prefetchOnAppStart } from 'react-native-nitro-fetch'
+import { prefetchOnAppStart } from 'react-native-nitro-fetch';
 
 await prefetchOnAppStart('https://httpbin.org/uuid', {
-  prefetchKey: 'uuid'
-})
+  prefetchKey: 'uuid',
+});
 ```
 
 Then, once the app opens the next time, a call to `fetch(...)` might resolve faster since it will contain already cached results:
 
 ```ts
-import { fetch } from 'react-native-nitro-fetch'
+import { fetch } from 'react-native-nitro-fetch';
 
 const res = await fetch('https://httpbin.org/uuid', {
-  headers: { prefetchKey: 'uuid' }
-})
-console.log('prefetched header:', res.headers.get('nitroPrefetched'))
+  headers: { prefetchKey: 'uuid' },
+});
+console.log('prefetched header:', res.headers.get('nitroPrefetched'));
 ```
 
 In our tests, prefetching alone yielded a **~220 ms** faster TTI (time-to-interactive) time! 🤯
@@ -94,16 +94,16 @@ Since Nitro Fetch is a [Nitro Module](https://nitro.margelo.com), it can be used
 This can be useful to parse data without blocking the main JS-Thread:
 
 ```ts
-import { nitroFetchOnWorklet } from 'react-native-nitro-fetch'
+import { nitroFetchOnWorklet } from 'react-native-nitro-fetch';
 
 const data = await nitroFetchOnWorklet(
   'https://httpbin.org/get',
   undefined,
   (payload) => {
-    'worklet'
-    return JSON.parse(payload.bodyString ?? '{}')
+    'worklet';
+    return JSON.parse(payload.bodyString ?? '{}');
   }
-)
+);
 ```
 
 ## Project Status
@@ -114,6 +114,37 @@ Nitro Fetch is currently in an alpha stage. You can adopt it in production, but 
 
 - [HTTP streaming](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) is not yet supported. As an alternative, use Expo's [expo-fetch](https://docs.expo.dev/versions/latest/sdk/expo/). Streaming is on the roadmap.
 - [WebSockets](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket) are not supported. For high‑performance sockets and binary streams, consider using [react-native-fast-io](https://github.com/callstackincubator/react-native-fast-io) by our friends at Callstack.
+
+## Configuration
+
+You can configure `react-native-nitro-fetch` by adding a `react-native-nitro-fetch` section to your `package.json`:
+
+```json
+{
+  "react-native-nitro-fetch": {
+    "httpCache": true,
+    "httpCacheSizeMB": 50,
+    "httpCacheMemoryMB": 32,
+    "enableHttp2": true,
+    "enableQuic": true,
+    "enableBrotli": true,
+    "userAgent": "MyApp/1.0",
+    "storagePath": "nitro_cronet_cache"
+  }
+}
+```
+
+### Available Options
+
+| Option            | Type      | Default                | Description                                  |
+| ----------------- | --------- | ---------------------- | -------------------------------------------- |
+| `httpCache`       | `boolean` | `true`                 | Enable or disable HTTP disk caching          |
+| `httpCacheSizeMB` | `number`  | `50`                   | Maximum size of HTTP disk cache in megabytes |
+| `enableHttp2`     | `boolean` | `true`                 | Enable HTTP/2 support                        |
+| `enableQuic`      | `boolean` | `true`                 | Enable QUIC/HTTP3 support                    |
+| `enableBrotli`    | `boolean` | `true`                 | Enable Brotli compression                    |
+| `userAgent`       | `string`  | `"NitroCronet/1.0"`    | Custom User-Agent string                     |
+| `storagePath`     | `string`  | `"nitro_cronet_cache"` | Custom storage directory name                |
 
 ## Documentation
 
@@ -148,4 +179,3 @@ We build fast and beautiful apps. Contact us at [margelo.com](https://margelo.co
 ## License
 
 MIT
-
