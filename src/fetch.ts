@@ -328,8 +328,6 @@ export async function fetch(
     }
   }
 
-  const engine = NitroCronet.getEngine();
-
   return new Promise((resolve, reject) => {
     let responseInfo: UrlResponseInfo | null = null;
     let request: UrlRequest;
@@ -384,7 +382,7 @@ export async function fetch(
       },
     };
 
-    const builder = engine.newUrlRequestBuilder(url, callback);
+    const builder = NitroCronet.newUrlRequestBuilder(url, callback);
 
     if (options?.method) {
       builder.setHttpMethod(options.method);

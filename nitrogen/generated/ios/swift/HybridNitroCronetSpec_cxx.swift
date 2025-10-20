@@ -111,43 +111,17 @@ open class HybridNitroCronetSpec_cxx {
 
   // Methods
   @inline(__always)
-  public final func getEngine() -> bridge.Result_std__shared_ptr_HybridCronetEngineSpec__ {
+  public final func newUrlRequestBuilder(url: std.string, callback: UrlRequestCallback) -> bridge.Result_std__shared_ptr_HybridUrlRequestBuilderSpec__ {
     do {
-      let __result = try self.__implementation.getEngine()
-      let __resultCpp = { () -> bridge.std__shared_ptr_HybridCronetEngineSpec_ in
+      let __result = try self.__implementation.newUrlRequestBuilder(url: String(url), callback: callback)
+      let __resultCpp = { () -> bridge.std__shared_ptr_HybridUrlRequestBuilderSpec_ in
         let __cxxWrapped = __result.getCxxWrapper()
         return __cxxWrapped.getCxxPart()
       }()
-      return bridge.create_Result_std__shared_ptr_HybridCronetEngineSpec__(__resultCpp)
+      return bridge.create_Result_std__shared_ptr_HybridUrlRequestBuilderSpec__(__resultCpp)
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_std__shared_ptr_HybridCronetEngineSpec__(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func createEngine() -> bridge.Result_std__shared_ptr_HybridCronetEngineSpec__ {
-    do {
-      let __result = try self.__implementation.createEngine()
-      let __resultCpp = { () -> bridge.std__shared_ptr_HybridCronetEngineSpec_ in
-        let __cxxWrapped = __result.getCxxWrapper()
-        return __cxxWrapped.getCxxPart()
-      }()
-      return bridge.create_Result_std__shared_ptr_HybridCronetEngineSpec__(__resultCpp)
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_std__shared_ptr_HybridCronetEngineSpec__(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
-  public final func shutdownAll() -> bridge.Result_void_ {
-    do {
-      try self.__implementation.shutdownAll()
-      return bridge.create_Result_void_()
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_void_(__exceptionPtr)
+      return bridge.create_Result_std__shared_ptr_HybridUrlRequestBuilderSpec__(__exceptionPtr)
     }
   }
   

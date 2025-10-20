@@ -18,8 +18,6 @@ namespace margelo::nitro::nitrofetch { enum class ErrorType; }
 namespace margelo::nitro::nitrofetch { enum class ExceptionPlatform; }
 // Forward declaration of `HttpHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct HttpHeader; }
-// Forward declaration of `HybridCronetEngineSpec` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { class HybridCronetEngineSpec; }
 // Forward declaration of `HybridNitroCronetSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroCronetSpec; }
 // Forward declaration of `HybridNitroFetchCacheSpec` to properly resolve imports.
@@ -45,7 +43,6 @@ namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 #include "ErrorType.hpp"
 #include "ExceptionPlatform.hpp"
 #include "HttpHeader.hpp"
-#include "HybridCronetEngineSpec.hpp"
 #include "HybridNitroCronetSpec.hpp"
 #include "HybridNitroFetchCacheSpec.hpp"
 #include "HybridRequestExceptionSpec.hpp"
@@ -77,8 +74,6 @@ namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 #include <NitroModules/DateToChronoDate.hpp>
 
 // Forward declarations of Swift defined types
-// Forward declaration of `HybridCronetEngineSpec_cxx` to properly resolve imports.
-namespace NitroFetch { class HybridCronetEngineSpec_cxx; }
 // Forward declaration of `HybridNitroCronetSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridNitroCronetSpec_cxx; }
 // Forward declaration of `HybridNitroFetchCacheSpec_cxx` to properly resolve imports.

@@ -8,7 +8,6 @@
 #include "NitroFetch-Swift-Cxx-Bridge.hpp"
 
 // Include C++ implementation defined types
-#include "HybridCronetEngineSpecSwift.hpp"
 #include "HybridNitroCronetSpecSwift.hpp"
 #include "HybridNitroFetchCacheSpecSwift.hpp"
 #include "HybridRequestExceptionSpecSwift.hpp"
@@ -144,22 +143,6 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return [swiftClosure = std::move(swiftClosure)](const std::optional<UrlResponseInfo>& info) mutable -> void {
       swiftClosure.call(info);
     };
-  }
-  
-  // pragma MARK: std::shared_ptr<HybridCronetEngineSpec>
-  std::shared_ptr<HybridCronetEngineSpec> create_std__shared_ptr_HybridCronetEngineSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
-    NitroFetch::HybridCronetEngineSpec_cxx swiftPart = NitroFetch::HybridCronetEngineSpec_cxx::fromUnsafe(swiftUnsafePointer);
-    return std::make_shared<margelo::nitro::nitrofetch::HybridCronetEngineSpecSwift>(swiftPart);
-  }
-  void* NON_NULL get_std__shared_ptr_HybridCronetEngineSpec_(std__shared_ptr_HybridCronetEngineSpec_ cppType) {
-    std::shared_ptr<margelo::nitro::nitrofetch::HybridCronetEngineSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::nitrofetch::HybridCronetEngineSpecSwift>(cppType);
-    #ifdef NITRO_DEBUG
-    if (swiftWrapper == nullptr) [[unlikely]] {
-      throw std::runtime_error("Class \"HybridCronetEngineSpec\" is not implemented in Swift!");
-    }
-    #endif
-    NitroFetch::HybridCronetEngineSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
-    return swiftPart.toUnsafe();
   }
   
   // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>

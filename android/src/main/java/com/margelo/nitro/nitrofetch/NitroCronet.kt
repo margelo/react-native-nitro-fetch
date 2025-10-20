@@ -12,31 +12,22 @@ import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
 /**
- * Main Nitro Cronet factory class.
- * Provides singleton engine access and engine creation.
+ * Main Nitro Cronet class.
+ * Manages Cronet engine internally and provides prefetch + request building capabilities.
  */
 @DoNotStrip
 class NitroCronet : HybridNitroCronetSpec() {
 
-  override fun getEngine(): HybridCronetEngineSpec {
-    return NitroCronetEngine(
+  override fun newUrlRequestBuilder(
+    url: String,
+    callback: UrlRequestCallback
+  ): HybridUrlRequestBuilderSpec {
+    return NitroUrlRequestBuilder(
       engine = getOrCreateCronetEngine(),
-      defaultExecutor = ioExecutor
+      url = url,
+      callback = callback,
+      executor = ioExecutor
     )
-  }
-
-  override fun createEngine(): HybridCronetEngineSpec {
-    return getEngine()
-  }
-
-  override fun shutdownAll() {
-    synchronized(this) {
-      try {
-        engineRef?.shutdown()
-      } finally {
-        engineRef = null
-      }
-    }
   }
 
   override fun prefetch(

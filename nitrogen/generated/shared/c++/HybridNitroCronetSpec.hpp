@@ -13,15 +13,18 @@
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
 
-// Forward declaration of `HybridCronetEngineSpec` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { class HybridCronetEngineSpec; }
+// Forward declaration of `HybridUrlRequestBuilderSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridUrlRequestBuilderSpec; }
+// Forward declaration of `UrlRequestCallback` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UrlRequestCallback; }
 // Forward declaration of `CachedFetchResponse` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct CachedFetchResponse; }
 
 #include <memory>
-#include "HybridCronetEngineSpec.hpp"
-#include <NitroModules/Promise.hpp>
+#include "HybridUrlRequestBuilderSpec.hpp"
 #include <string>
+#include "UrlRequestCallback.hpp"
+#include <NitroModules/Promise.hpp>
 #include <unordered_map>
 #include <NitroModules/ArrayBuffer.hpp>
 #include <variant>
@@ -59,9 +62,7 @@ namespace margelo::nitro::nitrofetch {
 
     public:
       // Methods
-      virtual std::shared_ptr<HybridCronetEngineSpec> getEngine() = 0;
-      virtual std::shared_ptr<HybridCronetEngineSpec> createEngine() = 0;
-      virtual void shutdownAll() = 0;
+      virtual std::shared_ptr<HybridUrlRequestBuilderSpec> newUrlRequestBuilder(const std::string& url, const UrlRequestCallback& callback) = 0;
       virtual std::shared_ptr<Promise<void>> prefetch(const std::string& url, const std::string& httpMethod, const std::unordered_map<std::string, std::string>& headers, const std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>>& body, double maxAge) = 0;
       virtual std::shared_ptr<Promise<std::optional<CachedFetchResponse>>> consumeNativePrefetch(const std::string& prefetchKey) = 0;
 

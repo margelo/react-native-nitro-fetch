@@ -2,16 +2,11 @@ import Foundation
 import NitroModules
 
 class HybridNitroCronet: HybridNitroCronetSpec {
-  func getEngine() throws -> any HybridCronetEngineSpec {
-    return HybridCronetEngine()
-  }
-
-  func createEngine() throws -> any HybridCronetEngineSpec {
-    return HybridCronetEngine()
-  }
-
-  func shutdownAll() throws {
-    // Dummy implementation
+  func newUrlRequestBuilder(
+    url: String,
+    callback: UrlRequestCallback
+  ) throws -> any HybridUrlRequestBuilderSpec {
+    return HybridUrlRequestBuilder()
   }
 
   func prefetch(

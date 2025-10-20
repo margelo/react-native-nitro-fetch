@@ -22,13 +22,12 @@
 #include "JFunc_void_std__string.hpp"
 #include "JFunc_void.hpp"
 #include "JFunc_void_UploadDataSink.hpp"
-#include "JHybridCronetEngineSpec.hpp"
+#include "JHybridNitroCronetSpec.hpp"
 #include "JFunc_void_UrlResponseInfo_std__string.hpp"
 #include "JFunc_void_UrlResponseInfo.hpp"
 #include "JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_.hpp"
 #include "JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_.hpp"
 #include "JFunc_void_std__optional_UrlResponseInfo_.hpp"
-#include "JHybridNitroCronetSpec.hpp"
 #include "JHybridRequestExceptionSpec.hpp"
 #include "JHybridNitroFetchCacheSpec.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
@@ -50,13 +49,12 @@ int initialize(JavaVM* vm) {
     margelo::nitro::nitrofetch::JFunc_void_std__string_cxx::registerNatives();
     margelo::nitro::nitrofetch::JFunc_void_cxx::registerNatives();
     margelo::nitro::nitrofetch::JFunc_void_UploadDataSink_cxx::registerNatives();
-    margelo::nitro::nitrofetch::JHybridCronetEngineSpec::registerNatives();
+    margelo::nitro::nitrofetch::JHybridNitroCronetSpec::registerNatives();
     margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_std__string_cxx::registerNatives();
     margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_cxx::registerNatives();
     margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__cxx::registerNatives();
     margelo::nitro::nitrofetch::JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec__cxx::registerNatives();
     margelo::nitro::nitrofetch::JFunc_void_std__optional_UrlResponseInfo__cxx::registerNatives();
-    margelo::nitro::nitrofetch::JHybridNitroCronetSpec::registerNatives();
     margelo::nitro::nitrofetch::JHybridRequestExceptionSpec::registerNatives();
     margelo::nitro::nitrofetch::JHybridNitroFetchCacheSpec::registerNatives();
 

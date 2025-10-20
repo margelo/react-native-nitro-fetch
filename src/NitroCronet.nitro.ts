@@ -61,18 +61,7 @@ export interface UrlRequestBuilder
   allowDirectExecutor(): void;
   build(): UrlRequest;
 }
-export interface CronetEngine
-  extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
-  newUrlRequestBuilder(
-    url: string,
-    callback: UrlRequestCallback
-    // executor?: Executor
-  ): UrlRequestBuilder;
-  shutdown(): void;
-  getVersionString(): string;
-  startNetLogToFile(fileName: string, logAll: boolean): void;
-  stopNetLog(): void;
-}
+
 export interface CachedFetchResponse {
   url: string;
   status: number;
@@ -83,10 +72,10 @@ export interface CachedFetchResponse {
 
 export interface NitroCronet
   extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
-  getEngine(): CronetEngine;
-  createEngine(): CronetEngine;
-  shutdownAll(): void;
-
+  newUrlRequestBuilder(
+    url: string,
+    callback: UrlRequestCallback
+  ): UrlRequestBuilder;
   /**
    * Start a prefetch request that will be stored in the native cache.
    * The response will be available for consumption via prefetchKey.

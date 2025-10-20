@@ -16,8 +16,6 @@ namespace margelo::nitro::nitrofetch { struct CachedFetchResponse; }
 namespace margelo::nitro::nitrofetch { struct CachedPrefetchResponse; }
 // Forward declaration of `HttpHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct HttpHeader; }
-// Forward declaration of `HybridCronetEngineSpec` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { class HybridCronetEngineSpec; }
 // Forward declaration of `HybridNitroCronetSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroCronetSpec; }
 // Forward declaration of `HybridNitroFetchCacheSpec` to properly resolve imports.
@@ -34,8 +32,6 @@ namespace margelo::nitro::nitrofetch { struct UploadDataSink; }
 namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 
 // Forward declarations of Swift defined types
-// Forward declaration of `HybridCronetEngineSpec_cxx` to properly resolve imports.
-namespace NitroFetch { class HybridCronetEngineSpec_cxx; }
 // Forward declaration of `HybridNitroCronetSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridNitroCronetSpec_cxx; }
 // Forward declaration of `HybridNitroFetchCacheSpec_cxx` to properly resolve imports.
@@ -51,7 +47,6 @@ namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 #include "CachedFetchResponse.hpp"
 #include "CachedPrefetchResponse.hpp"
 #include "HttpHeader.hpp"
-#include "HybridCronetEngineSpec.hpp"
 #include "HybridNitroCronetSpec.hpp"
 #include "HybridNitroFetchCacheSpec.hpp"
 #include "HybridRequestExceptionSpec.hpp"
@@ -454,36 +449,6 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return Func_void_std__optional_UrlResponseInfo__Wrapper(std::move(value));
   }
   
-  // pragma MARK: std::shared_ptr<HybridCronetEngineSpec>
-  /**
-   * Specialized version of `std::shared_ptr<HybridCronetEngineSpec>`.
-   */
-  using std__shared_ptr_HybridCronetEngineSpec_ = std::shared_ptr<HybridCronetEngineSpec>;
-  std::shared_ptr<HybridCronetEngineSpec> create_std__shared_ptr_HybridCronetEngineSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
-  void* NON_NULL get_std__shared_ptr_HybridCronetEngineSpec_(std__shared_ptr_HybridCronetEngineSpec_ cppType);
-  
-  // pragma MARK: std::weak_ptr<HybridCronetEngineSpec>
-  using std__weak_ptr_HybridCronetEngineSpec_ = std::weak_ptr<HybridCronetEngineSpec>;
-  inline std__weak_ptr_HybridCronetEngineSpec_ weakify_std__shared_ptr_HybridCronetEngineSpec_(const std::shared_ptr<HybridCronetEngineSpec>& strong) noexcept { return strong; }
-  
-  // pragma MARK: Result<std::shared_ptr<HybridUrlRequestBuilderSpec>>
-  using Result_std__shared_ptr_HybridUrlRequestBuilderSpec__ = Result<std::shared_ptr<HybridUrlRequestBuilderSpec>>;
-  inline Result_std__shared_ptr_HybridUrlRequestBuilderSpec__ create_Result_std__shared_ptr_HybridUrlRequestBuilderSpec__(const std::shared_ptr<HybridUrlRequestBuilderSpec>& value) noexcept {
-    return Result<std::shared_ptr<HybridUrlRequestBuilderSpec>>::withValue(value);
-  }
-  inline Result_std__shared_ptr_HybridUrlRequestBuilderSpec__ create_Result_std__shared_ptr_HybridUrlRequestBuilderSpec__(const std::exception_ptr& error) noexcept {
-    return Result<std::shared_ptr<HybridUrlRequestBuilderSpec>>::withError(error);
-  }
-  
-  // pragma MARK: Result<std::string>
-  using Result_std__string_ = Result<std::string>;
-  inline Result_std__string_ create_Result_std__string_(const std::string& value) noexcept {
-    return Result<std::string>::withValue(value);
-  }
-  inline Result_std__string_ create_Result_std__string_(const std::exception_ptr& error) noexcept {
-    return Result<std::string>::withError(error);
-  }
-  
   // pragma MARK: std::shared_ptr<Promise<void>>
   /**
    * Specialized version of `std::shared_ptr<Promise<void>>`.
@@ -594,13 +559,13 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   using std__weak_ptr_HybridNitroCronetSpec_ = std::weak_ptr<HybridNitroCronetSpec>;
   inline std__weak_ptr_HybridNitroCronetSpec_ weakify_std__shared_ptr_HybridNitroCronetSpec_(const std::shared_ptr<HybridNitroCronetSpec>& strong) noexcept { return strong; }
   
-  // pragma MARK: Result<std::shared_ptr<HybridCronetEngineSpec>>
-  using Result_std__shared_ptr_HybridCronetEngineSpec__ = Result<std::shared_ptr<HybridCronetEngineSpec>>;
-  inline Result_std__shared_ptr_HybridCronetEngineSpec__ create_Result_std__shared_ptr_HybridCronetEngineSpec__(const std::shared_ptr<HybridCronetEngineSpec>& value) noexcept {
-    return Result<std::shared_ptr<HybridCronetEngineSpec>>::withValue(value);
+  // pragma MARK: Result<std::shared_ptr<HybridUrlRequestBuilderSpec>>
+  using Result_std__shared_ptr_HybridUrlRequestBuilderSpec__ = Result<std::shared_ptr<HybridUrlRequestBuilderSpec>>;
+  inline Result_std__shared_ptr_HybridUrlRequestBuilderSpec__ create_Result_std__shared_ptr_HybridUrlRequestBuilderSpec__(const std::shared_ptr<HybridUrlRequestBuilderSpec>& value) noexcept {
+    return Result<std::shared_ptr<HybridUrlRequestBuilderSpec>>::withValue(value);
   }
-  inline Result_std__shared_ptr_HybridCronetEngineSpec__ create_Result_std__shared_ptr_HybridCronetEngineSpec__(const std::exception_ptr& error) noexcept {
-    return Result<std::shared_ptr<HybridCronetEngineSpec>>::withError(error);
+  inline Result_std__shared_ptr_HybridUrlRequestBuilderSpec__ create_Result_std__shared_ptr_HybridUrlRequestBuilderSpec__(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<HybridUrlRequestBuilderSpec>>::withError(error);
   }
   
   // pragma MARK: Result<std::shared_ptr<Promise<void>>>
