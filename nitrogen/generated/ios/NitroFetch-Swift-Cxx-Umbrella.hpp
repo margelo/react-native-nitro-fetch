@@ -8,10 +8,64 @@
 #pragma once
 
 // Forward declarations of C++ defined types
-
+// Forward declaration of `CachedFetchResponse` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct CachedFetchResponse; }
+// Forward declaration of `CachedPrefetchResponse` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct CachedPrefetchResponse; }
+// Forward declaration of `ErrorType` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { enum class ErrorType; }
+// Forward declaration of `ExceptionPlatform` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { enum class ExceptionPlatform; }
+// Forward declaration of `HttpHeader` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct HttpHeader; }
+// Forward declaration of `HybridCronetEngineSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridCronetEngineSpec; }
+// Forward declaration of `HybridNitroCronetSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridNitroCronetSpec; }
+// Forward declaration of `HybridNitroFetchCacheSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridNitroFetchCacheSpec; }
+// Forward declaration of `HybridRequestExceptionSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridRequestExceptionSpec; }
+// Forward declaration of `HybridUrlRequestBuilderSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridUrlRequestBuilderSpec; }
+// Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
+// Forward declaration of `UploadDataProvider` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UploadDataProvider; }
+// Forward declaration of `UploadDataSink` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UploadDataSink; }
+// Forward declaration of `UrlRequestCallback` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UrlRequestCallback; }
+// Forward declaration of `UrlResponseInfo` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 
 // Include C++ defined types
-
+#include "CachedFetchResponse.hpp"
+#include "CachedPrefetchResponse.hpp"
+#include "ErrorType.hpp"
+#include "ExceptionPlatform.hpp"
+#include "HttpHeader.hpp"
+#include "HybridCronetEngineSpec.hpp"
+#include "HybridNitroCronetSpec.hpp"
+#include "HybridNitroFetchCacheSpec.hpp"
+#include "HybridRequestExceptionSpec.hpp"
+#include "HybridUrlRequestBuilderSpec.hpp"
+#include "HybridUrlRequestSpec.hpp"
+#include "UploadDataProvider.hpp"
+#include "UploadDataSink.hpp"
+#include "UrlRequestCallback.hpp"
+#include "UrlResponseInfo.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
+#include <NitroModules/Promise.hpp>
+#include <NitroModules/Result.hpp>
+#include <exception>
+#include <functional>
+#include <memory>
+#include <optional>
+#include <string>
+#include <unordered_map>
+#include <variant>
+#include <vector>
 
 // C++ helpers for Swift
 #include "NitroFetch-Swift-Cxx-Bridge.hpp"
@@ -23,7 +77,18 @@
 #include <NitroModules/DateToChronoDate.hpp>
 
 // Forward declarations of Swift defined types
-
+// Forward declaration of `HybridCronetEngineSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridCronetEngineSpec_cxx; }
+// Forward declaration of `HybridNitroCronetSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridNitroCronetSpec_cxx; }
+// Forward declaration of `HybridNitroFetchCacheSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridNitroFetchCacheSpec_cxx; }
+// Forward declaration of `HybridRequestExceptionSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridRequestExceptionSpec_cxx; }
+// Forward declaration of `HybridUrlRequestBuilderSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridUrlRequestBuilderSpec_cxx; }
+// Forward declaration of `HybridUrlRequestSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 
 // Include Swift defined types
 #if __has_include("NitroFetch-Swift.h")

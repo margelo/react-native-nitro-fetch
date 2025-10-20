@@ -41,7 +41,8 @@ export interface UploadDataProvider {
   rewind(uploadDataSink: UploadDataSink): void;
 }
 
-export interface UrlRequest extends HybridObject<{ android: 'kotlin' }> {
+export interface UrlRequest
+  extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
   start(): void;
   followRedirect(): void;
   read(buffer: ArrayBuffer): void;
@@ -49,7 +50,8 @@ export interface UrlRequest extends HybridObject<{ android: 'kotlin' }> {
   isDone(): boolean;
 }
 
-export interface UrlRequestBuilder extends HybridObject<{ android: 'kotlin' }> {
+export interface UrlRequestBuilder
+  extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
   setHttpMethod(httpMethod: string): void;
   addHeader(name: string, value: string): void;
   setUploadDataProvider(provider: UploadDataProvider): void;
@@ -59,7 +61,8 @@ export interface UrlRequestBuilder extends HybridObject<{ android: 'kotlin' }> {
   allowDirectExecutor(): void;
   build(): UrlRequest;
 }
-export interface CronetEngine extends HybridObject<{ android: 'kotlin' }> {
+export interface CronetEngine
+  extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
   newUrlRequestBuilder(
     url: string,
     callback: UrlRequestCallback
@@ -78,7 +81,8 @@ export interface CachedFetchResponse {
   body: ArrayBuffer;
 }
 
-export interface NitroCronet extends HybridObject<{ android: 'kotlin' }> {
+export interface NitroCronet
+  extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
   getEngine(): CronetEngine;
   createEngine(): CronetEngine;
   shutdownAll(): void;

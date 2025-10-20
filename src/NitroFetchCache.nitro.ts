@@ -9,7 +9,8 @@ export interface CachedPrefetchResponse {
   timestampMs: number;
 }
 
-export interface NitroFetchCache extends HybridObject<{ android: 'kotlin' }> {
+export interface NitroFetchCache
+  extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
   /**
    * Get a cached prefetch response if it exists and is fresh.
    * Returns null if not found or expired.
