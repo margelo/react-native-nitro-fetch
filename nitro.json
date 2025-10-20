@@ -9,8 +9,7 @@
   },
   "autolinking": {
     "NitroCronet": {
-      "kotlin": "NitroCronet",
-      "swift": "NitroCronet"
+      "kotlin": "NitroCronet"
     },
     "NitroTextEncoding": {
       "cpp": "HybridTextEncoding"

@@ -17,7 +17,7 @@ Pod::Spec.new do |s|
   s.source_files = [
     "ios/**/*.{swift}",
     "ios/**/*.{m,mm}",
-    "cpp/**/*.{hpp,cpp}",
+    "cpp/**/*.{hpp,cpp,h}",
   ]
 
   s.dependency 'React-jsi'
