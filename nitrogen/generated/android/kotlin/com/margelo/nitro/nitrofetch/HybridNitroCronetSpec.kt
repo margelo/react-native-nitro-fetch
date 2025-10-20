@@ -10,7 +10,9 @@ package com.margelo.nitro.nitrofetch
 import androidx.annotation.Keep
 import com.facebook.jni.HybridData
 import com.facebook.proguard.annotations.DoNotStrip
-import com.margelo.nitro.core.*
+import com.margelo.nitro.core.Promise
+import com.margelo.nitro.core.ArrayBuffer
+import com.margelo.nitro.core.HybridObject
 
 /**
  * A Kotlin class representing the NitroCronet HybridObject.
@@ -54,7 +56,7 @@ abstract class HybridNitroCronetSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
-  abstract fun prefetch(url: String, httpMethod: String, headers: Map<String, String>, body: Variant_String_ArrayBuffer?, maxAge: Double): Promise<Unit>
+  abstract fun prefetch(url: String, httpMethod: String, headers: Map<String, String>, body: Variant_ArrayBuffer_String?, maxAge: Double): Promise<Unit>
   
   @DoNotStrip
   @Keep
@@ -63,6 +65,6 @@ abstract class HybridNitroCronetSpec: HybridObject() {
   private external fun initHybrid(): HybridData
 
   companion object {
-    private const val TAG = "HybridNitroCronetSpec"
+    protected const val TAG = "HybridNitroCronetSpec"
   }
 }

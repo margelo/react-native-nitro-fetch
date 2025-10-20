@@ -9,36 +9,43 @@ package com.margelo.nitro.nitrofetch
 
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
-import com.margelo.nitro.core.*
-
+import com.margelo.nitro.core.ArrayBuffer
 
 /**
  * Represents the JavaScript object/struct "CachedPrefetchResponse".
  */
 @DoNotStrip
 @Keep
-data class CachedPrefetchResponse
+data class CachedPrefetchResponse(
   @DoNotStrip
   @Keep
-  constructor(
+  val url: String,
+  @DoNotStrip
+  @Keep
+  val statusCode: Double,
+  @DoNotStrip
+  @Keep
+  val statusText: String,
+  @DoNotStrip
+  @Keep
+  val headers: Map<String, String>,
+  @DoNotStrip
+  @Keep
+  val body: ArrayBuffer,
+  @DoNotStrip
+  @Keep
+  val timestampMs: Double
+) {
+  private companion object {
+    /**
+     * Constructor called from C++
+     */
     @DoNotStrip
     @Keep
-    val url: String,
-    @DoNotStrip
-    @Keep
-    val statusCode: Double,
-    @DoNotStrip
-    @Keep
-    val statusText: String,
-    @DoNotStrip
-    @Keep
-    val headers: Map<String, String>,
-    @DoNotStrip
-    @Keep
-    val body: ArrayBuffer,
-    @DoNotStrip
-    @Keep
-    val timestampMs: Double
-  ) {
-  /* main constructor */
+    @Suppress("unused")
+    @JvmStatic
+    private fun fromCpp(url: String, statusCode: Double, statusText: String, headers: Map<String, String>, body: ArrayBuffer, timestampMs: Double): CachedPrefetchResponse {
+      return CachedPrefetchResponse(url, statusCode, statusText, headers, body, timestampMs)
+    }
+  }
 }

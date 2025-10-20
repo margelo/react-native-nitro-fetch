@@ -9,7 +9,6 @@ package com.margelo.nitro.nitrofetch
 
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
-import com.margelo.nitro.core.*
 
 
 /**
@@ -17,26 +16,30 @@ import com.margelo.nitro.core.*
  */
 @DoNotStrip
 @Keep
-data class UploadDataSink
+data class UploadDataSink(
   @DoNotStrip
   @Keep
-  constructor(
+  val onReadSucceeded: (finalChunk: Boolean) -> Unit,
+  @DoNotStrip
+  @Keep
+  val onReadError: (error: String) -> Unit,
+  @DoNotStrip
+  @Keep
+  val onRewindSucceeded: () -> Unit,
+  @DoNotStrip
+  @Keep
+  val onRewindError: (error: String) -> Unit
+) {
+  private companion object {
+    /**
+     * Constructor called from C++
+     */
     @DoNotStrip
     @Keep
-    val onReadSucceeded: Func_void_bool,
-    @DoNotStrip
-    @Keep
-    val onReadError: Func_void_std__string,
-    @DoNotStrip
-    @Keep
-    val onRewindSucceeded: Func_void,
-    @DoNotStrip
-    @Keep
-    val onRewindError: Func_void_std__string
-  ) {
-  /**
-   * Initialize a new instance of `UploadDataSink` from Kotlin.
-   */
-  constructor(onReadSucceeded: (finalChunk: Boolean) -> Unit, onReadError: (error: String) -> Unit, onRewindSucceeded: () -> Unit, onRewindError: (error: String) -> Unit)
-       : this(Func_void_bool_java(onReadSucceeded), Func_void_std__string_java(onReadError), Func_void_java(onRewindSucceeded), Func_void_std__string_java(onRewindError))
+    @Suppress("unused")
+    @JvmStatic
+    private fun fromCpp(onReadSucceeded: Func_void_bool, onReadError: Func_void_std__string, onRewindSucceeded: Func_void, onRewindError: Func_void_std__string): UploadDataSink {
+      return UploadDataSink(onReadSucceeded, onReadError, onRewindSucceeded, onRewindError)
+    }
+  }
 }

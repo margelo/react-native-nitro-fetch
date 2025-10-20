@@ -116,8 +116,10 @@ const server = Bun.serve({
                 'JSON response (sizes: small, medium, large, xlarge)',
               '/binary/:size':
                 'Binary data download (sizes: 1kb, 100kb, 1mb, 10mb, 50mb)',
+              '/stream':
+                'JSON streaming endpoint - newline-delimited JSON (query params: ?chunks=10&delay=100)',
               '/stream/:chunks/:delay':
-                'Streaming response (chunks: number of chunks, delay: ms between chunks)',
+                'Text streaming response (chunks: number of chunks, delay: ms between chunks)',
               '/delay/:ms': 'Delayed response (ms: milliseconds to delay)',
               '/headers': 'Returns request headers as JSON',
               '/status/:code': 'Returns specified HTTP status code',
@@ -351,7 +353,45 @@ const server = Bun.serve({
       });
     }
 
-    // Streaming endpoint
+    // JSON streaming endpoint (newline-delimited JSON)
+    if (path === '/stream') {
+      const chunks = parseInt(url.searchParams.get('chunks') || '10', 10);
+      const delay = parseInt(url.searchParams.get('delay') || '100', 10);
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          for (let i = 0; i < chunks; i++) {
+            const data = {
+              type: 'chunk',
+              index: i + 1,
+              total: chunks,
+              timestamp: Date.now(),
+              data: `Chunk data ${i + 1}`,
+              progress: ((i + 1) / chunks) * 100,
+            };
+            const line = JSON.stringify(data) + '\n';
+            controller.enqueue(new TextEncoder().encode(line));
+            if (i < chunks - 1) {
+              await Bun.sleep(delay);
+            }
+          }
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        status: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/x-ndjson',
+          'Transfer-Encoding': 'chunked',
+          'X-Chunk-Count': chunks.toString(),
+          'X-Chunk-Delay': `${delay}ms`,
+        },
+      });
+    }
+
+    // Streaming endpoint (text chunks)
     if (path.startsWith('/stream/')) {
       const parts = path.split('/');
       const chunks = parseInt(parts[2]) || 10;

@@ -16,8 +16,6 @@ namespace NitroFetch { class HybridUrlRequestBuilderSpec_cxx; }
 namespace margelo::nitro::nitrofetch { struct UploadDataProvider; }
 // Forward declaration of `UploadDataSink` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct UploadDataSink; }
-// Forward declaration of `ArrayBuffer` to properly resolve imports.
-namespace NitroModules { class ArrayBuffer; }
 // Forward declaration of `ArrayBufferHolder` to properly resolve imports.
 namespace NitroModules { class ArrayBufferHolder; }
 // Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
@@ -92,7 +90,7 @@ namespace margelo::nitro::nitrofetch {
         std::rethrow_exception(__result.error());
       }
     }
-    inline void setUploadBody(const std::variant<std::string, std::shared_ptr<ArrayBuffer>>& body) override {
+    inline void setUploadBody(const std::variant<std::shared_ptr<ArrayBuffer>, std::string>& body) override {
       auto __result = _swiftPart.setUploadBody(body);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());

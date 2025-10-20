@@ -14,8 +14,6 @@ namespace NitroFetch { class HybridNitroCronetSpec_cxx; }
 
 // Forward declaration of `HybridCronetEngineSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridCronetEngineSpec; }
-// Forward declaration of `ArrayBuffer` to properly resolve imports.
-namespace NitroModules { class ArrayBuffer; }
 // Forward declaration of `ArrayBufferHolder` to properly resolve imports.
 namespace NitroModules { class ArrayBufferHolder; }
 // Forward declaration of `CachedFetchResponse` to properly resolve imports.
@@ -95,7 +93,7 @@ namespace margelo::nitro::nitrofetch {
         std::rethrow_exception(__result.error());
       }
     }
-    inline std::shared_ptr<Promise<void>> prefetch(const std::string& url, const std::string& httpMethod, const std::unordered_map<std::string, std::string>& headers, const std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>& body, double maxAge) override {
+    inline std::shared_ptr<Promise<void>> prefetch(const std::string& url, const std::string& httpMethod, const std::unordered_map<std::string, std::string>& headers, const std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>>& body, double maxAge) override {
       auto __result = _swiftPart.prefetch(url, httpMethod, headers, body, std::forward<decltype(maxAge)>(maxAge));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());

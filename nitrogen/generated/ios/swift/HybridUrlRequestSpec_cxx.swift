@@ -7,6 +7,7 @@
 
 import Foundation
 import NitroModules
+import NitroModules
 
 /**
  * A class implementation that bridges HybridUrlRequestSpec over to C++.

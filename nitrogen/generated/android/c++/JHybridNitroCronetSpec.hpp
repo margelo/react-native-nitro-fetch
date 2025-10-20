@@ -56,7 +56,7 @@ namespace margelo::nitro::nitrofetch {
     std::shared_ptr<HybridCronetEngineSpec> getEngine() override;
     std::shared_ptr<HybridCronetEngineSpec> createEngine() override;
     void shutdownAll() override;
-    std::shared_ptr<Promise<void>> prefetch(const std::string& url, const std::string& httpMethod, const std::unordered_map<std::string, std::string>& headers, const std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>& body, double maxAge) override;
+    std::shared_ptr<Promise<void>> prefetch(const std::string& url, const std::string& httpMethod, const std::unordered_map<std::string, std::string>& headers, const std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>>& body, double maxAge) override;
     std::shared_ptr<Promise<std::optional<CachedFetchResponse>>> consumeNativePrefetch(const std::string& prefetchKey) override;
 
   private:

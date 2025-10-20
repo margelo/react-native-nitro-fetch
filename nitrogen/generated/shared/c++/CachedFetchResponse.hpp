@@ -17,9 +17,13 @@
 #else
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
+#if __has_include(<NitroModules/JSIHelpers.hpp>)
+#include <NitroModules/JSIHelpers.hpp>
+#else
+#error NitroModules cannot be found! Are you sure you installed NitroModules properly?
+#endif
 
-// Forward declaration of `ArrayBuffer` to properly resolve imports.
-namespace NitroModules { class ArrayBuffer; }
+
 
 #include <string>
 #include <unordered_map>
@@ -74,6 +78,9 @@ namespace margelo::nitro {
         return false;
       }
       jsi::Object obj = value.getObject(runtime);
+      if (!nitro::isPlainObject(runtime, obj)) {
+        return false;
+      }
       if (!JSIConverter<std::string>::canConvert(runtime, obj.getProperty(runtime, "url"))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, "status"))) return false;
       if (!JSIConverter<std::string>::canConvert(runtime, obj.getProperty(runtime, "statusText"))) return false;

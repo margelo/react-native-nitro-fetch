@@ -1,5 +1,5 @@
 import type { HybridObject } from 'react-native-nitro-modules';
-import type { CronetException } from './NitroCronetException.nitro';
+import type { RequestException } from './NitroException.nitro';
 
 export interface HttpHeader {
   key: string;
@@ -24,7 +24,7 @@ export interface UrlRequestCallback {
   onResponseStarted(info: UrlResponseInfo): void;
   onReadCompleted(info: UrlResponseInfo, byteBuffer: ArrayBuffer): void;
   onSucceeded(info: UrlResponseInfo): void;
-  onFailed(info: UrlResponseInfo | undefined, error: CronetException): void;
+  onFailed(info: UrlResponseInfo | undefined, error: RequestException): void;
   onCanceled(info: UrlResponseInfo | undefined): void;
 }
 

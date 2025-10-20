@@ -1,13 +1,20 @@
 import Foundation
+import NitroModules
 
-final class FetchCache {
+/**
+ * Cache for managing pending and completed fetch requests.
+ * Used for prefetch functionality to avoid duplicate requests.
+ * Implements the HybridNitroFetchCacheSpec protocol.
+ */
+final class FetchCache: HybridNitroFetchCacheSpec {
+
   struct CachedEntry {
-    let response: NitroResponse
+    let response: CachedPrefetchResponse
     let timestampMs: Int64
   }
 
   private static let queue = DispatchQueue(label: "nitrofetch.cache", attributes: .concurrent)
-  private static var pending: [String: [(Result<NitroResponse, Error>) -> Void]] = [:]
+  private static var pending: [String: [(Result<CachedPrefetchResponse, Error>) -> Void]] = [:]
   private static var results: [String: CachedEntry] = [:]
 
   static func getPending(_ key: String) -> Bool {
@@ -16,7 +23,7 @@ final class FetchCache {
     return has
   }
 
-  static func addPending(_ key: String, completion: @escaping (Result<NitroResponse, Error>) -> Void) {
+  static func addPending(_ key: String, completion: @escaping (Result<CachedPrefetchResponse, Error>) -> Void) {
     queue.async(flags: .barrier) {
       var arr = pending[key] ?? []
       arr.append(completion)
@@ -24,8 +31,8 @@ final class FetchCache {
     }
   }
 
-  static func complete(_ key: String, with result: Result<NitroResponse, Error>) {
-    var callbacks: [(Result<NitroResponse, Error>) -> Void] = []
+  static func complete(_ key: String, with result: Result<CachedPrefetchResponse, Error>) {
+    var callbacks: [(Result<CachedPrefetchResponse, Error>) -> Void] = []
     queue.sync {
       callbacks = pending[key] ?? []
     }
@@ -38,8 +45,8 @@ final class FetchCache {
     callbacks.forEach { $0(result) }
   }
 
-  static func getResultIfFresh(_ key: String, maxAgeMs: Int64) -> NitroResponse? {
-    var out: NitroResponse?
+  static func getResultIfFresh(_ key: String, maxAgeMs: Int64) -> CachedPrefetchResponse? {
+    var out: CachedPrefetchResponse?
     queue.sync {
       if let entry = results[key] {
         let age = Int64(Date().timeIntervalSince1970 * 1000) - entry.timestampMs
@@ -52,5 +59,21 @@ final class FetchCache {
     }
     return out
   }
-}
 
+  // MARK: - HybridNitroFetchCacheSpec protocol implementation
+
+  func getCachedPrefetch(key: String, maxAgeMs: Double) throws -> CachedPrefetchResponse? {
+    return FetchCache.getResultIfFresh(key, maxAgeMs: Int64(maxAgeMs))
+  }
+
+  func isPrefetchPending(key: String) throws -> Bool {
+    return FetchCache.getPending(key)
+  }
+
+  func clearAll() throws {
+    FetchCache.queue.async(flags: .barrier) {
+      FetchCache.pending.removeAll()
+      FetchCache.results.removeAll()
+    }
+  }
+}

@@ -9,16 +9,8 @@
   },
   "autolinking": {
     "NitroCronet": {
-      "kotlin": "NitroCronet"
-    },
-    "CronetEngine": {
-      "kotlin": "CronetEngine"
-    },
-    "UrlRequest": {
-      "kotlin": "UrlRequest"
-    },
-    "UrlRequestBuilder": {
-      "kotlin": "UrlRequestBuilder"
+      "kotlin": "NitroCronet",
+      "swift": "NitroCronet"
     },
     "NitroTextEncoding": {
       "cpp": "HybridTextEncoding"

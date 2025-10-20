@@ -15,8 +15,6 @@
 
 // Forward declaration of `UploadDataProvider` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct UploadDataProvider; }
-// Forward declaration of `ArrayBuffer` to properly resolve imports.
-namespace NitroModules { class ArrayBuffer; }
 // Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
 
@@ -61,7 +59,7 @@ namespace margelo::nitro::nitrofetch {
       virtual void setHttpMethod(const std::string& httpMethod) = 0;
       virtual void addHeader(const std::string& name, const std::string& value) = 0;
       virtual void setUploadDataProvider(const UploadDataProvider& provider) = 0;
-      virtual void setUploadBody(const std::variant<std::string, std::shared_ptr<ArrayBuffer>>& body) = 0;
+      virtual void setUploadBody(const std::variant<std::shared_ptr<ArrayBuffer>, std::string>& body) = 0;
       virtual void disableCache() = 0;
       virtual void setPriority(double priority) = 0;
       virtual void allowDirectExecutor() = 0;

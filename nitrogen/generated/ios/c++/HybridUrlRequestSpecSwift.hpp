@@ -12,8 +12,6 @@
 // Forward declaration of `HybridUrlRequestSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 
-// Forward declaration of `ArrayBuffer` to properly resolve imports.
-namespace NitroModules { class ArrayBuffer; }
 // Forward declaration of `ArrayBufferHolder` to properly resolve imports.
 namespace NitroModules { class ArrayBufferHolder; }
 

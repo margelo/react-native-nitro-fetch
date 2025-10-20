@@ -25,9 +25,13 @@ public extension UrlResponseInfo {
         bridge.emplace_std__unordered_map_std__string__std__string_(&__map, std.string(__k), std.string(__v))
       }
       return __map
-    }(), allHeadersAsList.withUnsafeBufferPointer { __pointer -> bridge.std__vector_HttpHeader_ in
-      return bridge.copy_std__vector_HttpHeader_(__pointer.baseAddress!, allHeadersAsList.count)
-    }, { () -> bridge.std__vector_std__string_ in
+    }(), { () -> bridge.std__vector_HttpHeader_ in
+      var __vector = bridge.create_std__vector_HttpHeader_(allHeadersAsList.count)
+      for __item in allHeadersAsList {
+        __vector.push_back(__item)
+      }
+      return __vector
+    }(), { () -> bridge.std__vector_std__string_ in
       var __vector = bridge.create_std__vector_std__string_(urlChain.count)
       for __item in urlChain {
         __vector.push_back(std.string(__item))
@@ -97,17 +101,17 @@ public extension UrlResponseInfo {
   var allHeadersAsList: [HttpHeader] {
     @inline(__always)
     get {
-      return { () -> [HttpHeader] in
-        let __data = bridge.get_data_std__vector_HttpHeader_(self.__allHeadersAsList)
-        let __size = self.__allHeadersAsList.size()
-        return Array(UnsafeBufferPointer(start: __data, count: __size))
-      }()
+      return self.__allHeadersAsList.map({ __item in __item })
     }
     @inline(__always)
     set {
-      self.__allHeadersAsList = newValue.withUnsafeBufferPointer { __pointer -> bridge.std__vector_HttpHeader_ in
-        return bridge.copy_std__vector_HttpHeader_(__pointer.baseAddress!, newValue.count)
-      }
+      self.__allHeadersAsList = { () -> bridge.std__vector_HttpHeader_ in
+        var __vector = bridge.create_std__vector_HttpHeader_(newValue.count)
+        for __item in newValue {
+          __vector.push_back(__item)
+        }
+        return __vector
+      }()
     }
   }
   

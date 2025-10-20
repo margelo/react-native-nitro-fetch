@@ -13,8 +13,6 @@ namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
 namespace margelo::nitro::nitrofetch { struct UploadDataProvider; }
 // Forward declaration of `UploadDataSink` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct UploadDataSink; }
-// Forward declaration of `ArrayBuffer` to properly resolve imports.
-namespace NitroModules { class ArrayBuffer; }
 
 #include <memory>
 #include "HybridUrlRequestSpec.hpp"
@@ -34,7 +32,7 @@ namespace NitroModules { class ArrayBuffer; }
 #include <NitroModules/JUnit.hpp>
 #include "JFunc_void_UploadDataSink.hpp"
 #include <variant>
-#include "JVariant_String_ArrayBuffer.hpp"
+#include "JVariant_ArrayBuffer_String.hpp"
 
 namespace margelo::nitro::nitrofetch {
 
@@ -74,9 +72,9 @@ namespace margelo::nitro::nitrofetch {
     static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JUploadDataProvider> /* provider */)>("setUploadDataProvider");
     method(_javaPart, JUploadDataProvider::fromCpp(provider));
   }
-  void JHybridUrlRequestBuilderSpec::setUploadBody(const std::variant<std::string, std::shared_ptr<ArrayBuffer>>& body) {
-    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JVariant_String_ArrayBuffer> /* body */)>("setUploadBody");
-    method(_javaPart, JVariant_String_ArrayBuffer::fromCpp(body));
+  void JHybridUrlRequestBuilderSpec::setUploadBody(const std::variant<std::shared_ptr<ArrayBuffer>, std::string>& body) {
+    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JVariant_ArrayBuffer_String> /* body */)>("setUploadBody");
+    method(_javaPart, JVariant_ArrayBuffer_String::fromCpp(body));
   }
   void JHybridUrlRequestBuilderSpec::disableCache() {
     static const auto method = javaClassStatic()->getMethod<void()>("disableCache");

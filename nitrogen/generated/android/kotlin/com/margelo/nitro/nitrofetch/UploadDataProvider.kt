@@ -9,31 +9,34 @@ package com.margelo.nitro.nitrofetch
 
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
-import com.margelo.nitro.core.*
-
+import com.margelo.nitro.core.ArrayBuffer
 
 /**
  * Represents the JavaScript object/struct "UploadDataProvider".
  */
 @DoNotStrip
 @Keep
-data class UploadDataProvider
+data class UploadDataProvider(
   @DoNotStrip
   @Keep
-  constructor(
+  val length: Double,
+  @DoNotStrip
+  @Keep
+  val read: (uploadDataSink: UploadDataSink, byteBuffer: ArrayBuffer) -> Unit,
+  @DoNotStrip
+  @Keep
+  val rewind: (uploadDataSink: UploadDataSink) -> Unit
+) {
+  private companion object {
+    /**
+     * Constructor called from C++
+     */
     @DoNotStrip
     @Keep
-    val length: Double,
-    @DoNotStrip
-    @Keep
-    val read: Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer_,
-    @DoNotStrip
-    @Keep
-    val rewind: Func_void_UploadDataSink
-  ) {
-  /**
-   * Initialize a new instance of `UploadDataProvider` from Kotlin.
-   */
-  constructor(length: Double, read: (uploadDataSink: UploadDataSink, byteBuffer: ArrayBuffer) -> Unit, rewind: (uploadDataSink: UploadDataSink) -> Unit)
-       : this(length, Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer__java(read), Func_void_UploadDataSink_java(rewind))
+    @Suppress("unused")
+    @JvmStatic
+    private fun fromCpp(length: Double, read: Func_void_UploadDataSink_std__shared_ptr_ArrayBuffer_, rewind: Func_void_UploadDataSink): UploadDataProvider {
+      return UploadDataProvider(length, read, rewind)
+    }
+  }
 }

@@ -10,9 +10,8 @@ package com.margelo.nitro.nitrofetch
 import androidx.annotation.Keep
 import com.facebook.jni.HybridData
 import com.facebook.proguard.annotations.DoNotStrip
-import com.margelo.nitro.core.*
 import dalvik.annotation.optimization.FastNative
-
+import com.margelo.nitro.core.ArrayBuffer
 
 /**
  * Represents the JavaScript callback `(uploadDataSink: struct, byteBuffer: array-buffer) => void`.

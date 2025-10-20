@@ -14,8 +14,6 @@ namespace NitroFetch { class HybridNitroFetchCacheSpec_cxx; }
 
 // Forward declaration of `CachedPrefetchResponse` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct CachedPrefetchResponse; }
-// Forward declaration of `ArrayBuffer` to properly resolve imports.
-namespace NitroModules { class ArrayBuffer; }
 // Forward declaration of `ArrayBufferHolder` to properly resolve imports.
 namespace NitroModules { class ArrayBufferHolder; }
 

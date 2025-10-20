@@ -18,7 +18,7 @@ public extension UrlRequestCallback {
   /**
    * Create a new instance of `UrlRequestCallback`.
    */
-  init(onRedirectReceived: @escaping (_ info: UrlResponseInfo, _ newLocationUrl: String) -> Void, onResponseStarted: @escaping (_ info: UrlResponseInfo) -> Void, onReadCompleted: @escaping (_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer) -> Void, onSucceeded: @escaping (_ info: UrlResponseInfo) -> Void, onFailed: @escaping (_ info: UrlResponseInfo?, _ error: (any HybridCronetExceptionSpec)) -> Void, onCanceled: @escaping (_ info: UrlResponseInfo?) -> Void) {
+  init(onRedirectReceived: @escaping (_ info: UrlResponseInfo, _ newLocationUrl: String) -> Void, onResponseStarted: @escaping (_ info: UrlResponseInfo) -> Void, onReadCompleted: @escaping (_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer) -> Void, onSucceeded: @escaping (_ info: UrlResponseInfo) -> Void, onFailed: @escaping (_ info: UrlResponseInfo?, _ error: (any HybridRequestExceptionSpec)) -> Void, onCanceled: @escaping (_ info: UrlResponseInfo?) -> Void) {
     self.init({ () -> bridge.Func_void_UrlResponseInfo_std__string in
       let __closureWrapper = Func_void_UrlResponseInfo_std__string(onRedirectReceived)
       return bridge.create_Func_void_UrlResponseInfo_std__string(__closureWrapper.toUnsafe())
@@ -31,9 +31,9 @@ public extension UrlRequestCallback {
     }(), { () -> bridge.Func_void_UrlResponseInfo in
       let __closureWrapper = Func_void_UrlResponseInfo(onSucceeded)
       return bridge.create_Func_void_UrlResponseInfo(__closureWrapper.toUnsafe())
-    }(), { () -> bridge.Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_ in
-      let __closureWrapper = Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_(onFailed)
-      return bridge.create_Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_(__closureWrapper.toUnsafe())
+    }(), { () -> bridge.Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_ in
+      let __closureWrapper = Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_(onFailed)
+      return bridge.create_Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_(__closureWrapper.toUnsafe())
     }(), { () -> bridge.Func_void_std__optional_UrlResponseInfo_ in
       let __closureWrapper = Func_void_std__optional_UrlResponseInfo_(onCanceled)
       return bridge.create_Func_void_std__optional_UrlResponseInfo_(__closureWrapper.toUnsafe())
@@ -116,19 +116,19 @@ public extension UrlRequestCallback {
     }
   }
   
-  var onFailed: (_ info: UrlResponseInfo?, _ error: (any HybridCronetExceptionSpec)) -> Void {
+  var onFailed: (_ info: UrlResponseInfo?, _ error: (any HybridRequestExceptionSpec)) -> Void {
     @inline(__always)
     get {
-      return { () -> (UrlResponseInfo?, (any HybridCronetExceptionSpec)) -> Void in
-        let __wrappedFunction = bridge.wrap_Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_(self.__onFailed)
-        return { (__info: UrlResponseInfo?, __error: (any HybridCronetExceptionSpec)) -> Void in
+      return { () -> (UrlResponseInfo?, (any HybridRequestExceptionSpec)) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_(self.__onFailed)
+        return { (__info: UrlResponseInfo?, __error: (any HybridRequestExceptionSpec)) -> Void in
           __wrappedFunction.call({ () -> bridge.std__optional_UrlResponseInfo_ in
             if let __unwrappedValue = __info {
               return bridge.create_std__optional_UrlResponseInfo_(__unwrappedValue)
             } else {
               return .init()
             }
-          }(), { () -> bridge.std__shared_ptr_HybridCronetExceptionSpec_ in
+          }(), { () -> bridge.std__shared_ptr_HybridRequestExceptionSpec_ in
             let __cxxWrapped = __error.getCxxWrapper()
             return __cxxWrapped.getCxxPart()
           }())
@@ -137,9 +137,9 @@ public extension UrlRequestCallback {
     }
     @inline(__always)
     set {
-      self.__onFailed = { () -> bridge.Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_ in
-        let __closureWrapper = Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_(newValue)
-        return bridge.create_Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_(__closureWrapper.toUnsafe())
+      self.__onFailed = { () -> bridge.Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_ in
+        let __closureWrapper = Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_(newValue)
+        return bridge.create_Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_(__closureWrapper.toUnsafe())
       }()
     }
   }

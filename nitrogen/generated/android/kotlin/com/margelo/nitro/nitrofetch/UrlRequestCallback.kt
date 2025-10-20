@@ -9,40 +9,43 @@ package com.margelo.nitro.nitrofetch
 
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
-import com.margelo.nitro.core.*
-
+import com.margelo.nitro.core.ArrayBuffer
 
 /**
  * Represents the JavaScript object/struct "UrlRequestCallback".
  */
 @DoNotStrip
 @Keep
-data class UrlRequestCallback
+data class UrlRequestCallback(
   @DoNotStrip
   @Keep
-  constructor(
+  val onRedirectReceived: (info: UrlResponseInfo, newLocationUrl: String) -> Unit,
+  @DoNotStrip
+  @Keep
+  val onResponseStarted: (info: UrlResponseInfo) -> Unit,
+  @DoNotStrip
+  @Keep
+  val onReadCompleted: (info: UrlResponseInfo, byteBuffer: ArrayBuffer) -> Unit,
+  @DoNotStrip
+  @Keep
+  val onSucceeded: (info: UrlResponseInfo) -> Unit,
+  @DoNotStrip
+  @Keep
+  val onFailed: (info: UrlResponseInfo?, error: HybridRequestExceptionSpec) -> Unit,
+  @DoNotStrip
+  @Keep
+  val onCanceled: (info: UrlResponseInfo?) -> Unit
+) {
+  private companion object {
+    /**
+     * Constructor called from C++
+     */
     @DoNotStrip
     @Keep
-    val onRedirectReceived: Func_void_UrlResponseInfo_std__string,
-    @DoNotStrip
-    @Keep
-    val onResponseStarted: Func_void_UrlResponseInfo,
-    @DoNotStrip
-    @Keep
-    val onReadCompleted: Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_,
-    @DoNotStrip
-    @Keep
-    val onSucceeded: Func_void_UrlResponseInfo,
-    @DoNotStrip
-    @Keep
-    val onFailed: Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_,
-    @DoNotStrip
-    @Keep
-    val onCanceled: Func_void_std__optional_UrlResponseInfo_
-  ) {
-  /**
-   * Initialize a new instance of `UrlRequestCallback` from Kotlin.
-   */
-  constructor(onRedirectReceived: (info: UrlResponseInfo, newLocationUrl: String) -> Unit, onResponseStarted: (info: UrlResponseInfo) -> Unit, onReadCompleted: (info: UrlResponseInfo, byteBuffer: ArrayBuffer) -> Unit, onSucceeded: (info: UrlResponseInfo) -> Unit, onFailed: (info: UrlResponseInfo?, error: HybridCronetExceptionSpec) -> Unit, onCanceled: (info: UrlResponseInfo?) -> Unit)
-       : this(Func_void_UrlResponseInfo_std__string_java(onRedirectReceived), Func_void_UrlResponseInfo_java(onResponseStarted), Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__java(onReadCompleted), Func_void_UrlResponseInfo_java(onSucceeded), Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec__java(onFailed), Func_void_std__optional_UrlResponseInfo__java(onCanceled))
+    @Suppress("unused")
+    @JvmStatic
+    private fun fromCpp(onRedirectReceived: Func_void_UrlResponseInfo_std__string, onResponseStarted: Func_void_UrlResponseInfo, onReadCompleted: Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_, onSucceeded: Func_void_UrlResponseInfo, onFailed: Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_, onCanceled: Func_void_std__optional_UrlResponseInfo_): UrlRequestCallback {
+      return UrlRequestCallback(onRedirectReceived, onResponseStarted, onReadCompleted, onSucceeded, onFailed, onCanceled)
+    }
+  }
 }

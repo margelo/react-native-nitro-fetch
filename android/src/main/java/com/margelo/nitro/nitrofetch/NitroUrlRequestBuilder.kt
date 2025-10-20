@@ -97,15 +97,15 @@ class NitroUrlRequestBuilder(
     builder.addHeader(name, value)
   }
 
-  override fun setUploadBody(body: Variant_String_ArrayBuffer) {
+  override fun setUploadBody(body: Variant_ArrayBuffer_String) {
     val bodyBytes: ByteArray = when (body) {
-      is Variant_String_ArrayBuffer.First -> body.value.toByteArray(Charsets.UTF_8)
-      is Variant_String_ArrayBuffer.Second -> {
-        val buffer = body.value.getBuffer(copyIfNeeded = true)
+      is Variant_ArrayBuffer_String.First -> {
+        val buffer = body.value.getBuffer(true)
         val bytes = ByteArray(buffer.remaining())
         buffer.get(bytes)
         bytes
       }
+      is Variant_ArrayBuffer_String.Second -> body.value.toByteArray(Charsets.UTF_8)
     }
 
     val provider = object : org.chromium.net.UploadDataProvider() {

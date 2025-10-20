@@ -9,7 +9,6 @@ package com.margelo.nitro.nitrofetch
 
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
-import com.margelo.nitro.core.*
 
 
 /**
@@ -17,40 +16,48 @@ import com.margelo.nitro.core.*
  */
 @DoNotStrip
 @Keep
-data class UrlResponseInfo
+data class UrlResponseInfo(
   @DoNotStrip
   @Keep
-  constructor(
+  val url: String,
+  @DoNotStrip
+  @Keep
+  val httpStatusCode: Double,
+  @DoNotStrip
+  @Keep
+  val httpStatusText: String,
+  @DoNotStrip
+  @Keep
+  val allHeaders: Map<String, String>,
+  @DoNotStrip
+  @Keep
+  val allHeadersAsList: Array<HttpHeader>,
+  @DoNotStrip
+  @Keep
+  val urlChain: Array<String>,
+  @DoNotStrip
+  @Keep
+  val negotiatedProtocol: String,
+  @DoNotStrip
+  @Keep
+  val proxyServer: String,
+  @DoNotStrip
+  @Keep
+  val receivedByteCount: Double,
+  @DoNotStrip
+  @Keep
+  val wasCached: Boolean
+) {
+  private companion object {
+    /**
+     * Constructor called from C++
+     */
     @DoNotStrip
     @Keep
-    val url: String,
-    @DoNotStrip
-    @Keep
-    val httpStatusCode: Double,
-    @DoNotStrip
-    @Keep
-    val httpStatusText: String,
-    @DoNotStrip
-    @Keep
-    val allHeaders: Map<String, String>,
-    @DoNotStrip
-    @Keep
-    val allHeadersAsList: Array<HttpHeader>,
-    @DoNotStrip
-    @Keep
-    val urlChain: Array<String>,
-    @DoNotStrip
-    @Keep
-    val negotiatedProtocol: String,
-    @DoNotStrip
-    @Keep
-    val proxyServer: String,
-    @DoNotStrip
-    @Keep
-    val receivedByteCount: Double,
-    @DoNotStrip
-    @Keep
-    val wasCached: Boolean
-  ) {
-  /* main constructor */
+    @Suppress("unused")
+    @JvmStatic
+    private fun fromCpp(url: String, httpStatusCode: Double, httpStatusText: String, allHeaders: Map<String, String>, allHeadersAsList: Array<HttpHeader>, urlChain: Array<String>, negotiatedProtocol: String, proxyServer: String, receivedByteCount: Double, wasCached: Boolean): UrlResponseInfo {
+      return UrlResponseInfo(url, httpStatusCode, httpStatusText, allHeaders, allHeadersAsList, urlChain, negotiatedProtocol, proxyServer, receivedByteCount, wasCached)
+    }
+  }
 }

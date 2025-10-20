@@ -7,6 +7,7 @@
 
 import Foundation
 import NitroModules
+import NitroModules
 
 /**
  * A class implementation that bridges HybridNitroCronetSpec over to C++.
@@ -151,7 +152,7 @@ open class HybridNitroCronetSpec_cxx {
   }
   
   @inline(__always)
-  public final func prefetch(url: std.string, httpMethod: std.string, headers: bridge.std__unordered_map_std__string__std__string_, body: bridge.std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___, maxAge: Double) -> bridge.Result_std__shared_ptr_Promise_void___ {
+  public final func prefetch(url: std.string, httpMethod: std.string, headers: bridge.std__unordered_map_std__string__std__string_, body: bridge.std__optional_std__variant_std__shared_ptr_ArrayBuffer___std__string__, maxAge: Double) -> bridge.Result_std__shared_ptr_Promise_void___ {
     do {
       let __result = try self.__implementation.prefetch(url: String(url), httpMethod: String(httpMethod), headers: { () -> Dictionary<String, String> in
         var __dictionary = Dictionary<String, String>(minimumCapacity: headers.size())
@@ -161,18 +162,18 @@ open class HybridNitroCronetSpec_cxx {
           __dictionary[String(__key)] = String(__value)
         }
         return __dictionary
-      }(), body: { () -> Variant_String_ArrayBuffer? in
-        if bridge.has_value_std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___(body) {
-          let __unwrapped = bridge.get_std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___(body)
-          return { () -> Variant_String_ArrayBuffer in
-            let __variant = bridge.std__variant_std__string__std__shared_ptr_ArrayBuffer__(__unwrapped)
+      }(), body: { () -> Variant_ArrayBuffer_String? in
+        if bridge.has_value_std__optional_std__variant_std__shared_ptr_ArrayBuffer___std__string__(body) {
+          let __unwrapped = bridge.get_std__optional_std__variant_std__shared_ptr_ArrayBuffer___std__string__(body)
+          return { () -> Variant_ArrayBuffer_String in
+            let __variant = bridge.std__variant_std__shared_ptr_ArrayBuffer___std__string_(__unwrapped)
             switch __variant.index() {
               case 0:
                 let __actual = __variant.get_0()
-                return .first(String(__actual))
+                return .first(ArrayBuffer(__actual))
               case 1:
                 let __actual = __variant.get_1()
-                return .second(ArrayBuffer(__actual))
+                return .second(String(__actual))
               default:
                 fatalError("Variant can never have index \(__variant.index())!")
             }

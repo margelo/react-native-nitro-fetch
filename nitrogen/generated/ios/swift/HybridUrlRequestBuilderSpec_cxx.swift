@@ -7,6 +7,7 @@
 
 import Foundation
 import NitroModules
+import NitroModules
 
 /**
  * A class implementation that bridges HybridUrlRequestBuilderSpec over to C++.
@@ -143,17 +144,17 @@ open class HybridUrlRequestBuilderSpec_cxx {
   }
   
   @inline(__always)
-  public final func setUploadBody(body: bridge.std__variant_std__string__std__shared_ptr_ArrayBuffer__) -> bridge.Result_void_ {
+  public final func setUploadBody(body: bridge.std__variant_std__shared_ptr_ArrayBuffer___std__string_) -> bridge.Result_void_ {
     do {
-      try self.__implementation.setUploadBody(body: { () -> Variant_String_ArrayBuffer in
+      try self.__implementation.setUploadBody(body: { () -> Variant_ArrayBuffer_String in
         let __variant = body
         switch __variant.index() {
           case 0:
             let __actual = __variant.get_0()
-            return .first(String(__actual))
+            return .first(ArrayBuffer(__actual))
           case 1:
             let __actual = __variant.get_1()
-            return .second(ArrayBuffer(__actual))
+            return .second(String(__actual))
           default:
             fatalError("Variant can never have index \(__variant.index())!")
         }

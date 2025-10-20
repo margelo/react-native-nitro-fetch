@@ -18,17 +18,31 @@ public final class NitroAutoPrefetcher: NSObject {
       guard let url = obj["url"] as? String, !url.isEmpty else { continue }
       guard let prefetchKey = obj["prefetchKey"] as? String, !prefetchKey.isEmpty else { continue }
       let headersDict = (obj["headers"] as? [String: Any]) ?? [:]
-      var headers: [NitroHeader] = headersDict.map { (k, v) in NitroHeader(key: String(describing: k), value: String(describing: v)) }
-      headers.append(NitroHeader(key: "prefetchKey", value: prefetchKey))
-      let req = NitroRequest(url: url,
-                             method: nil,
-                             headers: headers,
-                             bodyString: nil,
-                             bodyBytes: nil,
-                             timeoutMs: nil,
-                             followRedirects: true)
+      var headers = headersDict.reduce(into: [String: String]()) { result, pair in
+        result[String(describing: pair.key)] = String(describing: pair.value)
+      }
+      headers["prefetchKey"] = prefetchKey
+
       Task {
-        do { try await NitroFetchClient.prefetchStatic(req) } catch { /* ignore – best effort */ }
+        do {
+          let nitro = NitroCronet()
+          let promise = try nitro.prefetch(
+            url: url,
+            httpMethod: "GET",
+            headers: headers,
+            body: nil,
+            maxAge: 5000.0
+          )
+          // Use promise callbacks instead of async/await
+          promise.then { _ in
+            // Success - nothing to do
+          }
+          promise.catch { _ in
+            // Ignore errors - best effort prefetch
+          }
+        } catch {
+          // Ignore errors - best effort prefetch
+        }
       }
     }
   }

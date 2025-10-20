@@ -10,7 +10,8 @@ package com.margelo.nitro.nitrofetch
 import androidx.annotation.Keep
 import com.facebook.jni.HybridData
 import com.facebook.proguard.annotations.DoNotStrip
-import com.margelo.nitro.core.*
+import com.margelo.nitro.core.ArrayBuffer
+import com.margelo.nitro.core.HybridObject
 
 /**
  * A Kotlin class representing the UrlRequest HybridObject.
@@ -63,6 +64,6 @@ abstract class HybridUrlRequestSpec: HybridObject() {
   private external fun initHybrid(): HybridData
 
   companion object {
-    private const val TAG = "HybridUrlRequestSpec"
+    protected const val TAG = "HybridUrlRequestSpec"
   }
 }

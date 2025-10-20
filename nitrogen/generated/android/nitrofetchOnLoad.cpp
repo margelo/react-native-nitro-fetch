@@ -26,14 +26,10 @@
 #include "JFunc_void_UrlResponseInfo_std__string.hpp"
 #include "JFunc_void_UrlResponseInfo.hpp"
 #include "JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_.hpp"
-#include "JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_.hpp"
+#include "JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_.hpp"
 #include "JFunc_void_std__optional_UrlResponseInfo_.hpp"
 #include "JHybridNitroCronetSpec.hpp"
-#include "JHybridCronetExceptionSpec.hpp"
-#include "JHybridNetworkExceptionSpec.hpp"
-#include "JHybridQuicExceptionSpec.hpp"
-#include "JHybridCallbackExceptionSpec.hpp"
-#include "JHybridInlineExecutionProhibitedExceptionSpec.hpp"
+#include "JHybridRequestExceptionSpec.hpp"
 #include "JHybridNitroFetchCacheSpec.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
 #include "HybridTextEncoding.hpp"
@@ -58,14 +54,10 @@ int initialize(JavaVM* vm) {
     margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_std__string_cxx::registerNatives();
     margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_cxx::registerNatives();
     margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__cxx::registerNatives();
-    margelo::nitro::nitrofetch::JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec__cxx::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec__cxx::registerNatives();
     margelo::nitro::nitrofetch::JFunc_void_std__optional_UrlResponseInfo__cxx::registerNatives();
     margelo::nitro::nitrofetch::JHybridNitroCronetSpec::registerNatives();
-    margelo::nitro::nitrofetch::JHybridCronetExceptionSpec::registerNatives();
-    margelo::nitro::nitrofetch::JHybridNetworkExceptionSpec::registerNatives();
-    margelo::nitro::nitrofetch::JHybridQuicExceptionSpec::registerNatives();
-    margelo::nitro::nitrofetch::JHybridCallbackExceptionSpec::registerNatives();
-    margelo::nitro::nitrofetch::JHybridInlineExecutionProhibitedExceptionSpec::registerNatives();
+    margelo::nitro::nitrofetch::JHybridRequestExceptionSpec::registerNatives();
     margelo::nitro::nitrofetch::JHybridNitroFetchCacheSpec::registerNatives();
 
     // Register Nitro Hybrid Objects
@@ -73,30 +65,6 @@ int initialize(JavaVM* vm) {
       "NitroCronet",
       []() -> std::shared_ptr<HybridObject> {
         static DefaultConstructableObject<JHybridNitroCronetSpec::javaobject> object("com/margelo/nitro/nitrofetch/NitroCronet");
-        auto instance = object.create();
-        return instance->cthis()->shared();
-      }
-    );
-    HybridObjectRegistry::registerHybridObjectConstructor(
-      "CronetEngine",
-      []() -> std::shared_ptr<HybridObject> {
-        static DefaultConstructableObject<JHybridCronetEngineSpec::javaobject> object("com/margelo/nitro/nitrofetch/CronetEngine");
-        auto instance = object.create();
-        return instance->cthis()->shared();
-      }
-    );
-    HybridObjectRegistry::registerHybridObjectConstructor(
-      "UrlRequest",
-      []() -> std::shared_ptr<HybridObject> {
-        static DefaultConstructableObject<JHybridUrlRequestSpec::javaobject> object("com/margelo/nitro/nitrofetch/UrlRequest");
-        auto instance = object.create();
-        return instance->cthis()->shared();
-      }
-    );
-    HybridObjectRegistry::registerHybridObjectConstructor(
-      "UrlRequestBuilder",
-      []() -> std::shared_ptr<HybridObject> {
-        static DefaultConstructableObject<JHybridUrlRequestBuilderSpec::javaobject> object("com/margelo/nitro/nitrofetch/UrlRequestBuilder");
         auto instance = object.create();
         return instance->cthis()->shared();
       }

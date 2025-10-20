@@ -7,6 +7,7 @@
 
 import Foundation
 import NitroModules
+import NitroModules
 
 /// See ``HybridUrlRequestBuilderSpec``
 public protocol HybridUrlRequestBuilderSpec_protocol: HybridObject {
@@ -17,7 +18,7 @@ public protocol HybridUrlRequestBuilderSpec_protocol: HybridObject {
   func setHttpMethod(httpMethod: String) throws -> Void
   func addHeader(name: String, value: String) throws -> Void
   func setUploadDataProvider(provider: UploadDataProvider) throws -> Void
-  func setUploadBody(body: Variant_String_ArrayBuffer) throws -> Void
+  func setUploadBody(body: Variant_ArrayBuffer_String) throws -> Void
   func disableCache() throws -> Void
   func setPriority(priority: Double) throws -> Void
   func allowDirectExecutor() throws -> Void

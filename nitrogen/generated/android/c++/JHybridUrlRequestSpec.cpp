@@ -7,8 +7,7 @@
 
 #include "JHybridUrlRequestSpec.hpp"
 
-// Forward declaration of `ArrayBuffer` to properly resolve imports.
-namespace NitroModules { class ArrayBuffer; }
+
 
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/JArrayBuffer.hpp>

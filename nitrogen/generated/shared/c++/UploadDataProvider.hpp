@@ -17,11 +17,14 @@
 #else
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
+#if __has_include(<NitroModules/JSIHelpers.hpp>)
+#include <NitroModules/JSIHelpers.hpp>
+#else
+#error NitroModules cannot be found! Are you sure you installed NitroModules properly?
+#endif
 
 // Forward declaration of `UploadDataSink` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct UploadDataSink; }
-// Forward declaration of `ArrayBuffer` to properly resolve imports.
-namespace NitroModules { class ArrayBuffer; }
 
 #include "UploadDataSink.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
@@ -70,6 +73,9 @@ namespace margelo::nitro {
         return false;
       }
       jsi::Object obj = value.getObject(runtime);
+      if (!nitro::isPlainObject(runtime, obj)) {
+        return false;
+      }
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, "length"))) return false;
       if (!JSIConverter<std::function<void(const margelo::nitro::nitrofetch::UploadDataSink&, const std::shared_ptr<ArrayBuffer>&)>>::canConvert(runtime, obj.getProperty(runtime, "read"))) return false;
       if (!JSIConverter<std::function<void(const margelo::nitro::nitrofetch::UploadDataSink&)>>::canConvert(runtime, obj.getProperty(runtime, "rewind"))) return false;

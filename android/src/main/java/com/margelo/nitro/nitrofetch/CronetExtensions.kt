@@ -1,10 +1,6 @@
 package com.margelo.nitro.nitrofetch
 
-import com.margelo.nitro.nitrofetch.exceptions.NitroCronetException
-import com.margelo.nitro.nitrofetch.exceptions.NitroNetworkException
-import com.margelo.nitro.nitrofetch.exceptions.NitroQuicException
-import com.margelo.nitro.nitrofetch.exceptions.NitroCallbackException
-import com.margelo.nitro.nitrofetch.exceptions.NitroInlineExecutionProhibitedException
+import com.margelo.nitro.nitrofetch.exceptions.NitroRequestException
 import org.chromium.net.UrlResponseInfo as CronetUrlResponseInfo
 import org.chromium.net.CronetException as CronetNativeException
 import org.chromium.net.NetworkException as CronetNetworkException
@@ -35,7 +31,7 @@ fun CronetUrlResponseInfo.toNitro(): UrlResponseInfo {
   )
 }
 
-fun CronetNativeException.toNitro(): HybridCronetExceptionSpec {
+fun CronetNativeException.toNitro(): HybridRequestExceptionSpec {
   val internalErrorCode = try {
     val field = CronetNativeException::class.java.getDeclaredField("mCronetInternalErrorCode")
     field.isAccessible = true
@@ -46,36 +42,36 @@ fun CronetNativeException.toNitro(): HybridCronetExceptionSpec {
 
   return when (this) {
     is CronetNetworkException -> {
-      NitroNetworkException(
-        msg = message ?: "Network error",
-        internalErrCode = internalErrorCode,
-        errCode = errorCode.toDouble()
+      NitroRequestException.network(
+        message = message ?: "Network error",
+        internalErrorCode = internalErrorCode,
+        networkErrorCode = errorCode.toDouble()
       )
     }
     is CronetQuicException -> {
-      NitroQuicException(
-        msg = message ?: "QUIC error",
-        internalErrCode = internalErrorCode,
-        quicErrCode = quicDetailedErrorCode.toDouble()
+      NitroRequestException.quic(
+        message = message ?: "QUIC error",
+        internalErrorCode = internalErrorCode,
+        quicErrorCode = quicDetailedErrorCode.toDouble()
       )
     }
     is CronetCallbackException -> {
-      NitroCallbackException(
-        msg = message ?: "Callback error",
-        internalErrCode = internalErrorCode,
-        causeMsg = cause?.message
+      NitroRequestException.callback(
+        message = message ?: "Callback error",
+        internalErrorCode = internalErrorCode,
+        causeMessage = cause?.message
       )
     }
     is CronetInlineExecutionProhibitedException -> {
-      NitroInlineExecutionProhibitedException(
-        msg = message ?: "Inline execution prohibited",
-        internalErrCode = internalErrorCode
+      NitroRequestException.inlineExecution(
+        message = message ?: "Inline execution prohibited",
+        internalErrorCode = internalErrorCode
       )
     }
     else -> {
-      NitroCronetException(
-        msg = message ?: "Unknown Cronet error",
-        internalErrCode = internalErrorCode
+      NitroRequestException.cronet(
+        message = message ?: "Unknown Cronet error",
+        internalErrorCode = internalErrorCode
       )
     }
   }

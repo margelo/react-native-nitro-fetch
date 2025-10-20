@@ -67,7 +67,11 @@ namespace margelo::nitro::nitrofetch {
      */
     [[maybe_unused]]
     static jni::local_ref<JCachedFetchResponse::javaobject> fromCpp(const CachedFetchResponse& value) {
-      return newInstance(
+      using JSignature = JCachedFetchResponse(jni::alias_ref<jni::JString>, double, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JMap<jni::JString, jni::JString>>, jni::alias_ref<JArrayBuffer::javaobject>);
+      static const auto clazz = javaClassStatic();
+      static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
+      return create(
+        clazz,
         jni::make_jstring(value.url),
         value.status,
         jni::make_jstring(value.statusText),

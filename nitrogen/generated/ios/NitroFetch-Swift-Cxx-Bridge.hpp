@@ -10,30 +10,20 @@
 // Forward declarations of C++ defined types
 // Forward declaration of `ArrayBufferHolder` to properly resolve imports.
 namespace NitroModules { class ArrayBufferHolder; }
-// Forward declaration of `ArrayBuffer` to properly resolve imports.
-namespace NitroModules { class ArrayBuffer; }
 // Forward declaration of `CachedFetchResponse` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct CachedFetchResponse; }
 // Forward declaration of `CachedPrefetchResponse` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct CachedPrefetchResponse; }
 // Forward declaration of `HttpHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct HttpHeader; }
-// Forward declaration of `HybridCallbackExceptionSpec` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { class HybridCallbackExceptionSpec; }
 // Forward declaration of `HybridCronetEngineSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridCronetEngineSpec; }
-// Forward declaration of `HybridCronetExceptionSpec` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { class HybridCronetExceptionSpec; }
-// Forward declaration of `HybridInlineExecutionProhibitedExceptionSpec` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { class HybridInlineExecutionProhibitedExceptionSpec; }
-// Forward declaration of `HybridNetworkExceptionSpec` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { class HybridNetworkExceptionSpec; }
 // Forward declaration of `HybridNitroCronetSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroCronetSpec; }
 // Forward declaration of `HybridNitroFetchCacheSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchCacheSpec; }
-// Forward declaration of `HybridQuicExceptionSpec` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { class HybridQuicExceptionSpec; }
+// Forward declaration of `HybridRequestExceptionSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridRequestExceptionSpec; }
 // Forward declaration of `HybridUrlRequestBuilderSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestBuilderSpec; }
 // Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
@@ -44,22 +34,14 @@ namespace margelo::nitro::nitrofetch { struct UploadDataSink; }
 namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 
 // Forward declarations of Swift defined types
-// Forward declaration of `HybridCallbackExceptionSpec_cxx` to properly resolve imports.
-namespace NitroFetch { class HybridCallbackExceptionSpec_cxx; }
 // Forward declaration of `HybridCronetEngineSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridCronetEngineSpec_cxx; }
-// Forward declaration of `HybridCronetExceptionSpec_cxx` to properly resolve imports.
-namespace NitroFetch { class HybridCronetExceptionSpec_cxx; }
-// Forward declaration of `HybridInlineExecutionProhibitedExceptionSpec_cxx` to properly resolve imports.
-namespace NitroFetch { class HybridInlineExecutionProhibitedExceptionSpec_cxx; }
-// Forward declaration of `HybridNetworkExceptionSpec_cxx` to properly resolve imports.
-namespace NitroFetch { class HybridNetworkExceptionSpec_cxx; }
 // Forward declaration of `HybridNitroCronetSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridNitroCronetSpec_cxx; }
 // Forward declaration of `HybridNitroFetchCacheSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridNitroFetchCacheSpec_cxx; }
-// Forward declaration of `HybridQuicExceptionSpec_cxx` to properly resolve imports.
-namespace NitroFetch { class HybridQuicExceptionSpec_cxx; }
+// Forward declaration of `HybridRequestExceptionSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridRequestExceptionSpec_cxx; }
 // Forward declaration of `HybridUrlRequestBuilderSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridUrlRequestBuilderSpec_cxx; }
 // Forward declaration of `HybridUrlRequestSpec_cxx` to properly resolve imports.
@@ -69,14 +51,10 @@ namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 #include "CachedFetchResponse.hpp"
 #include "CachedPrefetchResponse.hpp"
 #include "HttpHeader.hpp"
-#include "HybridCallbackExceptionSpec.hpp"
 #include "HybridCronetEngineSpec.hpp"
-#include "HybridCronetExceptionSpec.hpp"
-#include "HybridInlineExecutionProhibitedExceptionSpec.hpp"
-#include "HybridNetworkExceptionSpec.hpp"
 #include "HybridNitroCronetSpec.hpp"
 #include "HybridNitroFetchCacheSpec.hpp"
-#include "HybridQuicExceptionSpec.hpp"
+#include "HybridRequestExceptionSpec.hpp"
 #include "HybridUrlRequestBuilderSpec.hpp"
 #include "HybridUrlRequestSpec.hpp"
 #include "UploadDataSink.hpp"
@@ -108,7 +86,7 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
    */
   using std__shared_ptr_HybridUrlRequestSpec_ = std::shared_ptr<HybridUrlRequestSpec>;
   std::shared_ptr<HybridUrlRequestSpec> create_std__shared_ptr_HybridUrlRequestSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
-  void* NON_NULL get_std__shared_ptr_HybridUrlRequestSpec_(std__shared_ptr_HybridUrlRequestSpec_ cppType) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridUrlRequestSpec_(std__shared_ptr_HybridUrlRequestSpec_ cppType);
   
   // pragma MARK: std::weak_ptr<HybridUrlRequestSpec>
   using std__weak_ptr_HybridUrlRequestSpec_ = std::weak_ptr<HybridUrlRequestSpec>;
@@ -242,33 +220,33 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return Func_void_UploadDataSink_Wrapper(std::move(value));
   }
   
-  // pragma MARK: std::variant<std::string, std::shared_ptr<ArrayBuffer>>
+  // pragma MARK: std::variant<std::shared_ptr<ArrayBuffer>, std::string>
   /**
-   * Wrapper struct for `std::variant<std::string, std::shared_ptr<ArrayBuffer>>`.
+   * Wrapper struct for `std::variant<std::shared_ptr<ArrayBuffer>, std::string>`.
    * std::variant cannot be used in Swift because of a Swift bug.
    * Not even specializing it works. So we create a wrapper struct.
    */
-  struct std__variant_std__string__std__shared_ptr_ArrayBuffer__ {
-    std::variant<std::string, std::shared_ptr<ArrayBuffer>> variant;
-    std__variant_std__string__std__shared_ptr_ArrayBuffer__(std::variant<std::string, std::shared_ptr<ArrayBuffer>> variant): variant(variant) { }
-    operator std::variant<std::string, std::shared_ptr<ArrayBuffer>>() const noexcept {
+  struct std__variant_std__shared_ptr_ArrayBuffer___std__string_ {
+    std::variant<std::shared_ptr<ArrayBuffer>, std::string> variant;
+    std__variant_std__shared_ptr_ArrayBuffer___std__string_(std::variant<std::shared_ptr<ArrayBuffer>, std::string> variant): variant(variant) { }
+    operator std::variant<std::shared_ptr<ArrayBuffer>, std::string>() const noexcept {
       return variant;
     }
     inline size_t index() const noexcept {
       return variant.index();
     }
-    inline std::string get_0() const noexcept {
+    inline std::shared_ptr<ArrayBuffer> get_0() const noexcept {
       return std::get<0>(variant);
     }
-    inline std::shared_ptr<ArrayBuffer> get_1() const noexcept {
+    inline std::string get_1() const noexcept {
       return std::get<1>(variant);
     }
   };
-  inline std__variant_std__string__std__shared_ptr_ArrayBuffer__ create_std__variant_std__string__std__shared_ptr_ArrayBuffer__(const std::string& value) noexcept {
-    return std__variant_std__string__std__shared_ptr_ArrayBuffer__(value);
+  inline std__variant_std__shared_ptr_ArrayBuffer___std__string_ create_std__variant_std__shared_ptr_ArrayBuffer___std__string_(const std::shared_ptr<ArrayBuffer>& value) noexcept {
+    return std__variant_std__shared_ptr_ArrayBuffer___std__string_(value);
   }
-  inline std__variant_std__string__std__shared_ptr_ArrayBuffer__ create_std__variant_std__string__std__shared_ptr_ArrayBuffer__(const std::shared_ptr<ArrayBuffer>& value) noexcept {
-    return std__variant_std__string__std__shared_ptr_ArrayBuffer__(value);
+  inline std__variant_std__shared_ptr_ArrayBuffer___std__string_ create_std__variant_std__shared_ptr_ArrayBuffer___std__string_(const std::string& value) noexcept {
+    return std__variant_std__shared_ptr_ArrayBuffer___std__string_(value);
   }
   
   // pragma MARK: std::shared_ptr<HybridUrlRequestBuilderSpec>
@@ -277,7 +255,7 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
    */
   using std__shared_ptr_HybridUrlRequestBuilderSpec_ = std::shared_ptr<HybridUrlRequestBuilderSpec>;
   std::shared_ptr<HybridUrlRequestBuilderSpec> create_std__shared_ptr_HybridUrlRequestBuilderSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
-  void* NON_NULL get_std__shared_ptr_HybridUrlRequestBuilderSpec_(std__shared_ptr_HybridUrlRequestBuilderSpec_ cppType) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridUrlRequestBuilderSpec_(std__shared_ptr_HybridUrlRequestBuilderSpec_ cppType);
   
   // pragma MARK: std::weak_ptr<HybridUrlRequestBuilderSpec>
   using std__weak_ptr_HybridUrlRequestBuilderSpec_ = std::weak_ptr<HybridUrlRequestBuilderSpec>;
@@ -322,11 +300,10 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
    * Specialized version of `std::vector<HttpHeader>`.
    */
   using std__vector_HttpHeader_ = std::vector<HttpHeader>;
-  inline std::vector<HttpHeader> copy_std__vector_HttpHeader_(const HttpHeader* CONTIGUOUS_MEMORY NON_NULL data, size_t size) noexcept {
-    return margelo::nitro::FastVectorCopy<HttpHeader>(data, size);
-  }
-  inline const HttpHeader* CONTIGUOUS_MEMORY NON_NULL get_data_std__vector_HttpHeader_(const std::vector<HttpHeader>& vector) noexcept {
-    return vector.data();
+  inline std::vector<HttpHeader> create_std__vector_HttpHeader_(size_t size) noexcept {
+    std::vector<HttpHeader> vector;
+    vector.reserve(size);
+    return vector;
   }
   
   // pragma MARK: std::vector<std::string>
@@ -421,38 +398,38 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return *optional;
   }
   
-  // pragma MARK: std::shared_ptr<HybridCronetExceptionSpec>
+  // pragma MARK: std::shared_ptr<HybridRequestExceptionSpec>
   /**
-   * Specialized version of `std::shared_ptr<HybridCronetExceptionSpec>`.
+   * Specialized version of `std::shared_ptr<HybridRequestExceptionSpec>`.
    */
-  using std__shared_ptr_HybridCronetExceptionSpec_ = std::shared_ptr<HybridCronetExceptionSpec>;
-  std::shared_ptr<HybridCronetExceptionSpec> create_std__shared_ptr_HybridCronetExceptionSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
-  void* NON_NULL get_std__shared_ptr_HybridCronetExceptionSpec_(std__shared_ptr_HybridCronetExceptionSpec_ cppType) noexcept;
+  using std__shared_ptr_HybridRequestExceptionSpec_ = std::shared_ptr<HybridRequestExceptionSpec>;
+  std::shared_ptr<HybridRequestExceptionSpec> create_std__shared_ptr_HybridRequestExceptionSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridRequestExceptionSpec_(std__shared_ptr_HybridRequestExceptionSpec_ cppType);
   
-  // pragma MARK: std::weak_ptr<HybridCronetExceptionSpec>
-  using std__weak_ptr_HybridCronetExceptionSpec_ = std::weak_ptr<HybridCronetExceptionSpec>;
-  inline std__weak_ptr_HybridCronetExceptionSpec_ weakify_std__shared_ptr_HybridCronetExceptionSpec_(const std::shared_ptr<HybridCronetExceptionSpec>& strong) noexcept { return strong; }
+  // pragma MARK: std::weak_ptr<HybridRequestExceptionSpec>
+  using std__weak_ptr_HybridRequestExceptionSpec_ = std::weak_ptr<HybridRequestExceptionSpec>;
+  inline std__weak_ptr_HybridRequestExceptionSpec_ weakify_std__shared_ptr_HybridRequestExceptionSpec_(const std::shared_ptr<HybridRequestExceptionSpec>& strong) noexcept { return strong; }
   
-  // pragma MARK: std::function<void(const std::optional<UrlResponseInfo>& /* info */, const std::shared_ptr<HybridCronetExceptionSpec>& /* error */)>
+  // pragma MARK: std::function<void(const std::optional<UrlResponseInfo>& /* info */, const std::shared_ptr<HybridRequestExceptionSpec>& /* error */)>
   /**
-   * Specialized version of `std::function<void(const std::optional<UrlResponseInfo>&, const std::shared_ptr<HybridCronetExceptionSpec>&)>`.
+   * Specialized version of `std::function<void(const std::optional<UrlResponseInfo>&, const std::shared_ptr<HybridRequestExceptionSpec>&)>`.
    */
-  using Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_ = std::function<void(const std::optional<UrlResponseInfo>& /* info */, const std::shared_ptr<HybridCronetExceptionSpec>& /* error */)>;
+  using Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_ = std::function<void(const std::optional<UrlResponseInfo>& /* info */, const std::shared_ptr<HybridRequestExceptionSpec>& /* error */)>;
   /**
-   * Wrapper class for a `std::function<void(const std::optional<UrlResponseInfo>& / * info * /, const std::shared_ptr<HybridCronetExceptionSpec>& / * error * /)>`, this can be used from Swift.
+   * Wrapper class for a `std::function<void(const std::optional<UrlResponseInfo>& / * info * /, const std::shared_ptr<HybridRequestExceptionSpec>& / * error * /)>`, this can be used from Swift.
    */
-  class Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec__Wrapper final {
+  class Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec__Wrapper final {
   public:
-    explicit Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec__Wrapper(std::function<void(const std::optional<UrlResponseInfo>& /* info */, const std::shared_ptr<HybridCronetExceptionSpec>& /* error */)>&& func): _function(std::make_unique<std::function<void(const std::optional<UrlResponseInfo>& /* info */, const std::shared_ptr<HybridCronetExceptionSpec>& /* error */)>>(std::move(func))) {}
-    inline void call(std::optional<UrlResponseInfo> info, std::shared_ptr<HybridCronetExceptionSpec> error) const noexcept {
+    explicit Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec__Wrapper(std::function<void(const std::optional<UrlResponseInfo>& /* info */, const std::shared_ptr<HybridRequestExceptionSpec>& /* error */)>&& func): _function(std::make_unique<std::function<void(const std::optional<UrlResponseInfo>& /* info */, const std::shared_ptr<HybridRequestExceptionSpec>& /* error */)>>(std::move(func))) {}
+    inline void call(std::optional<UrlResponseInfo> info, std::shared_ptr<HybridRequestExceptionSpec> error) const noexcept {
       _function->operator()(info, error);
     }
   private:
-    std::unique_ptr<std::function<void(const std::optional<UrlResponseInfo>& /* info */, const std::shared_ptr<HybridCronetExceptionSpec>& /* error */)>> _function;
+    std::unique_ptr<std::function<void(const std::optional<UrlResponseInfo>& /* info */, const std::shared_ptr<HybridRequestExceptionSpec>& /* error */)>> _function;
   } SWIFT_NONCOPYABLE;
-  Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_ create_Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_(void* NON_NULL swiftClosureWrapper) noexcept;
-  inline Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec__Wrapper wrap_Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_(Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec_ value) noexcept {
-    return Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridCronetExceptionSpec__Wrapper(std::move(value));
+  Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_ create_Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec__Wrapper wrap_Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_(Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_ value) noexcept {
+    return Func_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec__Wrapper(std::move(value));
   }
   
   // pragma MARK: std::function<void(const std::optional<UrlResponseInfo>& /* info */)>
@@ -483,7 +460,7 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
    */
   using std__shared_ptr_HybridCronetEngineSpec_ = std::shared_ptr<HybridCronetEngineSpec>;
   std::shared_ptr<HybridCronetEngineSpec> create_std__shared_ptr_HybridCronetEngineSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
-  void* NON_NULL get_std__shared_ptr_HybridCronetEngineSpec_(std__shared_ptr_HybridCronetEngineSpec_ cppType) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridCronetEngineSpec_(std__shared_ptr_HybridCronetEngineSpec_ cppType);
   
   // pragma MARK: std::weak_ptr<HybridCronetEngineSpec>
   using std__weak_ptr_HybridCronetEngineSpec_ = std::weak_ptr<HybridCronetEngineSpec>;
@@ -541,18 +518,18 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return Func_void_std__exception_ptr_Wrapper(std::move(value));
   }
   
-  // pragma MARK: std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>
+  // pragma MARK: std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>>
   /**
-   * Specialized version of `std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>`.
+   * Specialized version of `std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>>`.
    */
-  using std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___ = std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>;
-  inline std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>> create_std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___(const std::variant<std::string, std::shared_ptr<ArrayBuffer>>& value) noexcept {
-    return std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>(value);
+  using std__optional_std__variant_std__shared_ptr_ArrayBuffer___std__string__ = std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>>;
+  inline std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>> create_std__optional_std__variant_std__shared_ptr_ArrayBuffer___std__string__(const std::variant<std::shared_ptr<ArrayBuffer>, std::string>& value) noexcept {
+    return std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>>(value);
   }
-  inline bool has_value_std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___(const std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>& optional) noexcept {
+  inline bool has_value_std__optional_std__variant_std__shared_ptr_ArrayBuffer___std__string__(const std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>>& optional) noexcept {
     return optional.has_value();
   }
-  inline std::variant<std::string, std::shared_ptr<ArrayBuffer>> get_std__optional_std__variant_std__string__std__shared_ptr_ArrayBuffer___(const std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>& optional) noexcept {
+  inline std::variant<std::shared_ptr<ArrayBuffer>, std::string> get_std__optional_std__variant_std__shared_ptr_ArrayBuffer___std__string__(const std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>>& optional) noexcept {
     return *optional;
   }
   
@@ -611,7 +588,7 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
    */
   using std__shared_ptr_HybridNitroCronetSpec_ = std::shared_ptr<HybridNitroCronetSpec>;
   std::shared_ptr<HybridNitroCronetSpec> create_std__shared_ptr_HybridNitroCronetSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
-  void* NON_NULL get_std__shared_ptr_HybridNitroCronetSpec_(std__shared_ptr_HybridNitroCronetSpec_ cppType) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridNitroCronetSpec_(std__shared_ptr_HybridNitroCronetSpec_ cppType);
   
   // pragma MARK: std::weak_ptr<HybridNitroCronetSpec>
   using std__weak_ptr_HybridNitroCronetSpec_ = std::weak_ptr<HybridNitroCronetSpec>;
@@ -644,35 +621,20 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return Result<std::shared_ptr<Promise<std::optional<CachedFetchResponse>>>>::withError(error);
   }
   
-  // pragma MARK: std::shared_ptr<HybridNetworkExceptionSpec>
+  // pragma MARK: std::optional<double>
   /**
-   * Specialized version of `std::shared_ptr<HybridNetworkExceptionSpec>`.
+   * Specialized version of `std::optional<double>`.
    */
-  using std__shared_ptr_HybridNetworkExceptionSpec_ = std::shared_ptr<HybridNetworkExceptionSpec>;
-  std::shared_ptr<HybridNetworkExceptionSpec> create_std__shared_ptr_HybridNetworkExceptionSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
-  void* NON_NULL get_std__shared_ptr_HybridNetworkExceptionSpec_(std__shared_ptr_HybridNetworkExceptionSpec_ cppType) noexcept;
-  
-  // pragma MARK: std::shared_ptr<HybridCronetExceptionSpec>
-  inline std::shared_ptr<HybridCronetExceptionSpec> upcast_NetworkException_to_CronetException(std::shared_ptr<HybridNetworkExceptionSpec> child) noexcept { return child; }
-  
-  // pragma MARK: std::weak_ptr<HybridNetworkExceptionSpec>
-  using std__weak_ptr_HybridNetworkExceptionSpec_ = std::weak_ptr<HybridNetworkExceptionSpec>;
-  inline std__weak_ptr_HybridNetworkExceptionSpec_ weakify_std__shared_ptr_HybridNetworkExceptionSpec_(const std::shared_ptr<HybridNetworkExceptionSpec>& strong) noexcept { return strong; }
-  
-  // pragma MARK: std::shared_ptr<HybridQuicExceptionSpec>
-  /**
-   * Specialized version of `std::shared_ptr<HybridQuicExceptionSpec>`.
-   */
-  using std__shared_ptr_HybridQuicExceptionSpec_ = std::shared_ptr<HybridQuicExceptionSpec>;
-  std::shared_ptr<HybridQuicExceptionSpec> create_std__shared_ptr_HybridQuicExceptionSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
-  void* NON_NULL get_std__shared_ptr_HybridQuicExceptionSpec_(std__shared_ptr_HybridQuicExceptionSpec_ cppType) noexcept;
-  
-  // pragma MARK: std::shared_ptr<HybridCronetExceptionSpec>
-  inline std::shared_ptr<HybridCronetExceptionSpec> upcast_QuicException_to_CronetException(std::shared_ptr<HybridQuicExceptionSpec> child) noexcept { return child; }
-  
-  // pragma MARK: std::weak_ptr<HybridQuicExceptionSpec>
-  using std__weak_ptr_HybridQuicExceptionSpec_ = std::weak_ptr<HybridQuicExceptionSpec>;
-  inline std__weak_ptr_HybridQuicExceptionSpec_ weakify_std__shared_ptr_HybridQuicExceptionSpec_(const std::shared_ptr<HybridQuicExceptionSpec>& strong) noexcept { return strong; }
+  using std__optional_double_ = std::optional<double>;
+  inline std::optional<double> create_std__optional_double_(const double& value) noexcept {
+    return std::optional<double>(value);
+  }
+  inline bool has_value_std__optional_double_(const std::optional<double>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline double get_std__optional_double_(const std::optional<double>& optional) noexcept {
+    return *optional;
+  }
   
   // pragma MARK: std::optional<std::string>
   /**
@@ -688,36 +650,6 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   inline std::string get_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
     return *optional;
   }
-  
-  // pragma MARK: std::shared_ptr<HybridCallbackExceptionSpec>
-  /**
-   * Specialized version of `std::shared_ptr<HybridCallbackExceptionSpec>`.
-   */
-  using std__shared_ptr_HybridCallbackExceptionSpec_ = std::shared_ptr<HybridCallbackExceptionSpec>;
-  std::shared_ptr<HybridCallbackExceptionSpec> create_std__shared_ptr_HybridCallbackExceptionSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
-  void* NON_NULL get_std__shared_ptr_HybridCallbackExceptionSpec_(std__shared_ptr_HybridCallbackExceptionSpec_ cppType) noexcept;
-  
-  // pragma MARK: std::shared_ptr<HybridCronetExceptionSpec>
-  inline std::shared_ptr<HybridCronetExceptionSpec> upcast_CallbackException_to_CronetException(std::shared_ptr<HybridCallbackExceptionSpec> child) noexcept { return child; }
-  
-  // pragma MARK: std::weak_ptr<HybridCallbackExceptionSpec>
-  using std__weak_ptr_HybridCallbackExceptionSpec_ = std::weak_ptr<HybridCallbackExceptionSpec>;
-  inline std__weak_ptr_HybridCallbackExceptionSpec_ weakify_std__shared_ptr_HybridCallbackExceptionSpec_(const std::shared_ptr<HybridCallbackExceptionSpec>& strong) noexcept { return strong; }
-  
-  // pragma MARK: std::shared_ptr<HybridInlineExecutionProhibitedExceptionSpec>
-  /**
-   * Specialized version of `std::shared_ptr<HybridInlineExecutionProhibitedExceptionSpec>`.
-   */
-  using std__shared_ptr_HybridInlineExecutionProhibitedExceptionSpec_ = std::shared_ptr<HybridInlineExecutionProhibitedExceptionSpec>;
-  std::shared_ptr<HybridInlineExecutionProhibitedExceptionSpec> create_std__shared_ptr_HybridInlineExecutionProhibitedExceptionSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
-  void* NON_NULL get_std__shared_ptr_HybridInlineExecutionProhibitedExceptionSpec_(std__shared_ptr_HybridInlineExecutionProhibitedExceptionSpec_ cppType) noexcept;
-  
-  // pragma MARK: std::shared_ptr<HybridCronetExceptionSpec>
-  inline std::shared_ptr<HybridCronetExceptionSpec> upcast_InlineExecutionProhibitedException_to_CronetException(std::shared_ptr<HybridInlineExecutionProhibitedExceptionSpec> child) noexcept { return child; }
-  
-  // pragma MARK: std::weak_ptr<HybridInlineExecutionProhibitedExceptionSpec>
-  using std__weak_ptr_HybridInlineExecutionProhibitedExceptionSpec_ = std::weak_ptr<HybridInlineExecutionProhibitedExceptionSpec>;
-  inline std__weak_ptr_HybridInlineExecutionProhibitedExceptionSpec_ weakify_std__shared_ptr_HybridInlineExecutionProhibitedExceptionSpec_(const std::shared_ptr<HybridInlineExecutionProhibitedExceptionSpec>& strong) noexcept { return strong; }
   
   // pragma MARK: std::optional<CachedPrefetchResponse>
   /**
@@ -740,7 +672,7 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
    */
   using std__shared_ptr_HybridNitroFetchCacheSpec_ = std::shared_ptr<HybridNitroFetchCacheSpec>;
   std::shared_ptr<HybridNitroFetchCacheSpec> create_std__shared_ptr_HybridNitroFetchCacheSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
-  void* NON_NULL get_std__shared_ptr_HybridNitroFetchCacheSpec_(std__shared_ptr_HybridNitroFetchCacheSpec_ cppType) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridNitroFetchCacheSpec_(std__shared_ptr_HybridNitroFetchCacheSpec_ cppType);
   
   // pragma MARK: std::weak_ptr<HybridNitroFetchCacheSpec>
   using std__weak_ptr_HybridNitroFetchCacheSpec_ = std::weak_ptr<HybridNitroFetchCacheSpec>;

@@ -7,6 +7,7 @@
 
 import Foundation
 import NitroModules
+import NitroModules
 
 /// See ``HybridUrlRequestSpec``
 public protocol HybridUrlRequestSpec_protocol: HybridObject {

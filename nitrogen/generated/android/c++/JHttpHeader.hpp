@@ -47,7 +47,11 @@ namespace margelo::nitro::nitrofetch {
      */
     [[maybe_unused]]
     static jni::local_ref<JHttpHeader::javaobject> fromCpp(const HttpHeader& value) {
-      return newInstance(
+      using JSignature = JHttpHeader(jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>);
+      static const auto clazz = javaClassStatic();
+      static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
+      return create(
+        clazz,
         jni::make_jstring(value.key),
         jni::make_jstring(value.value)
       );

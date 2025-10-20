@@ -4,7 +4,7 @@ import android.app.Application
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.core.ArrayBuffer
 import com.margelo.nitro.core.Promise
-import com.margelo.nitro.nitrofetch.Variant_String_ArrayBuffer
+import com.margelo.nitro.nitrofetch.Variant_ArrayBuffer_String
 import org.chromium.net.CronetEngine
 import org.chromium.net.CronetProvider
 import java.io.File
@@ -43,7 +43,7 @@ class NitroCronet : HybridNitroCronetSpec() {
     url: String,
     httpMethod: String,
     headers: Map<String, String>,
-    body: Variant_String_ArrayBuffer?,
+    body: Variant_ArrayBuffer_String?,
     maxAge: Double
   ): Promise<Unit> {
     val promise = Promise<Unit>()
@@ -84,13 +84,13 @@ class NitroCronet : HybridNitroCronetSpec() {
 
     // Convert body to ByteArray if needed
     val bodyBytes: ByteArray? = when (body) {
-      is Variant_String_ArrayBuffer.First -> body.value.toByteArray(Charsets.UTF_8)
-      is Variant_String_ArrayBuffer.Second -> {
+      is Variant_ArrayBuffer_String.First -> {
         val buffer = body.value.getBuffer(true)
         val bytes = ByteArray(buffer.remaining())
         buffer.get(bytes)
         bytes
       }
+      is Variant_ArrayBuffer_String.Second -> body.value.toByteArray(Charsets.UTF_8)
       null -> null
     }
 

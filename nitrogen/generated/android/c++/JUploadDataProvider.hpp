@@ -81,7 +81,11 @@ namespace margelo::nitro::nitrofetch {
      */
     [[maybe_unused]]
     static jni::local_ref<JUploadDataProvider::javaobject> fromCpp(const UploadDataProvider& value) {
-      return newInstance(
+      using JSignature = JUploadDataProvider(double, jni::alias_ref<JFunc_void_UploadDataSink_std__shared_ptr_ArrayBuffer_::javaobject>, jni::alias_ref<JFunc_void_UploadDataSink::javaobject>);
+      static const auto clazz = javaClassStatic();
+      static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
+      return create(
+        clazz,
         value.length,
         JFunc_void_UploadDataSink_std__shared_ptr_ArrayBuffer__cxx::fromCpp(value.read),
         JFunc_void_UploadDataSink_cxx::fromCpp(value.rewind)

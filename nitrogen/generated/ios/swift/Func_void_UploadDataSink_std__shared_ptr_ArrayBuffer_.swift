@@ -6,7 +6,7 @@
 ///
 
 import NitroModules
-
+import NitroModules
 
 /**
  * Wraps a Swift `(_ uploadDataSink: UploadDataSink, _ byteBuffer: ArrayBuffer) -> Void` as a class.

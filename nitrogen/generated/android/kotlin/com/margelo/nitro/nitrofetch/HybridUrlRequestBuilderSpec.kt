@@ -10,7 +10,8 @@ package com.margelo.nitro.nitrofetch
 import androidx.annotation.Keep
 import com.facebook.jni.HybridData
 import com.facebook.proguard.annotations.DoNotStrip
-import com.margelo.nitro.core.*
+import com.margelo.nitro.core.ArrayBuffer
+import com.margelo.nitro.core.HybridObject
 
 /**
  * A Kotlin class representing the UrlRequestBuilder HybridObject.
@@ -54,7 +55,7 @@ abstract class HybridUrlRequestBuilderSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
-  abstract fun setUploadBody(body: Variant_String_ArrayBuffer): Unit
+  abstract fun setUploadBody(body: Variant_ArrayBuffer_String): Unit
   
   @DoNotStrip
   @Keep
@@ -75,6 +76,6 @@ abstract class HybridUrlRequestBuilderSpec: HybridObject() {
   private external fun initHybrid(): HybridData
 
   companion object {
-    private const val TAG = "HybridUrlRequestBuilderSpec"
+    protected const val TAG = "HybridUrlRequestBuilderSpec"
   }
 }

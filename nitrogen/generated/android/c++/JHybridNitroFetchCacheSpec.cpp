@@ -9,8 +9,6 @@
 
 // Forward declaration of `CachedPrefetchResponse` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct CachedPrefetchResponse; }
-// Forward declaration of `ArrayBuffer` to properly resolve imports.
-namespace NitroModules { class ArrayBuffer; }
 
 #include "CachedPrefetchResponse.hpp"
 #include <optional>

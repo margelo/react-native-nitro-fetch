@@ -200,7 +200,7 @@ export default function App() {
         nativeDuration: 0,
         nitroDuration: 0,
         dataSize: 'N/A',
-        error: error.message,
+        error: error,
       };
       setResults((prev) => [result, ...prev]);
       return result;
@@ -451,7 +451,8 @@ export default function App() {
                 const start = performance.now();
                 let itemCount = 0;
                 await fetchStreamedData({
-                  onData: () => {
+                  onData: (data) => {
+                    console.log('Data:', data);
                     itemCount++;
                   },
                 });

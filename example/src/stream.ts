@@ -38,10 +38,7 @@ export async function fetchStreamedData(options: FetchStreamOptions = {}) {
   } = options;
 
   try {
-    console.log('Fetching stream...');
     const response = await fetch(url);
-
-    console.log('Response:', response);
 
     if (!response.ok) {
       throw new StreamError(
@@ -62,7 +59,6 @@ export async function fetchStreamedData(options: FetchStreamOptions = {}) {
     const recentLines: string[] = [];
     const MAX_RECENT_LINES = 3;
 
-    console.log('Starting to read stream...');
     onData?.({ type: 'client_stream_started' });
 
     while (true) {
