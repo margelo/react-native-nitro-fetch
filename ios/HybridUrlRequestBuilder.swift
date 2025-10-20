@@ -1,40 +1,36 @@
 import Foundation
 import NitroModules
 
-public class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
-  public var memorySize: Int {
-    return 0
-  }
-
-  public func setHttpMethod(httpMethod: String) throws {
+class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
+  func setHttpMethod(httpMethod: String) throws {
     // Dummy implementation
   }
 
-  public func addHeader(name: String, value: String) throws {
+  func addHeader(name: String, value: String) throws {
     // Dummy implementation
   }
 
-  public func setUploadDataProvider(provider: UploadDataProvider) throws {
+  func setUploadDataProvider(provider: UploadDataProvider) throws {
     // Dummy implementation
   }
 
-  public func setUploadBody(body: Variant_ArrayBuffer_String) throws {
+  func setUploadBody(body: Variant_ArrayBuffer_String) throws {
     // Dummy implementation
   }
 
-  public func disableCache() throws {
+  func disableCache() throws {
     // Dummy implementation
   }
 
-  public func setPriority(priority: Double) throws {
+  func setPriority(priority: Double) throws {
     // Dummy implementation
   }
 
-  public func allowDirectExecutor() throws {
+  func allowDirectExecutor() throws {
     // Dummy implementation
   }
 
-  public func build() throws -> any HybridUrlRequestSpec {
+  func build() throws -> any HybridUrlRequestSpec {
     return HybridUrlRequest()
   }
 }

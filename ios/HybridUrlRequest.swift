@@ -1,28 +1,24 @@
 import Foundation
 import NitroModules
 
-public class HybridUrlRequest: HybridUrlRequestSpec {
-  public var memorySize: Int {
-    return 0
-  }
-
-  public func start() throws {
+class HybridUrlRequest: HybridUrlRequestSpec {
+  func start() throws {
     // Dummy implementation
   }
 
-  public func followRedirect() throws {
+  func followRedirect() throws {
     // Dummy implementation
   }
 
-  public func read(buffer: ArrayBuffer) throws {
+  func read(buffer: ArrayBuffer) throws {
     // Dummy implementation
   }
 
-  public func cancel() throws {
+  func cancel() throws {
     // Dummy implementation
   }
 
-  public func isDone() throws -> Bool {
+  func isDone() throws -> Bool {
     return true
   }
 }
