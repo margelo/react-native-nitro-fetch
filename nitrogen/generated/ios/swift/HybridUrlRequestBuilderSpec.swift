@@ -17,11 +17,16 @@ public protocol HybridUrlRequestBuilderSpec_protocol: HybridObject {
   // Methods
   func setHttpMethod(httpMethod: String) throws -> Void
   func addHeader(name: String, value: String) throws -> Void
-  func setUploadDataProvider(provider: UploadDataProvider) throws -> Void
   func setUploadBody(body: Variant_ArrayBuffer_String) throws -> Void
   func disableCache() throws -> Void
   func setPriority(priority: Double) throws -> Void
   func allowDirectExecutor() throws -> Void
+  func onSucceeded(callback: @escaping (_ info: UrlResponseInfo) -> Void) throws -> Void
+  func onFailed(callback: @escaping (_ info: UrlResponseInfo?, _ error: RequestException) -> Void) throws -> Void
+  func onCanceled(callback: @escaping (_ info: UrlResponseInfo?) -> Void) throws -> Void
+  func onRedirectReceived(callback: @escaping (_ info: UrlResponseInfo, _ newLocationUrl: String) -> Void) throws -> Void
+  func onResponseStarted(callback: @escaping (_ info: UrlResponseInfo) -> Void) throws -> Void
+  func onReadCompleted(callback: @escaping (_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer) -> Void) throws -> Void
   func build() throws -> (any HybridUrlRequestSpec)
 }
 

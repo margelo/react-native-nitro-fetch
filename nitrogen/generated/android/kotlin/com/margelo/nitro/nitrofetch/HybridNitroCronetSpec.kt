@@ -44,7 +44,7 @@ abstract class HybridNitroCronetSpec: HybridObject() {
   // Methods
   @DoNotStrip
   @Keep
-  abstract fun newUrlRequestBuilder(url: String, callback: UrlRequestCallback): HybridUrlRequestBuilderSpec
+  abstract fun newUrlRequestBuilder(url: String): HybridUrlRequestBuilderSpec
   
   @DoNotStrip
   @Keep

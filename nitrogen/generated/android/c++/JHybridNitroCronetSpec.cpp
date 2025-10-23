@@ -11,14 +11,6 @@
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestBuilderSpec; }
 // Forward declaration of `CachedFetchResponse` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct CachedFetchResponse; }
-// Forward declaration of `UrlRequestCallback` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct UrlRequestCallback; }
-// Forward declaration of `UrlResponseInfo` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
-// Forward declaration of `HttpHeader` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct HttpHeader; }
-// Forward declaration of `HybridRequestExceptionSpec` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { class HybridRequestExceptionSpec; }
 
 #include <memory>
 #include "HybridUrlRequestBuilderSpec.hpp"
@@ -33,21 +25,6 @@ namespace margelo::nitro::nitrofetch { class HybridRequestExceptionSpec; }
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/JArrayBuffer.hpp>
 #include <NitroModules/JUnit.hpp>
-#include "UrlRequestCallback.hpp"
-#include "JUrlRequestCallback.hpp"
-#include "UrlResponseInfo.hpp"
-#include <functional>
-#include "JFunc_void_UrlResponseInfo_std__string.hpp"
-#include "JUrlResponseInfo.hpp"
-#include "HttpHeader.hpp"
-#include <vector>
-#include "JHttpHeader.hpp"
-#include "JFunc_void_UrlResponseInfo.hpp"
-#include "JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_.hpp"
-#include "HybridRequestExceptionSpec.hpp"
-#include "JFunc_void_std__optional_UrlResponseInfo__std__shared_ptr_HybridRequestExceptionSpec_.hpp"
-#include "JHybridRequestExceptionSpec.hpp"
-#include "JFunc_void_std__optional_UrlResponseInfo_.hpp"
 #include <variant>
 #include "JVariant_ArrayBuffer_String.hpp"
 
@@ -77,9 +54,9 @@ namespace margelo::nitro::nitrofetch {
   
 
   // Methods
-  std::shared_ptr<HybridUrlRequestBuilderSpec> JHybridNitroCronetSpec::newUrlRequestBuilder(const std::string& url, const UrlRequestCallback& callback) {
-    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JHybridUrlRequestBuilderSpec::javaobject>(jni::alias_ref<jni::JString> /* url */, jni::alias_ref<JUrlRequestCallback> /* callback */)>("newUrlRequestBuilder");
-    auto __result = method(_javaPart, jni::make_jstring(url), JUrlRequestCallback::fromCpp(callback));
+  std::shared_ptr<HybridUrlRequestBuilderSpec> JHybridNitroCronetSpec::newUrlRequestBuilder(const std::string& url) {
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JHybridUrlRequestBuilderSpec::javaobject>(jni::alias_ref<jni::JString> /* url */)>("newUrlRequestBuilder");
+    auto __result = method(_javaPart, jni::make_jstring(url));
     return __result->cthis()->shared_cast<JHybridUrlRequestBuilderSpec>();
   }
   std::shared_ptr<Promise<void>> JHybridNitroCronetSpec::prefetch(const std::string& url, const std::string& httpMethod, const std::unordered_map<std::string, std::string>& headers, const std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>>& body, double maxAge) {

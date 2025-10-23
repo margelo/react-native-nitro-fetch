@@ -16,11 +16,16 @@ namespace margelo::nitro::nitrofetch {
     registerHybrids(this, [](Prototype& prototype) {
       prototype.registerHybridMethod("setHttpMethod", &HybridUrlRequestBuilderSpec::setHttpMethod);
       prototype.registerHybridMethod("addHeader", &HybridUrlRequestBuilderSpec::addHeader);
-      prototype.registerHybridMethod("setUploadDataProvider", &HybridUrlRequestBuilderSpec::setUploadDataProvider);
       prototype.registerHybridMethod("setUploadBody", &HybridUrlRequestBuilderSpec::setUploadBody);
       prototype.registerHybridMethod("disableCache", &HybridUrlRequestBuilderSpec::disableCache);
       prototype.registerHybridMethod("setPriority", &HybridUrlRequestBuilderSpec::setPriority);
       prototype.registerHybridMethod("allowDirectExecutor", &HybridUrlRequestBuilderSpec::allowDirectExecutor);
+      prototype.registerHybridMethod("onSucceeded", &HybridUrlRequestBuilderSpec::onSucceeded);
+      prototype.registerHybridMethod("onFailed", &HybridUrlRequestBuilderSpec::onFailed);
+      prototype.registerHybridMethod("onCanceled", &HybridUrlRequestBuilderSpec::onCanceled);
+      prototype.registerHybridMethod("onRedirectReceived", &HybridUrlRequestBuilderSpec::onRedirectReceived);
+      prototype.registerHybridMethod("onResponseStarted", &HybridUrlRequestBuilderSpec::onResponseStarted);
+      prototype.registerHybridMethod("onReadCompleted", &HybridUrlRequestBuilderSpec::onReadCompleted);
       prototype.registerHybridMethod("build", &HybridUrlRequestBuilderSpec::build);
     });
   }

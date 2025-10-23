@@ -12,22 +12,34 @@
 // Forward declaration of `HybridUrlRequestBuilderSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridUrlRequestBuilderSpec_cxx; }
 
-// Forward declaration of `UploadDataProvider` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct UploadDataProvider; }
-// Forward declaration of `UploadDataSink` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct UploadDataSink; }
 // Forward declaration of `ArrayBufferHolder` to properly resolve imports.
 namespace NitroModules { class ArrayBufferHolder; }
+// Forward declaration of `UrlResponseInfo` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
+// Forward declaration of `HttpHeader` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct HttpHeader; }
+// Forward declaration of `RequestException` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct RequestException; }
+// Forward declaration of `ExceptionPlatform` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { enum class ExceptionPlatform; }
+// Forward declaration of `ErrorType` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { enum class ErrorType; }
 // Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
 
 #include <string>
-#include "UploadDataProvider.hpp"
-#include "UploadDataSink.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
-#include <functional>
-#include <NitroModules/ArrayBufferHolder.hpp>
 #include <variant>
+#include <NitroModules/ArrayBufferHolder.hpp>
+#include "UrlResponseInfo.hpp"
+#include <functional>
+#include <unordered_map>
+#include "HttpHeader.hpp"
+#include <vector>
+#include <optional>
+#include "RequestException.hpp"
+#include "ExceptionPlatform.hpp"
+#include "ErrorType.hpp"
 #include <memory>
 #include "HybridUrlRequestSpec.hpp"
 
@@ -84,12 +96,6 @@ namespace margelo::nitro::nitrofetch {
         std::rethrow_exception(__result.error());
       }
     }
-    inline void setUploadDataProvider(const UploadDataProvider& provider) override {
-      auto __result = _swiftPart.setUploadDataProvider(std::forward<decltype(provider)>(provider));
-      if (__result.hasError()) [[unlikely]] {
-        std::rethrow_exception(__result.error());
-      }
-    }
     inline void setUploadBody(const std::variant<std::shared_ptr<ArrayBuffer>, std::string>& body) override {
       auto __result = _swiftPart.setUploadBody(body);
       if (__result.hasError()) [[unlikely]] {
@@ -110,6 +116,42 @@ namespace margelo::nitro::nitrofetch {
     }
     inline void allowDirectExecutor() override {
       auto __result = _swiftPart.allowDirectExecutor();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline void onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) override {
+      auto __result = _swiftPart.onSucceeded(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline void onFailed(const std::function<void(const std::optional<UrlResponseInfo>& /* info */, const RequestException& /* error */)>& callback) override {
+      auto __result = _swiftPart.onFailed(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline void onCanceled(const std::function<void(const std::optional<UrlResponseInfo>& /* info */)>& callback) override {
+      auto __result = _swiftPart.onCanceled(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline void onRedirectReceived(const std::function<void(const UrlResponseInfo& /* info */, const std::string& /* newLocationUrl */)>& callback) override {
+      auto __result = _swiftPart.onRedirectReceived(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline void onResponseStarted(const std::function<void(const UrlResponseInfo& /* info */)>& callback) override {
+      auto __result = _swiftPart.onResponseStarted(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline void onReadCompleted(const std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>& callback) override {
+      auto __result = _swiftPart.onReadCompleted(callback);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

@@ -39,7 +39,7 @@ export default function App() {
     new Set()
   );
 
-  return <TestScreen />;
+  // return <TestScreen />;
 
   // Helper function to check if response was cached
   const isCached = (response: Response): boolean => {

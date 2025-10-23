@@ -13,9 +13,16 @@ import java.util.concurrent.Executor as JavaExecutor
 class NitroUrlRequestBuilder(
   private val engine: CronetEngine,
   private val url: String,
-  private val callback: UrlRequestCallback,
   private val executor: JavaExecutor
 ) : HybridUrlRequestBuilderSpec() {
+
+  // Callbacks stored as optionals and set via setter methods
+  private var onRedirectReceivedCallback: ((info: UrlResponseInfo, newLocationUrl: String) -> Unit)? = null
+  private var onResponseStartedCallback: ((info: UrlResponseInfo) -> Unit)? = null
+  private var onReadCompletedCallback: ((info: UrlResponseInfo, byteBuffer: ArrayBuffer) -> Unit)? = null
+  private var onSucceededCallback: ((info: UrlResponseInfo) -> Unit)? = null
+  private var onFailedCallback: ((info: UrlResponseInfo?, error: RequestException) -> Unit)? = null
+  private var onCanceledCallback: ((info: UrlResponseInfo?) -> Unit)? = null
 
   private val builder: CronetUrlRequest.Builder
 
@@ -27,16 +34,20 @@ class NitroUrlRequestBuilder(
         info: CronetUrlResponseInfo,
         newLocationUrl: String
       ) {
-        val nitroInfo = info.toNitro()
-        callback.onRedirectReceived(nitroInfo, newLocationUrl)
+        onRedirectReceivedCallback?.let { callback ->
+          val nitroInfo = info.toNitro()
+          callback(nitroInfo, newLocationUrl)
+        }
       }
 
       override fun onResponseStarted(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo
       ) {
-        val nitroInfo = info.toNitro()
-        callback.onResponseStarted(nitroInfo)
+        onResponseStartedCallback?.let { callback ->
+          val nitroInfo = info.toNitro()
+          callback(nitroInfo)
+        }
       }
 
       override fun onReadCompleted(
@@ -44,27 +55,33 @@ class NitroUrlRequestBuilder(
         info: CronetUrlResponseInfo,
         byteBuffer: ByteBuffer
       ) {
-        byteBuffer.flip()
-        val size = byteBuffer.remaining()
+        onReadCompletedCallback?.let { callback ->
+          byteBuffer.flip()
+          val size = byteBuffer.remaining()
 
-        val directBuffer = ByteBuffer.allocateDirect(size)
-        directBuffer.put(byteBuffer)
-        directBuffer.flip()
+          val directBuffer = ByteBuffer.allocateDirect(size)
+          directBuffer.put(byteBuffer)
+          directBuffer.flip()
 
-        val arrayBuffer = ArrayBuffer(directBuffer)
-        val nitroInfo = info.toNitro()
+          val arrayBuffer = ArrayBuffer(directBuffer)
+          val nitroInfo = info.toNitro()
 
-        callback.onReadCompleted(nitroInfo, arrayBuffer)
+          callback(nitroInfo, arrayBuffer)
+        }
 
         byteBuffer.clear()
+        // Note: Do NOT call request.read() here - the JS side controls the read flow
+        // The JS callback will call request.read() when it's ready for the next chunk
       }
 
       override fun onSucceeded(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo
       ) {
-        val nitroInfo = info.toNitro()
-        callback.onSucceeded(nitroInfo)
+        onSucceededCallback?.let { callback ->
+          val nitroInfo = info.toNitro()
+          callback(nitroInfo)
+        }
       }
 
       override fun onFailed(
@@ -72,17 +89,21 @@ class NitroUrlRequestBuilder(
         info: CronetUrlResponseInfo?,
         error: CronetNativeException
       ) {
-        val nitroInfo = info?.toNitro()
-        val nitroError = error.toNitro()
-        callback.onFailed(nitroInfo, nitroError)
+        onFailedCallback?.let { callback ->
+          val nitroInfo = info?.toNitro()
+          val nitroError = error.toNitro()
+          callback(nitroInfo, nitroError)
+        }
       }
 
       override fun onCanceled(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo?
       ) {
-        val nitroInfo = info?.toNitro()
-        callback.onCanceled(nitroInfo)
+        onCanceledCallback?.let { callback ->
+          val nitroInfo = info?.toNitro()
+          callback(nitroInfo)
+        }
       }
     }
 
@@ -135,69 +156,6 @@ class NitroUrlRequestBuilder(
     builder.setUploadDataProvider(provider, executor)
   }
 
-  override fun setUploadDataProvider(provider: UploadDataProvider) {
-    val cronetProvider = object : org.chromium.net.UploadDataProvider() {
-      private var uploadedSoFar: Long = 0
-
-      override fun getLength(): Long {
-        return provider.length.toLong()
-      }
-
-      override fun read(uploadDataSink: org.chromium.net.UploadDataSink, byteBuffer: ByteBuffer) {
-        // Calculate how many bytes to write in this chunk
-        val remaining = (provider.length - uploadedSoFar).toInt()
-        val bufferCapacity = byteBuffer.remaining()
-        val bytesToWrite = minOf(bufferCapacity, remaining)
-
-        val nitroSink = UploadDataSink(
-          onReadSucceeded = { finalChunk ->
-            // Update ByteBuffer position to reflect the data written
-            byteBuffer.position(byteBuffer.position() + bytesToWrite)
-            uploadedSoFar += bytesToWrite
-            uploadDataSink.onReadSucceeded(finalChunk)
-          },
-          onReadError = { error ->
-            uploadDataSink.onReadError(Exception(error))
-          },
-          onRewindSucceeded = {
-            uploadDataSink.onRewindSucceeded()
-          },
-          onRewindError = { error ->
-            uploadDataSink.onRewindError(Exception(error))
-          }
-        )
-
-        // Create ArrayBuffer from ByteBuffer - this wraps the buffer at current position
-        val arrayBuffer = ArrayBuffer(byteBuffer)
-
-        // Call JavaScript provider - it will write data to the ArrayBuffer
-        provider.read(nitroSink, arrayBuffer)
-      }
-
-      override fun rewind(uploadDataSink: org.chromium.net.UploadDataSink) {
-        uploadedSoFar = 0
-
-        val nitroSink = UploadDataSink(
-          onReadSucceeded = { finalChunk ->
-            uploadDataSink.onRewindSucceeded()
-          },
-          onReadError = { error ->
-            uploadDataSink.onRewindError(Exception(error))
-          },
-          onRewindSucceeded = {
-            uploadDataSink.onRewindSucceeded()
-          },
-          onRewindError = { error ->
-            uploadDataSink.onRewindError(Exception(error))
-          }
-        )
-
-        provider.rewind(nitroSink)
-      }
-    }
-
-    builder.setUploadDataProvider(cronetProvider, executor)
-  }
 
   override fun disableCache() {
     builder.disableCache()
@@ -217,6 +175,33 @@ class NitroUrlRequestBuilder(
 
   override fun allowDirectExecutor() {
     builder.allowDirectExecutor()
+  }
+
+  // MARK: - Callback Setters
+  // Each setter takes only 1 callback to avoid Swift compiler bug (crashes with 4+ callbacks)
+
+  override fun onSucceeded(callback: (info: UrlResponseInfo) -> Unit) {
+    this.onSucceededCallback = callback
+  }
+
+  override fun onFailed(callback: (info: UrlResponseInfo?, error: RequestException) -> Unit) {
+    this.onFailedCallback = callback
+  }
+
+  override fun onCanceled(callback: (info: UrlResponseInfo?) -> Unit) {
+    this.onCanceledCallback = callback
+  }
+
+  override fun onRedirectReceived(callback: (info: UrlResponseInfo, newLocationUrl: String) -> Unit) {
+    this.onRedirectReceivedCallback = callback
+  }
+
+  override fun onResponseStarted(callback: (info: UrlResponseInfo) -> Unit) {
+    this.onResponseStartedCallback = callback
+  }
+
+  override fun onReadCompleted(callback: (info: UrlResponseInfo, byteBuffer: ArrayBuffer) -> Unit) {
+    this.onReadCompletedCallback = callback
   }
 
   override fun build(): HybridUrlRequestSpec {

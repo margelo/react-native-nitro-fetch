@@ -1,5 +1,5 @@
 import type { HybridObject } from 'react-native-nitro-modules';
-import type { RequestException } from './NitroException.nitro';
+import type { RequestException } from './NitroException';
 
 export interface HttpHeader {
   key: string;
@@ -19,27 +19,20 @@ export interface UrlResponseInfo {
   wasCached: boolean; // useful to know
 }
 
-export interface UrlRequestCallback {
-  onRedirectReceived(info: UrlResponseInfo, newLocationUrl: string): void;
-  onResponseStarted(info: UrlResponseInfo): void;
-  onReadCompleted(info: UrlResponseInfo, byteBuffer: ArrayBuffer): void;
-  onSucceeded(info: UrlResponseInfo): void;
-  onFailed(info: UrlResponseInfo | undefined, error: RequestException): void;
-  onCanceled(info: UrlResponseInfo | undefined): void;
-}
+// TEMP: Removed for now - too complex, use setUploadBody() instead
+// export interface UploadDataSink
+//   extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
+//   onReadSucceeded(finalChunk: boolean): void;
+//   onReadError(error: string): void;
+//   onRewindSucceeded(): void;
+//   onRewindError(error: string): void;
+// }
 
-export interface UploadDataSink {
-  onReadSucceeded(finalChunk: boolean): void;
-  onReadError(error: string): void;
-  onRewindSucceeded(): void;
-  onRewindError(error: string): void;
-}
-
-export interface UploadDataProvider {
-  length: number;
-  read(uploadDataSink: UploadDataSink, byteBuffer: ArrayBuffer): void;
-  rewind(uploadDataSink: UploadDataSink): void;
-}
+// export interface UploadDataProvider {
+//   length: number;
+//   read(uploadDataSink: UploadDataSink, byteBuffer: ArrayBuffer): void;
+//   rewind(uploadDataSink: UploadDataSink): void;
+// }
 
 export interface UrlRequest
   extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
@@ -52,13 +45,33 @@ export interface UrlRequest
 
 export interface UrlRequestBuilder
   extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
+  // Request configuration
   setHttpMethod(httpMethod: string): void;
   addHeader(name: string, value: string): void;
-  setUploadDataProvider(provider: UploadDataProvider): void;
-  setUploadBody(body: ArrayBuffer | string): void; // Simple helper for common case
+  // TEMP: Removed for now - too complex, use setUploadBody() instead
+  // setUploadDataProvider(provider: UploadDataProvider): void;
+  setUploadBody(body: ArrayBuffer | string): void;
   disableCache(): void;
   setPriority(priority: number): void; // 0=IDLE, 1=LOWEST, 2=LOW, 3=MEDIUM, 4=HIGHEST
   allowDirectExecutor(): void;
+
+  // Callback setters (each takes only 1 callback to avoid Swift compiler bug)
+  onSucceeded(callback: (info: UrlResponseInfo) => void): void;
+  onFailed(
+    callback: (
+      info: UrlResponseInfo | undefined,
+      error: RequestException
+    ) => void
+  ): void;
+  onCanceled(callback: (info: UrlResponseInfo | undefined) => void): void;
+  onRedirectReceived(
+    callback: (info: UrlResponseInfo, newLocationUrl: string) => void
+  ): void;
+  onResponseStarted(callback: (info: UrlResponseInfo) => void): void;
+  onReadCompleted(
+    callback: (info: UrlResponseInfo, byteBuffer: ArrayBuffer) => void
+  ): void;
+
   build(): UrlRequest;
 }
 
@@ -70,12 +83,26 @@ export interface CachedFetchResponse {
   body: ArrayBuffer;
 }
 
+/**
+ * Usage example:
+ *
+ * const builder = cronet.newUrlRequestBuilder(url);
+ * builder.onSucceeded((info) => console.log('Success!', info));
+ * builder.onFailed((info, error) => console.error('Failed!', error));
+ * builder.onCanceled((info) => console.log('Canceled'));
+ * builder.setHttpMethod('GET');
+ * builder.addHeader('Authorization', 'Bearer token');
+ * const request = builder.build();
+ * request.start();
+ */
 export interface NitroCronet
   extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
-  newUrlRequestBuilder(
-    url: string,
-    callback: UrlRequestCallback
-  ): UrlRequestBuilder;
+  /**
+   * Creates a new URL request builder.
+   * Use setter methods to configure callbacks (each setter takes only 1 callback to avoid Swift compiler bug).
+   * See: https://github.com/mrousavy/nitro/issues/975
+   */
+  newUrlRequestBuilder(url: string): UrlRequestBuilder;
   /**
    * Start a prefetch request that will be stored in the native cache.
    * The response will be available for consumption via prefetchKey.

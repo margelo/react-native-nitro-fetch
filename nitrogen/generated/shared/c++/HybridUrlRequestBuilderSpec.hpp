@@ -13,15 +13,20 @@
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
 
-// Forward declaration of `UploadDataProvider` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct UploadDataProvider; }
+// Forward declaration of `UrlResponseInfo` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
+// Forward declaration of `RequestException` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct RequestException; }
 // Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
 
 #include <string>
-#include "UploadDataProvider.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
 #include <variant>
+#include "UrlResponseInfo.hpp"
+#include <functional>
+#include <optional>
+#include "RequestException.hpp"
 #include <memory>
 #include "HybridUrlRequestSpec.hpp"
 
@@ -58,11 +63,16 @@ namespace margelo::nitro::nitrofetch {
       // Methods
       virtual void setHttpMethod(const std::string& httpMethod) = 0;
       virtual void addHeader(const std::string& name, const std::string& value) = 0;
-      virtual void setUploadDataProvider(const UploadDataProvider& provider) = 0;
       virtual void setUploadBody(const std::variant<std::shared_ptr<ArrayBuffer>, std::string>& body) = 0;
       virtual void disableCache() = 0;
       virtual void setPriority(double priority) = 0;
       virtual void allowDirectExecutor() = 0;
+      virtual void onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) = 0;
+      virtual void onFailed(const std::function<void(const std::optional<UrlResponseInfo>& /* info */, const RequestException& /* error */)>& callback) = 0;
+      virtual void onCanceled(const std::function<void(const std::optional<UrlResponseInfo>& /* info */)>& callback) = 0;
+      virtual void onRedirectReceived(const std::function<void(const UrlResponseInfo& /* info */, const std::string& /* newLocationUrl */)>& callback) = 0;
+      virtual void onResponseStarted(const std::function<void(const UrlResponseInfo& /* info */)>& callback) = 0;
+      virtual void onReadCompleted(const std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>& callback) = 0;
       virtual std::shared_ptr<HybridUrlRequestSpec> build() = 0;
 
     protected:

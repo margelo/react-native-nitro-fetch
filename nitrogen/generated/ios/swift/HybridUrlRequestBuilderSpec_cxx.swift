@@ -133,17 +133,6 @@ open class HybridUrlRequestBuilderSpec_cxx {
   }
   
   @inline(__always)
-  public final func setUploadDataProvider(provider: UploadDataProvider) -> bridge.Result_void_ {
-    do {
-      try self.__implementation.setUploadDataProvider(provider: provider)
-      return bridge.create_Result_void_()
-    } catch (let __error) {
-      let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_void_(__exceptionPtr)
-    }
-  }
-  
-  @inline(__always)
   public final func setUploadBody(body: bridge.std__variant_std__shared_ptr_ArrayBuffer___std__string_) -> bridge.Result_void_ {
     do {
       try self.__implementation.setUploadBody(body: { () -> Variant_ArrayBuffer_String in
@@ -192,6 +181,114 @@ open class HybridUrlRequestBuilderSpec_cxx {
   public final func allowDirectExecutor() -> bridge.Result_void_ {
     do {
       try self.__implementation.allowDirectExecutor()
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onSucceeded(callback: bridge.Func_void_UrlResponseInfo) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.onSucceeded(callback: { () -> (UrlResponseInfo) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_UrlResponseInfo(callback)
+        return { (__info: UrlResponseInfo) -> Void in
+          __wrappedFunction.call(__info)
+        }
+      }())
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onFailed(callback: bridge.Func_void_std__optional_UrlResponseInfo__RequestException) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.onFailed(callback: { () -> (UrlResponseInfo?, RequestException) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_std__optional_UrlResponseInfo__RequestException(callback)
+        return { (__info: UrlResponseInfo?, __error: RequestException) -> Void in
+          __wrappedFunction.call({ () -> bridge.std__optional_UrlResponseInfo_ in
+            if let __unwrappedValue = __info {
+              return bridge.create_std__optional_UrlResponseInfo_(__unwrappedValue)
+            } else {
+              return .init()
+            }
+          }(), __error)
+        }
+      }())
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onCanceled(callback: bridge.Func_void_std__optional_UrlResponseInfo_) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.onCanceled(callback: { () -> (UrlResponseInfo?) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_std__optional_UrlResponseInfo_(callback)
+        return { (__info: UrlResponseInfo?) -> Void in
+          __wrappedFunction.call({ () -> bridge.std__optional_UrlResponseInfo_ in
+            if let __unwrappedValue = __info {
+              return bridge.create_std__optional_UrlResponseInfo_(__unwrappedValue)
+            } else {
+              return .init()
+            }
+          }())
+        }
+      }())
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onRedirectReceived(callback: bridge.Func_void_UrlResponseInfo_std__string) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.onRedirectReceived(callback: { () -> (UrlResponseInfo, String) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_UrlResponseInfo_std__string(callback)
+        return { (__info: UrlResponseInfo, __newLocationUrl: String) -> Void in
+          __wrappedFunction.call(__info, std.string(__newLocationUrl))
+        }
+      }())
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onResponseStarted(callback: bridge.Func_void_UrlResponseInfo) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.onResponseStarted(callback: { () -> (UrlResponseInfo) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_UrlResponseInfo(callback)
+        return { (__info: UrlResponseInfo) -> Void in
+          __wrappedFunction.call(__info)
+        }
+      }())
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onReadCompleted(callback: bridge.Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.onReadCompleted(callback: { () -> (UrlResponseInfo, ArrayBuffer) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_(callback)
+        return { (__info: UrlResponseInfo, __byteBuffer: ArrayBuffer) -> Void in
+          __wrappedFunction.call(__info, __byteBuffer)
+        }
+      }())
       return bridge.create_Result_void_()
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()

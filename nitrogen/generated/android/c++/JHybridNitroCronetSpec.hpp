@@ -53,7 +53,7 @@ namespace margelo::nitro::nitrofetch {
 
   public:
     // Methods
-    std::shared_ptr<HybridUrlRequestBuilderSpec> newUrlRequestBuilder(const std::string& url, const UrlRequestCallback& callback) override;
+    std::shared_ptr<HybridUrlRequestBuilderSpec> newUrlRequestBuilder(const std::string& url) override;
     std::shared_ptr<Promise<void>> prefetch(const std::string& url, const std::string& httpMethod, const std::unordered_map<std::string, std::string>& headers, const std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>>& body, double maxAge) override;
     std::shared_ptr<Promise<std::optional<CachedFetchResponse>>> consumeNativePrefetch(const std::string& prefetchKey) override;
 

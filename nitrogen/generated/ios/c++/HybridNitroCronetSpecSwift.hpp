@@ -14,34 +14,20 @@ namespace NitroFetch { class HybridNitroCronetSpec_cxx; }
 
 // Forward declaration of `HybridUrlRequestBuilderSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestBuilderSpec; }
-// Forward declaration of `UrlRequestCallback` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct UrlRequestCallback; }
-// Forward declaration of `UrlResponseInfo` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
-// Forward declaration of `HttpHeader` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct HttpHeader; }
 // Forward declaration of `ArrayBufferHolder` to properly resolve imports.
 namespace NitroModules { class ArrayBufferHolder; }
-// Forward declaration of `HybridRequestExceptionSpec` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { class HybridRequestExceptionSpec; }
 // Forward declaration of `CachedFetchResponse` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct CachedFetchResponse; }
 
 #include <memory>
 #include "HybridUrlRequestBuilderSpec.hpp"
 #include <string>
-#include "UrlRequestCallback.hpp"
-#include "UrlResponseInfo.hpp"
-#include <functional>
-#include <unordered_map>
-#include "HttpHeader.hpp"
-#include <vector>
-#include <NitroModules/ArrayBuffer.hpp>
-#include <NitroModules/ArrayBufferHolder.hpp>
-#include <optional>
-#include "HybridRequestExceptionSpec.hpp"
 #include <NitroModules/Promise.hpp>
+#include <unordered_map>
+#include <NitroModules/ArrayBuffer.hpp>
 #include <variant>
+#include <optional>
+#include <NitroModules/ArrayBufferHolder.hpp>
 #include "CachedFetchResponse.hpp"
 
 #include "NitroFetch-Swift-Cxx-Umbrella.hpp"
@@ -85,8 +71,8 @@ namespace margelo::nitro::nitrofetch {
 
   public:
     // Methods
-    inline std::shared_ptr<HybridUrlRequestBuilderSpec> newUrlRequestBuilder(const std::string& url, const UrlRequestCallback& callback) override {
-      auto __result = _swiftPart.newUrlRequestBuilder(url, std::forward<decltype(callback)>(callback));
+    inline std::shared_ptr<HybridUrlRequestBuilderSpec> newUrlRequestBuilder(const std::string& url) override {
+      auto __result = _swiftPart.newUrlRequestBuilder(url);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

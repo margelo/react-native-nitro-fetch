@@ -111,9 +111,9 @@ open class HybridNitroCronetSpec_cxx {
 
   // Methods
   @inline(__always)
-  public final func newUrlRequestBuilder(url: std.string, callback: UrlRequestCallback) -> bridge.Result_std__shared_ptr_HybridUrlRequestBuilderSpec__ {
+  public final func newUrlRequestBuilder(url: std.string) -> bridge.Result_std__shared_ptr_HybridUrlRequestBuilderSpec__ {
     do {
-      let __result = try self.__implementation.newUrlRequestBuilder(url: String(url), callback: callback)
+      let __result = try self.__implementation.newUrlRequestBuilder(url: String(url))
       let __resultCpp = { () -> bridge.std__shared_ptr_HybridUrlRequestBuilderSpec_ in
         let __cxxWrapped = __result.getCxxWrapper()
         return __cxxWrapped.getCxxPart()

@@ -1,5 +1,3 @@
-import type { HybridObject } from 'react-native-nitro-modules';
-
 /**
  * Platform identifier for the exception
  */
@@ -23,8 +21,7 @@ export type ErrorType =
  * Contains all possible fields from both Android and iOS exceptions.
  * Platform-specific fields will be undefined on the other platform.
  */
-export interface RequestException
-  extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
+export interface RequestException {
   readonly platform: ExceptionPlatform;
   readonly message: string;
   readonly code: number;

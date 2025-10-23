@@ -51,10 +51,6 @@ abstract class HybridUrlRequestBuilderSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
-  abstract fun setUploadDataProvider(provider: UploadDataProvider): Unit
-  
-  @DoNotStrip
-  @Keep
   abstract fun setUploadBody(body: Variant_ArrayBuffer_String): Unit
   
   @DoNotStrip
@@ -68,6 +64,60 @@ abstract class HybridUrlRequestBuilderSpec: HybridObject() {
   @DoNotStrip
   @Keep
   abstract fun allowDirectExecutor(): Unit
+  
+  abstract fun onSucceeded(callback: (info: UrlResponseInfo) -> Unit): Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onSucceeded_cxx(callback: Func_void_UrlResponseInfo): Unit {
+    val __result = onSucceeded(callback)
+    return __result
+  }
+  
+  abstract fun onFailed(callback: (info: UrlResponseInfo?, error: RequestException) -> Unit): Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onFailed_cxx(callback: Func_void_std__optional_UrlResponseInfo__RequestException): Unit {
+    val __result = onFailed(callback)
+    return __result
+  }
+  
+  abstract fun onCanceled(callback: (info: UrlResponseInfo?) -> Unit): Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onCanceled_cxx(callback: Func_void_std__optional_UrlResponseInfo_): Unit {
+    val __result = onCanceled(callback)
+    return __result
+  }
+  
+  abstract fun onRedirectReceived(callback: (info: UrlResponseInfo, newLocationUrl: String) -> Unit): Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onRedirectReceived_cxx(callback: Func_void_UrlResponseInfo_std__string): Unit {
+    val __result = onRedirectReceived(callback)
+    return __result
+  }
+  
+  abstract fun onResponseStarted(callback: (info: UrlResponseInfo) -> Unit): Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onResponseStarted_cxx(callback: Func_void_UrlResponseInfo): Unit {
+    val __result = onResponseStarted(callback)
+    return __result
+  }
+  
+  abstract fun onReadCompleted(callback: (info: UrlResponseInfo, byteBuffer: ArrayBuffer) -> Unit): Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onReadCompleted_cxx(callback: Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_): Unit {
+    val __result = onReadCompleted(callback)
+    return __result
+  }
   
   @DoNotStrip
   @Keep

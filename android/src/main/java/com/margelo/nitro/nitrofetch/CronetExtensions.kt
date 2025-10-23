@@ -31,7 +31,7 @@ fun CronetUrlResponseInfo.toNitro(): UrlResponseInfo {
   )
 }
 
-fun CronetNativeException.toNitro(): HybridRequestExceptionSpec {
+fun CronetNativeException.toNitro(): RequestException {
   val internalErrorCode = try {
     val field = CronetNativeException::class.java.getDeclaredField("mCronetInternalErrorCode")
     field.isAccessible = true

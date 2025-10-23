@@ -15,7 +15,7 @@ public protocol HybridNitroCronetSpec_protocol: HybridObject {
   
 
   // Methods
-  func newUrlRequestBuilder(url: String, callback: UrlRequestCallback) throws -> (any HybridUrlRequestBuilderSpec)
+  func newUrlRequestBuilder(url: String) throws -> (any HybridUrlRequestBuilderSpec)
   func prefetch(url: String, httpMethod: String, headers: Dictionary<String, String>, body: Variant_ArrayBuffer_String?, maxAge: Double) throws -> Promise<Void>
   func consumeNativePrefetch(prefetchKey: String) throws -> Promise<CachedFetchResponse?>
 }

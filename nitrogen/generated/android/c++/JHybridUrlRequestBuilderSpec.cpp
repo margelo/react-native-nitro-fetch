@@ -9,30 +9,45 @@
 
 // Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
-// Forward declaration of `UploadDataProvider` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct UploadDataProvider; }
-// Forward declaration of `UploadDataSink` to properly resolve imports.
-namespace margelo::nitro::nitrofetch { struct UploadDataSink; }
+// Forward declaration of `UrlResponseInfo` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
+// Forward declaration of `HttpHeader` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct HttpHeader; }
+// Forward declaration of `RequestException` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct RequestException; }
+// Forward declaration of `ExceptionPlatform` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { enum class ExceptionPlatform; }
+// Forward declaration of `ErrorType` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { enum class ErrorType; }
 
 #include <memory>
 #include "HybridUrlRequestSpec.hpp"
 #include "JHybridUrlRequestSpec.hpp"
 #include <string>
-#include "UploadDataProvider.hpp"
-#include "JUploadDataProvider.hpp"
-#include "UploadDataSink.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
-#include <functional>
-#include "JFunc_void_UploadDataSink_std__shared_ptr_ArrayBuffer_.hpp"
-#include "JUploadDataSink.hpp"
-#include "JFunc_void_bool.hpp"
-#include "JFunc_void_std__string.hpp"
-#include "JFunc_void.hpp"
-#include <NitroModules/JArrayBuffer.hpp>
-#include <NitroModules/JUnit.hpp>
-#include "JFunc_void_UploadDataSink.hpp"
 #include <variant>
 #include "JVariant_ArrayBuffer_String.hpp"
+#include <NitroModules/JArrayBuffer.hpp>
+#include <NitroModules/JUnit.hpp>
+#include "UrlResponseInfo.hpp"
+#include <functional>
+#include "JFunc_void_UrlResponseInfo.hpp"
+#include "JUrlResponseInfo.hpp"
+#include <unordered_map>
+#include "HttpHeader.hpp"
+#include <vector>
+#include "JHttpHeader.hpp"
+#include <optional>
+#include "RequestException.hpp"
+#include "JFunc_void_std__optional_UrlResponseInfo__RequestException.hpp"
+#include "JRequestException.hpp"
+#include "ExceptionPlatform.hpp"
+#include "JExceptionPlatform.hpp"
+#include "ErrorType.hpp"
+#include "JErrorType.hpp"
+#include "JFunc_void_std__optional_UrlResponseInfo_.hpp"
+#include "JFunc_void_UrlResponseInfo_std__string.hpp"
+#include "JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_.hpp"
 
 namespace margelo::nitro::nitrofetch {
 
@@ -68,10 +83,6 @@ namespace margelo::nitro::nitrofetch {
     static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* name */, jni::alias_ref<jni::JString> /* value */)>("addHeader");
     method(_javaPart, jni::make_jstring(name), jni::make_jstring(value));
   }
-  void JHybridUrlRequestBuilderSpec::setUploadDataProvider(const UploadDataProvider& provider) {
-    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JUploadDataProvider> /* provider */)>("setUploadDataProvider");
-    method(_javaPart, JUploadDataProvider::fromCpp(provider));
-  }
   void JHybridUrlRequestBuilderSpec::setUploadBody(const std::variant<std::shared_ptr<ArrayBuffer>, std::string>& body) {
     static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JVariant_ArrayBuffer_String> /* body */)>("setUploadBody");
     method(_javaPart, JVariant_ArrayBuffer_String::fromCpp(body));
@@ -87,6 +98,30 @@ namespace margelo::nitro::nitrofetch {
   void JHybridUrlRequestBuilderSpec::allowDirectExecutor() {
     static const auto method = javaClassStatic()->getMethod<void()>("allowDirectExecutor");
     method(_javaPart);
+  }
+  void JHybridUrlRequestBuilderSpec::onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) {
+    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo::javaobject> /* callback */)>("onSucceeded_cxx");
+    method(_javaPart, JFunc_void_UrlResponseInfo_cxx::fromCpp(callback));
+  }
+  void JHybridUrlRequestBuilderSpec::onFailed(const std::function<void(const std::optional<UrlResponseInfo>& /* info */, const RequestException& /* error */)>& callback) {
+    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_std__optional_UrlResponseInfo__RequestException::javaobject> /* callback */)>("onFailed_cxx");
+    method(_javaPart, JFunc_void_std__optional_UrlResponseInfo__RequestException_cxx::fromCpp(callback));
+  }
+  void JHybridUrlRequestBuilderSpec::onCanceled(const std::function<void(const std::optional<UrlResponseInfo>& /* info */)>& callback) {
+    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_std__optional_UrlResponseInfo_::javaobject> /* callback */)>("onCanceled_cxx");
+    method(_javaPart, JFunc_void_std__optional_UrlResponseInfo__cxx::fromCpp(callback));
+  }
+  void JHybridUrlRequestBuilderSpec::onRedirectReceived(const std::function<void(const UrlResponseInfo& /* info */, const std::string& /* newLocationUrl */)>& callback) {
+    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo_std__string::javaobject> /* callback */)>("onRedirectReceived_cxx");
+    method(_javaPart, JFunc_void_UrlResponseInfo_std__string_cxx::fromCpp(callback));
+  }
+  void JHybridUrlRequestBuilderSpec::onResponseStarted(const std::function<void(const UrlResponseInfo& /* info */)>& callback) {
+    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo::javaobject> /* callback */)>("onResponseStarted_cxx");
+    method(_javaPart, JFunc_void_UrlResponseInfo_cxx::fromCpp(callback));
+  }
+  void JHybridUrlRequestBuilderSpec::onReadCompleted(const std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>& callback) {
+    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_::javaobject> /* callback */)>("onReadCompleted_cxx");
+    method(_javaPart, JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__cxx::fromCpp(callback));
   }
   std::shared_ptr<HybridUrlRequestSpec> JHybridUrlRequestBuilderSpec::build() {
     static const auto method = javaClassStatic()->getMethod<jni::local_ref<JHybridUrlRequestSpec::javaobject>()>("build");

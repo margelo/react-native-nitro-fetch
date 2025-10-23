@@ -36,7 +36,6 @@ target_sources(
   ../nitrogen/generated/shared/c++/HybridUrlRequestSpec.cpp
   ../nitrogen/generated/shared/c++/HybridUrlRequestBuilderSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNitroCronetSpec.cpp
-  ../nitrogen/generated/shared/c++/HybridRequestExceptionSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNitroFetchCacheSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNitroTextDecoderSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNitroTextEncodingSpec.cpp
@@ -45,7 +44,6 @@ target_sources(
   ../nitrogen/generated/android/c++/JHybridUrlRequestBuilderSpec.cpp
   ../nitrogen/generated/android/c++/JVariant_ArrayBuffer_String.cpp
   ../nitrogen/generated/android/c++/JHybridNitroCronetSpec.cpp
-  ../nitrogen/generated/android/c++/JHybridRequestExceptionSpec.cpp
   ../nitrogen/generated/android/c++/JHybridNitroFetchCacheSpec.cpp
 )
 

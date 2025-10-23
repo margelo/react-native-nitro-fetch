@@ -2,7 +2,6 @@ import { NitroModules } from 'react-native-nitro-modules';
 import type {
   NitroCronet as NitroCronetType,
   UrlRequest,
-  UrlRequestCallback,
   UrlResponseInfo,
 } from './NitroCronet.nitro';
 import { TextDecoder } from './TextDecoder';
@@ -344,45 +343,45 @@ export async function fetch(
       },
     });
 
-    const callback: UrlRequestCallback = {
-      onRedirectReceived(_info, _newLocationUrl) {
-        request.followRedirect();
-      },
+    // Create the builder
+    const builder = NitroCronet.newUrlRequestBuilder(url);
 
-      onResponseStarted(info) {
-        responseInfo = info;
-        resolve(new FetchResponse(info, stream));
-        const buffer = new ArrayBuffer(65536); // 64KB buffer
+    // Set up callbacks using the builder pattern
+    builder.onRedirectReceived((_info, _newLocationUrl) => {
+      request.followRedirect();
+    });
+
+    builder.onResponseStarted((info) => {
+      responseInfo = info;
+      resolve(new FetchResponse(info, stream));
+      const buffer = new ArrayBuffer(65536); // 64KB buffer
+      request.read(buffer);
+    });
+
+    builder.onReadCompleted((_info, byteBuffer) => {
+      const chunk = new Uint8Array(byteBuffer);
+      streamController.enqueue(chunk);
+
+      if (!request.isDone()) {
+        const buffer = new ArrayBuffer(65536);
         request.read(buffer);
-      },
+      }
+    });
 
-      onReadCompleted(_info, byteBuffer) {
-        const chunk = new Uint8Array(byteBuffer);
-        streamController.enqueue(chunk);
+    builder.onSucceeded((_info) => {
+      streamController.close();
+    });
 
-        if (!request.isDone()) {
-          const buffer = new ArrayBuffer(65536);
-          request.read(buffer);
-        }
-      },
+    builder.onFailed((_info, error) => {
+      streamController.error(new Error(error.message));
+      if (!responseInfo) {
+        reject(new Error(error.message));
+      }
+    });
 
-      onSucceeded(_info) {
-        streamController.close();
-      },
-
-      onFailed(_info, error) {
-        streamController.error(new Error(error.message));
-        if (!responseInfo) {
-          reject(new Error(error.message));
-        }
-      },
-
-      onCanceled(_info) {
-        streamController.close();
-      },
-    };
-
-    const builder = NitroCronet.newUrlRequestBuilder(url, callback);
+    builder.onCanceled((_info) => {
+      streamController.close();
+    });
 
     if (options?.method) {
       builder.setHttpMethod(options.method);

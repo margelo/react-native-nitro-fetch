@@ -18,14 +18,10 @@ import java.util.concurrent.Executors
 @DoNotStrip
 class NitroCronet : HybridNitroCronetSpec() {
 
-  override fun newUrlRequestBuilder(
-    url: String,
-    callback: UrlRequestCallback
-  ): HybridUrlRequestBuilderSpec {
+  override fun newUrlRequestBuilder(url: String): HybridUrlRequestBuilderSpec {
     return NitroUrlRequestBuilder(
       engine = getOrCreateCronetEngine(),
       url = url,
-      callback = callback,
       executor = ioExecutor
     )
   }

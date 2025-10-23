@@ -3,77 +3,36 @@ package com.margelo.nitro.nitrofetch.exceptions
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.nitrofetch.ErrorType
 import com.margelo.nitro.nitrofetch.ExceptionPlatform
-import com.margelo.nitro.nitrofetch.HybridRequestExceptionSpec
+import com.margelo.nitro.nitrofetch.RequestException
 
 /**
- * Unified request exception for Android that implements the HybridRequestExceptionSpec.
- * This class consolidates all error types (network, QUIC, callback, etc.) into a single
- * exception type with Android-specific details.
+ * Factory for creating RequestException instances on Android.
+ * This object provides convenient factory methods for creating RequestException instances
+ * with Android-specific details for different error types (network, QUIC, callback, etc.).
  */
 @DoNotStrip
-class NitroRequestException private constructor(
-  private val msg: String,
-  private val errorCode: Double,
-  private val errType: ErrorType,
-  private val internalErrCode: Double? = null,
-  private val networkErrCode: Double? = null,
-  private val quicErrCode: Double? = null,
-  private val cause: String? = null,
-  private val stackTraceString: String? = null
-) : HybridRequestExceptionSpec() {
-
-  override val platform: ExceptionPlatform
-    get() = ExceptionPlatform.ANDROID_PLATFORM
-
-  override val message: String
-    get() = msg
-
-  override val code: Double
-    get() = errorCode
-
-  override val errorType: ErrorType
-    get() = errType
-
-  override val internalErrorCode: Double?
-    get() = internalErrCode
-
-  override val networkErrorCode: Double?
-    get() = networkErrCode
-
-  override val quicErrorCode: Double?
-    get() = quicErrCode
-
-  override val causeMessage: String?
-    get() = cause
-
-  override val stackTrace: String?
-    get() = stackTraceString
-
-  override val errorDomain: Double?
-    get() = null
-
-  override val localizedDescription: String?
-    get() = null
-
-  override val underlyingError: String?
-    get() = null
-
-  override val failingURL: String?
-    get() = null
-
-  companion object {
-    /**
-     * Create a Cronet base exception
-     */
-    fun cronet(
+object NitroRequestException {
+  /**
+   * Create a Cronet base exception
+   */
+  fun cronet(
       message: String,
       internalErrorCode: Double
-    ): NitroRequestException {
-      return NitroRequestException(
-        msg = message,
-        errorCode = internalErrorCode,
-        errType = ErrorType.CRONET,
-        internalErrCode = internalErrorCode
+    ): RequestException {
+      return RequestException(
+        platform = ExceptionPlatform.ANDROID_PLATFORM,
+        message = message,
+        code = internalErrorCode,
+        errorType = ErrorType.CRONET,
+        internalErrorCode = internalErrorCode,
+        networkErrorCode = null,
+        quicErrorCode = null,
+        stackTrace = null,
+        errorDomain = null,
+        localizedDescription = null,
+        underlyingError = null,
+        failingURL = null,
+        causeMessage = null
       )
     }
 
@@ -84,13 +43,21 @@ class NitroRequestException private constructor(
       message: String,
       internalErrorCode: Double,
       networkErrorCode: Double
-    ): NitroRequestException {
-      return NitroRequestException(
-        msg = message,
-        errorCode = networkErrorCode,
-        errType = ErrorType.NETWORK,
-        internalErrCode = internalErrorCode,
-        networkErrCode = networkErrorCode
+    ): RequestException {
+      return RequestException(
+        platform = ExceptionPlatform.ANDROID_PLATFORM,
+        message = message,
+        code = networkErrorCode,
+        errorType = ErrorType.NETWORK,
+        internalErrorCode = internalErrorCode,
+        networkErrorCode = networkErrorCode,
+        quicErrorCode = null,
+        stackTrace = null,
+        errorDomain = null,
+        localizedDescription = null,
+        underlyingError = null,
+        failingURL = null,
+        causeMessage = null
       )
     }
 
@@ -101,13 +68,21 @@ class NitroRequestException private constructor(
       message: String,
       internalErrorCode: Double,
       quicErrorCode: Double
-    ): NitroRequestException {
-      return NitroRequestException(
-        msg = message,
-        errorCode = quicErrorCode,
-        errType = ErrorType.QUIC,
-        internalErrCode = internalErrorCode,
-        quicErrCode = quicErrorCode
+    ): RequestException {
+      return RequestException(
+        platform = ExceptionPlatform.ANDROID_PLATFORM,
+        message = message,
+        code = quicErrorCode,
+        errorType = ErrorType.QUIC,
+        internalErrorCode = internalErrorCode,
+        networkErrorCode = null,
+        quicErrorCode = quicErrorCode,
+        stackTrace = null,
+        errorDomain = null,
+        localizedDescription = null,
+        underlyingError = null,
+        failingURL = null,
+        causeMessage = null
       )
     }
 
@@ -118,13 +93,21 @@ class NitroRequestException private constructor(
       message: String,
       internalErrorCode: Double,
       causeMessage: String?
-    ): NitroRequestException {
-      return NitroRequestException(
-        msg = message,
-        errorCode = internalErrorCode,
-        errType = ErrorType.CALLBACK,
-        internalErrCode = internalErrorCode,
-        cause = causeMessage
+    ): RequestException {
+      return RequestException(
+        platform = ExceptionPlatform.ANDROID_PLATFORM,
+        message = message,
+        code = internalErrorCode,
+        errorType = ErrorType.CALLBACK,
+        internalErrorCode = internalErrorCode,
+        networkErrorCode = null,
+        quicErrorCode = null,
+        stackTrace = null,
+        errorDomain = null,
+        localizedDescription = null,
+        underlyingError = null,
+        failingURL = null,
+        causeMessage = causeMessage
       )
     }
 
@@ -134,12 +117,21 @@ class NitroRequestException private constructor(
     fun security(
       message: String,
       internalErrorCode: Double
-    ): NitroRequestException {
-      return NitroRequestException(
-        msg = message,
-        errorCode = internalErrorCode,
-        errType = ErrorType.SECURITY,
-        internalErrCode = internalErrorCode
+    ): RequestException {
+      return RequestException(
+        platform = ExceptionPlatform.ANDROID_PLATFORM,
+        message = message,
+        code = internalErrorCode,
+        errorType = ErrorType.SECURITY,
+        internalErrorCode = internalErrorCode,
+        networkErrorCode = null,
+        quicErrorCode = null,
+        stackTrace = null,
+        errorDomain = null,
+        localizedDescription = null,
+        underlyingError = null,
+        failingURL = null,
+        causeMessage = null
       )
     }
 
@@ -149,12 +141,21 @@ class NitroRequestException private constructor(
     fun inlineExecution(
       message: String,
       internalErrorCode: Double
-    ): NitroRequestException {
-      return NitroRequestException(
-        msg = message,
-        errorCode = internalErrorCode,
-        errType = ErrorType.INLINEEXECUTION,
-        internalErrCode = internalErrorCode
+    ): RequestException {
+      return RequestException(
+        platform = ExceptionPlatform.ANDROID_PLATFORM,
+        message = message,
+        code = internalErrorCode,
+        errorType = ErrorType.INLINEEXECUTION,
+        internalErrorCode = internalErrorCode,
+        networkErrorCode = null,
+        quicErrorCode = null,
+        stackTrace = null,
+        errorDomain = null,
+        localizedDescription = null,
+        underlyingError = null,
+        failingURL = null,
+        causeMessage = null
       )
     }
 
@@ -165,25 +166,32 @@ class NitroRequestException private constructor(
       message: String,
       errorCode: Double,
       throwable: Throwable? = null
-    ): NitroRequestException {
-      return NitroRequestException(
-        msg = message,
-        errorCode = errorCode,
-        errType = ErrorType.OTHER,
-        cause = throwable?.message,
-        stackTraceString = throwable?.stackTraceToString()
+    ): RequestException {
+      return RequestException(
+        platform = ExceptionPlatform.ANDROID_PLATFORM,
+        message = message,
+        code = errorCode,
+        errorType = ErrorType.OTHER,
+        internalErrorCode = null,
+        networkErrorCode = null,
+        quicErrorCode = null,
+        stackTrace = throwable?.stackTraceToString(),
+        errorDomain = null,
+        localizedDescription = null,
+        underlyingError = null,
+        failingURL = null,
+        causeMessage = throwable?.message
       )
     }
 
     /**
      * Create an exception from a Throwable
      */
-    fun from(throwable: Throwable): NitroRequestException {
+    fun from(throwable: Throwable): RequestException {
       return other(
         message = throwable.message ?: "Unknown error",
         errorCode = -1.0,
         throwable = throwable
       )
     }
-  }
 }
