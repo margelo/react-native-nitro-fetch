@@ -192,6 +192,14 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     }
 
   // MARK: - URLSessionTaskDelegate
+  //
+  // IMPORTANT: All callbacks use executor.sync (not .async) to guarantee ordering:
+  // 1. onRedirectReceived (if redirects occur)
+  // 2. onResponseStarted (once)
+  // 3. onReadCompleted (multiple times, in order)
+  // 4. onSucceeded/onFailed/onCanceled (once)
+  //
+  // This prevents race conditions where onSucceeded could fire before the final onReadCompleted.
 
   func urlSession(
     _ session: URLSession,
@@ -200,11 +208,9 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     newRequest request: URLRequest,
     completionHandler: @escaping (URLRequest?) -> Void
   ) {
-    executor.async { [weak self] in
-      guard let self = self else {
-        completionHandler(nil)
-        return
-      }
+    // Use sync to ensure ordering
+    executor.sync { [weak self] in
+      guard let self = self else { return }
 
       // Call callback if set
       if let callback = self.onRedirectReceived {
@@ -212,10 +218,10 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
         let newUrl = request.url?.absoluteString ?? ""
         callback(info, newUrl)
       }
-
-      // Auto-follow redirects (matching Android behavior)
-      completionHandler(request)
     }
+
+    // Auto-follow redirects (matching Android behavior)
+    completionHandler(request)
   }
 
   func urlSession(
@@ -233,7 +239,8 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     task: URLSessionTask,
     didCompleteWithError error: Error?
   ) {
-    executor.async { [weak self] in
+    // Use sync to ensure this runs after all didReceive callbacks
+    executor.sync { [weak self] in
       guard let self = self else { return }
 
       self.hybridRequest?.markDone()
@@ -276,19 +283,18 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
 
     self.response = httpResponse
 
-    executor.async { [weak self] in
-      guard let self = self else {
-        completionHandler(.cancel)
-        return
-      }
+    // Use sync to ensure this runs before any didReceive data callbacks
+    executor.sync { [weak self] in
+      guard let self = self else { return }
 
       // Call callback if set
       if let callback = self.onResponseStarted {
         let info = httpResponse.toNitro()
         callback(info)
       }
-      completionHandler(.allow)
     }
+
+    completionHandler(.allow)
   }
 
   func urlSession(
@@ -300,7 +306,8 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
 
     // If onReadCompleted callback is set, notify with the chunk
     if let callback = self.onReadCompleted {
-      executor.async { [weak self] in
+      // Use sync to ensure ordering - data callbacks fire in order before completion
+      executor.sync { [weak self] in
         guard let self = self, let response = self.response else { return }
 
         // Copy data into ArrayBuffer
