@@ -16,8 +16,6 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
 
   private var urlRequest: URLRequest
   private var priority: Float = 0.5
-  // TEMP: Removed for now - too complex
-  // private var uploadProvider: UploadDataProvider?
 
   init(
     url: String,
@@ -69,12 +67,6 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     self.urlRequest.addValue(value, forHTTPHeaderField: name)
   }
 
-  // TEMP: Commented out - UploadDataProvider has ArrayBuffer
-  // func setUploadDataProvider(provider: UploadDataProvider) throws {
-  //   self.uploadProvider = provider
-  //   // Will be handled in build() using URLSession upload task
-  // }
-
   func setUploadBody(body: Variant_ArrayBuffer_String) throws {
     switch body {
     case .first(let arrayBuffer):
@@ -87,11 +79,6 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
       self.urlRequest.httpBody = string.data(using: .utf8)
     }
   }
-
-  // TEMP: Removed for now - too complex
-  // func setUploadDataProvider(provider: UploadDataProvider) throws {
-  //   self.uploadProvider = provider
-  // }
 
   func disableCache() throws {
     self.urlRequest.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
@@ -159,8 +146,6 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     let onCanceled: ((_ info: UrlResponseInfo?) -> Void)?
 
   let executor: DispatchQueue
-  // TEMP: Removed for now - too complex
-  // var uploadProvider: UploadDataProvider?
   weak var task: URLSessionDataTask?
   weak var hybridRequest: HybridUrlRequest?
 
@@ -177,7 +162,6 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
       onCanceled: ((_ info: UrlResponseInfo?) -> Void)?,
       executor: DispatchQueue,
       hybridRequest: HybridUrlRequest?
-      // uploadProvider: UploadDataProvider?
     ) {
       self.onRedirectReceived = onRedirectReceived
       self.onResponseStarted = onResponseStarted
@@ -187,19 +171,8 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
       self.onCanceled = onCanceled
       self.executor = executor
       self.hybridRequest = hybridRequest
-      // self.uploadProvider = uploadProvider
       super.init()
     }
-
-  // MARK: - URLSessionTaskDelegate
-  //
-  // IMPORTANT: All callbacks use executor.sync (not .async) to guarantee ordering:
-  // 1. onRedirectReceived (if redirects occur)
-  // 2. onResponseStarted (once)
-  // 3. onReadCompleted (multiple times, in order)
-  // 4. onSucceeded/onFailed/onCanceled (once)
-  //
-  // This prevents race conditions where onSucceeded could fire before the final onReadCompleted.
 
   func urlSession(
     _ session: URLSession,
@@ -230,7 +203,6 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     needNewBodyStream completionHandler: @escaping (InputStream?) -> Void
   ) {
     // Handle upload provider rewind
-    // TEMP: Removed UploadDataProvider for now
     completionHandler(nil)
   }
 

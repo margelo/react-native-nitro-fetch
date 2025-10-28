@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 
-import './tests/custom';
+import './tests/text-decoder';
 import './tests/web';
 import './tests/prefetch';
 import './tests/fetch-spec';
