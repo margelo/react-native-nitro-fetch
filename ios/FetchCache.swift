@@ -77,21 +77,26 @@ final class FetchCache {
    */
   static func getResultIfFresh(_ key: String, maxAgeMs: Int64? = nil) -> CachedResponse? {
     var out: CachedResponse?
+    var age: Int64 = 0
+    var effectiveMaxAge: Int64 = 0
+
     queue.sync {
       if let entry = results[key] {
-        let age = Int64(Date().timeIntervalSince1970 * 1000) - entry.timestampMs
-        let effectiveMaxAge = maxAgeMs ?? entry.maxAgeMs
+        age = Int64(Date().timeIntervalSince1970 * 1000) - entry.timestampMs
+        effectiveMaxAge = maxAgeMs ?? entry.maxAgeMs
         if age <= effectiveMaxAge {
           out = entry
         }
       }
     }
+
     // Remove from cache after retrieving (consume once)
     if out != nil {
       queue.async(flags: .barrier) {
         results.removeValue(forKey: key)
       }
     }
+
     return out
   }
 

@@ -141,7 +141,6 @@ export async function fetchStreamedData(options: FetchStreamOptions = {}) {
     if (buffer.trim()) {
       try {
         const data = JSON.parse(buffer);
-        console.log('Final data:', data);
         onData?.(data);
       } catch (parseError) {
         console.error('=== JSON Parse Error Context (Final Buffer) ===');

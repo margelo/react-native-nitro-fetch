@@ -69,7 +69,7 @@ extension NSError {
       networkErrorCode: errorType == .network ? errorCode : nil,
       quicErrorCode: nil,
       stackTrace: nil,
-      errorDomain: Double(truncating: NSNumber(value: CFStringConvertEncodingToNSStringEncoding(CFStringConvertNSStringEncodingToEncoding(UInt(domain.hashValue))))),
+      errorDomain: Double(domain.hashValue),
       localizedDescription: localizedDescription,
       underlyingError: (userInfo[NSUnderlyingErrorKey] as? NSError)?.localizedDescription,
       failingURL: (userInfo[NSURLErrorFailingURLErrorKey] as? URL)?.absoluteString,

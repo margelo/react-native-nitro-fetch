@@ -4,7 +4,7 @@
 #endif
 
 // Declare the C entry point from Swift
-extern "C" void NitroFetchAutoStartSwift(void);
+extern "C" void NitroStartSwift(void);
 
 @interface NitroFetchBootstrapper : NSObject @end
 @implementation NitroFetchBootstrapper
@@ -17,12 +17,12 @@ extern "C" void NitroFetchAutoStartSwift(void);
                                                       object:nil
                                                        queue:nil
                                                   usingBlock:^(__unused NSNotification *note) {
-      NitroFetchAutoStartSwift();
+      NitroStartSwift();
     }];
 
     // Also try to call immediately in case the notification was already fired
     dispatch_async(dispatch_get_main_queue(), ^{
-      NitroFetchAutoStartSwift();
+      NitroStartSwift();
     });
   }
 #endif

@@ -1,457 +1,896 @@
-/* eslint-disable react-native/no-inline-styles */
 import React from 'react';
 import {
   Text,
   View,
   StyleSheet,
-  Button,
+  TouchableOpacity,
   ScrollView,
-  Modal,
-  Pressable,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
-import {
-  fetch as nitroFetch,
-  // prefetch,
-  // prefetchOnAppStart,
-} from 'react-native-nitro-fetch';
+import { fetch as nitroFetch } from 'react-native-nitro-fetch';
+import { fetchStreamedData } from './stream';
+import TestScreen from './Tests';
 
-type Row = {
-  url: string;
-  builtinMs: number;
-  nitroMs: number;
-  errorBuiltin?: string;
-  errorNitro?: string;
-  cachedBuiltin?: boolean;
-  cachedNitro?: boolean;
+// Update this to your computer's local IP address
+// You can find it by running: ipconfig getifaddr en0 (macOS) or ipconfig (Windows)
+const SERVER_URL = 'http://192.168.1.157:3000';
+
+// Number of times to run each test (for averaging)
+const TEST_ITERATIONS = 20; // Reduced from 15 to avoid OOM with large payloads
+
+type TestResult = {
+  endpoint: string;
+  nativeDuration: number;
+  nitroDuration: number;
+  dataSize: string;
+  nativeCached?: boolean;
+  nitroCached?: boolean;
+  prevBestNitro?: number;
+  error?: string;
+  dataMatch?: boolean; // true if data matches, false if mismatch
+  dataMismatch?: string; // details of mismatch
 };
 
-const CANDIDATES: string[] = [
-  // // Small HTML/text
-  // 'https://example.com',
-  // 'https://example.org',
-  // 'https://www.google.com/robots.txt',
-  // 'https://www.wikipedia.org',
-  // 'https://news.ycombinator.com',
-  // 'https://developer.mozilla.org',
-  // 'https://www.cloudflare.com/cdn-cgi/trace',
-  // 'https://www.apple.com',
-  // 'https://www.microsoft.com',
-  // 'https://www.reddit.com/.json',
-  // // httpbin
-  // 'https://httpbin.org/get',
-  // 'https://httpbin.org/uuid',
-  // 'https://httpbin.org/ip',
-  // 'https://httpbin.org/headers',
-  // // jsonplaceholder
-  // 'https://jsonplaceholder.typicode.com/todos/1',
-  // 'https://jsonplaceholder.typicode.com/todos/2',
-  // 'https://jsonplaceholder.typicode.com/todos/3',
-  // 'https://jsonplaceholder.typicode.com/posts/1',
-  // 'https://jsonplaceholder.typicode.com/posts/2',
-  // 'https://jsonplaceholder.typicode.com/posts/3',
-  // 'https://jsonplaceholder.typicode.com/users/1',
-  // 'https://jsonplaceholder.typicode.com/users/2',
-  // 'https://jsonplaceholder.typicode.com/users/3',
-  // // status pages (small bodies)
-  // 'https://httpstat.us/200',
-  // 'https://httpstat.us/204',
-  // 'https://httpstat.us/301',
-  // 'https://httpstat.us/302',
-  // 'https://httpstat.us/404',
-  // 'https://httpstat.us/418',
-  // 'https://httpstat.us/500',
-  // 'https://httpstat.us/503',
-  // raw small files
-  'https://raw.githubusercontent.com/github/gitignore/main/Node.gitignore',
-  'https://raw.githubusercontent.com/github/gitignore/main/Android.gitignore',
-  'https://raw.githubusercontent.com/github/gitignore/main/Swift.gitignore',
-  'https://raw.githubusercontent.com/github/gitignore/main/Go.gitignore',
-  'https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore',
-  'https://raw.githubusercontent.com/github/gitignore/main/Ruby.gitignore',
-  // CDN JS (moderate size)
-  'https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js',
-  'https://cdn.jsdelivr.net/npm/lodash-es/lodash.js',
-  'https://unpkg.com/react/umd/react.production.min.js',
-  'https://unpkg.com/react-dom/umd/react-dom.production.min.js',
-  // IP/info
-  'https://icanhazip.com',
-  'https://ipapi.co/json/',
-  'https://wttr.in/?format=3',
-  // robots from various sites
-  'https://github.com/robots.txt',
-  'https://www.youtube.com/robots.txt',
-  'https://www.npmjs.com/robots.txt',
-  'https://www.cloudflare.com/robots.txt',
-  'https://www.netflix.com/robots.txt',
-  'https://www.bbc.co.uk/robots.txt',
-  'https://www.nytimes.com/robots.txt',
-  'https://www.stackoverflow.com/robots.txt',
-  'https://www.stackexchange.com/robots.txt',
-  'https://www.cloudflarestatus.com/robots.txt',
-  // misc
-  'https://api.github.com',
-  'https://api.ipify.org?format=json',
-  'https://httpbingo.org/get',
-  'https://httpbingo.org/headers',
-  'https://httpbingo.org/uuid',
-  'https://ifconfig.co/json',
-  'https://get.geojs.io/v1/ip.json',
-  'https://get.geojs.io/v1/ip/geo.json',
-];
-
-function pickRandomUrls(n: number): string[] {
-  // Choose without replacement to avoid duplicates
-  const arr = [...CANDIDATES];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr.slice(0, Math.min(n, arr.length));
-}
-
-function trimmedAverage(values: number[], trimFraction = 0.1): number | null {
-  const valid = values.filter((v) => Number.isFinite(v));
-  if (valid.length === 0) return null;
-  const sorted = valid.slice().sort((a, b) => a - b);
-  const k = Math.floor(sorted.length * trimFraction);
-  const start = Math.min(k, sorted.length);
-  const end = Math.max(start, sorted.length - k);
-  const sliced = sorted.slice(start, end);
-  if (sliced.length === 0) return null;
-  const sum = sliced.reduce((s, v) => s + v, 0);
-  return sum / sliced.length;
-}
-
-function detectCached(headers: Headers): boolean {
-  const get = (k: string) => headers.get(k);
-  const age = get('age');
-  if (age && Number(age) > 0) return true;
-  const hits = get('x-cache-hits');
-  if (hits && Number(hits) > 0) return true;
-  const combined = (
-    (get('x-cache') || '') +
-    ' ' +
-    (get('x-cache-status') || '') +
-    ' ' +
-    (get('x-cache-remote') || '') +
-    ' ' +
-    (get('cf-cache-status') || '') +
-    ' ' +
-    (get('via') || '')
-  ).toUpperCase();
-  if (combined.includes('HIT') || combined.includes('REVALIDATED')) return true;
-  if (combined.includes('MISS')) return false;
-  return false;
-}
-
-async function measure(
-  fn: (url: string) => Promise<Response>,
-  url: string
-): Promise<
-  { ms: number } & (
-    | { ok: true; cached: boolean }
-    | { ok: false; error: string }
-  )
-> {
-  const t0 = global.performance ? global.performance.now() : Date.now();
-  try {
-    const res = await fn(`${url}?timestamp=${performance.now()}`);
-    // Ensure body read to make timing comparable
-    await res.arrayBuffer();
-    const t1 = global.performance ? global.performance.now() : Date.now();
-    const cached = detectCached(res.headers);
-    return { ok: true, ms: t1 - t0, cached } as const;
-  } catch (e: any) {
-    const t1 = global.performance ? global.performance.now() : Date.now();
-    return { ok: false, ms: t1 - t0, error: e?.message ?? String(e) } as const;
-  }
-}
-
 export default function App() {
-  const [rows, setRows] = React.useState<Row[] | null>(null);
-  const [avgBuiltinAll, setAvgBuiltinAll] = React.useState<number | null>(null);
-  const [avgNitroAll, setAvgNitroAll] = React.useState<number | null>(null);
-  const [avgBuiltinNC, setAvgBuiltinNC] = React.useState<number | null>(null);
-  const [avgNitroNC, setAvgNitroNC] = React.useState<number | null>(null);
-  const [running, setRunning] = React.useState(false);
-  const [showSheet, setShowSheet] = React.useState(false);
-  const [prices, setPrices] = React.useState<
-    Array<{ id: string; usd: number }>
-  >([]);
-  const [prefetchInfo, setPrefetchInfo] = React.useState<string>('');
-  const PREFETCH_URL = 'https://httpbin.org/uuid';
-  const PREFETCH_KEY = 'uuid';
+  const [results, setResults] = React.useState<TestResult[]>([]);
+  const [testing, setTesting] = React.useState(false);
+  const [cacheEnabled, setCacheEnabled] = React.useState(false);
+  const [bestTimes, setBestTimes] = React.useState<Record<string, number>>({});
+  const [seenRequestIds, setSeenRequestIds] = React.useState<Set<string>>(
+    new Set()
+  );
 
-  // const loadPrices = React.useCallback(async () => {
-  //   console.log('Loading crypto prices from coingecko start');
-  //   const ids = [
-  //     'bitcoin',
-  //     'ethereum',
-  //     'solana',
-  //     'dogecoin',
-  //     'litecoin',
-  //     'cardano',
-  //     'ripple',
-  //     'polkadot',
-  //     'chainlink',
-  //     'polygon-pos',
-  //   ];
-  //   const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids.join(','))}&vs_currencies=usd`;
-  //   const mapper = (payload: { bodyString?: string }) => {
-  //     'worklet';
-  //     const txt = payload.bodyString ?? '';
-  //     const json = JSON.parse(txt) as Record<string, { usd: number }>;
-  //     const arr = Object.entries(json).map(([id, v]) => ({ id, usd: v.usd }));
-  //     arr.sort((a, b) => a.id.localeCompare(b.id));
-  //     return arr;
-  //   };
-  //   console.log('Loading crypto prices from coingecko');
-  //   const data = await nitroFetchOnWorklet(url, undefined, mapper, {
-  //     preferBytes: false,
-  //   });
-  //   console.log('Loaded crypto prices:', data);
-  //   setPrices(data);
-  // }, []);
+  return <TestScreen />;
 
-  const run = React.useCallback(async () => {
-    if (running) return;
-    setRunning(true);
-    try {
-      const urls = pickRandomUrls(50);
-      const out = await Promise.all(
-        urls.map(async (url): Promise<Row> => {
-          const [b, n] = await Promise.all([
-            measure(global.fetch, url),
-            measure(nitroFetch, url),
-          ]);
-          return {
-            url,
-            builtinMs: b.ms,
-            nitroMs: n.ms,
-            errorBuiltin: b.ok ? undefined : b.error,
-            errorNitro: n.ok ? undefined : n.error,
-            cachedBuiltin: b.ok ? b.cached : undefined,
-            cachedNitro: n.ok ? n.cached : undefined,
-          };
-        })
-      );
-      setRows(out);
-      const okRows = out.filter(
-        (r) => r.errorBuiltin == null && r.errorNitro == null
-      );
-      const avgBAll = trimmedAverage(okRows.map((r) => r.builtinMs));
-      const avgNAll = trimmedAverage(okRows.map((r) => r.nitroMs));
-      const avgBNC = trimmedAverage(
-        okRows.filter((r) => r.cachedBuiltin === false).map((r) => r.builtinMs)
-      );
-      const avgNNC = trimmedAverage(
-        okRows.filter((r) => r.cachedNitro === false).map((r) => r.nitroMs)
-      );
-      setAvgBuiltinAll(avgBAll);
-      setAvgNitroAll(avgNAll);
-      setAvgBuiltinNC(avgBNC);
-      setAvgNitroNC(avgNNC);
-      console.log(
-        'trimmed avgs (all, not-cached)',
-        avgBAll,
-        avgNAll,
-        avgBNC,
-        avgNNC
-      );
-    } finally {
-      setRunning(false);
+  // Helper function to calculate robust average (resistant to outliers)
+  const calculateRobustAverage = (values: number[]) => {
+    if (values.length === 0) return 0;
+
+    // Sort the values
+    const sorted = [...values].sort((a, b) => a - b);
+
+    // For small sample sizes (< 4), just use median
+    if (sorted.length < 4) {
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 === 0
+        ? (sorted[mid - 1] + sorted[mid]) / 2
+        : sorted[mid];
     }
-  }, [running]);
 
-  React.useEffect(() => {
-    run();
-  }, [run]);
+    // For medium samples (4-9), use trimmed mean (30%)
+    if (sorted.length < 10) {
+      const trimPercent = 0.3;
+      const trimCount = Math.floor(sorted.length * trimPercent);
+      const trimmed = sorted.slice(trimCount, sorted.length - trimCount);
+      return trimmed.reduce((sum, val) => sum + val, 0) / trimmed.length;
+    }
+
+    // For larger samples (10+), use Interquartile Mean (IQR)
+    // This takes only the middle 50% of data (Q1 to Q3)
+    const q1Index = Math.floor(sorted.length * 0.25);
+    const q3Index = Math.floor(sorted.length * 0.75);
+    const iqrValues = sorted.slice(q1Index, q3Index + 1);
+
+    return iqrValues.reduce((sum, val) => sum + val, 0) / iqrValues.length;
+  };
+
+  // Helper function to compare two ArrayBuffers
+  const compareArrayBuffers = (
+    buffer1: ArrayBuffer,
+    buffer2: ArrayBuffer
+  ): { match: boolean; details?: string } => {
+    if (buffer1.byteLength !== buffer2.byteLength) {
+      return {
+        match: false,
+        details: `Size mismatch: ${buffer1.byteLength} vs ${buffer2.byteLength} bytes`,
+      };
+    }
+
+    const arr1 = new Uint8Array(buffer1);
+    const arr2 = new Uint8Array(buffer2);
+
+    // Compare ALL bytes and track mismatches
+    const mismatches: number[] = [];
+    let totalMismatches = 0;
+
+    for (let i = 0; i < arr1.length; i++) {
+      if (arr1[i] !== arr2[i]) {
+        totalMismatches++;
+        // Store first 10 for detailed logging
+        if (mismatches.length < 10) {
+          mismatches.push(i);
+        }
+      }
+    }
+
+    if (totalMismatches > 0) {
+      const firstMismatch = mismatches[0];
+      const contextStart = Math.max(0, firstMismatch - 5);
+      const contextEnd = Math.min(arr1.length, firstMismatch + 6);
+
+      // Get context around first mismatch
+      const nativeContext = Array.from(arr1.slice(contextStart, contextEnd))
+        .map((b, i) => {
+          const pos = contextStart + i;
+          const marker = pos === firstMismatch ? '→' : ' ';
+          return `${marker}[${pos}]:${b}`;
+        })
+        .join(' ');
+
+      const nitroContext = Array.from(arr2.slice(contextStart, contextEnd))
+        .map((b, i) => {
+          const pos = contextStart + i;
+          const marker = pos === firstMismatch ? '→' : ' ';
+          return `${marker}[${pos}]:${b}`;
+        })
+        .join(' ');
+
+      // Check first and last 10 bytes
+      const first10Native = Array.from(arr1.slice(0, 10)).join(',');
+      const first10Nitro = Array.from(arr2.slice(0, 10)).join(',');
+      const last10Native = Array.from(arr1.slice(-10)).join(',');
+      const last10Nitro = Array.from(arr2.slice(-10)).join(',');
+
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('🔍 DATA MISMATCH DETAILS:');
+      console.log(`  Total bytes compared: ${arr1.length}`);
+      console.log(`  Total mismatches found: ${totalMismatches}`);
+      console.log(
+        `  Match rate: ${(((arr1.length - totalMismatches) / arr1.length) * 100).toFixed(2)}%`
+      );
+      console.log(
+        `  First mismatch at byte: ${firstMismatch} (${((firstMismatch / buffer1.byteLength) * 100).toFixed(2)}% through data)`
+      );
+      console.log(`  Native byte value: ${arr1[firstMismatch]}`);
+      console.log(`  Nitro byte value:  ${arr2[firstMismatch]}`);
+      console.log('\n📍 Context around first mismatch:');
+      console.log(`  Native: ${nativeContext}`);
+      console.log(`  Nitro:  ${nitroContext}`);
+      console.log('\n🔢 First 10 bytes:');
+      console.log(`  Native: [${first10Native}]`);
+      console.log(`  Nitro:  [${first10Nitro}]`);
+      console.log('\n🔢 Last 10 bytes:');
+      console.log(`  Native: [${last10Native}]`);
+      console.log(`  Nitro:  [${last10Nitro}]`);
+      if (mismatches.length > 1) {
+        console.log(
+          `\n📊 First 10 mismatch positions: ${mismatches.join(', ')}`
+        );
+      }
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      return {
+        match: false,
+        details: `${totalMismatches} byte${totalMismatches > 1 ? 's' : ''} mismatch (${((totalMismatches / arr1.length) * 100).toFixed(2)}% of data)`,
+      };
+    }
+
+    return { match: true };
+  };
+
+  // Helper function to check if response was cached
+  const isCached = (response: Response): boolean => {
+    const get = (k: string) => response.headers.get(k);
+
+    // Check Age header (if > 0, it's cached)
+    const age = get('age');
+    if (age && Number(age) > 0) return true;
+
+    // Check x-cache-hits header
+    const hits = get('x-cache-hits');
+    if (hits && Number(hits) > 0) return true;
+
+    // Check X-Request-Id (if we've seen it before, it's cached)
+    const xRequestId = get('x-request-id');
+    if (xRequestId) {
+      if (seenRequestIds.has(xRequestId)) {
+        return true;
+      }
+      // Remember this request ID
+      setSeenRequestIds((prev) => new Set(prev).add(xRequestId));
+    }
+
+    // Combine multiple cache headers and check for HIT/MISS indicators
+    const combined = (
+      (get('x-cache') || '') +
+      ' ' +
+      (get('x-cache-status') || '') +
+      ' ' +
+      (get('x-cache-remote') || '') +
+      ' ' +
+      (get('cf-cache-status') || '') +
+      ' ' +
+      (get('via') || '')
+    ).toUpperCase();
+
+    if (combined.includes('HIT') || combined.includes('REVALIDATED')) {
+      return true;
+    }
+    if (combined.includes('MISS')) {
+      return false;
+    }
+
+    return false;
+  };
+
+  const runTest = async (url: string, label: string) => {
+    const iterations = TEST_ITERATIONS;
+    try {
+      const nativeDurations: number[] = [];
+      const nitroDurations: number[] = [];
+      let dataSize = 0;
+      let anyCached = false;
+      let dataMatch = true;
+      let dataMismatchDetails: string | undefined;
+
+      // WARMUP: Run a few requests first to warm up the connection (don't count these)
+      console.log(`🔥 Warming up for ${label}...`);
+      for (let i = 0; i < 3; i++) {
+        const separator = url.includes('?') ? '&' : '?';
+        const warmupUrl = `${url}${separator}_warmup=${Date.now()}-${Math.random()}`;
+        const noCacheHeaders = {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        };
+        try {
+          await fetch(warmupUrl, {
+            headers: noCacheHeaders,
+            cache: 'no-store',
+          });
+          await nitroFetch(warmupUrl, {
+            headers: noCacheHeaders,
+            cache: 'no-store',
+          });
+        } catch (e) {
+          // Warmup failed, continue anyway
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      // Additional delay after warmup
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      console.log(`✅ Warmup complete for ${label}`);
+
+      // Run the test multiple times with RANDOMIZED order
+      for (let i = 0; i < iterations; i++) {
+        // ALWAYS disable cache with unique URLs and headers
+        const separator = url.includes('?') ? '&' : '?';
+        const testUrlNitro = `${url}${separator}_=${Date.now()}-${Math.random()}`;
+        const testUrlNative = `${url}${separator}_=${Date.now()}-${Math.random()}`;
+        const headers: Record<string, string> = {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+        };
+
+        // RANDOMIZE ORDER: 50% chance to run Native first, 50% to run Nitro first
+        const runNativeFirst = Math.random() < 0.5;
+
+        let nativeData: ArrayBuffer;
+        let nativeDuration: number;
+        let nativeResponse: Response;
+        let nitroData: ArrayBuffer;
+        let nitroDuration: number;
+        let nitroResponse: Response;
+
+        if (runNativeFirst) {
+          // Test Native Fetch first
+          const nativeStart = performance.now();
+          nativeResponse = await fetch(testUrlNative, {
+            headers,
+            cache: 'no-store',
+          });
+          nativeData = await nativeResponse.arrayBuffer();
+          nativeDuration = performance.now() - nativeStart;
+          nativeDurations.push(nativeDuration);
+
+          // Small delay between tests to allow GC
+          await new Promise((resolve) => setTimeout(resolve, 200));
+
+          // Test Nitro Fetch second
+          const nitroStart = performance.now();
+          nitroResponse = await nitroFetch(testUrlNitro, {
+            headers,
+            cache: 'no-store',
+          });
+          nitroData = await nitroResponse.arrayBuffer();
+          nitroDuration = performance.now() - nitroStart;
+          nitroDurations.push(nitroDuration);
+        } else {
+          // Test Nitro Fetch first
+          const nitroStart = performance.now();
+          nitroResponse = await nitroFetch(testUrlNitro, {
+            headers,
+            cache: 'no-store',
+          });
+          nitroData = await nitroResponse.arrayBuffer();
+          nitroDuration = performance.now() - nitroStart;
+          nitroDurations.push(nitroDuration);
+
+          // Small delay between tests to allow GC
+          await new Promise((resolve) => setTimeout(resolve, 200));
+
+          // Test Native Fetch second
+          const nativeStart = performance.now();
+          nativeResponse = await fetch(testUrlNative, {
+            headers,
+            cache: 'no-store',
+          });
+          nativeData = await nativeResponse.arrayBuffer();
+          nativeDuration = performance.now() - nativeStart;
+          nativeDurations.push(nativeDuration);
+        }
+
+        console.log(
+          `Iteration ${i + 1}: Native=${nativeDuration.toFixed(0)}ms, Nitro=${nitroDuration.toFixed(0)}ms (${runNativeFirst ? 'Native→Nitro' : 'Nitro→Native'})`
+        );
+
+        if (i === 0) {
+          dataSize = nativeData.byteLength;
+        }
+
+        const nativeCached = isCached(nativeResponse);
+        const nitroCached = isCached(nitroResponse);
+        if (nativeCached || nitroCached) anyCached = true;
+
+        // Compare data integrity (only on first iteration to save time)
+        if (i === 0 && dataMatch) {
+          const comparison = compareArrayBuffers(nativeData, nitroData);
+          if (!comparison.match) {
+            dataMatch = false;
+            dataMismatchDetails = comparison.details;
+            console.log(`❌ Data mismatch for ${label}: ${comparison.details}`);
+          } else {
+            console.log(`✅ Data matches for ${label}`);
+          }
+        }
+
+        // Small delay before next iteration to allow GC
+        if (i < iterations - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 300));
+        }
+      }
+
+      // Calculate averages using robust method (resistant to outliers)
+      const avgNativeDuration = calculateRobustAverage(nativeDurations);
+      const avgNitroDuration = calculateRobustAverage(nitroDurations);
+
+      // Get previous best time for this endpoint
+      const prevBestNitro = bestTimes[label];
+
+      // Update best time if this is better
+      if (!bestTimes[label] || avgNitroDuration < bestTimes[label]) {
+        setBestTimes((prev) => ({ ...prev, [label]: avgNitroDuration }));
+      }
+
+      const result: TestResult = {
+        endpoint: label,
+        nativeDuration: avgNativeDuration,
+        nitroDuration: avgNitroDuration,
+        dataSize: `${(dataSize / 1024).toFixed(2)} KB`,
+        nativeCached: anyCached,
+        nitroCached: anyCached,
+        prevBestNitro,
+        dataMatch,
+        dataMismatch: dataMismatchDetails,
+      };
+
+      setResults((prev) => [result, ...prev]);
+
+      return result;
+    } catch (error: any) {
+      const result: TestResult = {
+        endpoint: label,
+        nativeDuration: 0,
+        nitroDuration: 0,
+        dataSize: 'N/A',
+        error: error,
+      };
+      setResults((prev) => [result, ...prev]);
+      return result;
+    }
+  };
+
+  // Calculate average performance improvement
+  const calculateAverageImprovement = () => {
+    const validResults = results.filter(
+      (r) => !r.error && r.nativeDuration > 0
+    );
+    if (validResults.length === 0) return null;
+
+    const totalImprovement = validResults.reduce((sum, result) => {
+      const improvement =
+        ((result.nativeDuration - result.nitroDuration) /
+          result.nativeDuration) *
+        100;
+      return sum + improvement;
+    }, 0);
+
+    return totalImprovement / validResults.length;
+  };
+
+  const runAllTests = async () => {
+    setTesting(true);
+    setResults([]);
+    try {
+      const tests = [
+        // Quick Tests
+        // { url: `${SERVER_URL}/health`, label: 'Health Check' },
+        // { url: `${SERVER_URL}/headers`, label: 'Headers' },
+
+        // Text Data
+        // { url: `${SERVER_URL}/data/1kb`, label: '1 KB' },
+        // { url: `${SERVER_URL}/data/10kb`, label: '10 KB' },
+        // { url: `${SERVER_URL}/data/100kb`, label: '100 KB' },
+        { url: `${SERVER_URL}/data/1mb`, label: '1 MB' },
+        { url: `${SERVER_URL}/data/5mb`, label: '5 MB' },
+        { url: `${SERVER_URL}/data/10mb`, label: '10 MB' },
+        // { url: `${SERVER_URL}/data/50mb`, label: '50 MB' },
+
+        // JSON Data
+        // { url: `${SERVER_URL}/json/small`, label: 'Small JSON' },
+        { url: `${SERVER_URL}/json/medium`, label: 'Medium JSON' },
+        { url: `${SERVER_URL}/json/large`, label: 'Large JSON' },
+        { url: `${SERVER_URL}/json/xlarge`, label: 'XLarge JSON' },
+
+        // Binary Data
+        // { url: `${SERVER_URL}/binary/1kb`, label: 'Binary 1 KB' },
+        // { url: `${SERVER_URL}/binary/100kb`, label: 'Binary 100 KB' },
+        { url: `${SERVER_URL}/binary/1mb`, label: 'Binary 1 MB' },
+        { url: `${SERVER_URL}/binary/5mb`, label: 'Binary 5 MB' },
+        { url: `${SERVER_URL}/binary/10mb`, label: 'Binary 10 MB' },
+
+        // Delay (but not streaming)
+        // { url: `${SERVER_URL}/delay/500`, label: 'Delay 500ms' },
+        // { url: `${SERVER_URL}/delay/1000`, label: 'Delay 1s' },
+        // { url: `${SERVER_URL}/chunked`, label: 'Chunked Transfer' },
+      ];
+
+      for (const test of tests) {
+        await runTest(test.url, test.label);
+        // Small delay before next test
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    } finally {
+      setTesting(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Nitro vs Built-in Fetch</Text>
-      <View style={styles.actions}>
-        <Button
-          title={running ? 'Running…' : 'Run Again'}
-          onPress={run}
-          disabled={running}
-        />
-        <View style={{ width: 12 }} />
-        <Button
-          title="Show Crypto Prices"
-          onPress={() => {
-            setShowSheet(true);
-            // loadPrices();
-          }}
-        />
-      </View>
-      <View style={[styles.actions, { marginTop: 0 }]}>
-        {/* <Button
-          title="Prefetch UUID"
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.button, styles.runAllButton]}
+          onPress={runAllTests}
+          disabled={testing}
+        >
+          <Text style={styles.buttonText}>
+            {testing ? '⏳ Running Tests...' : '🚀 Run All Tests'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.cacheToggleButton,
+            cacheEnabled && styles.cacheEnabledButton,
+          ]}
+          onPress={() => setCacheEnabled(!cacheEnabled)}
+          disabled={testing}
+        >
+          <Text style={styles.buttonText}>
+            {cacheEnabled ? '🔒 Cache ON' : '🔓 Cache OFF'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.cacheTestButton]}
           onPress={async () => {
+            setTesting(true);
             try {
-              await prefetch(PREFETCH_URL, {
-                headers: { prefetchKey: PREFETCH_KEY },
-              });
-              setPrefetchInfo('Prefetch started');
-            } catch (e: any) {
-              setPrefetchInfo(`Prefetch error: ${e?.message ?? String(e)}`);
-            }
-          }}
-        /> */}
-        <View style={{ width: 12 }} />
-        <Button
-          title="Fetch Prefetched"
-          onPress={async () => {
-            try {
-              const res = await nitroFetch(PREFETCH_URL, {
-                headers: { prefetchKey: PREFETCH_KEY },
-              });
-              const text = await res.text();
-              const pref = res.headers.get('nitroPrefetched');
-              setPrefetchInfo(
-                `Fetched. nitroPrefetched=${pref ?? 'null'} len=${text.length}`
+              const totalStart = performance.now();
+              const times: number[] = [];
+              let dataCount = 0;
+              let savedRecordCount = 0;
+
+              for (let i = 0; i < 15; i++) {
+                const start = performance.now();
+                let itemCount = 0;
+                let totalRecordCount = 0;
+                await fetchStreamedData({
+                  onData: (data) => {
+                    if ('records' in data && Array.isArray(data.records)) {
+                      totalRecordCount += data.records.length;
+                      console.log(
+                        'Data:',
+                        data,
+                        `(${data.records.length} records)`
+                      );
+                    } else {
+                      console.log('Data:', data);
+                    }
+                    itemCount++;
+                  },
+                });
+                const end = performance.now();
+                const duration = end - start;
+                times.push(duration);
+                if (i === 0) {
+                  dataCount = itemCount;
+                  savedRecordCount = totalRecordCount;
+                }
+
+                // Add each individual run to results
+                const dataSizeText =
+                  totalRecordCount > 0
+                    ? `${totalRecordCount} records`
+                    : `${itemCount} chunks`;
+                const runResult: TestResult = {
+                  endpoint: `🌊 Stream #${i + 1}`,
+                  nativeDuration: 0,
+                  nitroDuration: duration,
+                  dataSize: dataSizeText,
+                };
+                setResults((prev) => [runResult, ...prev]);
+              }
+
+              const totalEnd = performance.now();
+              const totalDuration = totalEnd - totalStart;
+              const avgDuration = calculateRobustAverage(times);
+              const minDuration = Math.min(...times);
+              const maxDuration = Math.max(...times);
+
+              // Add summary results to the UI
+              const summaryDataSize =
+                savedRecordCount > 0
+                  ? `${savedRecordCount} records`
+                  : `${dataCount} chunks`;
+              const summaryResults: TestResult[] = [
+                {
+                  endpoint: '📊 Stream - Average',
+                  nativeDuration: 0,
+                  nitroDuration: avgDuration,
+                  dataSize: summaryDataSize,
+                },
+                {
+                  endpoint: '📊 Stream - Min',
+                  nativeDuration: 0,
+                  nitroDuration: minDuration,
+                  dataSize: summaryDataSize,
+                },
+                {
+                  endpoint: '📊 Stream - Max',
+                  nativeDuration: 0,
+                  nitroDuration: maxDuration,
+                  dataSize: summaryDataSize,
+                },
+                {
+                  endpoint: '📊 Stream - Total',
+                  nativeDuration: 0,
+                  nitroDuration: totalDuration,
+                  dataSize: `15 runs`,
+                },
+              ];
+
+              setResults((prev) => [...summaryResults, ...prev]);
+
+              console.log('='.repeat(50));
+              console.log(
+                `Completed 15 stream tests in ${totalDuration.toFixed(2)}ms`
               );
-            } catch (e: any) {
-              setPrefetchInfo(`Fetch error: ${e?.message ?? String(e)}`);
+              console.log(`Average: ${avgDuration.toFixed(2)}ms`);
+              console.log(`Min: ${minDuration.toFixed(2)}ms`);
+              console.log(`Max: ${maxDuration.toFixed(2)}ms`);
+              console.log('='.repeat(50));
+            } finally {
+              setTesting(false);
             }
           }}
-        />
-      </View>
-      <View style={[styles.actions, { marginTop: 0 }]}>
-        {/* <Button
-          title="Schedule Auto-Prefetch (MMKV)"
+          disabled={testing}
+        >
+          <Text style={styles.buttonText}>🔍 Test Stream</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.cacheTestButton]}
           onPress={async () => {
+            setTesting(true);
             try {
-              await prefetchOnAppStart(PREFETCH_URL, {
-                prefetchKey: PREFETCH_KEY,
-              });
-              setPrefetchInfo('Scheduled in MMKV (Android)');
-            } catch (e: any) {
-              setPrefetchInfo(`Schedule error: ${e?.message ?? String(e)}`);
-            }
-          }}
-        />
-        <View style={{ width: 12 }} />
-        <Button
-          title="Clear Auto-Prefetch"
-          onPress={async () => {
-            try {
-              await removeAllFromAutoprefetch();
-              setPrefetchInfo('Cleared auto-prefetch queue');
-            } catch (e: any) {
-              setPrefetchInfo(`Clear error: ${e?.message ?? String(e)}`);
-            }
-          }}
-        /> */}
-      </View>
-      {!!prefetchInfo && (
-        <Text style={{ textAlign: 'center', marginBottom: 8 }}>
-          {prefetchInfo}
-        </Text>
-      )}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {rows == null ? (
-          <Text>Measuring…</Text>
-        ) : (
-          <>
-            <View style={styles.headerRow}>
-              <Text style={[styles.cell, styles.url]}>URL</Text>
-              <Text style={styles.cell}>Built-in (ms)</Text>
-              <Text style={styles.cell}>Nitro (ms)</Text>
-              <Text style={styles.cell}>Cache B/N</Text>
-            </View>
-            {rows.map((r) => {
-              const builtinWins = r.builtinMs < r.nitroMs;
-              const nitroWins = r.nitroMs < r.builtinMs;
-              return (
-                <View key={r.url} style={styles.row}>
-                  <Text style={[styles.cell, styles.url]} numberOfLines={1}>
-                    {r.url}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.cell,
-                      builtinWins ? styles.winner : undefined,
-                    ]}
-                  >
-                    {r.errorBuiltin
-                      ? 'Err'
-                      : Number.isFinite(r.builtinMs)
-                        ? r.builtinMs.toFixed(1)
-                        : '—'}
-                  </Text>
-                  <Text
-                    style={[styles.cell, nitroWins ? styles.winner : undefined]}
-                  >
-                    {r.errorNitro
-                      ? 'Err'
-                      : Number.isFinite(r.nitroMs)
-                        ? r.nitroMs.toFixed(1)
-                        : '—'}
-                  </Text>
-                  <Text style={styles.cell}>
-                    {r.cachedBuiltin == null
-                      ? '?'
-                      : r.cachedBuiltin
-                        ? 'B✓'
-                        : 'B✗'}{' '}
-                    {r.cachedNitro == null ? '?' : r.cachedNitro ? 'N✓' : 'N✗'}
-                  </Text>
-                </View>
+              const testData = {
+                message: 'Hello from React Native!',
+                timestamp: Date.now(),
+                data: Array.from({ length: 100 }, (_, i) => ({
+                  id: i,
+                  value: Math.random(),
+                })),
+              };
+              const bodyString = JSON.stringify(testData);
+
+              console.log(
+                'Testing POST with body:',
+                bodyString.length,
+                'bytes'
               );
-            })}
-            <View style={styles.footer}>
-              <Text style={styles.avg}>
-                Built-in avg (all / not cached):{' '}
-                {avgBuiltinAll != null ? avgBuiltinAll.toFixed(1) : '—'} ms /{' '}
-                {avgBuiltinNC != null ? avgBuiltinNC.toFixed(1) : '—'} ms
-              </Text>
-              <Text style={styles.avg}>
-                Nitro avg (all / not cached):{' '}
-                {avgNitroAll != null ? avgNitroAll.toFixed(1) : '—'} ms /{' '}
-                {avgNitroNC != null ? avgNitroNC.toFixed(1) : '—'} ms
-              </Text>
-            </View>
-          </>
-        )}
-      </ScrollView>
-      <Modal
-        visible={showSheet}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowSheet(false)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setShowSheet(false)}>
-          <View />
-        </Pressable>
-        <View style={styles.sheet}>
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Crypto Prices (USD)</Text>
-            <Button title="Close" onPress={() => setShowSheet(false)} />
+
+              // Test Native Fetch
+              const nativeStart = performance.now();
+              const nativeResponse = await fetch(`${SERVER_URL}/echo`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: bodyString,
+              });
+              const nativeData = await nativeResponse.json();
+              const nativeDuration = performance.now() - nativeStart;
+
+              console.log('Native POST Response:', nativeData);
+
+              await new Promise((resolve) => setTimeout(resolve, 100));
+
+              // Test Nitro Fetch
+              const nitroStart = performance.now();
+              const nitroResponse = await nitroFetch(`${SERVER_URL}/echo`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: bodyString,
+              });
+              const nitroData = await nitroResponse.json();
+              const nitroDuration = performance.now() - nitroStart;
+
+              console.log('Nitro POST Response:', nitroData);
+
+              const result: TestResult = {
+                endpoint: '📤 POST /echo',
+                nativeDuration: nativeDuration,
+                nitroDuration: nitroDuration,
+                dataSize: `${bodyString.length}B`,
+              };
+
+              if (
+                nativeData.success &&
+                nitroData.success &&
+                nativeData.receivedBytes === bodyString.length &&
+                nitroData.receivedBytes === bodyString.length
+              ) {
+                console.log('✅ POST test successful!');
+                setResults((prev) => [result, ...prev]);
+              } else {
+                console.error('❌ POST test failed');
+                setResults((prev) => [
+                  { ...result, error: 'Mismatch' },
+                  ...prev,
+                ]);
+              }
+            } catch (error: any) {
+              console.error('❌ POST test error:', error);
+              setResults((prev) => [
+                {
+                  endpoint: '📤 POST /echo',
+                  nativeDuration: 0,
+                  nitroDuration: 0,
+                  dataSize: 'Error',
+                  error: error.message,
+                },
+                ...prev,
+              ]);
+            } finally {
+              setTesting(false);
+            }
+          }}
+          disabled={testing}
+        >
+          <Text style={styles.buttonText}>📤 Test POST Body</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.resultsContainer}>
+        <View style={styles.resultsHeader}>
+          <View style={styles.resultsHeaderLeft}>
+            <Text style={styles.resultsTitle}>
+              Results - Avg of {TEST_ITERATIONS} runs{' '}
+              {cacheEnabled ? '🔒' : '🔓'}
+            </Text>
+            {results.length > 0 &&
+              !testing &&
+              calculateAverageImprovement() !== null && (
+                <Text style={styles.averageText}>
+                  Avg: {calculateAverageImprovement()! > 0 ? '+' : ''}
+                  {calculateAverageImprovement()!.toFixed(1)}% faster
+                </Text>
+              )}
           </View>
-          <ScrollView style={{ maxHeight: 360 }}>
-            {prices.length === 0 ? (
-              <Text style={{ padding: 12 }}>Loading…</Text>
-            ) : (
-              prices.map((p) => (
-                <View key={p.id} style={styles.priceRow}>
-                  <Text style={styles.priceId}>{p.id}</Text>
-                  <Text style={styles.priceVal}>
-                    $
-                    {p.usd.toLocaleString(undefined, {
-                      maximumFractionDigits: 6,
-                    })}
-                  </Text>
-                </View>
-              ))
-            )}
-          </ScrollView>
+          {testing && <ActivityIndicator size="small" color="#007AFF" />}
         </View>
-      </Modal>
+
+        <ScrollView style={styles.resultsList}>
+          {results.length === 0 ? (
+            <Text style={styles.emptyText}>
+              No results yet. Tap "Run All Tests" to begin!
+            </Text>
+          ) : (
+            <>
+              {/* Table Header */}
+              <View style={styles.tableHeader}>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    styles.tableHeaderText,
+                    styles.colTest,
+                  ]}
+                >
+                  Test
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    styles.tableHeaderText,
+                    styles.colSize,
+                  ]}
+                >
+                  Size
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    styles.tableHeaderText,
+                    styles.colNative,
+                  ]}
+                >
+                  Native
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    styles.tableHeaderText,
+                    styles.colNitro,
+                  ]}
+                >
+                  Nitro
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    styles.tableHeaderText,
+                    styles.colPrev,
+                  ]}
+                >
+                  Prev
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    styles.tableHeaderText,
+                    styles.colDiff,
+                  ]}
+                >
+                  Diff
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    styles.tableHeaderText,
+                    styles.colMatch,
+                  ]}
+                >
+                  ✓
+                </Text>
+              </View>
+
+              {/* Table Rows */}
+              {results.map((result, index) => (
+                <View key={index} style={styles.tableRow}>
+                  {result.error ? (
+                    <>
+                      <Text
+                        style={[styles.tableCell, styles.colTest]}
+                        numberOfLines={1}
+                      >
+                        {result.endpoint}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          styles.colSize,
+                          styles.errorText,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        Error
+                      </Text>
+                      <Text style={[styles.tableCell, styles.colNative]} />
+                      <Text style={[styles.tableCell, styles.colNitro]} />
+                      <Text style={[styles.tableCell, styles.colPrev]} />
+                      <Text style={[styles.tableCell, styles.colDiff]} />
+                      <Text style={[styles.tableCell, styles.colMatch]} />
+                    </>
+                  ) : (
+                    <>
+                      <Text
+                        style={[styles.tableCell, styles.colTest]}
+                        numberOfLines={1}
+                      >
+                        {result.endpoint}
+                      </Text>
+                      <Text
+                        style={[styles.tableCell, styles.colSize]}
+                        numberOfLines={1}
+                      >
+                        {result.dataSize}
+                      </Text>
+                      <Text
+                        style={[styles.tableCell, styles.colNative]}
+                        numberOfLines={1}
+                      >
+                        {result.nativeDuration.toFixed(0)}
+                        {result.nativeCached ? '🟡' : ''}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          styles.colNitro,
+                          result.nitroDuration < result.nativeDuration &&
+                            styles.winner,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {result.nitroDuration.toFixed(0)}
+                        {result.nitroCached ? '🟡' : ''}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          styles.colPrev,
+                          result.prevBestNitro !== undefined &&
+                            result.nitroDuration < result.prevBestNitro &&
+                            styles.improved,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {result.prevBestNitro !== undefined
+                          ? result.prevBestNitro.toFixed(0)
+                          : '-'}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          styles.colDiff,
+                          result.nitroDuration < result.nativeDuration &&
+                            styles.winner,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {result.nitroDuration < result.nativeDuration
+                          ? `${((1 - result.nitroDuration / result.nativeDuration) * 100).toFixed(0)}%`
+                          : `-${((result.nitroDuration / result.nativeDuration - 1) * 100).toFixed(0)}%`}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          styles.colMatch,
+                          result.dataMatch === true && styles.matchOk,
+                          result.dataMatch === false && styles.matchFail,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {result.dataMatch === true
+                          ? '✅'
+                          : result.dataMatch === false
+                            ? '❌'
+                            : '-'}
+                      </Text>
+                    </>
+                  )}
+                </View>
+              ))}
+            </>
+          )}
+        </ScrollView>
+      </View>
     </View>
   );
 }
@@ -459,105 +898,170 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 48,
+    backgroundColor: '#f5f5f5',
+    paddingTop: 36,
   },
   title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 4,
+    color: '#333',
+  },
+  subtitle: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 12,
+    color: '#666',
+  },
+  buttonContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    padding: 14,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  runAllButton: {
+    backgroundColor: '#34C759',
+  },
+  cacheToggleButton: {
+    backgroundColor: '#5856D6',
+  },
+  cacheEnabledButton: {
+    backgroundColor: '#FF9500',
+  },
+  cacheTestButton: {
+    backgroundColor: '#AF52DE',
+  },
+  clearButton: {
+    backgroundColor: '#FF3B30',
+  },
+  buttonText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  resultsContainer: {
+    flex: 1,
+    borderTopWidth: 2,
+    borderTopColor: '#ddd',
+    backgroundColor: '#fff',
+  },
+  resultsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  resultsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  resultsTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: '#333',
+  },
+  averageText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#34C759',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  resultsList: {
+    flex: 1,
+  },
+  emptyText: {
     textAlign: 'center',
-    marginBottom: 8,
+    color: '#999',
+    marginTop: 40,
+    fontSize: 14,
   },
-  actions: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  // Table styles
+  tableHeader: {
     flexDirection: 'row',
-    marginBottom: 8,
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    paddingBottom: 24,
-  },
-  sheetHeader: {
-    paddingHorizontal: 12,
+    backgroundColor: '#f0f0f0',
+    borderBottomWidth: 2,
+    borderBottomColor: '#ddd',
     paddingVertical: 8,
+    paddingHorizontal: 8,
+  },
+  tableHeaderText: {
+    fontWeight: '700',
+    fontSize: 11,
+    color: '#333',
+  },
+  tableRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#eee',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: '#fff',
   },
-  sheetTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  tableCell: {
+    fontSize: 11,
+    color: '#333',
+    paddingHorizontal: 4,
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#f1f1f1',
+  // Column widths
+  colTest: {
+    flex: 2.2,
   },
-  priceId: {
-    fontSize: 14,
+  colSize: {
+    flex: 1.3,
+    textAlign: 'right',
   },
-  priceVal: {
-    fontSize: 14,
+  colNative: {
+    flex: 1.1,
+    textAlign: 'right',
     fontVariant: ['tabular-nums'],
   },
-  scroll: {
+  colNitro: {
+    flex: 1.1,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
+  },
+  colPrev: {
     flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 12,
-    paddingBottom: 24,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ccc',
-    paddingVertical: 6,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#eee',
-  },
-  cell: {
-    width: 100,
+    textAlign: 'right',
     fontVariant: ['tabular-nums'],
+  },
+  colDiff: {
+    flex: 0.9,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
+  },
+  colMatch: {
+    flex: 0.6,
+    textAlign: 'center',
   },
   winner: {
-    color: 'green',
-    fontWeight: '600',
+    color: '#34C759',
+    fontWeight: '700',
   },
-  url: {
-    flex: 1,
-    width: undefined,
-    marginRight: 8,
+  improved: {
+    color: '#2196F3',
+    fontWeight: '700',
   },
-  footer: {
-    marginTop: 12,
+  matchOk: {
+    color: '#34C759',
   },
-  avg: {
-    textAlign: 'center',
-    fontSize: 16,
+  matchFail: {
+    color: '#FF3B30',
   },
-  error: {
-    color: 'red',
-    marginLeft: 8,
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 11,
   },
 });

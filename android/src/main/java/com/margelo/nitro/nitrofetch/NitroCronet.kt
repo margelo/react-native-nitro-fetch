@@ -168,14 +168,16 @@ class NitroCronet : HybridNitroCronetSpec() {
           )
           promise.resolve(result)
         } else {
-          promise.reject(IllegalStateException("Pending prefetch returned null"))
+          // Pending prefetch returned null - return null for graceful fallback
+          promise.resolve(null as CachedFetchResponse?)
         }
       }
       return promise
     }
 
-    // Not found in cache and not pending - reject instead of resolving with null
-    promise.reject(IllegalStateException("No prefetch found for key: $prefetchKey"))
+    // Not found in cache and not pending - return null for graceful fallback
+    // This allows the JS layer to automatically fall back to a normal fetch
+    promise.resolve(null as CachedFetchResponse?)
     return promise
   }
 

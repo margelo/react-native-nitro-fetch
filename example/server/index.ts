@@ -1,38 +1,40 @@
 const PORT = 3000;
 
-// Helper to generate random data
-function generateRandomData(sizeInBytes: number): string {
+// Helper to generate deterministic data (same output for same size every time)
+function generateDeterministicData(sizeInBytes: number): string {
   const chars =
     'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
   for (let i = 0; i < sizeInBytes; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    // Use modulo for deterministic pattern
+    result += chars.charAt(i % chars.length);
   }
   return result;
 }
 
-// Helper to generate binary data
+// Helper to generate binary data (deterministic)
 function generateBinaryData(sizeInBytes: number): Uint8Array {
   const data = new Uint8Array(sizeInBytes);
   for (let i = 0; i < sizeInBytes; i++) {
-    data[i] = Math.floor(Math.random() * 256);
+    // Use deterministic pattern based on position
+    data[i] = i % 256;
   }
   return data;
 }
 
-// Helper to generate JSON objects
+// Helper to generate JSON objects (deterministic)
 function generateLargeJSON(numItems: number) {
   return {
-    timestamp: Date.now(),
+    timestamp: 1234567890, // Fixed timestamp for deterministic comparison
     items: Array.from({ length: numItems }, (_, i) => ({
       id: i,
       name: `Item ${i}`,
       description: `This is a description for item ${i}`,
-      value: Math.random() * 1000,
+      value: (i * 123.456) % 1000, // Deterministic value based on index
       tags: ['tag1', 'tag2', 'tag3'],
       metadata: {
-        created: new Date().toISOString(),
-        updated: new Date().toISOString(),
+        created: '2024-01-01T00:00:00.000Z', // Fixed date
+        updated: '2024-01-01T00:00:00.000Z', // Fixed date
         version: 1,
       },
     })),
@@ -111,11 +113,11 @@ const server = Bun.serve({
               '/echo-headers': 'Returns request headers in response body',
               '/utf8': 'UTF-8 test endpoint with emojis and special characters',
               '/data/:size':
-                'Download text data (sizes: 1kb, 10kb, 100kb, 1mb, 10mb, 50mb, 100mb)',
+                'Download text data (sizes: 1kb, 10kb, 100kb, 1mb, 5mb, 10mb, 50mb, 100mb)',
               '/json/:size':
                 'JSON response (sizes: small, medium, large, xlarge)',
               '/binary/:size':
-                'Binary data download (sizes: 1kb, 100kb, 1mb, 10mb, 50mb)',
+                'Binary data download (sizes: 1kb, 100kb, 1mb, 5mb, 10mb, 50mb)',
               '/stream':
                 'JSON streaming endpoint - newline-delimited JSON (query params: ?chunks=10&delay=100)',
               '/stream/:chunks/:delay':
@@ -181,6 +183,7 @@ const server = Bun.serve({
         '10kb': 10 * 1024,
         '100kb': 100 * 1024,
         '1mb': 1024 * 1024,
+        '5mb': 5 * 1024 * 1024,
         '10mb': 10 * 1024 * 1024,
         '50mb': 50 * 1024 * 1024,
         '100mb': 100 * 1024 * 1024,
@@ -189,7 +192,7 @@ const server = Bun.serve({
       const bytes = sizeMap[size.toLowerCase()];
       if (!bytes) {
         return new Response(
-          'Invalid size. Use: 1kb, 10kb, 100kb, 1mb, 10mb, 50mb, 100mb',
+          'Invalid size. Use: 1kb, 10kb, 100kb, 1mb, 5mb, 10mb, 50mb, 100mb',
           {
             status: 400,
             headers: corsHeaders,
@@ -198,7 +201,7 @@ const server = Bun.serve({
       }
 
       const startTime = Date.now();
-      const data = generateRandomData(bytes);
+      const data = generateDeterministicData(bytes);
       const generationTime = Date.now() - startTime;
 
       // Log server hit - if cached, this won't appear
@@ -266,7 +269,7 @@ const server = Bun.serve({
 
     // Cacheable test endpoint (100 KB of data)
     if (path === '/cacheable/test') {
-      const data = generateRandomData(100 * 1024); // 100 KB
+      const data = generateDeterministicData(100 * 1024); // 100 KB
       const headers = getHeaders(true); // Always allow caching for this endpoint
 
       return new Response(data, {
@@ -328,16 +331,20 @@ const server = Bun.serve({
         '1kb': 1024,
         '100kb': 100 * 1024,
         '1mb': 1024 * 1024,
+        '5mb': 5 * 1024 * 1024,
         '10mb': 10 * 1024 * 1024,
         '50mb': 50 * 1024 * 1024,
       };
 
       const bytes = sizeMap[size.toLowerCase()];
       if (!bytes) {
-        return new Response('Invalid size. Use: 1kb, 100kb, 1mb, 10mb, 50mb', {
-          status: 400,
-          headers: corsHeaders,
-        });
+        return new Response(
+          'Invalid size. Use: 1kb, 100kb, 1mb, 5mb, 10mb, 50mb',
+          {
+            status: 400,
+            headers: corsHeaders,
+          }
+        );
       }
 
       const data = generateBinaryData(bytes);
