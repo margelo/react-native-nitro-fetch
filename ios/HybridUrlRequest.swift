@@ -21,7 +21,7 @@ class HybridUrlRequest: HybridUrlRequestSpec {
     // This is a no-op on iOS but required for API compatibility
   }
 
-  func read(buffer: ArrayBuffer) throws {
+  func read() throws {
     // Reading is handled automatically by URLSession delegate
     // This is a no-op on iOS but required for API compatibility
   }

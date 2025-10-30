@@ -9,8 +9,10 @@ class NitroUrlRequest(
   private val cronetRequest: CronetUrlRequest
 ) : HybridUrlRequestSpec() {
 
-  // Store the current read buffer so callback can access it
-  var currentReadBuffer: ArrayBuffer? = null
+  // Allocate ONE reusable owning buffer for all reads
+  // This is more efficient than JS allocating 160+ buffers per large file
+  val reusableBuffer = ArrayBuffer.allocate(65536) // 64KB
+  private val byteBuffer = reusableBuffer.getBuffer(false)
 
   override fun start() {
     cronetRequest.start()
@@ -20,12 +22,8 @@ class NitroUrlRequest(
     cronetRequest.followRedirect()
   }
 
-  override fun read(buffer: ArrayBuffer) {
-    // Store the original ArrayBuffer so we can return it in the callback
-    currentReadBuffer = buffer
-    // Get the ByteBuffer from JS-allocated ArrayBuffer
-    val byteBuffer = buffer.getBuffer(copyIfNeeded = false)
-    // Ensure it's ready for writing
+  override fun read() {
+    // Prepare buffer for writing (position=0, limit=capacity)
     byteBuffer.clear()
     // Pass to Cronet to fill
     cronetRequest.read(byteBuffer)

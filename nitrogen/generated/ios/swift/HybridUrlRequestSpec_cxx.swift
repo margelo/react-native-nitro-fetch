@@ -7,7 +7,6 @@
 
 import Foundation
 import NitroModules
-import NitroModules
 
 /**
  * A class implementation that bridges HybridUrlRequestSpec over to C++.
@@ -133,9 +132,9 @@ open class HybridUrlRequestSpec_cxx {
   }
   
   @inline(__always)
-  public final func read(buffer: ArrayBuffer) -> bridge.Result_void_ {
+  public final func read() -> bridge.Result_void_ {
     do {
-      try self.__implementation.read(buffer: buffer)
+      try self.__implementation.read()
       return bridge.create_Result_void_()
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()

@@ -7,7 +7,6 @@
 
 import Foundation
 import NitroModules
-import NitroModules
 
 /// See ``HybridUrlRequestSpec``
 public protocol HybridUrlRequestSpec_protocol: HybridObject {
@@ -17,7 +16,7 @@ public protocol HybridUrlRequestSpec_protocol: HybridObject {
   // Methods
   func start() throws -> Void
   func followRedirect() throws -> Void
-  func read(buffer: ArrayBuffer) throws -> Void
+  func read() throws -> Void
   func cancel() throws -> Void
   func isDone() throws -> Bool
 }

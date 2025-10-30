@@ -12,11 +12,9 @@
 // Forward declaration of `HybridUrlRequestSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 
-// Forward declaration of `ArrayBufferHolder` to properly resolve imports.
-namespace NitroModules { class ArrayBufferHolder; }
 
-#include <NitroModules/ArrayBuffer.hpp>
-#include <NitroModules/ArrayBufferHolder.hpp>
+
+
 
 #include "NitroFetch-Swift-Cxx-Umbrella.hpp"
 
@@ -71,8 +69,8 @@ namespace margelo::nitro::nitrofetch {
         std::rethrow_exception(__result.error());
       }
     }
-    inline void read(const std::shared_ptr<ArrayBuffer>& buffer) override {
-      auto __result = _swiftPart.read(ArrayBufferHolder(buffer));
+    inline void read() override {
+      auto __result = _swiftPart.read();
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

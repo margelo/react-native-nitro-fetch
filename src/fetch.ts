@@ -354,18 +354,19 @@ export async function fetch(
     builder.onResponseStarted((info) => {
       responseInfo = info;
       resolve(new FetchResponse(info, stream));
-      const buffer = new ArrayBuffer(65536); // 64KB buffer
-      request.read(buffer);
+      // Native manages the buffer internally
+      request.read();
     });
 
     builder.onReadCompleted((_info, byteBuffer, bytesRead) => {
-      // Create a view of only the filled portion
-      const chunk = new Uint8Array(byteBuffer, 0, bytesRead);
+      // Copy the data since native will reuse the buffer for the next read
+      // This copy is cheap compared to allocating 160+ buffers per large file
+      const chunk = new Uint8Array(bytesRead);
+      chunk.set(new Uint8Array(byteBuffer, 0, bytesRead));
       streamController.enqueue(chunk);
 
       if (!request.isDone()) {
-        const buffer = new ArrayBuffer(65536);
-        request.read(buffer);
+        request.read();
       }
     });
 

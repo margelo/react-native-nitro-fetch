@@ -55,7 +55,7 @@ namespace margelo::nitro::nitrofetch {
     // Methods
     void start() override;
     void followRedirect() override;
-    void read(const std::shared_ptr<ArrayBuffer>& buffer) override;
+    void read() override;
     void cancel() override;
     bool isDone() override;
 

@@ -9,9 +9,7 @@
 
 
 
-#include <NitroModules/ArrayBuffer.hpp>
-#include <NitroModules/JArrayBuffer.hpp>
-#include <NitroModules/JUnit.hpp>
+
 
 namespace margelo::nitro::nitrofetch {
 
@@ -47,9 +45,9 @@ namespace margelo::nitro::nitrofetch {
     static const auto method = javaClassStatic()->getMethod<void()>("followRedirect");
     method(_javaPart);
   }
-  void JHybridUrlRequestSpec::read(const std::shared_ptr<ArrayBuffer>& buffer) {
-    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JArrayBuffer::javaobject> /* buffer */)>("read");
-    method(_javaPart, JArrayBuffer::wrap(buffer));
+  void JHybridUrlRequestSpec::read() {
+    static const auto method = javaClassStatic()->getMethod<void()>("read");
+    method(_javaPart);
   }
   void JHybridUrlRequestSpec::cancel() {
     static const auto method = javaClassStatic()->getMethod<void()>("cancel");

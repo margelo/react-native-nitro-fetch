@@ -10,7 +10,6 @@ package com.margelo.nitro.nitrofetch
 import androidx.annotation.Keep
 import com.facebook.jni.HybridData
 import com.facebook.proguard.annotations.DoNotStrip
-import com.margelo.nitro.core.ArrayBuffer
 import com.margelo.nitro.core.HybridObject
 
 /**
@@ -51,7 +50,7 @@ abstract class HybridUrlRequestSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
-  abstract fun read(buffer: ArrayBuffer): Unit
+  abstract fun read(): Unit
   
   @DoNotStrip
   @Keep

@@ -15,7 +15,7 @@
 
 
 
-#include <NitroModules/ArrayBuffer.hpp>
+
 
 namespace margelo::nitro::nitrofetch {
 
@@ -50,7 +50,7 @@ namespace margelo::nitro::nitrofetch {
       // Methods
       virtual void start() = 0;
       virtual void followRedirect() = 0;
-      virtual void read(const std::shared_ptr<ArrayBuffer>& buffer) = 0;
+      virtual void read() = 0;
       virtual void cancel() = 0;
       virtual bool isDone() = 0;
 

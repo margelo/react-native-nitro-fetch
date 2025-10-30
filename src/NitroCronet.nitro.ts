@@ -38,7 +38,7 @@ export interface UrlRequest
   extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
   start(): void;
   followRedirect(): void;
-  read(buffer: ArrayBuffer): void;
+  read(): void;
   cancel(): void;
   isDone(): boolean;
 }
