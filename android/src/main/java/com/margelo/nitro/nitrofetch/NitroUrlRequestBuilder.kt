@@ -57,21 +57,17 @@ class NitroUrlRequestBuilder(
       ) {
         onReadCompletedCallback?.let { callback ->
           byteBuffer.flip()
-          val size = byteBuffer.remaining()
 
-          val directBuffer = ByteBuffer.allocateDirect(size)
-          directBuffer.put(byteBuffer)
-          directBuffer.flip()
-
-          val arrayBuffer = ArrayBuffer(directBuffer)
+          // Zero-copy: slice the filled portion and wrap it in an ArrayBuffer
+          // This is safe because JS allocates a new buffer for each read
+          val slice = byteBuffer.slice()
+          val arrayBuffer = ArrayBuffer.wrap(slice)
           val nitroInfo = info.toNitro()
 
           callback(nitroInfo, arrayBuffer)
         }
 
         byteBuffer.clear()
-        // Note: Do NOT call request.read() here - the JS side controls the read flow
-        // The JS callback will call request.read() when it's ready for the next chunk
       }
 
       override fun onSucceeded(

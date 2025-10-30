@@ -1,5 +1,32 @@
 const PORT = 3000;
 
+// State for tracking consecutive endpoint calls
+let lastEndpoint = '';
+let endpointCallCount = 0;
+
+// Helper to log endpoint hits with counter
+function logEndpointHit(endpoint: string, details: string = '') {
+  const timestamp = new Date().toISOString().split('T')[1]?.slice(0, -1) ?? '';
+
+  if (endpoint === lastEndpoint) {
+    // Same endpoint - increment counter and overwrite the line
+    endpointCallCount++;
+    process.stdout.write(
+      `\r[${timestamp}] 🌐 SERVER HIT: ${endpoint} ${details} (count: ${endpointCallCount})`
+    );
+  } else {
+    // Different endpoint - print newline if needed and start new counter
+    if (lastEndpoint !== '') {
+      process.stdout.write('\n');
+    }
+    lastEndpoint = endpoint;
+    endpointCallCount = 1;
+    process.stdout.write(
+      `[${timestamp}] 🌐 SERVER HIT: ${endpoint} ${details} (count: ${endpointCallCount})`
+    );
+  }
+}
+
 // Helper to generate deterministic data (same output for same size every time)
 function generateDeterministicData(sizeInBytes: number): string {
   const chars =
@@ -204,15 +231,8 @@ const server = Bun.serve({
       const data = generateDeterministicData(bytes);
       const generationTime = Date.now() - startTime;
 
-      // Log server hit - if cached, this won't appear
-      const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
-      const cacheControl = req.headers.get('cache-control');
-      const isCacheBypassed =
-        cacheControl?.includes('no-cache') ||
-        cacheControl?.includes('no-store');
-      console.log(
-        `[${timestamp}] 🌐 SERVER HIT: /data/${size} ${url.search} ${isCacheBypassed ? '(cache bypassed)' : '(cacheable)'} - Generated in ${generationTime}ms`
-      );
+      // Log server hit
+      logEndpointHit(`/data/${size}`, `- Generated in ${generationTime}ms`);
 
       return new Response(data, {
         status: 200,
@@ -230,22 +250,9 @@ const server = Bun.serve({
     if (path === '/cache-test') {
       const serverTimestamp = Date.now();
       const requestId = `${serverTimestamp}-${Math.random().toString(36).substring(7)}`;
-      const logTimestamp = new Date().toISOString().split('T')[1].slice(0, -1);
-      const cacheControl = req.headers.get('cache-control');
-      const isCacheBypassed =
-        cacheControl?.includes('no-cache') ||
-        cacheControl?.includes('no-store');
 
-      // Clear server-side log - if you see this, the request HIT THE SERVER
-      console.log(`\n${'='.repeat(80)}`);
-      console.log(`[${logTimestamp}] 🔴 SERVER HIT: /cache-test`);
-      console.log(`  Request ID: ${requestId}`);
-      console.log(`-------${cacheControl}`);
-      console.log(
-        `  Status: ${isCacheBypassed ? '❌ CACHE BYPASSED' : '✅ CACHEABLE'}`
-      );
-      console.log(`  Query: ${url.search || '(none)'}`);
-      console.log(`${'='.repeat(80)}\n`);
+      // Log using the same counter pattern
+      logEndpointHit('/cache-test');
 
       const responseData = {
         message: 'Cache test endpoint',
@@ -304,14 +311,7 @@ const server = Bun.serve({
       const json = JSON.stringify(data);
 
       // Log server hit
-      const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
-      const cacheControl = req.headers.get('cache-control');
-      const isCacheBypassed =
-        cacheControl?.includes('no-cache') ||
-        cacheControl?.includes('no-store');
-      console.log(
-        `[${timestamp}] 🌐 SERVER HIT: /json/${size} ${url.search} ${isCacheBypassed ? '(cache bypassed)' : '(cacheable)'}`
-      );
+      logEndpointHit(`/json/${size}`);
 
       return new Response(json, {
         status: 200,
@@ -479,14 +479,7 @@ const server = Bun.serve({
     // UTF-8 test endpoint with emojis
     if (path === '/utf8') {
       // Log server hit
-      const timestamp = new Date().toISOString().split('T')[1].slice(0, -1);
-      const cacheControl = req.headers.get('cache-control');
-      const isCacheBypassed =
-        cacheControl?.includes('no-cache') ||
-        cacheControl?.includes('no-store');
-      console.log(
-        `[${timestamp}] 🌐 SERVER HIT: /utf8 ${url.search} ${isCacheBypassed ? '(cache bypassed)' : '(cacheable)'}`
-      );
+      logEndpointHit('/utf8');
 
       const utf8Content = {
         message: 'UTF-8 test with emoji support 🎉',
