@@ -1,18 +1,14 @@
 package com.margelo.nitro.nitrofetch
 
 import com.facebook.proguard.annotations.DoNotStrip
-import com.margelo.nitro.core.ArrayBuffer
 import org.chromium.net.UrlRequest as CronetUrlRequest
+import java.nio.ByteBuffer
 
 @DoNotStrip
 class NitroUrlRequest(
-  private val cronetRequest: CronetUrlRequest
+  private val cronetRequest: CronetUrlRequest,
+  private val byteBuffer: ByteBuffer
 ) : HybridUrlRequestSpec() {
-
-  // Allocate ONE reusable owning buffer for all reads
-  // This is more efficient than JS allocating 160+ buffers per large file
-  val reusableBuffer = ArrayBuffer.allocate(65536) // 64KB
-  private val byteBuffer = reusableBuffer.getBuffer(false)
 
   override fun start() {
     cronetRequest.start()

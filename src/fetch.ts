@@ -360,9 +360,8 @@ export async function fetch(
 
     builder.onReadCompleted((_info, byteBuffer, bytesRead) => {
       // Copy the data since native will reuse the buffer for the next read
-      // This copy is cheap compared to allocating 160+ buffers per large file
-      const chunk = new Uint8Array(bytesRead);
-      chunk.set(new Uint8Array(byteBuffer, 0, bytesRead));
+      // slice() is more efficient than creating+copying with .set()
+      const chunk = new Uint8Array(byteBuffer, 0, bytesRead).slice();
       streamController.enqueue(chunk);
 
       if (!request.isDone()) {

@@ -25,11 +25,15 @@ class NitroUrlRequestBuilder(
   private var onCanceledCallback: ((info: UrlResponseInfo?) -> Unit)? = null
 
   private val builder: CronetUrlRequest.Builder
-
-  // Store reference to access the reusable buffer in callbacks
-  private var nitroRequest: NitroUrlRequest? = null
+  private val byteBuffer: ByteBuffer
 
   init {
+    // Allocate ONE reusable owning buffer for all reads
+    // This is more efficient than JS allocating 160+ buffers per large file
+    // Callback captures this in its closure - Cronet keeps callback alive
+    val reusableBuffer = ArrayBuffer.allocate(65536) // 64KB
+    byteBuffer = reusableBuffer.getBuffer(false)
+
     val cronetCallback = object : CronetUrlRequest.Callback() {
 
       override fun onRedirectReceived(
@@ -56,18 +60,16 @@ class NitroUrlRequestBuilder(
       override fun onReadCompleted(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo,
-        byteBuffer: ByteBuffer
+        receivedBuffer: ByteBuffer
       ) {
         onReadCompletedCallback?.let { callback ->
           // After Cronet writes, buffer position is at the end of written data
-          val bytesRead = byteBuffer.position()
+          val bytesRead = receivedBuffer.position()
 
-          // Return the reusable owning buffer
+          // Return the reusable owning buffer (captured in closure)
           // JS will copy the data since we'll reuse this buffer for the next read
-          val arrayBuffer = nitroRequest?.reusableBuffer
-            ?: throw IllegalStateException("NitroUrlRequest not available")
           val nitroInfo = info.toNitro()
-          callback(nitroInfo, arrayBuffer, bytesRead.toDouble())
+          callback(nitroInfo, reusableBuffer, bytesRead.toDouble())
         }
       }
 
@@ -203,9 +205,7 @@ class NitroUrlRequestBuilder(
 
   override fun build(): HybridUrlRequestSpec {
     val cronetRequest = builder.build()
-    val request = NitroUrlRequest(cronetRequest)
-    // Store so callback can access reusableBuffer
-    nitroRequest = request
-    return request
+    // Pass byteBuffer so request can use it for read() calls
+    return NitroUrlRequest(cronetRequest, byteBuffer)
   }
 }
