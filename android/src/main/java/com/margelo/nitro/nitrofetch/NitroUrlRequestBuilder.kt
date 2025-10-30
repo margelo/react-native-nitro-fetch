@@ -26,6 +26,9 @@ class NitroUrlRequestBuilder(
 
   private val builder: CronetUrlRequest.Builder
 
+  // Store reference to the NitroUrlRequest so callback can access currentReadBuffer
+  private var nitroRequest: NitroUrlRequest? = null
+
   init {
     val cronetCallback = object : CronetUrlRequest.Callback() {
 
@@ -59,12 +62,12 @@ class NitroUrlRequestBuilder(
           // After Cronet writes, buffer position is at the end of written data
           val bytesRead = byteBuffer.position()
 
-          // Don't create a new ArrayBuffer - just pass back the original one!
-          // JS will create a view of the correct size using bytesRead
-          byteBuffer.rewind()
-          val arrayBuffer = ArrayBuffer(byteBuffer)
-          val nitroInfo = info.toNitro()
+          // Return the ORIGINAL ArrayBuffer that JS passed to read()
+          // This avoids creating a new ArrayBuffer wrapper
+          val arrayBuffer = nitroRequest?.currentReadBuffer
+            ?: throw IllegalStateException("No currentReadBuffer - did you call read()?")
 
+          val nitroInfo = info.toNitro()
           callback(nitroInfo, arrayBuffer, bytesRead.toDouble())
         }
 
@@ -202,6 +205,9 @@ class NitroUrlRequestBuilder(
 
   override fun build(): HybridUrlRequestSpec {
     val cronetRequest = builder.build()
-    return NitroUrlRequest(cronetRequest)
+    val request = NitroUrlRequest(cronetRequest)
+    // Store reference so callback can access currentReadBuffer
+    nitroRequest = request
+    return request
   }
 }
