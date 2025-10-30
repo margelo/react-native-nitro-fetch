@@ -19,7 +19,7 @@ class NitroUrlRequestBuilder(
   // Callbacks stored as optionals and set via setter methods
   private var onRedirectReceivedCallback: ((info: UrlResponseInfo, newLocationUrl: String) -> Unit)? = null
   private var onResponseStartedCallback: ((info: UrlResponseInfo) -> Unit)? = null
-  private var onReadCompletedCallback: ((info: UrlResponseInfo, byteBuffer: ArrayBuffer) -> Unit)? = null
+  private var onReadCompletedCallback: ((info: UrlResponseInfo, byteBuffer: ArrayBuffer, bytesRead: Double) -> Unit)? = null
   private var onSucceededCallback: ((info: UrlResponseInfo) -> Unit)? = null
   private var onFailedCallback: ((info: UrlResponseInfo?, error: RequestException) -> Unit)? = null
   private var onCanceledCallback: ((info: UrlResponseInfo?) -> Unit)? = null
@@ -56,18 +56,18 @@ class NitroUrlRequestBuilder(
         byteBuffer: ByteBuffer
       ) {
         onReadCompletedCallback?.let { callback ->
-          byteBuffer.flip()
+          // After Cronet writes, buffer position is at the end of written data
+          val bytesRead = byteBuffer.position()
 
-          // Zero-copy: slice the filled portion and wrap it in an ArrayBuffer
-          // This is safe because JS allocates a new buffer for each read
-          val slice = byteBuffer.slice()
-          val arrayBuffer = ArrayBuffer.wrap(slice)
+          // Don't create a new ArrayBuffer - just pass back the original one!
+          // JS will create a view of the correct size using bytesRead
+          byteBuffer.rewind()
+          val arrayBuffer = ArrayBuffer(byteBuffer)
           val nitroInfo = info.toNitro()
 
-          callback(nitroInfo, arrayBuffer)
+          callback(nitroInfo, arrayBuffer, bytesRead.toDouble())
         }
 
-        byteBuffer.clear()
       }
 
       override fun onSucceeded(
@@ -196,7 +196,7 @@ class NitroUrlRequestBuilder(
     this.onResponseStartedCallback = callback
   }
 
-  override fun onReadCompleted(callback: (info: UrlResponseInfo, byteBuffer: ArrayBuffer) -> Unit) {
+  override fun onReadCompleted(callback: (info: UrlResponseInfo, byteBuffer: ArrayBuffer, bytesRead: Double) -> Unit) {
     this.onReadCompletedCallback = callback
   }
 

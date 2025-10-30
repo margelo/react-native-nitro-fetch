@@ -69,7 +69,11 @@ export interface UrlRequestBuilder
   ): void;
   onResponseStarted(callback: (info: UrlResponseInfo) => void): void;
   onReadCompleted(
-    callback: (info: UrlResponseInfo, byteBuffer: ArrayBuffer) => void
+    callback: (
+      info: UrlResponseInfo,
+      byteBuffer: ArrayBuffer,
+      bytesRead: number
+    ) => void
   ): void;
 
   build(): UrlRequest;

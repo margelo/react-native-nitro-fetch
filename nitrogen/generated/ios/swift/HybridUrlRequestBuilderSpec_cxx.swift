@@ -281,12 +281,12 @@ open class HybridUrlRequestBuilderSpec_cxx {
   }
   
   @inline(__always)
-  public final func onReadCompleted(callback: bridge.Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_) -> bridge.Result_void_ {
+  public final func onReadCompleted(callback: bridge.Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double) -> bridge.Result_void_ {
     do {
-      try self.__implementation.onReadCompleted(callback: { () -> (UrlResponseInfo, ArrayBuffer) -> Void in
-        let __wrappedFunction = bridge.wrap_Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_(callback)
-        return { (__info: UrlResponseInfo, __byteBuffer: ArrayBuffer) -> Void in
-          __wrappedFunction.call(__info, __byteBuffer)
+      try self.__implementation.onReadCompleted(callback: { () -> (UrlResponseInfo, ArrayBuffer, Double) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double(callback)
+        return { (__info: UrlResponseInfo, __byteBuffer: ArrayBuffer, __bytesRead: Double) -> Void in
+          __wrappedFunction.call(__info, __byteBuffer, __bytesRead)
         }
       }())
       return bridge.create_Result_void_()

@@ -18,7 +18,11 @@ class NitroUrlRequest(
   }
 
   override fun read(buffer: ArrayBuffer) {
+    // Get the ByteBuffer from JS-allocated ArrayBuffer
     val byteBuffer = buffer.getBuffer(copyIfNeeded = false)
+    // Ensure it's ready for writing
+    byteBuffer.clear()
+    // Pass to Cronet to fill
     cronetRequest.read(byteBuffer)
   }
 

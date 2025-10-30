@@ -64,11 +64,11 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     };
   }
   
-  // pragma MARK: std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>
-  Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_ create_Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = NitroFetch::Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)](const UrlResponseInfo& info, const std::shared_ptr<ArrayBuffer>& byteBuffer) mutable -> void {
-      swiftClosure.call(info, ArrayBufferHolder(byteBuffer));
+  // pragma MARK: std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */, double /* bytesRead */)>
+  Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double create_Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const UrlResponseInfo& info, const std::shared_ptr<ArrayBuffer>& byteBuffer, double bytesRead) mutable -> void {
+      swiftClosure.call(info, ArrayBufferHolder(byteBuffer), bytesRead);
     };
   }
   

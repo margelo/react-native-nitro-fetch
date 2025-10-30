@@ -150,7 +150,7 @@ namespace margelo::nitro::nitrofetch {
         std::rethrow_exception(__result.error());
       }
     }
-    inline void onReadCompleted(const std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>& callback) override {
+    inline void onReadCompleted(const std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */, double /* bytesRead */)>& callback) override {
       auto __result = _swiftPart.onReadCompleted(callback);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());

@@ -47,7 +47,7 @@ namespace margelo::nitro::nitrofetch { enum class ErrorType; }
 #include "JErrorType.hpp"
 #include "JFunc_void_std__optional_UrlResponseInfo_.hpp"
 #include "JFunc_void_UrlResponseInfo_std__string.hpp"
-#include "JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_.hpp"
+#include "JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double.hpp"
 
 namespace margelo::nitro::nitrofetch {
 
@@ -119,9 +119,9 @@ namespace margelo::nitro::nitrofetch {
     static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo::javaobject> /* callback */)>("onResponseStarted_cxx");
     method(_javaPart, JFunc_void_UrlResponseInfo_cxx::fromCpp(callback));
   }
-  void JHybridUrlRequestBuilderSpec::onReadCompleted(const std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>& callback) {
-    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_::javaobject> /* callback */)>("onReadCompleted_cxx");
-    method(_javaPart, JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__cxx::fromCpp(callback));
+  void JHybridUrlRequestBuilderSpec::onReadCompleted(const std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */, double /* bytesRead */)>& callback) {
+    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double::javaobject> /* callback */)>("onReadCompleted_cxx");
+    method(_javaPart, JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double_cxx::fromCpp(callback));
   }
   std::shared_ptr<HybridUrlRequestSpec> JHybridUrlRequestBuilderSpec::build() {
     static const auto method = javaClassStatic()->getMethod<jni::local_ref<JHybridUrlRequestSpec::javaobject>()>("build");

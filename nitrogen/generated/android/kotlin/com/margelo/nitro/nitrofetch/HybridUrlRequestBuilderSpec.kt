@@ -110,11 +110,11 @@ abstract class HybridUrlRequestBuilderSpec: HybridObject() {
     return __result
   }
   
-  abstract fun onReadCompleted(callback: (info: UrlResponseInfo, byteBuffer: ArrayBuffer) -> Unit): Unit
+  abstract fun onReadCompleted(callback: (info: UrlResponseInfo, byteBuffer: ArrayBuffer, bytesRead: Double) -> Unit): Unit
   
   @DoNotStrip
   @Keep
-  private fun onReadCompleted_cxx(callback: Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_): Unit {
+  private fun onReadCompleted_cxx(callback: Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double): Unit {
     val __result = onReadCompleted(callback)
     return __result
   }

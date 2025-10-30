@@ -358,8 +358,9 @@ export async function fetch(
       request.read(buffer);
     });
 
-    builder.onReadCompleted((_info, byteBuffer) => {
-      const chunk = new Uint8Array(byteBuffer);
+    builder.onReadCompleted((_info, byteBuffer, bytesRead) => {
+      // Create a view of only the filled portion
+      const chunk = new Uint8Array(byteBuffer, 0, bytesRead);
       streamController.enqueue(chunk);
 
       if (!request.isDone()) {

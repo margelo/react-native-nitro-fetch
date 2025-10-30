@@ -9,7 +9,7 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
   // Callbacks stored as optionals and set via setter methods
   private var onRedirectReceivedCallback: ((_ info: UrlResponseInfo, _ newLocationUrl: String) -> Void)?
   private var onResponseStartedCallback: ((_ info: UrlResponseInfo) -> Void)?
-  private var onReadCompletedCallback: ((_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer) -> Void)?
+  private var onReadCompletedCallback: ((_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer, _ bytesRead: Double) -> Void)?
   private var onSucceededCallback: ((_ info: UrlResponseInfo) -> Void)?
   private var onFailedCallback: ((_ info: UrlResponseInfo?, _ error: RequestException) -> Void)?
   private var onCanceledCallback: ((_ info: UrlResponseInfo?) -> Void)?
@@ -55,7 +55,7 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     self.onResponseStartedCallback = callback
   }
 
-  func onReadCompleted(callback: @escaping (_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer) -> Void) {
+  func onReadCompleted(callback: @escaping (_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer, _ bytesRead: Double) -> Void) {
     self.onReadCompletedCallback = callback
   }
 
@@ -140,7 +140,7 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     // Optional callbacks - only called if set
     let onRedirectReceived: ((_ info: UrlResponseInfo, _ newLocationUrl: String) -> Void)?
     let onResponseStarted: ((_ info: UrlResponseInfo) -> Void)?
-    let onReadCompleted: ((_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer) -> Void)?
+    let onReadCompleted: ((_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer, _ bytesRead: Double) -> Void)?
     let onSucceeded: ((_ info: UrlResponseInfo) -> Void)?
     let onFailed: ((_ info: UrlResponseInfo?, _ error: RequestException) -> Void)?
     let onCanceled: ((_ info: UrlResponseInfo?) -> Void)?
@@ -156,7 +156,7 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     init(
       onRedirectReceived: ((_ info: UrlResponseInfo, _ newLocationUrl: String) -> Void)?,
       onResponseStarted: ((_ info: UrlResponseInfo) -> Void)?,
-      onReadCompleted: ((_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer) -> Void)?,
+      onReadCompleted: ((_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer, _ bytesRead: Double) -> Void)?,
       onSucceeded: ((_ info: UrlResponseInfo) -> Void)?,
       onFailed: ((_ info: UrlResponseInfo?, _ error: RequestException) -> Void)?,
       onCanceled: ((_ info: UrlResponseInfo?) -> Void)?,
@@ -297,7 +297,8 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
         }
 
         let info = response.toNitro()
-        callback(info, arrayBuffer)
+        let bytesRead = Double(data.count)
+        callback(info, arrayBuffer, bytesRead)
       }
     }
   }

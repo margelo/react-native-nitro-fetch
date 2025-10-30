@@ -315,26 +315,26 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return Func_void_UrlResponseInfo_std__string_Wrapper(std::move(value));
   }
   
-  // pragma MARK: std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>
+  // pragma MARK: std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */, double /* bytesRead */)>
   /**
-   * Specialized version of `std::function<void(const UrlResponseInfo&, const std::shared_ptr<ArrayBuffer>&)>`.
+   * Specialized version of `std::function<void(const UrlResponseInfo&, const std::shared_ptr<ArrayBuffer>&, double)>`.
    */
-  using Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_ = std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>;
+  using Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double = std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */, double /* bytesRead */)>;
   /**
-   * Wrapper class for a `std::function<void(const UrlResponseInfo& / * info * /, const std::shared_ptr<ArrayBuffer>& / * byteBuffer * /)>`, this can be used from Swift.
+   * Wrapper class for a `std::function<void(const UrlResponseInfo& / * info * /, const std::shared_ptr<ArrayBuffer>& / * byteBuffer * /, double / * bytesRead * /)>`, this can be used from Swift.
    */
-  class Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__Wrapper final {
+  class Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double_Wrapper final {
   public:
-    explicit Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__Wrapper(std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>&& func): _function(std::make_unique<std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>>(std::move(func))) {}
-    inline void call(UrlResponseInfo info, ArrayBufferHolder byteBuffer) const noexcept {
-      _function->operator()(info, byteBuffer.getArrayBuffer());
+    explicit Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double_Wrapper(std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */, double /* bytesRead */)>&& func): _function(std::make_unique<std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */, double /* bytesRead */)>>(std::move(func))) {}
+    inline void call(UrlResponseInfo info, ArrayBufferHolder byteBuffer, double bytesRead) const noexcept {
+      _function->operator()(info, byteBuffer.getArrayBuffer(), bytesRead);
     }
   private:
-    std::unique_ptr<std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */)>> _function;
+    std::unique_ptr<std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */, double /* bytesRead */)>> _function;
   } SWIFT_NONCOPYABLE;
-  Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_ create_Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept;
-  inline Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__Wrapper wrap_Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_(Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer_ value) noexcept {
-    return Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__Wrapper(std::move(value));
+  Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double create_Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double_Wrapper wrap_Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double(Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double value) noexcept {
+    return Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double_Wrapper(std::move(value));
   }
   
   // pragma MARK: std::shared_ptr<HybridUrlRequestBuilderSpec>
