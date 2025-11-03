@@ -156,6 +156,23 @@ export class FetchResponse {
     return formData;
   }
 
+  clone(): FetchResponse {
+    if (this._streamUsed) {
+      throw new TypeError(
+        'Cannot clone a Response whose body has already been used'
+      );
+    }
+
+    // Tee the stream so both the original and clone can be read independently
+    const [stream1, stream2] = this._stream.tee();
+
+    // Update the current instance to use the first teed stream
+    this._stream = stream1;
+
+    // Create a new FetchResponse with the second teed stream and cloned info
+    return new FetchResponse(this._info, stream2);
+  }
+
   toString(): string {
     return `FetchResponse: { status: ${this.status}, statusText: ${this.statusText}, url: ${this.url} }`;
   }
@@ -486,14 +503,18 @@ export async function fetch(
 
     builder.onSucceeded((_info) => {
       cleanup();
-      streamClosed = true;
-      streamController.close();
+      if (!streamClosed) {
+        streamClosed = true;
+        streamController.close();
+      }
     });
 
     builder.onFailed((_info, error) => {
       cleanup();
-      streamClosed = true;
-      streamController.error(new Error(error.message));
+      if (!streamClosed) {
+        streamClosed = true;
+        streamController.error(new Error(error.message));
+      }
       if (!responseInfo) {
         reject(new Error(error.message));
       }
@@ -501,9 +522,11 @@ export async function fetch(
 
     builder.onCanceled((_info) => {
       cleanup();
-      streamClosed = true;
       const abortError = new AbortError();
-      streamController.error(abortError);
+      if (!streamClosed) {
+        streamClosed = true;
+        streamController.error(abortError);
+      }
       if (!responseInfo) {
         reject(abortError);
       }

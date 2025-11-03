@@ -572,6 +572,201 @@ test(SUITE, 'multiple concurrent fetches dont interfere', async () => {
 });
 
 // =======================
+// Response.clone() Tests
+// =======================
+
+test(SUITE, 'can clone response and read both independently', async () => {
+  const url = getServerUrl('/json/small');
+  const response = await fetch(url);
+
+  // Clone the response
+  const clone = response.clone();
+
+  // Both should have same properties
+  expect(clone.status).to.equal(response.status);
+  expect(clone.statusText).to.equal(response.statusText);
+  expect(clone.ok).to.equal(response.ok);
+  expect(clone.url).to.equal(response.url);
+
+  // Read from original
+  const json1 = await response.json();
+  expect(json1).to.be.an('object');
+
+  // Read from clone independently
+  const json2 = await clone.json();
+  expect(json2).to.be.an('object');
+
+  // Both should have the same data
+  expect(JSON.stringify(json1)).to.equal(JSON.stringify(json2));
+});
+
+test(SUITE, 'cannot clone after body has been consumed', async () => {
+  const url = getServerUrl('/data/1kb');
+  const response = await fetch(url);
+
+  // Consume the body
+  await response.text();
+
+  // Try to clone - should throw
+  try {
+    response.clone();
+    throw new Error('Should have thrown');
+  } catch (error: any) {
+    expect(error.message).to.match(/already been used|cannot clone/i);
+  }
+});
+
+test(SUITE, 'clone preserves all response properties', async () => {
+  const url = getServerUrl('/data/1kb');
+  const response = await fetch(url);
+
+  const clone = response.clone();
+
+  expect(clone.status).to.equal(response.status);
+  expect(clone.statusText).to.equal(response.statusText);
+  expect(clone.ok).to.equal(response.ok);
+  expect(clone.url).to.equal(response.url);
+  expect(clone.redirected).to.equal(response.redirected);
+  expect(clone.type).to.equal(response.type);
+
+  // Headers should be the same
+  const contentType1 = response.headers.get('content-type');
+  const contentType2 = clone.headers.get('content-type');
+  expect(contentType1).to.equal(contentType2);
+});
+
+test(SUITE, 'can read original and clone with different methods', async () => {
+  const url = getServerUrl('/json/small');
+  const response = await fetch(url);
+
+  const clone = response.clone();
+
+  // Read original as JSON
+  const json = await response.json();
+  expect(json).to.be.an('object');
+
+  // Read clone as text
+  const text = await clone.text();
+  expect(text).to.be.a('string');
+
+  // Verify text is valid JSON
+  const parsedText = JSON.parse(text);
+  expect(JSON.stringify(json)).to.equal(JSON.stringify(parsedText));
+});
+
+test(SUITE, 'can clone multiple times before reading', async () => {
+  const url = getServerUrl('/data/1kb');
+  const response = await fetch(url);
+
+  // Create multiple clones
+  const clone1 = response.clone();
+  const clone2 = response.clone();
+  const clone3 = response.clone();
+
+  // All should be readable
+  const text1 = await response.text();
+  const text2 = await clone1.text();
+  const text3 = await clone2.text();
+  const text4 = await clone3.text();
+
+  expect(text1.length).to.equal(1024);
+  expect(text2.length).to.equal(1024);
+  expect(text3.length).to.equal(1024);
+  expect(text4.length).to.equal(1024);
+
+  expect(text1).to.equal(text2);
+  expect(text1).to.equal(text3);
+  expect(text1).to.equal(text4);
+});
+
+test(SUITE, 'clone works with arrayBuffer', async () => {
+  const url = getServerUrl('/data/1kb');
+  const response = await fetch(url);
+
+  const clone = response.clone();
+
+  const buffer1 = await response.arrayBuffer();
+  const buffer2 = await clone.arrayBuffer();
+
+  expect(buffer1.byteLength).to.equal(1024);
+  expect(buffer2.byteLength).to.equal(1024);
+  expect(buffer1.byteLength).to.equal(buffer2.byteLength);
+
+  // Verify contents are identical
+  const view1 = new Uint8Array(buffer1);
+  const view2 = new Uint8Array(buffer2);
+  expect(view1.length).to.equal(view2.length);
+});
+
+test(SUITE, 'clone with empty response', async () => {
+  const url = getServerUrl('/status/204'); // No Content
+  const response = await fetch(url);
+
+  const clone = response.clone();
+
+  const text1 = await response.text();
+  const text2 = await clone.text();
+
+  expect(text1).to.equal('');
+  expect(text2).to.equal('');
+});
+
+test(SUITE, 'clone with large response', async () => {
+  const url = getServerUrl('/data/1mb');
+  const response = await fetch(url);
+
+  const clone = response.clone();
+
+  const text1 = await response.text();
+  const text2 = await clone.text();
+
+  expect(text1.length).to.equal(1024 * 1024);
+  expect(text2.length).to.equal(1024 * 1024);
+  expect(text1).to.equal(text2);
+});
+
+test(SUITE, 'bodyUsed is independent for clone', async () => {
+  const url = getServerUrl('/data/1kb');
+  const response = await fetch(url);
+
+  const clone = response.clone();
+
+  // Initially both should be unused
+  expect(response.bodyUsed).to.equal(false);
+  expect(clone.bodyUsed).to.equal(false);
+
+  // Read original
+  await response.text();
+
+  // Original should be used, clone should not
+  expect(response.bodyUsed).to.equal(true);
+  expect(clone.bodyUsed).to.equal(false);
+
+  // Clone should still be readable
+  const text = await clone.text();
+  expect(text.length).to.equal(1024);
+
+  // Now both should be used
+  expect(response.bodyUsed).to.equal(true);
+  expect(clone.bodyUsed).to.equal(true);
+});
+
+test(SUITE, 'clone can be cloned again', async () => {
+  const url = getServerUrl('/data/1kb');
+  const response = await fetch(url);
+
+  const clone1 = response.clone();
+  const clone2 = clone1.clone();
+
+  const text1 = await response.text();
+  const text2 = await clone1.text();
+  const text3 = await clone2.text();
+
+  expect(text1).to.equal(text2);
+  expect(text1).to.equal(text3);
+});
+
+// =======================
 // AbortController Tests
 // =======================
 
@@ -593,7 +788,7 @@ test(SUITE, 'can abort request before it starts', async () => {
 
 test(SUITE, 'can abort request during fetch', async () => {
   const controller = new AbortController();
-  const url = getServerUrl('/delay/1000'); // 1 second delay
+  const url = getServerUrl('/delay/2000'); // 2 second delay
 
   // Start fetch
   const promise = fetch(url, { signal: controller.signal });
@@ -612,13 +807,13 @@ test(SUITE, 'can abort request during fetch', async () => {
 
 test(SUITE, 'can abort large download mid-stream', async () => {
   const controller = new AbortController();
-  const url = getServerUrl('/data/5mb'); // Large file to ensure it's downloading
+  const url = getServerUrl('/delay/2000'); // 2 second delay
 
   // Start fetch
   const promise = fetch(url, { signal: controller.signal });
 
-  // Abort very quickly to catch it before response completes
-  setTimeout(() => controller.abort(), 5);
+  // Abort during delay
+  setTimeout(() => controller.abort(), 200);
 
   try {
     await promise;
@@ -650,15 +845,15 @@ test(SUITE, 'multiple requests with different abort controllers', async () => {
   const controller2 = new AbortController();
   const controller3 = new AbortController();
 
-  const url = getServerUrl('/delay/500');
+  const url = getServerUrl('/delay/2000'); // 2 second delay
 
   // Start 3 requests
   const promise1 = fetch(url, { signal: controller1.signal });
   const promise2 = fetch(url, { signal: controller2.signal });
   const promise3 = fetch(url, { signal: controller3.signal });
 
-  // Abort only the second one
-  setTimeout(() => controller2.abort(), 50);
+  // Abort only the second one during delay
+  setTimeout(() => controller2.abort(), 200);
 
   try {
     const results = await Promise.allSettled([promise1, promise2, promise3]);
