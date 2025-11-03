@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { fetch as nitroFetch } from 'react-native-nitro-fetch';
+import { fetch as nitroFetch, fetchOnWorklet } from 'react-native-nitro-fetch';
 import { fetchStreamedData } from './stream';
 import TestScreen from './Tests';
 
@@ -43,6 +43,7 @@ export default function App() {
   const [activeTab, setActiveTab] = React.useState<'tests' | 'benchmark'>(
     'tests'
   );
+  const [workletResult, setWorkletResult] = React.useState<string>('');
 
   // Helper function to calculate robust average (resistant to outliers)
   const calculateRobustAverage = (values: number[]) => {
@@ -722,6 +723,93 @@ export default function App() {
             >
               <Text style={styles.buttonText}>📤 Test POST Body</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.button, styles.workletButton]}
+              onPress={async () => {
+                setTesting(true);
+                setWorkletResult('Loading crypto prices on worklet...');
+                try {
+                  const ids = [
+                    'bitcoin',
+                    'ethereum',
+                    'solana',
+                    'dogecoin',
+                    'litecoin',
+                    'cardano',
+                    'ripple',
+                    'polkadot',
+                    'chainlink',
+                    'polygon-pos',
+                  ];
+                  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids.join(','))}&vs_currencies=usd`;
+
+                  const start = performance.now();
+                  const data = await fetchOnWorklet<
+                    Array<{ id: string; usd: number }>
+                  >(url, undefined, async (response: any) => {
+                    'worklet';
+                    // This runs on worklet thread
+                    const text = await response.text();
+                    const json = JSON.parse(text) as Record<
+                      string,
+                      { usd: number }
+                    >;
+                    const arr = Object.entries(json).map(([id, v]) => ({
+                      id,
+                      usd: v.usd,
+                    }));
+                    arr.sort((a, b) => a.id.localeCompare(b.id));
+                    return arr;
+                  });
+                  const duration = performance.now() - start;
+
+                  const pricesList = data
+                    .map(
+                      (p: { id: string; usd: number }) =>
+                        `${p.id}: $${p.usd.toFixed(2)}`
+                    )
+                    .join(', ');
+                  setWorkletResult(
+                    `✅ Worklet fetch completed in ${duration.toFixed(0)}ms\n${data.length} prices loaded: ${pricesList}`
+                  );
+
+                  const result: TestResult = {
+                    endpoint: '⚡️ Worklet Crypto Prices',
+                    nativeDuration: 0,
+                    nitroDuration: duration,
+                    dataSize: `${data.length} coins`,
+                  };
+                  setResults((prev) => [result, ...prev]);
+                } catch (error: any) {
+                  console.error('Worklet test error:', error);
+                  setWorkletResult(
+                    `❌ Worklet test failed: ${error.message || String(error)}`
+                  );
+                  setResults((prev) => [
+                    {
+                      endpoint: '⚡️ Worklet Crypto Prices',
+                      nativeDuration: 0,
+                      nitroDuration: 0,
+                      dataSize: 'Error',
+                      error: error.message || String(error),
+                    },
+                    ...prev,
+                  ]);
+                } finally {
+                  setTesting(false);
+                }
+              }}
+              disabled={testing}
+            >
+              <Text style={styles.buttonText}>⚡️ Test Worklet Fetch</Text>
+            </TouchableOpacity>
+
+            {workletResult ? (
+              <View style={styles.workletResultContainer}>
+                <Text style={styles.workletResultText}>{workletResult}</Text>
+              </View>
+            ) : null}
           </View>
 
           <View style={styles.resultsContainer}>
@@ -1004,6 +1092,21 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     backgroundColor: '#FF3B30',
+  },
+  workletButton: {
+    backgroundColor: '#FF9500',
+  },
+  workletResultContainer: {
+    backgroundColor: '#f0f0f0',
+    padding: 12,
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+  },
+  workletResultText: {
+    fontSize: 13,
+    color: '#333',
+    lineHeight: 18,
   },
   buttonText: {
     color: '#fff',

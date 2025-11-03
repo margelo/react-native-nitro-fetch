@@ -299,7 +299,7 @@ export async function clearAutoPrefetchQueue(): Promise<void> {
 }
 
 // Optional off-thread processing using react-native-worklets-core
-export type WorkletMapper<T> = (response: FetchResponse) => T;
+export type WorkletMapper<T> = (response: FetchResponse) => T | Promise<T>;
 
 let nitroRuntime: any | undefined;
 let WorkletsRef: any | undefined;
