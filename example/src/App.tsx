@@ -41,7 +41,7 @@ export default function App() {
     new Set()
   );
 
-  // return <TestScreen />;
+  return <TestScreen />;
 
   // Helper function to calculate robust average (resistant to outliers)
   const calculateRobustAverage = (values: number[]) => {

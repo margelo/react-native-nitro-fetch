@@ -41,6 +41,7 @@ namespace margelo::nitro::nitrofetch {
   public:
     size_t getExternalMemorySize() noexcept override;
     void dispose() noexcept override;
+    std::string toString() override;
 
   public:
     inline const jni::global_ref<JHybridUrlRequestSpec::javaobject>& getJavaPart() const noexcept {

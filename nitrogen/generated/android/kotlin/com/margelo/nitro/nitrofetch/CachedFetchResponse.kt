@@ -33,6 +33,8 @@ data class CachedFetchResponse(
   @Keep
   val body: ArrayBuffer
 ) {
+  /* primary constructor */
+
   private companion object {
     /**
      * Constructor called from C++

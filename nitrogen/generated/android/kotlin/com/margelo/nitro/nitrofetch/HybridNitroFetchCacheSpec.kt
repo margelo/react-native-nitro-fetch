@@ -36,6 +36,11 @@ abstract class HybridNitroFetchCacheSpec: HybridObject() {
     super.updateNative(hybridData)
   }
 
+  // Default implementation of `HybridObject.toString()`
+  override fun toString(): String {
+    return "[HybridObject NitroFetchCache]"
+  }
+
   // Properties
   
 

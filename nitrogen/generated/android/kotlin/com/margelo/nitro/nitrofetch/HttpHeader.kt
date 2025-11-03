@@ -24,6 +24,8 @@ data class HttpHeader(
   @Keep
   val value: String
 ) {
+  /* primary constructor */
+
   private companion object {
     /**
      * Constructor called from C++

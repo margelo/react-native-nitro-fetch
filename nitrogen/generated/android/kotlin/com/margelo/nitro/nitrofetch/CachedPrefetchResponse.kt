@@ -36,6 +36,8 @@ data class CachedPrefetchResponse(
   @Keep
   val timestampMs: Double
 ) {
+  /* primary constructor */
+
   private companion object {
     /**
      * Constructor called from C++

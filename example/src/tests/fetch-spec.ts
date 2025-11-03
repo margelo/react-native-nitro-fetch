@@ -570,3 +570,264 @@ test(SUITE, 'multiple concurrent fetches dont interfere', async () => {
     expect(length).to.equal(1024);
   });
 });
+
+// =======================
+// AbortController Tests
+// =======================
+
+test(SUITE, 'can abort request before it starts', async () => {
+  const controller = new AbortController();
+  const url = getServerUrl('/data/1kb');
+
+  // Abort before fetch
+  controller.abort();
+
+  try {
+    await fetch(url, { signal: controller.signal });
+    throw new Error('Should have thrown');
+  } catch (error: any) {
+    expect(error.name).to.equal('AbortError');
+    expect(error.message).to.match(/abort/i);
+  }
+});
+
+test(SUITE, 'can abort request during fetch', async () => {
+  const controller = new AbortController();
+  const url = getServerUrl('/delay/1000'); // 1 second delay
+
+  // Start fetch
+  const promise = fetch(url, { signal: controller.signal });
+
+  // Abort after a short delay
+  setTimeout(() => controller.abort(), 100);
+
+  try {
+    await promise;
+    throw new Error('Should have thrown');
+  } catch (error: any) {
+    expect(error.name).to.equal('AbortError');
+    expect(error.message).to.match(/abort/i);
+  }
+});
+
+test(SUITE, 'can abort large download mid-stream', async () => {
+  const controller = new AbortController();
+  const url = getServerUrl('/data/5mb'); // Large file to ensure it's downloading
+
+  // Start fetch
+  const promise = fetch(url, { signal: controller.signal });
+
+  // Abort very quickly to catch it before response completes
+  setTimeout(() => controller.abort(), 5);
+
+  try {
+    await promise;
+    throw new Error('Should have thrown');
+  } catch (error: any) {
+    expect(error.name).to.equal('AbortError');
+    expect(error.message).to.match(/abort/i);
+  }
+});
+
+test(SUITE, 'abort error has correct type', async () => {
+  const controller = new AbortController();
+  const url = getServerUrl('/data/1kb');
+
+  controller.abort();
+
+  try {
+    await fetch(url, { signal: controller.signal });
+    throw new Error('Should have thrown');
+  } catch (error: any) {
+    expect(error).to.be.instanceOf(Error);
+    expect(error.name).to.equal('AbortError');
+    expect(error.message).to.match(/abort/i);
+  }
+});
+
+test(SUITE, 'multiple requests with different abort controllers', async () => {
+  const controller1 = new AbortController();
+  const controller2 = new AbortController();
+  const controller3 = new AbortController();
+
+  const url = getServerUrl('/delay/500');
+
+  // Start 3 requests
+  const promise1 = fetch(url, { signal: controller1.signal });
+  const promise2 = fetch(url, { signal: controller2.signal });
+  const promise3 = fetch(url, { signal: controller3.signal });
+
+  // Abort only the second one
+  setTimeout(() => controller2.abort(), 50);
+
+  try {
+    const results = await Promise.allSettled([promise1, promise2, promise3]);
+
+    // First request should succeed
+    expect(results[0].status).to.equal('fulfilled');
+
+    // Second request should be aborted
+    expect(results[1].status).to.equal('rejected');
+    if (results[1].status === 'rejected') {
+      expect(results[1].reason.name).to.equal('AbortError');
+    }
+
+    // Third request should succeed
+    expect(results[2].status).to.equal('fulfilled');
+  } catch (error: any) {
+    // If we get here, something went wrong
+    throw error;
+  }
+});
+
+test(SUITE, 'abort after response started but before body read', async () => {
+  const controller = new AbortController();
+  const url = getServerUrl('/data/10kb'); // Smaller file for faster test
+
+  const response = await fetch(url, { signal: controller.signal });
+  expect(response.status).to.equal(200);
+
+  // Abort before reading the body
+  controller.abort();
+
+  // Try to read the body - behavior may vary
+  // Some implementations might allow reading, others might fail
+  try {
+    await response.text();
+    // If it succeeds, that's okay - the abort happened after response
+  } catch (error: any) {
+    // If it fails with abort error, that's also okay
+    expect(error.name).to.match(/AbortError|Error/i);
+  }
+});
+
+test(SUITE, 'can reuse aborted controller signal', async () => {
+  const controller = new AbortController();
+  controller.abort();
+
+  const url = getServerUrl('/data/1kb');
+
+  // First attempt with aborted signal
+  try {
+    await fetch(url, { signal: controller.signal });
+    throw new Error('Should have thrown');
+  } catch (error: any) {
+    expect(error.name).to.equal('AbortError');
+  }
+
+  // Second attempt with same aborted signal
+  try {
+    await fetch(url, { signal: controller.signal });
+    throw new Error('Should have thrown');
+  } catch (error: any) {
+    expect(error.name).to.equal('AbortError');
+  }
+});
+
+test(SUITE, 'fetch without signal continues normally', async () => {
+  const url = getServerUrl('/data/1kb');
+
+  // Fetch without signal
+  const response = await fetch(url);
+
+  expect(response.status).to.equal(200);
+  const text = await response.text();
+  expect(text.length).to.equal(1024);
+});
+
+test(SUITE, 'aborting completed request does nothing', async () => {
+  const controller = new AbortController();
+  const url = getServerUrl('/data/1kb');
+
+  const response = await fetch(url, { signal: controller.signal });
+  const text = await response.text();
+
+  expect(text.length).to.equal(1024);
+
+  // Abort after completion
+  controller.abort();
+
+  // Should not throw or cause issues
+  expect(response.status).to.equal(200);
+});
+
+test(SUITE, 'can abort while actively reading stream', async () => {
+  const controller = new AbortController();
+  const url = getServerUrl('/data/5mb'); // Large file to ensure multiple chunks
+
+  const response = await fetch(url, { signal: controller.signal });
+  expect(response.status).to.equal(200);
+
+  const stream = response.body;
+  expect(stream).to.not.be.null;
+
+  if (!stream) {
+    throw new Error('Stream is null');
+  }
+
+  const reader = stream.getReader();
+  let chunksRead = 0;
+  let bytesRead = 0;
+
+  try {
+    // Read a few chunks
+    while (chunksRead < 3) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      chunksRead++;
+      bytesRead += value.length;
+    }
+
+    expect(chunksRead).to.be.greaterThan(0);
+    expect(bytesRead).to.be.greaterThan(0);
+
+    // Abort while stream is still active
+    controller.abort();
+
+    // Try to read more - should fail with abort error or done
+    try {
+      while (true) {
+        const { done } = await reader.read();
+        if (done) break;
+        // If we get here, some implementations might drain the stream
+        // which is acceptable behavior
+      }
+    } catch (error: any) {
+      // Stream should error after abort
+      expect(error.name).to.match(/AbortError|Error/i);
+    }
+
+    // Either we got an error or the stream finished gracefully
+    // Both are acceptable after abort is called mid-stream
+  } finally {
+    reader.releaseLock();
+  }
+});
+
+test(SUITE, 'abort signal cancels stream via stream.cancel()', async () => {
+  const controller = new AbortController();
+  const url = getServerUrl('/data/5mb');
+
+  const response = await fetch(url, { signal: controller.signal });
+  const stream = response.body;
+
+  expect(stream).to.not.be.null;
+  if (!stream) throw new Error('Stream is null');
+
+  const reader = stream.getReader();
+
+  // Read one chunk to start the stream
+  await reader.read();
+
+  // Now manually cancel the stream (this should trigger request.cancel())
+  reader.releaseLock();
+  await stream.cancel();
+
+  // Verify stream is closed
+  const reader2 = stream.getReader();
+  const { done } = await reader2.read();
+  expect(done).to.equal(true);
+
+  reader2.releaseLock();
+});

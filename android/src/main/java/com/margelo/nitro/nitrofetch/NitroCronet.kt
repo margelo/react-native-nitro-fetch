@@ -129,7 +129,7 @@ class NitroCronet : HybridNitroCronetSpec() {
       byteBuffer.put(cached.body)
       byteBuffer.flip()
 
-      val arrayBuffer = ArrayBuffer(byteBuffer)
+      val arrayBuffer = ArrayBuffer.wrap(byteBuffer)
       val result = CachedFetchResponse(
         url = cached.url,
         status = cached.statusCode.toDouble(),
@@ -158,7 +158,7 @@ class NitroCronet : HybridNitroCronetSpec() {
           byteBuffer.put(cached.body)
           byteBuffer.flip()
 
-          val arrayBuffer = ArrayBuffer(byteBuffer)
+          val arrayBuffer = ArrayBuffer.wrap(byteBuffer)
           val result = CachedFetchResponse(
             url = cached.url,
             status = cached.statusCode.toDouble(),
@@ -168,16 +168,16 @@ class NitroCronet : HybridNitroCronetSpec() {
           )
           promise.resolve(result)
         } else {
-          // Pending prefetch returned null - return null for graceful fallback
-          promise.resolve(null as CachedFetchResponse?)
+          // Pending prefetch returned null - reject so JS can handle it
+          promise.reject(Exception("Prefetch not found"))
         }
       }
       return promise
     }
 
-    // Not found in cache and not pending - return null for graceful fallback
+    // Not found in cache and not pending - reject so JS can handle it
     // This allows the JS layer to automatically fall back to a normal fetch
-    promise.resolve(null as CachedFetchResponse?)
+    promise.reject(Exception("Prefetch not found"))
     return promise
   }
 

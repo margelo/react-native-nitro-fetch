@@ -19,6 +19,13 @@ public protocol HybridNitroFetchCacheSpec_protocol: HybridObject {
   func clearAll() throws -> Void
 }
 
+public extension HybridNitroFetchCacheSpec_protocol {
+  /// Default implementation of ``HybridObject.toString``
+  func toString() -> String {
+    return "[HybridObject NitroFetchCache]"
+  }
+}
+
 /// See ``HybridNitroFetchCacheSpec``
 open class HybridNitroFetchCacheSpec_base {
   private weak var cxxWrapper: HybridNitroFetchCacheSpec_cxx? = nil

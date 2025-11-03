@@ -57,7 +57,6 @@ namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 #include "UrlResponseInfo.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/ArrayBufferHolder.hpp>
-#include <NitroModules/FastVectorCopy.hpp>
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/PromiseHolder.hpp>
 #include <NitroModules/Result.hpp>

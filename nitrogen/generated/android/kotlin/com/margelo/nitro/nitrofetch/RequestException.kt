@@ -57,6 +57,8 @@ data class RequestException(
   @Keep
   val causeMessage: String?
 ) {
+  /* primary constructor */
+
   private companion object {
     /**
      * Constructor called from C++

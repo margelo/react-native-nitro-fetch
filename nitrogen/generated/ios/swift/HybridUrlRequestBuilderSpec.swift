@@ -30,6 +30,13 @@ public protocol HybridUrlRequestBuilderSpec_protocol: HybridObject {
   func build() throws -> (any HybridUrlRequestSpec)
 }
 
+public extension HybridUrlRequestBuilderSpec_protocol {
+  /// Default implementation of ``HybridObject.toString``
+  func toString() -> String {
+    return "[HybridObject UrlRequestBuilder]"
+  }
+}
+
 /// See ``HybridUrlRequestBuilderSpec``
 open class HybridUrlRequestBuilderSpec_base {
   private weak var cxxWrapper: HybridUrlRequestBuilderSpec_cxx? = nil

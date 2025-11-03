@@ -48,6 +48,8 @@ data class UrlResponseInfo(
   @Keep
   val wasCached: Boolean
 ) {
+  /* primary constructor */
+
   private companion object {
     /**
      * Constructor called from C++

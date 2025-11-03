@@ -20,6 +20,13 @@ public protocol HybridNitroCronetSpec_protocol: HybridObject {
   func consumeNativePrefetch(prefetchKey: String) throws -> Promise<CachedFetchResponse?>
 }
 
+public extension HybridNitroCronetSpec_protocol {
+  /// Default implementation of ``HybridObject.toString``
+  func toString() -> String {
+    return "[HybridObject NitroCronet]"
+  }
+}
+
 /// See ``HybridNitroCronetSpec``
 open class HybridNitroCronetSpec_base {
   private weak var cxxWrapper: HybridNitroCronetSpec_cxx? = nil

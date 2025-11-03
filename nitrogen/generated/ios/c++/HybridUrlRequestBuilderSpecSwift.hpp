@@ -77,6 +77,9 @@ namespace margelo::nitro::nitrofetch {
     void dispose() noexcept override {
       _swiftPart.dispose();
     }
+    std::string toString() override {
+      return _swiftPart.toString();
+    }
 
   public:
     // Properties

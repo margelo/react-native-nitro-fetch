@@ -6,6 +6,16 @@ import type {
 } from './NitroCronet.nitro';
 import { TextDecoder } from './TextDecoder';
 
+// AbortError class for React Native (DOMException not available)
+export class AbortError extends Error {
+  constructor(message: string = 'The operation was aborted.') {
+    super(message);
+    this.name = 'AbortError';
+    // Maintain proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, AbortError.prototype);
+  }
+}
+
 export const NitroCronet: NitroCronetType =
   NitroModules.createHybridObject<NitroCronetType>('NitroCronet');
 
@@ -14,6 +24,7 @@ export interface FetchOptions {
   headers?: Record<string, string>;
   body?: ArrayBuffer | Uint8Array | string;
   cache?: 'default' | 'no-cache';
+  signal?: AbortSignal;
 }
 
 export interface PrefetchOptions {
@@ -270,6 +281,77 @@ export async function clearAutoPrefetchQueue(): Promise<void> {
   storage.set(KEY, JSON.stringify([]));
 }
 
+// Optional off-thread processing using react-native-worklets-core
+export type WorkletMapper<T> = (response: FetchResponse) => T;
+
+let nitroRuntime: any | undefined;
+let WorkletsRef: any | undefined;
+
+function ensureWorkletRuntime(name = 'nitro-fetch'): any | undefined {
+  try {
+    const { Worklets } = require('react-native-worklets-core');
+    nitroRuntime = nitroRuntime ?? Worklets.createRuntime(name);
+    return nitroRuntime;
+  } catch {
+    console.warn('react-native-worklets-core not available');
+    return undefined;
+  }
+}
+
+function getWorklets(): any | undefined {
+  try {
+    if (WorkletsRef) return WorkletsRef;
+    const { Worklets } = require('react-native-worklets-core');
+    WorkletsRef = Worklets;
+    return WorkletsRef;
+  } catch {
+    console.warn('react-native-worklets-core not available');
+    return undefined;
+  }
+}
+
+export async function fetchOnWorklet<T>(
+  url: string,
+  options: FetchOptions | undefined,
+  mapWorklet: WorkletMapper<T>,
+  runtimeOptions?: { runtimeName?: string }
+): Promise<T> {
+  let rt: any | undefined;
+  let Worklets: any | undefined;
+  try {
+    rt = ensureWorkletRuntime(runtimeOptions?.runtimeName);
+    Worklets = getWorklets();
+  } catch (e) {
+    console.error('fetchOnWorklet: setup failed', e);
+  }
+
+  // Fallback: if runtime is not available, do the work on JS
+  if (!rt || !Worklets || typeof rt.run !== 'function') {
+    console.warn('fetchOnWorklet: no runtime, mapping on JS thread');
+    const res = await fetch(url, options);
+    return mapWorklet(res);
+  }
+
+  return await new Promise<T>((resolve, reject) => {
+    try {
+      rt.run(async (map: WorkletMapper<T>) => {
+        'worklet';
+        try {
+          const res = await fetch(url, options);
+          const out = map(res);
+          // Resolve back on JS thread
+          Worklets.runOnJS(resolve)(out as any);
+        } catch (e) {
+          Worklets.runOnJS(reject)(e as any);
+        }
+      }, mapWorklet as any);
+    } catch (e) {
+      console.error('fetchOnWorklet: rt.run failed', e);
+      reject(e);
+    }
+  });
+}
+
 function createResponseFromNativeCache(cached: {
   url: string;
   status: number;
@@ -307,18 +389,27 @@ function createResponseFromNativeCache(cached: {
 async function tryConsumePrefetch(
   prefetchKey: string
 ): Promise<FetchResponse | null> {
-  const nativeCached = await NitroCronet.consumeNativePrefetch(prefetchKey);
-  if (nativeCached) {
-    return createResponseFromNativeCache(nativeCached);
+  try {
+    const nativeCached = await NitroCronet.consumeNativePrefetch(prefetchKey);
+    if (nativeCached) {
+      return createResponseFromNativeCache(nativeCached);
+    }
+    return null;
+  } catch (error) {
+    // Prefetch not found or expired - return null to fall back to normal fetch
+    return null;
   }
-
-  return null;
 }
 
 export async function fetch(
   url: string,
   options?: FetchOptions
 ): Promise<FetchResponse> {
+  // Check if already aborted
+  if (options?.signal?.aborted) {
+    return Promise.reject(new AbortError());
+  }
+
   const prefetchKey = options?.headers?.prefetchKey;
   if (prefetchKey) {
     const prefetched = await tryConsumePrefetch(prefetchKey);
@@ -331,17 +422,36 @@ export async function fetch(
     let responseInfo: UrlResponseInfo | null = null;
     let request: UrlRequest;
     let streamController: ReadableStreamDefaultController<Uint8Array>;
+    let abortHandler: (() => void) | undefined;
+    let streamClosed = false;
 
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         streamController = controller;
       },
       cancel() {
+        streamClosed = true;
         if (request && !request.isDone()) {
           request.cancel();
         }
       },
     });
+
+    // Set up abort handling
+    if (options?.signal) {
+      abortHandler = () => {
+        if (request && !request.isDone()) {
+          request.cancel();
+        }
+      };
+      options.signal.addEventListener('abort', abortHandler);
+    }
+
+    const cleanup = () => {
+      if (options?.signal && abortHandler) {
+        options.signal.removeEventListener('abort', abortHandler);
+      }
+    };
 
     // Create the builder
     const builder = NitroCronet.newUrlRequestBuilder(url);
@@ -359,6 +469,11 @@ export async function fetch(
     });
 
     builder.onReadCompleted((_info, byteBuffer, bytesRead) => {
+      // Skip if stream is already closed/errored
+      if (streamClosed) {
+        return;
+      }
+
       // Copy the data since native will reuse the buffer for the next read
       // slice() is more efficient than creating+copying with .set()
       const chunk = new Uint8Array(byteBuffer, 0, bytesRead).slice();
@@ -370,10 +485,14 @@ export async function fetch(
     });
 
     builder.onSucceeded((_info) => {
+      cleanup();
+      streamClosed = true;
       streamController.close();
     });
 
     builder.onFailed((_info, error) => {
+      cleanup();
+      streamClosed = true;
       streamController.error(new Error(error.message));
       if (!responseInfo) {
         reject(new Error(error.message));
@@ -381,7 +500,13 @@ export async function fetch(
     });
 
     builder.onCanceled((_info) => {
-      streamController.close();
+      cleanup();
+      streamClosed = true;
+      const abortError = new AbortError();
+      streamController.error(abortError);
+      if (!responseInfo) {
+        reject(abortError);
+      }
     });
 
     if (options?.method) {
@@ -417,6 +542,14 @@ export async function fetch(
     }
 
     request = builder.build();
+
+    // Check if aborted before starting
+    if (options?.signal?.aborted) {
+      cleanup();
+      reject(new AbortError());
+      return;
+    }
+
     request.start();
   });
 }

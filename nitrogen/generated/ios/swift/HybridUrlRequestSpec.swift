@@ -21,6 +21,13 @@ public protocol HybridUrlRequestSpec_protocol: HybridObject {
   func isDone() throws -> Bool
 }
 
+public extension HybridUrlRequestSpec_protocol {
+  /// Default implementation of ``HybridObject.toString``
+  func toString() -> String {
+    return "[HybridObject UrlRequest]"
+  }
+}
+
 /// See ``HybridUrlRequestSpec``
 open class HybridUrlRequestSpec_base {
   private weak var cxxWrapper: HybridUrlRequestSpec_cxx? = nil
