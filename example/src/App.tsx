@@ -40,8 +40,9 @@ export default function App() {
   const [seenRequestIds, setSeenRequestIds] = React.useState<Set<string>>(
     new Set()
   );
-
-  return <TestScreen />;
+  const [activeTab, setActiveTab] = React.useState<'tests' | 'benchmark'>(
+    'tests'
+  );
 
   // Helper function to calculate robust average (resistant to outliers)
   const calculateRobustAverage = (values: number[]) => {
@@ -460,437 +461,474 @@ export default function App() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.buttonContainer}>
+      {/* Tab Bar */}
+      <View style={styles.tabBar}>
         <TouchableOpacity
-          style={[styles.button, styles.runAllButton]}
-          onPress={runAllTests}
-          disabled={testing}
+          style={[styles.tab, activeTab === 'tests' && styles.activeTab]}
+          onPress={() => setActiveTab('tests')}
         >
-          <Text style={styles.buttonText}>
-            {testing ? '⏳ Running Tests...' : '🚀 Run All Tests'}
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'tests' && styles.activeTabText,
+            ]}
+          >
+            Tests
           </Text>
         </TouchableOpacity>
-
         <TouchableOpacity
-          style={[
-            styles.button,
-            styles.cacheToggleButton,
-            cacheEnabled && styles.cacheEnabledButton,
-          ]}
-          onPress={() => setCacheEnabled(!cacheEnabled)}
-          disabled={testing}
+          style={[styles.tab, activeTab === 'benchmark' && styles.activeTab]}
+          onPress={() => setActiveTab('benchmark')}
         >
-          <Text style={styles.buttonText}>
-            {cacheEnabled ? '🔒 Cache ON' : '🔓 Cache OFF'}
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'benchmark' && styles.activeTabText,
+            ]}
+          >
+            Benchmark
           </Text>
         </TouchableOpacity>
+      </View>
 
-        <TouchableOpacity
-          style={[styles.button, styles.cacheTestButton]}
-          onPress={async () => {
-            setTesting(true);
-            try {
-              const totalStart = performance.now();
-              const times: number[] = [];
-              let dataCount = 0;
-              let savedRecordCount = 0;
+      {/* Content */}
+      {activeTab === 'tests' ? (
+        <TestScreen />
+      ) : (
+        <View style={styles.benchmarkContainer}>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.button, styles.runAllButton]}
+              onPress={runAllTests}
+              disabled={testing}
+            >
+              <Text style={styles.buttonText}>
+                {testing ? '⏳ Running Tests...' : '🚀 Run All Tests'}
+              </Text>
+            </TouchableOpacity>
 
-              for (let i = 0; i < 15; i++) {
-                const start = performance.now();
-                let itemCount = 0;
-                let totalRecordCount = 0;
-                await fetchStreamedData({
-                  onData: (data) => {
-                    if ('records' in data && Array.isArray(data.records)) {
-                      totalRecordCount += data.records.length;
-                      console.log(
-                        'Data:',
-                        data,
-                        `(${data.records.length} records)`
-                      );
-                    } else {
-                      console.log('Data:', data);
+            <TouchableOpacity
+              style={[
+                styles.button,
+                styles.cacheToggleButton,
+                cacheEnabled && styles.cacheEnabledButton,
+              ]}
+              onPress={() => setCacheEnabled(!cacheEnabled)}
+              disabled={testing}
+            >
+              <Text style={styles.buttonText}>
+                {cacheEnabled ? '🔒 Cache ON' : '🔓 Cache OFF'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.button, styles.cacheTestButton]}
+              onPress={async () => {
+                setTesting(true);
+                try {
+                  const totalStart = performance.now();
+                  const times: number[] = [];
+                  let dataCount = 0;
+                  let savedRecordCount = 0;
+
+                  for (let i = 0; i < 15; i++) {
+                    const start = performance.now();
+                    let itemCount = 0;
+                    let totalRecordCount = 0;
+                    await fetchStreamedData({
+                      onData: (data) => {
+                        if ('records' in data && Array.isArray(data.records)) {
+                          totalRecordCount += data.records.length;
+                          console.log(
+                            'Data:',
+                            data,
+                            `(${data.records.length} records)`
+                          );
+                        } else {
+                          console.log('Data:', data);
+                        }
+                        itemCount++;
+                      },
+                    });
+                    const end = performance.now();
+                    const duration = end - start;
+                    times.push(duration);
+                    if (i === 0) {
+                      dataCount = itemCount;
+                      savedRecordCount = totalRecordCount;
                     }
-                    itemCount++;
-                  },
-                });
-                const end = performance.now();
-                const duration = end - start;
-                times.push(duration);
-                if (i === 0) {
-                  dataCount = itemCount;
-                  savedRecordCount = totalRecordCount;
+
+                    // Add each individual run to results
+                    const dataSizeText =
+                      totalRecordCount > 0
+                        ? `${totalRecordCount} records`
+                        : `${itemCount} chunks`;
+                    const runResult: TestResult = {
+                      endpoint: `🌊 Stream #${i + 1}`,
+                      nativeDuration: 0,
+                      nitroDuration: duration,
+                      dataSize: dataSizeText,
+                    };
+                    setResults((prev) => [runResult, ...prev]);
+                  }
+
+                  const totalEnd = performance.now();
+                  const totalDuration = totalEnd - totalStart;
+                  const avgDuration = calculateRobustAverage(times);
+                  const minDuration = Math.min(...times);
+                  const maxDuration = Math.max(...times);
+
+                  // Add summary results to the UI
+                  const summaryDataSize =
+                    savedRecordCount > 0
+                      ? `${savedRecordCount} records`
+                      : `${dataCount} chunks`;
+                  const summaryResults: TestResult[] = [
+                    {
+                      endpoint: '📊 Stream - Average',
+                      nativeDuration: 0,
+                      nitroDuration: avgDuration,
+                      dataSize: summaryDataSize,
+                    },
+                    {
+                      endpoint: '📊 Stream - Min',
+                      nativeDuration: 0,
+                      nitroDuration: minDuration,
+                      dataSize: summaryDataSize,
+                    },
+                    {
+                      endpoint: '📊 Stream - Max',
+                      nativeDuration: 0,
+                      nitroDuration: maxDuration,
+                      dataSize: summaryDataSize,
+                    },
+                    {
+                      endpoint: '📊 Stream - Total',
+                      nativeDuration: 0,
+                      nitroDuration: totalDuration,
+                      dataSize: `15 runs`,
+                    },
+                  ];
+
+                  setResults((prev) => [...summaryResults, ...prev]);
+
+                  console.log('='.repeat(50));
+                  console.log(
+                    `Completed 15 stream tests in ${totalDuration.toFixed(2)}ms`
+                  );
+                  console.log(`Average: ${avgDuration.toFixed(2)}ms`);
+                  console.log(`Min: ${minDuration.toFixed(2)}ms`);
+                  console.log(`Max: ${maxDuration.toFixed(2)}ms`);
+                  console.log('='.repeat(50));
+                } finally {
+                  setTesting(false);
                 }
+              }}
+              disabled={testing}
+            >
+              <Text style={styles.buttonText}>🔍 Test Stream</Text>
+            </TouchableOpacity>
 
-                // Add each individual run to results
-                const dataSizeText =
-                  totalRecordCount > 0
-                    ? `${totalRecordCount} records`
-                    : `${itemCount} chunks`;
-                const runResult: TestResult = {
-                  endpoint: `🌊 Stream #${i + 1}`,
-                  nativeDuration: 0,
-                  nitroDuration: duration,
-                  dataSize: dataSizeText,
-                };
-                setResults((prev) => [runResult, ...prev]);
-              }
+            <TouchableOpacity
+              style={[styles.button, styles.cacheTestButton]}
+              onPress={async () => {
+                setTesting(true);
+                try {
+                  const testData = {
+                    message: 'Hello from React Native!',
+                    timestamp: Date.now(),
+                    data: Array.from({ length: 100 }, (_, i) => ({
+                      id: i,
+                      value: Math.random(),
+                    })),
+                  };
+                  const bodyString = JSON.stringify(testData);
 
-              const totalEnd = performance.now();
-              const totalDuration = totalEnd - totalStart;
-              const avgDuration = calculateRobustAverage(times);
-              const minDuration = Math.min(...times);
-              const maxDuration = Math.max(...times);
+                  console.log(
+                    'Testing POST with body:',
+                    bodyString.length,
+                    'bytes'
+                  );
 
-              // Add summary results to the UI
-              const summaryDataSize =
-                savedRecordCount > 0
-                  ? `${savedRecordCount} records`
-                  : `${dataCount} chunks`;
-              const summaryResults: TestResult[] = [
-                {
-                  endpoint: '📊 Stream - Average',
-                  nativeDuration: 0,
-                  nitroDuration: avgDuration,
-                  dataSize: summaryDataSize,
-                },
-                {
-                  endpoint: '📊 Stream - Min',
-                  nativeDuration: 0,
-                  nitroDuration: minDuration,
-                  dataSize: summaryDataSize,
-                },
-                {
-                  endpoint: '📊 Stream - Max',
-                  nativeDuration: 0,
-                  nitroDuration: maxDuration,
-                  dataSize: summaryDataSize,
-                },
-                {
-                  endpoint: '📊 Stream - Total',
-                  nativeDuration: 0,
-                  nitroDuration: totalDuration,
-                  dataSize: `15 runs`,
-                },
-              ];
+                  // Test Native Fetch
+                  const nativeStart = performance.now();
+                  const nativeResponse = await fetch(`${SERVER_URL}/echo`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: bodyString,
+                  });
+                  const nativeData = await nativeResponse.json();
+                  const nativeDuration = performance.now() - nativeStart;
 
-              setResults((prev) => [...summaryResults, ...prev]);
+                  console.log('Native POST Response:', nativeData);
 
-              console.log('='.repeat(50));
-              console.log(
-                `Completed 15 stream tests in ${totalDuration.toFixed(2)}ms`
-              );
-              console.log(`Average: ${avgDuration.toFixed(2)}ms`);
-              console.log(`Min: ${minDuration.toFixed(2)}ms`);
-              console.log(`Max: ${maxDuration.toFixed(2)}ms`);
-              console.log('='.repeat(50));
-            } finally {
-              setTesting(false);
-            }
-          }}
-          disabled={testing}
-        >
-          <Text style={styles.buttonText}>🔍 Test Stream</Text>
-        </TouchableOpacity>
+                  await new Promise((resolve) => setTimeout(resolve, 100));
 
-        <TouchableOpacity
-          style={[styles.button, styles.cacheTestButton]}
-          onPress={async () => {
-            setTesting(true);
-            try {
-              const testData = {
-                message: 'Hello from React Native!',
-                timestamp: Date.now(),
-                data: Array.from({ length: 100 }, (_, i) => ({
-                  id: i,
-                  value: Math.random(),
-                })),
-              };
-              const bodyString = JSON.stringify(testData);
+                  // Test Nitro Fetch
+                  const nitroStart = performance.now();
+                  const nitroResponse = await nitroFetch(`${SERVER_URL}/echo`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                    body: bodyString,
+                  });
+                  const nitroData = await nitroResponse.json();
+                  const nitroDuration = performance.now() - nitroStart;
 
-              console.log(
-                'Testing POST with body:',
-                bodyString.length,
-                'bytes'
-              );
+                  console.log('Nitro POST Response:', nitroData);
 
-              // Test Native Fetch
-              const nativeStart = performance.now();
-              const nativeResponse = await fetch(`${SERVER_URL}/echo`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: bodyString,
-              });
-              const nativeData = await nativeResponse.json();
-              const nativeDuration = performance.now() - nativeStart;
+                  const result: TestResult = {
+                    endpoint: '📤 POST /echo',
+                    nativeDuration: nativeDuration,
+                    nitroDuration: nitroDuration,
+                    dataSize: `${bodyString.length}B`,
+                  };
 
-              console.log('Native POST Response:', nativeData);
-
-              await new Promise((resolve) => setTimeout(resolve, 100));
-
-              // Test Nitro Fetch
-              const nitroStart = performance.now();
-              const nitroResponse = await nitroFetch(`${SERVER_URL}/echo`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: bodyString,
-              });
-              const nitroData = await nitroResponse.json();
-              const nitroDuration = performance.now() - nitroStart;
-
-              console.log('Nitro POST Response:', nitroData);
-
-              const result: TestResult = {
-                endpoint: '📤 POST /echo',
-                nativeDuration: nativeDuration,
-                nitroDuration: nitroDuration,
-                dataSize: `${bodyString.length}B`,
-              };
-
-              if (
-                nativeData.success &&
-                nitroData.success &&
-                nativeData.receivedBytes === bodyString.length &&
-                nitroData.receivedBytes === bodyString.length
-              ) {
-                console.log('✅ POST test successful!');
-                setResults((prev) => [result, ...prev]);
-              } else {
-                console.error('❌ POST test failed');
-                setResults((prev) => [
-                  { ...result, error: 'Mismatch' },
-                  ...prev,
-                ]);
-              }
-            } catch (error: any) {
-              console.error('❌ POST test error:', error);
-              setResults((prev) => [
-                {
-                  endpoint: '📤 POST /echo',
-                  nativeDuration: 0,
-                  nitroDuration: 0,
-                  dataSize: 'Error',
-                  error: error.message,
-                },
-                ...prev,
-              ]);
-            } finally {
-              setTesting(false);
-            }
-          }}
-          disabled={testing}
-        >
-          <Text style={styles.buttonText}>📤 Test POST Body</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.resultsContainer}>
-        <View style={styles.resultsHeader}>
-          <View style={styles.resultsHeaderLeft}>
-            <Text style={styles.resultsTitle}>
-              Results - Avg of {TEST_ITERATIONS} runs{' '}
-              {cacheEnabled ? '🔒' : '🔓'}
-            </Text>
-            {results.length > 0 &&
-              !testing &&
-              calculateAverageImprovement() !== null && (
-                <Text style={styles.averageText}>
-                  Avg: {calculateAverageImprovement()! > 0 ? '+' : ''}
-                  {calculateAverageImprovement()!.toFixed(1)}% faster
-                </Text>
-              )}
+                  if (
+                    nativeData.success &&
+                    nitroData.success &&
+                    nativeData.receivedBytes === bodyString.length &&
+                    nitroData.receivedBytes === bodyString.length
+                  ) {
+                    console.log('✅ POST test successful!');
+                    setResults((prev) => [result, ...prev]);
+                  } else {
+                    console.error('❌ POST test failed');
+                    setResults((prev) => [
+                      { ...result, error: 'Mismatch' },
+                      ...prev,
+                    ]);
+                  }
+                } catch (error: any) {
+                  console.error('❌ POST test error:', error);
+                  setResults((prev) => [
+                    {
+                      endpoint: '📤 POST /echo',
+                      nativeDuration: 0,
+                      nitroDuration: 0,
+                      dataSize: 'Error',
+                      error: error.message,
+                    },
+                    ...prev,
+                  ]);
+                } finally {
+                  setTesting(false);
+                }
+              }}
+              disabled={testing}
+            >
+              <Text style={styles.buttonText}>📤 Test POST Body</Text>
+            </TouchableOpacity>
           </View>
-          {testing && <ActivityIndicator size="small" color="#007AFF" />}
-        </View>
 
-        <ScrollView style={styles.resultsList}>
-          {results.length === 0 ? (
-            <Text style={styles.emptyText}>
-              No results yet. Tap "Run All Tests" to begin!
-            </Text>
-          ) : (
-            <>
-              {/* Table Header */}
-              <View style={styles.tableHeader}>
-                <Text
-                  style={[
-                    styles.tableCell,
-                    styles.tableHeaderText,
-                    styles.colTest,
-                  ]}
-                >
-                  Test
+          <View style={styles.resultsContainer}>
+            <View style={styles.resultsHeader}>
+              <View style={styles.resultsHeaderLeft}>
+                <Text style={styles.resultsTitle}>
+                  Results - Avg of {TEST_ITERATIONS} runs{' '}
+                  {cacheEnabled ? '🔒' : '🔓'}
                 </Text>
-                <Text
-                  style={[
-                    styles.tableCell,
-                    styles.tableHeaderText,
-                    styles.colSize,
-                  ]}
-                >
-                  Size
-                </Text>
-                <Text
-                  style={[
-                    styles.tableCell,
-                    styles.tableHeaderText,
-                    styles.colNative,
-                  ]}
-                >
-                  Native
-                </Text>
-                <Text
-                  style={[
-                    styles.tableCell,
-                    styles.tableHeaderText,
-                    styles.colNitro,
-                  ]}
-                >
-                  Nitro
-                </Text>
-                <Text
-                  style={[
-                    styles.tableCell,
-                    styles.tableHeaderText,
-                    styles.colPrev,
-                  ]}
-                >
-                  Prev
-                </Text>
-                <Text
-                  style={[
-                    styles.tableCell,
-                    styles.tableHeaderText,
-                    styles.colDiff,
-                  ]}
-                >
-                  Diff
-                </Text>
-                <Text
-                  style={[
-                    styles.tableCell,
-                    styles.tableHeaderText,
-                    styles.colMatch,
-                  ]}
-                >
-                  ✓
-                </Text>
-              </View>
-
-              {/* Table Rows */}
-              {results.map((result, index) => (
-                <View key={index} style={styles.tableRow}>
-                  {result.error ? (
-                    <>
-                      <Text
-                        style={[styles.tableCell, styles.colTest]}
-                        numberOfLines={1}
-                      >
-                        {result.endpoint}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.tableCell,
-                          styles.colSize,
-                          styles.errorText,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        Error
-                      </Text>
-                      <Text style={[styles.tableCell, styles.colNative]} />
-                      <Text style={[styles.tableCell, styles.colNitro]} />
-                      <Text style={[styles.tableCell, styles.colPrev]} />
-                      <Text style={[styles.tableCell, styles.colDiff]} />
-                      <Text style={[styles.tableCell, styles.colMatch]} />
-                    </>
-                  ) : (
-                    <>
-                      <Text
-                        style={[styles.tableCell, styles.colTest]}
-                        numberOfLines={1}
-                      >
-                        {result.endpoint}
-                      </Text>
-                      <Text
-                        style={[styles.tableCell, styles.colSize]}
-                        numberOfLines={1}
-                      >
-                        {result.dataSize}
-                      </Text>
-                      <Text
-                        style={[styles.tableCell, styles.colNative]}
-                        numberOfLines={1}
-                      >
-                        {result.nativeDuration.toFixed(0)}
-                        {result.nativeCached ? '🟡' : ''}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.tableCell,
-                          styles.colNitro,
-                          result.nitroDuration < result.nativeDuration &&
-                            styles.winner,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {result.nitroDuration.toFixed(0)}
-                        {result.nitroCached ? '🟡' : ''}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.tableCell,
-                          styles.colPrev,
-                          result.prevBestNitro !== undefined &&
-                            result.nitroDuration < result.prevBestNitro &&
-                            styles.improved,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {result.prevBestNitro !== undefined
-                          ? result.prevBestNitro.toFixed(0)
-                          : '-'}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.tableCell,
-                          styles.colDiff,
-                          result.nitroDuration < result.nativeDuration &&
-                            styles.winner,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {result.nitroDuration < result.nativeDuration
-                          ? `${((1 - result.nitroDuration / result.nativeDuration) * 100).toFixed(0)}%`
-                          : `-${((result.nitroDuration / result.nativeDuration - 1) * 100).toFixed(0)}%`}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.tableCell,
-                          styles.colMatch,
-                          result.dataMatch === true && styles.matchOk,
-                          result.dataMatch === false && styles.matchFail,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {result.dataMatch === true
-                          ? '✅'
-                          : result.dataMatch === false
-                            ? '❌'
-                            : '-'}
-                      </Text>
-                    </>
+                {results.length > 0 &&
+                  !testing &&
+                  calculateAverageImprovement() !== null && (
+                    <Text style={styles.averageText}>
+                      Avg: {calculateAverageImprovement()! > 0 ? '+' : ''}
+                      {calculateAverageImprovement()!.toFixed(1)}% faster
+                    </Text>
                   )}
-                </View>
-              ))}
-            </>
-          )}
-        </ScrollView>
-      </View>
+              </View>
+              {testing && <ActivityIndicator size="small" color="#007AFF" />}
+            </View>
+
+            <ScrollView style={styles.resultsList}>
+              {results.length === 0 ? (
+                <Text style={styles.emptyText}>
+                  No results yet. Tap "Run All Tests" to begin!
+                </Text>
+              ) : (
+                <>
+                  {/* Table Header */}
+                  <View style={styles.tableHeader}>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        styles.tableHeaderText,
+                        styles.colTest,
+                      ]}
+                    >
+                      Test
+                    </Text>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        styles.tableHeaderText,
+                        styles.colSize,
+                      ]}
+                    >
+                      Size
+                    </Text>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        styles.tableHeaderText,
+                        styles.colNative,
+                      ]}
+                    >
+                      Native
+                    </Text>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        styles.tableHeaderText,
+                        styles.colNitro,
+                      ]}
+                    >
+                      Nitro
+                    </Text>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        styles.tableHeaderText,
+                        styles.colPrev,
+                      ]}
+                    >
+                      Prev
+                    </Text>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        styles.tableHeaderText,
+                        styles.colDiff,
+                      ]}
+                    >
+                      Diff
+                    </Text>
+                    <Text
+                      style={[
+                        styles.tableCell,
+                        styles.tableHeaderText,
+                        styles.colMatch,
+                      ]}
+                    >
+                      ✓
+                    </Text>
+                  </View>
+
+                  {/* Table Rows */}
+                  {results.map((result, index) => (
+                    <View key={index} style={styles.tableRow}>
+                      {result.error ? (
+                        <>
+                          <Text
+                            style={[styles.tableCell, styles.colTest]}
+                            numberOfLines={1}
+                          >
+                            {result.endpoint}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              styles.colSize,
+                              styles.errorText,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            Error
+                          </Text>
+                          <Text style={[styles.tableCell, styles.colNative]} />
+                          <Text style={[styles.tableCell, styles.colNitro]} />
+                          <Text style={[styles.tableCell, styles.colPrev]} />
+                          <Text style={[styles.tableCell, styles.colDiff]} />
+                          <Text style={[styles.tableCell, styles.colMatch]} />
+                        </>
+                      ) : (
+                        <>
+                          <Text
+                            style={[styles.tableCell, styles.colTest]}
+                            numberOfLines={1}
+                          >
+                            {result.endpoint}
+                          </Text>
+                          <Text
+                            style={[styles.tableCell, styles.colSize]}
+                            numberOfLines={1}
+                          >
+                            {result.dataSize}
+                          </Text>
+                          <Text
+                            style={[styles.tableCell, styles.colNative]}
+                            numberOfLines={1}
+                          >
+                            {result.nativeDuration.toFixed(0)}
+                            {result.nativeCached ? '🟡' : ''}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              styles.colNitro,
+                              result.nitroDuration < result.nativeDuration &&
+                                styles.winner,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {result.nitroDuration.toFixed(0)}
+                            {result.nitroCached ? '🟡' : ''}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              styles.colPrev,
+                              result.prevBestNitro !== undefined &&
+                                result.nitroDuration < result.prevBestNitro &&
+                                styles.improved,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {result.prevBestNitro !== undefined
+                              ? result.prevBestNitro.toFixed(0)
+                              : '-'}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              styles.colDiff,
+                              result.nitroDuration < result.nativeDuration &&
+                                styles.winner,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {result.nitroDuration < result.nativeDuration
+                              ? `${((1 - result.nitroDuration / result.nativeDuration) * 100).toFixed(0)}%`
+                              : `-${((result.nitroDuration / result.nativeDuration - 1) * 100).toFixed(0)}%`}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.tableCell,
+                              styles.colMatch,
+                              result.dataMatch === true && styles.matchOk,
+                              result.dataMatch === false && styles.matchFail,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {result.dataMatch === true
+                              ? '✅'
+                              : result.dataMatch === false
+                                ? '❌'
+                                : '-'}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                  ))}
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -899,7 +937,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    paddingTop: 36,
+    paddingTop: Platform.OS === 'ios' ? 52 : 40,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeTab: {
+    borderBottomColor: '#007AFF',
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  activeTabText: {
+    color: '#007AFF',
+  },
+  benchmarkContainer: {
+    flex: 1,
   },
   title: {
     fontSize: 24,
