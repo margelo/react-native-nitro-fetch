@@ -41,6 +41,16 @@ object FetchCache {
     return if (age <= maxAgeMs) entry.response else null
   }
 
+  /**
+   * Check if a fresh result exists WITHOUT consuming it.
+   * Used to check if we should skip starting a new prefetch.
+   */
+  fun hasFreshResult(key: String, maxAgeMs: Long): Boolean {
+    val entry = results[key] ?: return false
+    val age = System.currentTimeMillis() - entry.timestampMs
+    return age <= maxAgeMs
+  }
+
   fun clear() {
     pending.clear()
     results.clear()

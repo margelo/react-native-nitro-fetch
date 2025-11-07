@@ -17,6 +17,7 @@
 
 #include "JHybridNitroFetchClientSpec.hpp"
 #include "JHybridNitroFetchSpec.hpp"
+#include "JHybridNativeStorageSpec.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
 
 namespace margelo::nitro::nitrofetch {
@@ -30,6 +31,7 @@ int initialize(JavaVM* vm) {
     // Register native JNI methods
     margelo::nitro::nitrofetch::JHybridNitroFetchClientSpec::registerNatives();
     margelo::nitro::nitrofetch::JHybridNitroFetchSpec::registerNatives();
+    margelo::nitro::nitrofetch::JHybridNativeStorageSpec::registerNatives();
 
     // Register Nitro Hybrid Objects
     HybridObjectRegistry::registerHybridObjectConstructor(
@@ -44,6 +46,14 @@ int initialize(JavaVM* vm) {
       "NitroFetchClient",
       []() -> std::shared_ptr<HybridObject> {
         static DefaultConstructableObject<JHybridNitroFetchClientSpec::javaobject> object("com/margelo/nitro/nitrofetch/NitroFetchClient");
+        auto instance = object.create();
+        return instance->cthis()->shared();
+      }
+    );
+    HybridObjectRegistry::registerHybridObjectConstructor(
+      "NativeStorage",
+      []() -> std::shared_ptr<HybridObject> {
+        static DefaultConstructableObject<JHybridNativeStorageSpec::javaobject> object("com/margelo/nitro/nitrofetch/NativeStorage");
         auto instance = object.create();
         return instance->cthis()->shared();
       }

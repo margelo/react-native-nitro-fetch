@@ -24,7 +24,7 @@ console.log(res.headers.get('nitroPrefetched')); // 'true' if prefetched
 
 Auto-Prefetch (on next app start)
 
-- Queue a request in MMKV so native can prefetch on next startup:
+- Queue a request in NativeStorage so native can prefetch on next startup:
 
 ```ts
 import { prefetchOnAppStart } from 'react-native-nitro-fetch';

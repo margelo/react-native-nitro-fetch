@@ -220,8 +220,8 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       promise.reject(IllegalArgumentException("prefetch: missing 'prefetchKey' header"))
       return promise
     }
-    // If already have a fresh result, resolve immediately
-    FetchCache.getResultIfFresh(key, 5_000L)?.let {
+    // If already have a fresh result, resolve immediately (NON-DESTRUCTIVE CHECK)
+    if (FetchCache.hasFreshResult(key, 5_000L)) {
       promise.resolve(Unit)
       return promise
     }

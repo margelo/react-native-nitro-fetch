@@ -8,6 +8,8 @@
 #pragma once
 
 // Forward declarations of C++ defined types
+// Forward declaration of `HybridNativeStorageSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridNativeStorageSpec; }
 // Forward declaration of `HybridNitroFetchClientSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchClientSpec; }
 // Forward declaration of `HybridNitroFetchSpec` to properly resolve imports.
@@ -20,12 +22,15 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 
 // Forward declarations of Swift defined types
+// Forward declaration of `HybridNativeStorageSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridNativeStorageSpec_cxx; }
 // Forward declaration of `HybridNitroFetchClientSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridNitroFetchClientSpec_cxx; }
 // Forward declaration of `HybridNitroFetchSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridNitroFetchSpec_cxx; }
 
 // Include C++ defined types
+#include "HybridNativeStorageSpec.hpp"
 #include "HybridNitroFetchClientSpec.hpp"
 #include "HybridNitroFetchSpec.hpp"
 #include "NitroHeader.hpp"
@@ -272,6 +277,36 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   }
   inline Result_std__shared_ptr_HybridNitroFetchClientSpec__ create_Result_std__shared_ptr_HybridNitroFetchClientSpec__(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<HybridNitroFetchClientSpec>>::withError(error);
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridNativeStorageSpec>
+  /**
+   * Specialized version of `std::shared_ptr<HybridNativeStorageSpec>`.
+   */
+  using std__shared_ptr_HybridNativeStorageSpec_ = std::shared_ptr<HybridNativeStorageSpec>;
+  std::shared_ptr<HybridNativeStorageSpec> create_std__shared_ptr_HybridNativeStorageSpec_(void* _Nonnull swiftUnsafePointer) noexcept;
+  void* _Nonnull get_std__shared_ptr_HybridNativeStorageSpec_(std__shared_ptr_HybridNativeStorageSpec_ cppType) noexcept;
+  
+  // pragma MARK: std::weak_ptr<HybridNativeStorageSpec>
+  using std__weak_ptr_HybridNativeStorageSpec_ = std::weak_ptr<HybridNativeStorageSpec>;
+  inline std__weak_ptr_HybridNativeStorageSpec_ weakify_std__shared_ptr_HybridNativeStorageSpec_(const std::shared_ptr<HybridNativeStorageSpec>& strong) noexcept { return strong; }
+  
+  // pragma MARK: Result<std::string>
+  using Result_std__string_ = Result<std::string>;
+  inline Result_std__string_ create_Result_std__string_(const std::string& value) noexcept {
+    return Result<std::string>::withValue(value);
+  }
+  inline Result_std__string_ create_Result_std__string_(const std::exception_ptr& error) noexcept {
+    return Result<std::string>::withError(error);
+  }
+  
+  // pragma MARK: Result<void>
+  using Result_void_ = Result<void>;
+  inline Result_void_ create_Result_void_() noexcept {
+    return Result<void>::withValue();
+  }
+  inline Result_void_ create_Result_void_(const std::exception_ptr& error) noexcept {
+    return Result<void>::withError(error);
   }
 
 } // namespace margelo::nitro::nitrofetch::bridge::swift

@@ -35,9 +35,11 @@ target_sources(
   # Shared Nitrogen C++ sources
   ../nitrogen/generated/shared/c++/HybridNitroFetchClientSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNitroFetchSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridNativeStorageSpec.cpp
   # Android-specific Nitrogen C++ sources
   ../nitrogen/generated/android/c++/JHybridNitroFetchClientSpec.cpp
   ../nitrogen/generated/android/c++/JHybridNitroFetchSpec.cpp
+  ../nitrogen/generated/android/c++/JHybridNativeStorageSpec.cpp
 )
 
 # From node_modules/react-native/ReactAndroid/cmake-utils/folly-flags.cmake

@@ -181,7 +181,7 @@ export default function App() {
     Array<{ id: string; usd: number }>
   >([]);
   const [prefetchInfo, setPrefetchInfo] = React.useState<string>('');
-  const PREFETCH_URL = 'https://httpbin.org/uuid';
+  const PREFETCH_URL = 'https://pokeapi.co/api/v2/pokemon/ditto';
   const PREFETCH_KEY = 'uuid';
 
   const loadPrices = React.useCallback(async () => {
@@ -309,8 +309,9 @@ export default function App() {
               const res = await nitroFetch(PREFETCH_URL, {
                 headers: { prefetchKey: PREFETCH_KEY },
               });
+              console.log('res', res);
               const text = await res.text();
-              const pref = res.headers.get('nitroPrefetched');
+              const pref = res.headers?.nitroPrefetched;
               setPrefetchInfo(
                 `Fetched. nitroPrefetched=${pref ?? 'null'} len=${text.length}`
               );
@@ -322,13 +323,13 @@ export default function App() {
       </View>
       <View style={[styles.actions, { marginTop: 0 }]}>
         <Button
-          title="Schedule Auto-Prefetch (MMKV)"
+          title="Schedule Auto-Prefetch (NativeStorage)"
           onPress={async () => {
             try {
               await prefetchOnAppStart(PREFETCH_URL, {
                 prefetchKey: PREFETCH_KEY,
               });
-              setPrefetchInfo('Scheduled in MMKV (Android)');
+              setPrefetchInfo('Scheduled in NativeStorage');
             } catch (e: any) {
               setPrefetchInfo(`Schedule error: ${e?.message ?? String(e)}`);
             }

@@ -15,6 +15,10 @@
     "NitroFetchClient": {
       "kotlin": "NitroFetchClient",
       "swift": "NitroFetchClient"
+    },
+    "NativeStorage": {
+      "kotlin": "NativeStorage",
+      "swift": "NativeStorage"
     }
   },
   "ignorePaths": ["node_modules"]
