@@ -121,7 +121,6 @@ dependencies {
   // Cronet
   api "org.chromium.net:cronet-embedded:${cronetVersion}"
   implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0"
-  implementation "io.github.zhongwuzw:mmkv:2.2.4"
 
 }
 

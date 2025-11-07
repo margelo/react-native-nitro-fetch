@@ -4,12 +4,16 @@ import Foundation
 public final class NitroAutoPrefetcher: NSObject {
   private static var initialized = false
   private static let queueKey = "nitrofetch_autoprefetch_queue"
+  private static let suiteName = "nitro_fetch_storage"
 
   @objc
   public static func prefetchOnStart() {
     if initialized { return }
     initialized = true
-    guard let raw = readMMKVString(forKey: queueKey), !raw.isEmpty else { return }
+    
+    // Read from UserDefaults
+    let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
+    guard let raw = userDefaults.string(forKey: queueKey), !raw.isEmpty else { return }
     guard let data = raw.data(using: .utf8) else { return }
     guard let arr = try? JSONSerialization.jsonObject(with: data, options: []) as? [Any] else { return }
 
@@ -31,46 +35,6 @@ public final class NitroAutoPrefetcher: NSObject {
         do { try await NitroFetchClient.prefetchStatic(req) } catch { /* ignore – best effort */ }
       }
     }
-  }
-
-  // MARK: - MMKV dynamic access (optional)
-
-  private static func readMMKVString(forKey key: String) -> String? {
-    guard let mmkvClass = NSClassFromString("MMKV") as? NSObject.Type else { return nil }
-    // Try to initialize if needed (ignore failures)
-    let initSelectors = [
-      NSSelectorFromString("initializeMMKV:"),
-      NSSelectorFromString("initialize:")
-    ]
-    for sel in initSelectors where mmkvClass.responds(to: sel) {
-      _ = mmkvClass.perform(sel, with: nil)
-      break
-    }
-    guard let mmkvObjUnretained = mmkvClass.perform(NSSelectorFromString("defaultMMKV"))?.takeUnretainedValue() else { return nil }
-    let mmkv = mmkvObjUnretained as AnyObject
-    // Try common selectors
-    let candidates = [
-      NSSelectorFromString("decodeStringForKey:"),
-      NSSelectorFromString("stringForKey:"),
-      NSSelectorFromString("getStringForKey:"),
-    ]
-    for sel in candidates where mmkv.responds(to: sel) {
-      if let val = mmkv.perform(sel, with: key)?.takeUnretainedValue() as? String {
-        return val
-      }
-    }
-    // Some APIs have (forKey: defaultValue:) signatures
-    let twoArgCandidates = [
-      NSSelectorFromString("decodeStringForKey:defaultValue:"),
-      NSSelectorFromString("stringForKey:defaultValue:"),
-      NSSelectorFromString("getStringForKey:defaultValue:"),
-    ]
-    for sel in twoArgCandidates where mmkv.responds(to: sel) {
-      // NSInvocation is cumbersome in Swift; best-effort fallthrough without it
-      // Prefer single-arg variants above.
-      break
-    }
-    return nil
   }
 }
 

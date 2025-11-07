@@ -42,12 +42,11 @@ const data = await nitroFetchOnWorklet('https://httpbin.org/get', undefined, map
 
 ## `prefetchOnAppStart(input, { prefetchKey })` (Android)
 
-- Enqueues a request to be prefetched at the next app start by writing into MMKV under `nitrofetch_autoprefetch_queue`.
-- Requires `react-native-mmkv` in the app. No-op on iOS.
+- Enqueues a request to be prefetched at the next app start by writing into Shared Preferences under `nitrofetch_autoprefetch_queue`.
 
 ## `removeFromAutoPrefetch(prefetchKey)` / `removeAllFromAutoprefetch()` (Android)
 
-- Utilities to manage the MMKV auto-prefetch queue.
+- Utilities to manage the auto-prefetch queue.
 
 ## Types
 

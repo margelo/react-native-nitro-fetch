@@ -56,11 +56,8 @@ export interface NitroFetch
   // shutdown(): void;
 }
 
-
-
-
-
-export interface NativeStorage extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+export interface NativeStorage
+  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
   getString(key: string): string;
   setString(key: string, value: string): void;
   removeString(key: string): void;

@@ -6,8 +6,6 @@
 - Prefetch error: "missing prefetchKey"
   - Provide `headers: { prefetchKey: '...' }` or `init.prefetchKey` when calling `prefetch()` and when consuming via `fetch()`.
 
-- MMKV warnings for auto-prefetch
-  - Install `react-native-mmkv` if you want Android auto-prefetch. Without it, `prefetchOnAppStart()` becomes a no-op.
 
 - Cronet provider details
   - The library logs available Cronet providers and prefers the "Native" provider. Check Android logs for provider name/version during init.

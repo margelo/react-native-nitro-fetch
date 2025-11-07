@@ -265,9 +265,9 @@ export default function App() {
     }
   }, [running]);
 
-  // React.useEffect(() => {
-  //   run();
-  // }, [run]);
+  React.useEffect(() => {
+    run();
+  }, [run]);
 
   return (
     <View style={styles.container}>
@@ -323,13 +323,13 @@ export default function App() {
       </View>
       <View style={[styles.actions, { marginTop: 0 }]}>
         <Button
-          title="Schedule Auto-Prefetch (MMKV)"
+          title="Schedule Auto-Prefetch (NativeStorage)"
           onPress={async () => {
             try {
               await prefetchOnAppStart(PREFETCH_URL, {
                 prefetchKey: PREFETCH_KEY,
               });
-              setPrefetchInfo('Scheduled in MMKV (Android)');
+              setPrefetchInfo('Scheduled in NativeStorage');
             } catch (e: any) {
               setPrefetchInfo(`Schedule error: ${e?.message ?? String(e)}`);
             }

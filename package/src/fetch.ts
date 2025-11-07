@@ -223,8 +223,7 @@ export async function prefetch(
   await client.prefetch(req);
 }
 
-// Persist a request to MMKV so native can prefetch it on app start.
-// Stores an array of entries under the same key Android reads: "nitrofetch_autoprefetch_queue".
+// Persist a request to storage so native can prefetch it on app start.
 export async function prefetchOnAppStart(
   input: RequestInfo | URL,
   init?: RequestInit & { prefetchKey?: string }
@@ -257,14 +256,14 @@ export async function prefetchOnAppStart(
     headers: headersObj,
   } as const;
 
-  // Write or append to MMKV queue
+  // Write or append to storage queue
   try {
-    // Dynamically require to keep it optional for consumers
-    
     const KEY = 'nitrofetch_autoprefetch_queue';
     let arr: any[] = [];
     try {
-      const raw =  NativeStorageSingleton.getString('nitrofetch_autoprefetch_queue');
+      const raw = NativeStorageSingleton.getString(
+        'nitrofetch_autoprefetch_queue'
+      );
       if (raw) arr = JSON.parse(raw);
       if (!Array.isArray(arr)) arr = [];
     } catch {
@@ -275,25 +274,22 @@ export async function prefetchOnAppStart(
     }
     arr.push(entry);
     NativeStorageSingleton.setString(KEY, JSON.stringify(arr));
-    console.log("done")
   } catch (e) {
-    console.warn(
-      'react-native-mmkv not ffff; prefetchOnAppStart is a no-op',
-      e
-    );
+    console.warn('Failed to persist prefetch queue', e);
   }
 }
 
-// Remove one entry (by prefetchKey) from the auto-prefetch queue in MMKV.
+// Remove one entry (by prefetchKey) from the auto-prefetch queue.
 export async function removeFromAutoPrefetch(
   prefetchKey: string
 ): Promise<void> {
-  // No-op on iOS
   try {
     const KEY = 'nitrofetch_autoprefetch_queue';
     let arr: any[] = [];
     try {
-      const raw =  NativeStorageSingleton.getString('nitrofetch_autoprefetch_queue');
+      const raw = NativeStorageSingleton.getString(
+        'nitrofetch_autoprefetch_queue'
+      );
       if (raw) arr = JSON.parse(raw);
       if (!Array.isArray(arr)) arr = [];
     } catch {
@@ -306,17 +302,14 @@ export async function removeFromAutoPrefetch(
       NativeStorageSingleton.setString(KEY, JSON.stringify(next));
     }
   } catch (e) {
-    console.warn(
-      'react-native-mmkv not available; removeFromAutoPrefetch is a no-op',
-      e
-    );
+    console.warn('Failed to remove from prefetch queue', e);
   }
 }
 
-// Remove all entries from the auto-prefetch queue in MMKV.
+// Remove all entries from the auto-prefetch queue.
 export async function removeAllFromAutoprefetch(): Promise<void> {
-    const KEY = 'nitrofetch_autoprefetch_queue';
-    NativeStorageSingleton.setString(KEY, JSON.stringify([]));
+  const KEY = 'nitrofetch_autoprefetch_queue';
+  NativeStorageSingleton.setString(KEY, JSON.stringify([]));
 }
 
 // Optional off-thread processing using react-native-worklets-core
