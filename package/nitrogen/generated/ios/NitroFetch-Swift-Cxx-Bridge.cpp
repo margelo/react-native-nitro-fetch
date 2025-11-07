@@ -8,6 +8,7 @@
 #include "NitroFetch-Swift-Cxx-Bridge.hpp"
 
 // Include C++ implementation defined types
+#include "HybridNativeStorageSpecSwift.hpp"
 #include "HybridNitroFetchClientSpecSwift.hpp"
 #include "HybridNitroFetchSpecSwift.hpp"
 #include "NitroFetch-Swift-Cxx-Umbrella.hpp"
@@ -67,6 +68,22 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     }
     #endif
     NitroFetch::HybridNitroFetchSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    return swiftPart.toUnsafe();
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridNativeStorageSpec>
+  std::shared_ptr<HybridNativeStorageSpec> create_std__shared_ptr_HybridNativeStorageSpec_(void* _Nonnull swiftUnsafePointer) noexcept {
+    NitroFetch::HybridNativeStorageSpec_cxx swiftPart = NitroFetch::HybridNativeStorageSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::nitrofetch::HybridNativeStorageSpecSwift>(swiftPart);
+  }
+  void* _Nonnull get_std__shared_ptr_HybridNativeStorageSpec_(std__shared_ptr_HybridNativeStorageSpec_ cppType) noexcept {
+    std::shared_ptr<margelo::nitro::nitrofetch::HybridNativeStorageSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::nitrofetch::HybridNativeStorageSpecSwift>(cppType);
+    #ifdef NITRO_DEBUG
+    if (swiftWrapper == nullptr) [[unlikely]] {
+      throw std::runtime_error("Class \"HybridNativeStorageSpec\" is not implemented in Swift!");
+    }
+    #endif
+    NitroFetch::HybridNativeStorageSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
     return swiftPart.toUnsafe();
   }
 

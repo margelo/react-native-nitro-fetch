@@ -181,7 +181,7 @@ export default function App() {
     Array<{ id: string; usd: number }>
   >([]);
   const [prefetchInfo, setPrefetchInfo] = React.useState<string>('');
-  const PREFETCH_URL = 'https://httpbin.org/uuid';
+  const PREFETCH_URL = 'https://pokeapi.co/api/v2/pokemon/ditto';
   const PREFETCH_KEY = 'uuid';
 
   const loadPrices = React.useCallback(async () => {
@@ -265,9 +265,9 @@ export default function App() {
     }
   }, [running]);
 
-  React.useEffect(() => {
-    run();
-  }, [run]);
+  // React.useEffect(() => {
+  //   run();
+  // }, [run]);
 
   return (
     <View style={styles.container}>
@@ -309,8 +309,9 @@ export default function App() {
               const res = await nitroFetch(PREFETCH_URL, {
                 headers: { prefetchKey: PREFETCH_KEY },
               });
+              console.log('res', res);
               const text = await res.text();
-              const pref = res.headers.get('nitroPrefetched');
+              const pref = res.headers?.nitroPrefetched;
               setPrefetchInfo(
                 `Fetched. nitroPrefetched=${pref ?? 'null'} len=${text.length}`
               );
