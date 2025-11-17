@@ -181,7 +181,7 @@ export default function App() {
     Array<{ id: string; usd: number }>
   >([]);
   const [prefetchInfo, setPrefetchInfo] = React.useState<string>('');
-  const PREFETCH_URL = 'https://pokeapi.co/api/v2/pokemon/ditto';
+  const PREFETCH_URL = 'https://httpbin.org/uuid';
   const PREFETCH_KEY = 'uuid';
 
   const loadPrices = React.useCallback(async () => {
