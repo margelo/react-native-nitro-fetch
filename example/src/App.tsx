@@ -164,6 +164,7 @@ async function measure(
     const cached = detectCached(res.headers);
     return { ok: true, ms: t1 - t0, cached } as const;
   } catch (e: any) {
+    console.error('measure error', url, e);
     const t1 = global.performance ? global.performance.now() : Date.now();
     return { ok: false, ms: t1 - t0, error: e?.message ?? String(e) } as const;
   }

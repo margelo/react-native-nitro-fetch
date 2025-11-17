@@ -152,6 +152,43 @@ async function nitroFetchRaw(
   return res;
 }
 
+// Simple Headers-like class that supports get() method
+class NitroHeaders {
+  private _headers: Map<string, string>;
+
+  constructor(headers: NitroHeader[]) {
+    this._headers = new Map();
+    for (const { key, value } of headers) {
+      // Headers are case-insensitive, normalize to lowercase
+      this._headers.set(key.toLowerCase(), value);
+    }
+  }
+
+  get(name: string): string | null {
+    return this._headers.get(name.toLowerCase()) ?? null;
+  }
+
+  has(name: string): boolean {
+    return this._headers.has(name.toLowerCase());
+  }
+
+  forEach(callback: (value: string, key: string) => void): void {
+    this._headers.forEach(callback);
+  }
+
+  entries(): IterableIterator<[string, string]> {
+    return this._headers.entries();
+  }
+
+  keys(): IterableIterator<string> {
+    return this._headers.keys();
+  }
+
+  values(): IterableIterator<string> {
+    return this._headers.values();
+  }
+}
+
 export async function nitroFetch(
   input: RequestInfo | URL,
   init?: RequestInit
@@ -160,14 +197,7 @@ export async function nitroFetch(
 
   const res = await nitroFetchRaw(input, init);
 
-  // Fallback lightweight Response-like object (minimal methods)
-  const headersObj = res.headers.reduce(
-    (acc, { key, value }) => {
-      acc[key] = value;
-      return acc;
-    },
-    {} as Record<string, string>
-  );
+  const headersObj = new NitroHeaders(res.headers);
 
   const bodyBytes = res.bodyBytes;
   const bodyString = res.bodyString;
@@ -178,7 +208,7 @@ export async function nitroFetch(
     status: res.status,
     statusText: res.statusText,
     redirected: res.redirected,
-    headers: { ...headersObj },
+    headers: headersObj,
     arrayBuffer: async () => bodyBytes,
     text: async () => bodyString,
     json: async () => JSON.parse(bodyString ?? '{}'),
