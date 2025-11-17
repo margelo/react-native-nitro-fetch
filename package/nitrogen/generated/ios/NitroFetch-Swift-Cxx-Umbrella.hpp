@@ -8,6 +8,8 @@
 #pragma once
 
 // Forward declarations of C++ defined types
+// Forward declaration of `HybridNativeStorageSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridNativeStorageSpec; }
 // Forward declaration of `HybridNitroFetchClientSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchClientSpec; }
 // Forward declaration of `HybridNitroFetchSpec` to properly resolve imports.
@@ -22,6 +24,7 @@ namespace margelo::nitro::nitrofetch { struct NitroRequest; }
 namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 
 // Include C++ defined types
+#include "HybridNativeStorageSpec.hpp"
 #include "HybridNitroFetchClientSpec.hpp"
 #include "HybridNitroFetchSpec.hpp"
 #include "NitroHeader.hpp"
@@ -46,6 +49,8 @@ namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 #include <NitroModules/DateToChronoDate.hpp>
 
 // Forward declarations of Swift defined types
+// Forward declaration of `HybridNativeStorageSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridNativeStorageSpec_cxx; }
 // Forward declaration of `HybridNitroFetchClientSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridNitroFetchClientSpec_cxx; }
 // Forward declaration of `HybridNitroFetchSpec_cxx` to properly resolve imports.

@@ -12,6 +12,7 @@
 
 #include "HybridNitroFetchSpecSwift.hpp"
 #include "HybridNitroFetchClientSpecSwift.hpp"
+#include "HybridNativeStorageSpecSwift.hpp"
 
 @interface NitroFetchAutolinking : NSObject
 @end
@@ -33,6 +34,13 @@
     "NitroFetchClient",
     []() -> std::shared_ptr<HybridObject> {
       std::shared_ptr<HybridNitroFetchClientSpec> hybridObject = NitroFetch::NitroFetchAutolinking::createNitroFetchClient();
+      return hybridObject;
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "NativeStorage",
+    []() -> std::shared_ptr<HybridObject> {
+      std::shared_ptr<HybridNativeStorageSpec> hybridObject = NitroFetch::NitroFetchAutolinking::createNativeStorage();
       return hybridObject;
     }
   );

@@ -23,7 +23,7 @@ await prefetch('https://httpbin.org/uuid', { prefetchKey: 'uuid' } as any);
 
 ## Auto-Prefetch on Android
 
-Use `prefetchOnAppStart()` to enqueue requests in MMKV so they are fetched on next app start:
+Use `prefetchOnAppStart()` to enqueue requests in Shared Preferences so they are fetched on next app start:
 
 ```ts
 import { prefetchOnAppStart } from 'react-native-nitro-fetch';
@@ -45,7 +45,7 @@ Notes
 
 ## Why Prefetch Is Cool
 
-- Earlier start at app launch: Auto‑prefetch with MMKV can kick off network work immediately when the process starts, before React and JS are ready. On mid‑range Android devices (e.g., Samsung A16), we observed the prefetch starting at least ~220 ms earlier than triggering the same request from JS after the app warms up.
+- Earlier start at app launch: Auto‑prefetch can kick off network work immediately when the process starts, before React and JS are ready. On mid‑range Android devices (e.g., Samsung A16), we observed the prefetch starting at least ~220 ms earlier than triggering the same request from JS after the app warms up.
 - Smoother navigation: Trigger a prefetch when the user initiates navigation, then serve the prefetched result as the destination screen mounts.
 
 ### Pattern: Prefetch on Navigation Intent + useQuery
@@ -102,9 +102,9 @@ export function UserDetails() {
 }
 ```
 
-## Auto-Prefetch on iOS (with MMKV)
+## Auto-Prefetch on iOS (with User Defaults)
 
-If your app links MMKV (e.g., via `react-native-mmkv`), you can prefetch queued URLs at app startup by calling the native bootstrap in your `AppDelegate`:
+You can prefetch queued URLs at app startup by calling the native bootstrap in your `AppDelegate`:
 
 ```swift
 import NitroFetch

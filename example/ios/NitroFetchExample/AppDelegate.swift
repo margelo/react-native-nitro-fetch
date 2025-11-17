@@ -15,7 +15,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    // Kick off auto-prefetch for queued URLs (if MMKV is linked)
+    // Kick off auto-prefetch for queued URLs
     //NitroAutoPrefetcher.prefetchOnStart() it requires adding a separate module for it
 
     let delegate = ReactNativeDelegate()

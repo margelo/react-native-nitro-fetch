@@ -5,6 +5,7 @@ import type {
   NitroResponse,
 } from './NitroFetch.nitro';
 import { NitroFetch as NitroFetchSingleton } from './NitroInstances';
+import { NativeStorage as NativeStorageSingleton } from './NitroInstances';
 
 // No base64: pass strings/ArrayBuffers directly
 
@@ -151,6 +152,43 @@ async function nitroFetchRaw(
   return res;
 }
 
+// Simple Headers-like class that supports get() method
+class NitroHeaders {
+  private _headers: Map<string, string>;
+
+  constructor(headers: NitroHeader[]) {
+    this._headers = new Map();
+    for (const { key, value } of headers) {
+      // Headers are case-insensitive, normalize to lowercase
+      this._headers.set(key.toLowerCase(), value);
+    }
+  }
+
+  get(name: string): string | null {
+    return this._headers.get(name.toLowerCase()) ?? null;
+  }
+
+  has(name: string): boolean {
+    return this._headers.has(name.toLowerCase());
+  }
+
+  forEach(callback: (value: string, key: string) => void): void {
+    this._headers.forEach(callback);
+  }
+
+  entries(): IterableIterator<[string, string]> {
+    return this._headers.entries();
+  }
+
+  keys(): IterableIterator<string> {
+    return this._headers.keys();
+  }
+
+  values(): IterableIterator<string> {
+    return this._headers.values();
+  }
+}
+
 export async function nitroFetch(
   input: RequestInfo | URL,
   init?: RequestInit
@@ -159,14 +197,7 @@ export async function nitroFetch(
 
   const res = await nitroFetchRaw(input, init);
 
-  // Fallback lightweight Response-like object (minimal methods)
-  const headersObj = res.headers.reduce(
-    (acc, { key, value }) => {
-      acc[key] = value;
-      return acc;
-    },
-    {} as Record<string, string>
-  );
+  const headersObj = new NitroHeaders(res.headers);
 
   const bodyBytes = res.bodyBytes;
   const bodyString = res.bodyString;
@@ -177,7 +208,7 @@ export async function nitroFetch(
     status: res.status,
     statusText: res.statusText,
     redirected: res.redirected,
-    headers: { ...headersObj },
+    headers: headersObj,
     arrayBuffer: async () => bodyBytes,
     text: async () => bodyString,
     json: async () => JSON.parse(bodyString ?? '{}'),
@@ -222,8 +253,7 @@ export async function prefetch(
   await client.prefetch(req);
 }
 
-// Persist a request to MMKV so native can prefetch it on app start.
-// Stores an array of entries under the same key Android reads: "nitrofetch_autoprefetch_queue".
+// Persist a request to storage so native can prefetch it on app start.
 export async function prefetchOnAppStart(
   input: RequestInfo | URL,
   init?: RequestInit & { prefetchKey?: string }
@@ -256,16 +286,14 @@ export async function prefetchOnAppStart(
     headers: headersObj,
   } as const;
 
-  // Write or append to MMKV queue
+  // Write or append to storage queue
   try {
-    // Dynamically require to keep it optional for consumers
-
-    const { MMKV } = require('react-native-mmkv');
-    const storage = new MMKV(); // default instance matches Android's defaultMMKV
     const KEY = 'nitrofetch_autoprefetch_queue';
     let arr: any[] = [];
     try {
-      const raw = storage.getString(KEY);
+      const raw = NativeStorageSingleton.getString(
+        'nitrofetch_autoprefetch_queue'
+      );
       if (raw) arr = JSON.parse(raw);
       if (!Array.isArray(arr)) arr = [];
     } catch {
@@ -275,27 +303,23 @@ export async function prefetchOnAppStart(
       arr = arr.filter((e) => e && e.prefetchKey !== prefetchKey);
     }
     arr.push(entry);
-    storage.set(KEY, JSON.stringify(arr));
+    NativeStorageSingleton.setString(KEY, JSON.stringify(arr));
   } catch (e) {
-    console.warn(
-      'react-native-mmkv not available; prefetchOnAppStart is a no-op',
-      e
-    );
+    console.warn('Failed to persist prefetch queue', e);
   }
 }
 
-// Remove one entry (by prefetchKey) from the auto-prefetch queue in MMKV.
+// Remove one entry (by prefetchKey) from the auto-prefetch queue.
 export async function removeFromAutoPrefetch(
   prefetchKey: string
 ): Promise<void> {
-  // No-op on iOS
   try {
-    const { MMKV } = require('react-native-mmkv');
-    const storage = new MMKV();
     const KEY = 'nitrofetch_autoprefetch_queue';
     let arr: any[] = [];
     try {
-      const raw = storage.getString(KEY);
+      const raw = NativeStorageSingleton.getString(
+        'nitrofetch_autoprefetch_queue'
+      );
       if (raw) arr = JSON.parse(raw);
       if (!Array.isArray(arr)) arr = [];
     } catch {
@@ -303,39 +327,19 @@ export async function removeFromAutoPrefetch(
     }
     const next = arr.filter((e) => e && e.prefetchKey !== prefetchKey);
     if (next.length === 0) {
-      if (typeof (storage as any).delete === 'function') {
-        (storage as any).delete(KEY);
-      } else {
-        storage.set(KEY, JSON.stringify([]));
-      }
+      NativeStorageSingleton.removeString(KEY);
     } else if (next.length !== arr.length) {
-      storage.set(KEY, JSON.stringify(next));
+      NativeStorageSingleton.setString(KEY, JSON.stringify(next));
     }
   } catch (e) {
-    console.warn(
-      'react-native-mmkv not available; removeFromAutoPrefetch is a no-op',
-      e
-    );
+    console.warn('Failed to remove from prefetch queue', e);
   }
 }
 
-// Remove all entries from the auto-prefetch queue in MMKV.
+// Remove all entries from the auto-prefetch queue.
 export async function removeAllFromAutoprefetch(): Promise<void> {
-  try {
-    const { MMKV } = require('react-native-mmkv');
-    const storage = new MMKV();
-    const KEY = 'nitrofetch_autoprefetch_queue';
-    if (typeof (storage as any).delete === 'function') {
-      (storage as any).delete(KEY);
-    } else {
-      storage.set(KEY, JSON.stringify([]));
-    }
-  } catch (e) {
-    console.warn(
-      'react-native-mmkv not available; removeAllFromAutoprefetch is a no-op',
-      e
-    );
-  }
+  const KEY = 'nitrofetch_autoprefetch_queue';
+  NativeStorageSingleton.setString(KEY, JSON.stringify([]));
 }
 
 // Optional off-thread processing using react-native-worklets-core

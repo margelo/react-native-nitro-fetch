@@ -1,21 +1,23 @@
 package com.margelo.nitro.nitrofetch
 
 import android.app.Application
+import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.CompletableFuture
-import com.tencent.mmkv.MMKV;
 
 
 object AutoPrefetcher {
   @Volatile private var initialized = false
+  private const val KEY_QUEUE = "nitrofetch_autoprefetch_queue"
+  private const val PREFS_NAME = "nitro_fetch_storage"
 
   fun prefetchOnStart(app: Application) {
     if (initialized) return
     initialized = true
     try {
-      val mmkv = getMMKV(app) ?: return
-      val raw = invokeMMKVDecodeString(mmkv, KEY_QUEUE) ?: return
+      val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+      val raw = prefs.getString(KEY_QUEUE, null) ?: ""
       if (raw.isEmpty()) return
       val arr = JSONArray(raw)
       for (i in 0 until arr.length()) {
@@ -42,12 +44,8 @@ object AutoPrefetcher {
         )
 
         // If already pending or fresh, skip starting a new one
-        if (FetchCache.getPending(prefetchKey) != null) {
-          continue
-        }
-        if (FetchCache.getResultIfFresh(prefetchKey, 5_000L) != null) {
-          continue
-        }
+        if (FetchCache.getPending(prefetchKey) != null) continue
+        if (FetchCache.hasFreshResult(prefetchKey, 5_000L)) continue
 
         val future = CompletableFuture<NitroResponse>()
         FetchCache.setPending(prefetchKey, future)
@@ -70,24 +68,5 @@ object AutoPrefetcher {
     } catch (_: Throwable) {
       // ignore – prefetch-on-start is best-effort
     }
-  }
-
-  private const val KEY_QUEUE = "nitrofetch_autoprefetch_queue"
-
-  private fun getMMKV(app: Application): Any? {
-    return try {
-      MMKV.initialize(app);
-
-      return MMKV.defaultMMKV()
-    } catch (_: Throwable) {
-      null
-    }
-  }
-
-  private fun invokeMMKVDecodeString(mmkv: Any, key: String): String? {
-    return try {
-      val m = mmkv.javaClass.getMethod("decodeString", String::class.java, String::class.java)
-      m.invoke(mmkv, key, null) as? String
-    } catch (_: Throwable) { null }
   }
 }
