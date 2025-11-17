@@ -2,7 +2,7 @@
   "name": "react-native-nitro-fetch-monorepo",
   "packageManager": "bun@1.2.22",
   "private": true,
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Awesome Fetch :)",
   "author": "Szymon Kapala <szymon20000@gmail.com'> (https://x.com/Turbo_Szymon)",
   "workspaces": [
