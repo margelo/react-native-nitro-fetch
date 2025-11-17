@@ -164,7 +164,6 @@ async function measure(
     const cached = detectCached(res.headers);
     return { ok: true, ms: t1 - t0, cached } as const;
   } catch (e: any) {
-    console.error('measure error', url, e);
     const t1 = global.performance ? global.performance.now() : Date.now();
     return { ok: false, ms: t1 - t0, error: e?.message ?? String(e) } as const;
   }
@@ -204,16 +203,34 @@ export default function App() {
       'worklet';
       const txt = payload.bodyString ?? '';
       const json = JSON.parse(txt) as Record<string, { usd: number }>;
-      const arr = Object.entries(json).map(([id, v]) => ({ id, usd: v.usd }));
-      arr.sort((a, b) => a.id.localeCompare(b.id));
+      const entries = Object.entries(json);
+      const arr = [];
+      for (let i = 0; i < entries.length; ++i) {
+        const entry = entries[i];
+        arr.push({ id: entry[0], usd: entry[1].usd });
+      }
+      // Manual sort (localeCompare not available in worklets, use plain compare)
+      for (let i = 0; i < arr.length - 1; ++i) {
+        for (let j = i + 1; j < arr.length; ++j) {
+          if (arr[i].id > arr[j].id) {
+            const tmp = arr[i] as { id: string; usd: number };
+            arr[i] = arr[j];
+            arr[j] = tmp;
+          }
+        }
+      }
       return arr;
     };
     console.log('Loading crypto prices from coingecko');
-    const data = await nitroFetchOnWorklet(url, undefined, mapper, {
-      preferBytes: false,
-    });
-    console.log('Loaded crypto prices:', data);
-    setPrices(data);
+    try {
+      const data = await nitroFetchOnWorklet(url, undefined, mapper, {
+        preferBytes: false,
+      });
+      console.log('Loaded crypto prices:', data);
+      setPrices(data);
+    } catch (e: any) {
+      console.error('Loading crypto prices error', e);
+    }
   }, []);
 
   const run = React.useCallback(async () => {

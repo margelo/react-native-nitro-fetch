@@ -2,6 +2,31 @@ import Foundation
 import NitroModules
 
 final class NitroFetchClient: HybridNitroFetchClientSpec {
+  func requestSync(req: NitroRequest) throws -> NitroResponse {
+    let semaphore = DispatchSemaphore(value: 0)
+    var result: Result<NitroResponse, Error>?
+    
+    Task {
+      do {
+        let response = try await NitroFetchClient.requestStatic(req)
+        result = .success(response)
+      } catch {
+        result = .failure(error)
+      }
+      semaphore.signal()
+    }
+    
+    semaphore.wait()
+    
+    switch result! {
+    case .success(let response):
+      return response
+    case .failure(let error):
+      throw error
+    }
+  }
+  
+  // Async version - returns Promise<NitroResponse>
   func request(req: NitroRequest) throws -> Promise<NitroResponse> {
     let promise = Promise<NitroResponse>.init()
     Task {

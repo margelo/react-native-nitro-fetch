@@ -10,3 +10,5 @@ export const NitroFetch: NitroFetchType =
 
 export const NativeStorage: NativeStorageType =
   NitroModules.createHybridObject<NativeStorageType>('NativeStorage');
+
+export const boxedNitroFetch = NitroModules.box(NitroFetch);
