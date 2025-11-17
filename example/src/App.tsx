@@ -312,7 +312,7 @@ export default function App() {
               });
               console.log('res', res);
               const text = await res.text();
-              const pref = res.headers?.nitroPrefetched;
+              const pref = res.headers.get('nitroPrefetched');
               setPrefetchInfo(
                 `Fetched. nitroPrefetched=${pref ?? 'null'} len=${text.length}`
               );
