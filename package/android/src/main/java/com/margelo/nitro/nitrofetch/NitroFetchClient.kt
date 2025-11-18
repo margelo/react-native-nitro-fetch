@@ -155,6 +155,56 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
     }
   }
 
+  // Helper function to add prefetch header to response (reused by both sync/async)
+  private fun withPrefetchedHeader(res: NitroResponse): NitroResponse {
+    val newHeaders = (res.headers?.toMutableList() ?: mutableListOf())
+    newHeaders.add(NitroHeader("nitroPrefetched", "true"))
+    return NitroResponse(
+      url = res.url,
+      status = res.status,
+      statusText = res.statusText,
+      ok = res.ok,
+      redirected = res.redirected,
+      headers = newHeaders.toTypedArray(),
+      bodyString = res.bodyString,
+      bodyBytes = res.bodyBytes
+    )
+  }
+
+  override fun requestSync(req: NitroRequest): NitroResponse {
+    val key = findPrefetchKey(req)
+    if (key != null) {
+      FetchCache.getPending(key)?.let { fut ->
+        return try {
+          withPrefetchedHeader(fut.get()) // blocks until complete
+        } catch (e: Exception) {
+          throw e.cause ?: e
+        }
+      }
+      FetchCache.getResultIfFresh(key, 5_000L)?.let { cached ->
+        return withPrefetchedHeader(cached)
+      }
+    }
+    val latch = java.util.concurrent.CountDownLatch(1)
+    var result: NitroResponse? = null
+    var error: Throwable? = null
+    
+    fetch(
+      req,
+      onSuccess = { 
+        result = it
+        latch.countDown()
+      },
+      onFail = { 
+        error = it
+        latch.countDown()
+      }
+    )
+    latch.await()
+    error?.let { throw it }
+    return result!!
+  }
+
   override fun request(req: NitroRequest): Promise<NitroResponse> {
     val promise = Promise<NitroResponse>()
     // Try to serve from prefetch cache/pending first
@@ -162,20 +212,6 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
     if (key != null) {
       // If a prefetch is currently pending, wait for it
       FetchCache.getPending(key)?.let { fut ->
-        fun withPrefetchedHeader(res: NitroResponse): NitroResponse {
-          val newHeaders = (res.headers?.toMutableList() ?: mutableListOf())
-          newHeaders.add(NitroHeader("nitroPrefetched", "true"))
-          return NitroResponse(
-            url = res.url,
-            status = res.status,
-            statusText = res.statusText,
-            ok = res.ok,
-            redirected = res.redirected,
-            headers = newHeaders.toTypedArray(),
-            bodyString = res.bodyString,
-            bodyBytes = res.bodyBytes
-          )
-        }
         fut.whenComplete { res, err ->
           if (err != null) {
             promise.reject(err)
@@ -189,19 +225,7 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       }
       // If a fresh prefetched result exists (<=5s old), return it immediately
       FetchCache.getResultIfFresh(key, 5_000L)?.let { cached ->
-        val newHeaders = (cached.headers?.toMutableList() ?: mutableListOf())
-        newHeaders.add(NitroHeader("nitroPrefetched", "true"))
-        val wrapped = NitroResponse(
-          url = cached.url,
-          status = cached.status,
-          statusText = cached.statusText,
-          ok = cached.ok,
-          redirected = cached.redirected,
-          headers = newHeaders.toTypedArray(),
-          bodyString = cached.bodyString,
-          bodyBytes = cached.bodyBytes
-        )
-        promise.resolve(wrapped)
+        promise.resolve(withPrefetchedHeader(cached))
         return promise
       }
     }

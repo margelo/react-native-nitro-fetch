@@ -45,6 +45,9 @@ export interface NitroFetchClient
   request(req: NitroRequest): Promise<NitroResponse>;
   // Start a prefetch for a given request; expects a header `prefetchKey`.
   prefetch(req: NitroRequest): Promise<void>;
+
+  // Synchronous version of request for worklets
+  requestSync(req: NitroRequest): NitroResponse;
 }
 
 export interface NitroFetch

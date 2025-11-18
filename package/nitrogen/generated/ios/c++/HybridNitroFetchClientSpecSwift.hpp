@@ -87,6 +87,14 @@ namespace margelo::nitro::nitrofetch {
       auto __value = std::move(__result.value());
       return __value;
     }
+    inline NitroResponse requestSync(const NitroRequest& req) override {
+      auto __result = _swiftPart.requestSync(req);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
 
   private:
     NitroFetch::HybridNitroFetchClientSpec_cxx _swiftPart;
