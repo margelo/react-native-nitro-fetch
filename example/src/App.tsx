@@ -181,6 +181,7 @@ export default function App() {
     Array<{ id: string; usd: number }>
   >([]);
   const [prefetchInfo, setPrefetchInfo] = React.useState<string>('');
+  const [postResult, setPostResult] = React.useState<string>('');
   const PREFETCH_URL = 'https://httpbin.org/uuid';
   const PREFETCH_KEY = 'uuid';
 
@@ -230,6 +231,60 @@ export default function App() {
       setPrices(data);
     } catch (e: any) {
       console.error('Loading crypto prices error', e);
+    }
+  }, []);
+
+  const sendPostRequest = React.useCallback(async () => {
+    console.log('Sending POST request with worklet');
+    const url = 'https://httpbin.org/post';
+    const requestBody = {
+      message: 'Hello from Nitro Fetch!',
+      timestamp: Date.now(),
+      data: { userId: 123, action: 'test' },
+    };
+
+    const mapper = (payload: { bodyString?: string; status: number }) => {
+      'worklet';
+      if (payload.status !== 200) {
+        return { success: false, error: `HTTP ${payload.status}` };
+      }
+      const txt = payload.bodyString ?? '';
+      const json = JSON.parse(txt) as {
+        json?: typeof requestBody;
+        data?: string;
+      };
+      // Extract the parsed JSON from httpbin response
+      const sentData = json.json ?? (json.data ? JSON.parse(json.data) : null);
+      return {
+        success: true,
+        sent: sentData,
+        received: json,
+      };
+    };
+
+    try {
+      setPostResult('Sending POST request...');
+      const data = await nitroFetchOnWorklet(
+        url,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        },
+        mapper,
+        {
+          preferBytes: false,
+        }
+      );
+      console.log('POST request result:', data);
+      setPostResult(
+        `Success! Sent: ${JSON.stringify(data.sent, null, 2).substring(0, 100)}...`
+      );
+    } catch (e: any) {
+      console.error('POST request error', e);
+      setPostResult(`Error: ${e?.message ?? String(e)}`);
     }
   }, []);
 
@@ -304,6 +359,8 @@ export default function App() {
             loadPrices();
           }}
         />
+        <View style={{ width: 12 }} />
+        <Button title="POST Request (Worklet)" onPress={sendPostRequest} />
       </View>
       <View style={[styles.actions, { marginTop: 0 }]}>
         <Button
@@ -369,6 +426,17 @@ export default function App() {
       {!!prefetchInfo && (
         <Text style={{ textAlign: 'center', marginBottom: 8 }}>
           {prefetchInfo}
+        </Text>
+      )}
+      {!!postResult && (
+        <Text
+          style={{
+            textAlign: 'center',
+            marginBottom: 8,
+            paddingHorizontal: 12,
+          }}
+        >
+          POST Result: {postResult}
         </Text>
       )}
       <ScrollView
