@@ -519,11 +519,9 @@ export type NitroWorkletMapper<T> = (payload: {
 let nitroRuntime: any | undefined;
 let WorkletsRef: any | undefined;
 function ensureWorkletRuntime(name = 'nitro-fetch'): any | undefined {
-  console.log('ensuring worklet runtime');
   try {
     const { Worklets } = require('react-native-worklets-core');
     nitroRuntime = nitroRuntime ?? Worklets.createContext(name);
-    console.log('nitroRuntime:', !!nitroRuntime);
     return nitroRuntime;
   } catch {
     console.warn('react-native-worklets-core not available');
@@ -550,16 +548,12 @@ export async function nitroFetchOnWorklet<T>(
   mapWorklet: NitroWorkletMapper<T>,
   options?: { preferBytes?: boolean; runtimeName?: string }
 ): Promise<T> {
-  console.log('nitroFetchOnWorklet: starting');
   const preferBytes = options?.preferBytes === true; // default true
-  console.log('nitroFetchOnWorklet: preferBytes:', preferBytes);
   let rt: any | undefined;
   let Worklets: any | undefined;
   try {
     rt = ensureWorkletRuntime(options?.runtimeName);
-    console.log('nitroFetchOnWorklet: runtime created?', !!rt);
     Worklets = getWorklets();
-    console.log('nitroFetchOnWorklet: Worklets available?', !!Worklets);
   } catch (e) {
     console.error('nitroFetchOnWorklet: setup failed', e);
   }
@@ -580,13 +574,11 @@ export async function nitroFetchOnWorklet<T>(
     } as const;
     return mapWorklet(payload as any);
   }
-  console.log('nitroFetchOnWorklet: running on worklet threaddddd');
   return await rt.runAsync(() => {
     'worklet';
     const unboxedNitroFetch = boxedNitroFetch.unbox();
     const unboxedClient = unboxedNitroFetch.createClient();
     const request = buildNitroRequestPure(input, init);
-    console.log('nitroFetchOnWorklet: request:', request, input, init);
     const res = unboxedClient.requestSync(request);
     const payload = {
       url: res.url,
