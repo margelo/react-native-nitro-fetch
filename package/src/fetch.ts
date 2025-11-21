@@ -36,9 +36,31 @@ function headersToPairs(headers?: HeadersInit): NitroHeader[] | undefined {
     }
     return pairs;
   }
-  // Record<string, string>
-  for (const [k, v] of Object.entries(headers)) {
-    pairs.push({ key: k, value: String(v) });
+  // Check if it's a plain object (Record<string, string>) first
+  // Plain objects don't have forEach, so check for its absence
+  if (typeof headers === 'object' && headers !== null) {
+    // Check if it's a Headers instance by checking for forEach method
+    const hasForEach = typeof (headers as any).forEach === 'function';
+
+    if (hasForEach) {
+      // Headers-like object (duck typing)
+      (headers as any).forEach((v: string, k: string) =>
+        pairs.push({ key: k, value: v })
+      );
+      return pairs;
+    } else {
+      // Plain object (Record<string, string>)
+      // Use Object.keys to iterate since Object.entries might not work in worklets
+      const keys = Object.keys(headers);
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        const v = (headers as Record<string, string>)[k];
+        if (v !== undefined) {
+          pairs.push({ key: k, value: String(v) });
+        }
+      }
+      return pairs;
+    }
   }
   return pairs;
 }
@@ -108,6 +130,146 @@ function buildNitroRequest(
 
   const headers = headersToPairs(headersInit);
   const normalized = normalizeBody(body);
+
+  return {
+    url,
+    method: (method?.toUpperCase() as any) ?? 'GET',
+    headers,
+    bodyString: normalized?.bodyString,
+    // Only include bodyBytes when provided to avoid signaling upload data unintentionally
+    bodyBytes: undefined as any,
+    followRedirects: true,
+  };
+}
+
+// Pure JS version of buildNitroRequest that doesnt use anything that breaks worklets. TODO: Merge this to use Same logic for Worklets and normal Fetch
+function headersToPairsPure(headers?: HeadersInit): NitroHeader[] | undefined {
+  'worklet';
+  if (!headers) return undefined;
+  const pairs: NitroHeader[] = [];
+
+  if (Array.isArray(headers)) {
+    // Convert tuple pairs to objects if needed
+    for (const entry of headers as any[]) {
+      if (Array.isArray(entry) && entry.length >= 2) {
+        pairs.push({ key: String(entry[0]), value: String(entry[1]) });
+      } else if (
+        entry &&
+        typeof entry === 'object' &&
+        'key' in entry &&
+        'value' in entry
+      ) {
+        pairs.push(entry as NitroHeader);
+      }
+    }
+    return pairs;
+  }
+
+  // Check if it's a plain object (Record<string, string>) first
+  // Plain objects don't have forEach, so check for its absence
+  if (typeof headers === 'object' && headers !== null) {
+    // Check if it's a Headers instance by checking for forEach method
+    const hasForEach = typeof (headers as any).forEach === 'function';
+
+    if (hasForEach) {
+      // Headers-like object (duck typing)
+      (headers as any).forEach((v: string, k: string) =>
+        pairs.push({ key: k, value: v })
+      );
+      return pairs;
+    } else {
+      // Plain object (Record<string, string>)
+      // Use Object.keys to iterate since Object.entries might not work in worklets
+      const keys = Object.keys(headers);
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        const v = (headers as Record<string, string>)[k];
+        if (v !== undefined) {
+          pairs.push({ key: k, value: String(v) });
+        }
+      }
+      return pairs;
+    }
+  }
+
+  return pairs;
+}
+// Pure JS version of buildNitroRequest that doesnt use anything that breaks worklets
+function normalizeBodyPure(
+  body: BodyInit | null | undefined
+): { bodyString?: string; bodyBytes?: ArrayBuffer } | undefined {
+  'worklet';
+  if (body == null) return undefined;
+  if (typeof body === 'string') return { bodyString: body };
+
+  // Check for URLSearchParams (duck typing)
+  // It should be an object, have a toString method, and typically append/delete methods
+  // But mainly we care about toString() returning the query string
+  if (
+    typeof body === 'object' &&
+    body !== null &&
+    typeof (body as any).toString === 'function' &&
+    Object.prototype.toString.call(body) === '[object URLSearchParams]'
+  ) {
+    return { bodyString: body.toString() };
+  }
+
+  // Check for ArrayBuffer (using toString tag to avoid instanceof)
+  if (
+    typeof ArrayBuffer !== 'undefined' &&
+    Object.prototype.toString.call(body) === '[object ArrayBuffer]'
+  ) {
+    return { bodyBytes: body as ArrayBuffer };
+  }
+
+  if (ArrayBuffer.isView(body)) {
+    const view = body as ArrayBufferView;
+    // Pass a copy/slice of the underlying bytes without base64
+    return {
+      //@ts-ignore
+      bodyBytes: view.buffer.slice(
+        view.byteOffset,
+        view.byteOffset + view.byteLength
+      ),
+    };
+  }
+  // TODO: Blob/FormData support can be added later
+  throw new Error('Unsupported body type for nitro fetch');
+}
+// Pure JS version of buildNitroRequest that doesnt use anything that breaks worklets
+export function buildNitroRequestPure(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): NitroRequest {
+  'worklet';
+  let url: string;
+  let method: string | undefined;
+  let headersInit: HeadersInit | undefined;
+  let body: BodyInit | null | undefined;
+
+  // Check if input is URL-like without instanceof
+  const isUrlObject =
+    typeof input === 'object' &&
+    input !== null &&
+    Object.prototype.toString.call(input) === '[object URL]';
+
+  if (typeof input === 'string' || isUrlObject) {
+    url = String(input);
+    method = init?.method;
+    headersInit = init?.headers;
+    body = init?.body ?? null;
+  } else {
+    // Request object
+    const req = input as Request;
+    url = req.url;
+    method = req.method;
+    headersInit = req.headers;
+    // Clone body if needed – Request objects in RN typically allow direct access
+    body = init?.body ?? null;
+  }
+
+  const headers = headersToPairsPure(headersInit);
+  const normalized = normalizeBodyPure(body);
 
   return {
     url,
@@ -418,12 +580,14 @@ export async function nitroFetchOnWorklet<T>(
     } as const;
     return mapWorklet(payload as any);
   }
-  console.log('nitroFetchOnWorklet: running on worklet thread');
+  console.log('nitroFetchOnWorklet: running on worklet threaddddd');
   return await rt.runAsync(() => {
     'worklet';
     const unboxedNitroFetch = boxedNitroFetch.unbox();
     const unboxedClient = unboxedNitroFetch.createClient();
-    const res = unboxedClient.requestSync(buildNitroRequest(input, init));
+    const request = buildNitroRequestPure(input, init);
+    console.log('nitroFetchOnWorklet: request:', request, input, init);
+    const res = unboxedClient.requestSync(request);
     const payload = {
       url: res.url,
       status: res.status,
