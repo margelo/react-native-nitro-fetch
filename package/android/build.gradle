@@ -110,7 +110,7 @@ repositories {
 
 def kotlin_version = getExtOrDefault("kotlinVersion")
 // ---------- Cronet (Java API only) ----------
-def cronetVersion = (getExtOrDefault("cronetVersion") ?: "119.6045.31")
+def cronetVersion = (getExtOrDefault("cronetVersion") ?: "141.7340.3")
 
 
 dependencies {
