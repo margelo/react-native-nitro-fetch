@@ -1,57 +1,59 @@
+/*
+ * TextDecoder implementation for Nitro.
+ *
+ * UTF-8 validation and decoding logic adapted from Meta's Hermes TextDecoder:
+ * https://github.com/facebook/hermes/blob/static_h/API/hermes/extensions/contrib/TextDecoderUtils.h
+ * https://github.com/facebook/hermes/blob/static_h/API/hermes/extensions/contrib/TextDecoderUtils.cpp
+ */
+
 #pragma once
 
 #include "HybridNitroTextDecoderSpec.hpp"
-#include "simdutf/simdutf.h"
-#include <memory>
+
+#include <cstdint>
 #include <string>
 #include <vector>
 
-namespace margelo::nitro::nitrofetch
-{
+namespace margelo::nitro::nitrofetch {
 
-  // Forward declaration
-  struct UTF8DecoderState;
+/**
+ * C++ implementation of the `NitroTextDecoder` interface.
+ * Implements the WHATWG Encoding Standard UTF-8 decoder algorithm.
+ */
+class HybridTextDecoder : public HybridNitroTextDecoderSpec {
+public:
+  // Constructor with encoding, fatal flag, and ignoreBOM flag
+  explicit HybridTextDecoder(const std::string &encoding = "utf-8",
+                             bool fatal = false,
+                             bool ignoreBOM = false);
 
-  /**
-   * C++ implementation of the `NitroTextDecoder` interface.
-   * Implements the WHATWG Encoding Standard UTF-8 decoder algorithm.
-   */
-  class HybridTextDecoder : public HybridNitroTextDecoderSpec
-  {
-  public:
-    // Constructor with encoding, fatal flag, and ignoreBOM flag
-    explicit HybridTextDecoder(const std::string &encoding = "utf-8", bool fatal = false, bool ignoreBOM = false);
+  // Destructor
+  ~HybridTextDecoder() override;
 
-    // Destructor (must be in .cpp for unique_ptr with incomplete type)
-    ~HybridTextDecoder() override;
+public:
+  // Properties (matching web spec TextDecoder interface)
+  std::string getEncoding() override;
+  bool getFatal() override;
+  bool getIgnoreBOM() override;
 
-  public:
-    // Properties (matching web spec TextDecoder interface)
-    std::string getEncoding() override;
-    bool getFatal() override;
-    bool getIgnoreBOM() override;
+public:
+  // Methods
+  std::string decode(const std::optional<std::shared_ptr<ArrayBuffer>> &input,
+                     const std::optional<TextDecodeOptions> &options) override;
 
-  public:
-    // Methods
-    std::string decode(const std::optional<std::shared_ptr<ArrayBuffer>> &input,
-                       const std::optional<TextDecodeOptions> &options) override;
+private:
+  // Helper methods
+  std::string normalizeEncoding(const std::string &encoding);
 
-  private:
-    // Helper methods
-    std::string normalizeEncoding(const std::string &encoding);
-    std::string serializeStream(const std::vector<int32_t> &codePoints);
-    std::string decodeFastPath(const uint8_t *data, size_t length);
-    std::string decodeWithSpec(const uint8_t *data, size_t length, bool doNotFlush);
+private:
+  std::string _encoding;
+  bool _fatal;
+  bool _ignoreBOM;
 
-  private:
-    std::string _encoding;
-    bool _fatal;
-    bool _ignoreBOM;
-    bool _BOMseen;
-    bool _doNotFlush;
-
-    // Decoder state machine (matches web spec algorithm)
-    std::unique_ptr<UTF8DecoderState> _decoderState;
-  };
+  // Streaming state (matching Hermes implementation)
+  bool _bomSeen;
+  uint8_t _pendingBytes[4];
+  size_t _pendingCount;
+};
 
 } // namespace margelo::nitro::nitrofetch

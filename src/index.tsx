@@ -16,12 +16,3 @@ export type {
   PrefetchOptions,
   WorkletMapper,
 } from './fetch';
-
-// Debug utilities (only available in __DEV__)
-export {
-  getCacheStats,
-  clearAllCaches,
-  logCacheState,
-  watchCache,
-} from './debug';
-export type { CacheStats } from './debug';

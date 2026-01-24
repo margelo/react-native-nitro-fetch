@@ -4007,6 +4007,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"big-integer@npm:^1.6.51":
+  version: 1.6.52
+  resolution: "big-integer@npm:1.6.52"
+  checksum: 6e86885787a20fed96521958ae9086960e4e4b5e74d04f3ef7513d4d0ad631a9f3bde2730fc8aaa4b00419fc865f6ec573e5320234531ef37505da7da192c40b
+  languageName: node
+  linkType: hard
+
 "bl@npm:^4.1.0":
   version: 4.1.0
   resolution: "bl@npm:4.1.0"
@@ -6022,6 +6029,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"fast-text-encoding@npm:^1.0.6":
+  version: 1.0.6
+  resolution: "fast-text-encoding@npm:1.0.6"
+  checksum: 9d58f694314b3283e785bf61954902536da228607ad246905e30256f9ab8331f780ac987e7222c9f5eafd04168d07e12b8054c85cedb76a2c05af0e82387a903
+  languageName: node
+  linkType: hard
+
 "fast-uri@npm:^3.0.1":
   version: 3.1.0
   resolution: "fast-uri@npm:3.1.0"
@@ -6166,6 +6180,13 @@ __metadata:
     flatted: ^3.2.9
     keyv: ^4.5.4
   checksum: 899fc86bf6df093547d76e7bfaeb900824b869d7d457d02e9b8aae24836f0a99fbad79328cfd6415ee8908f180699bf259dc7614f793447cb14f707caf5996f6
+  languageName: node
+  linkType: hard
+
+"flatbuffers@npm:2.0.6":
+  version: 2.0.6
+  resolution: "flatbuffers@npm:2.0.6"
+  checksum: 88d907d3c9404c2e10c3e45e23a39ed5517b77c036738f88973933f50454a44f49336cbfbc5f3758b3eeb8e644902d84fdedd94c3fd0a54dfda724d4adb1155f
   languageName: node
   linkType: hard
 
@@ -10210,6 +10231,19 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-native-fast-encoder@npm:^0.2.0":
+  version: 0.2.2
+  resolution: "react-native-fast-encoder@npm:0.2.2"
+  dependencies:
+    big-integer: ^1.6.51
+    flatbuffers: 2.0.6
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: e5cae6e39b05aef66ce224d17478487567d92dc0fd373392c0a9fa8973410a6a34493fe04caa20cd9c3eb81f12a9a5cb75d762f553a2a9ad6cba1532b1238d1e
+  languageName: node
+  linkType: hard
+
 "react-native-mmkv@npm:^3.0.0":
   version: 3.3.3
   resolution: "react-native-mmkv@npm:3.3.3"
@@ -10250,9 +10284,11 @@ __metadata:
     babel-plugin-module-resolver: ^5.0.2
     chai: ^6.2.0
     event-target-polyfill: ^0.0.4
+    fast-text-encoding: ^1.0.6
     react: 19.1.0
     react-native: 0.81.0
     react-native-builder-bob: ^0.40.13
+    react-native-fast-encoder: ^0.2.0
     react-native-mmkv: ^3.0.0
     react-native-monorepo-config: ^0.1.9
     react-native-nitro-modules: ^0.31.4

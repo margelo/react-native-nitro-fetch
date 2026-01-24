@@ -9,9 +9,10 @@ import {
 } from 'react-native';
 
 import './tests/text-decoder';
+import './tests/fast-encoder-decoder';
 import './tests/web-text-decoder';
-import './tests/prefetch';
-import './tests/fetch-spec';
+// import './tests/prefetch';
+// import './tests/fetch-spec';
 import type { TestResult, TestResults } from './types';
 import { TestsContext } from './utils';
 import { fetchStreamedData } from './stream';

@@ -10,11 +10,8 @@ add_library(${PACKAGE_NAME} SHARED
         src/main/cpp/cpp-adapter.cpp
         ../cpp/HybridTextEncoding.cpp
         ../cpp/HybridTextDecoder.cpp
+        ../cpp/TextDecoderUtils.cpp
 )
-
-# Add simdutf library
-add_library(simdutf STATIC ../cpp/simdutf/simdutf.cpp)
-target_include_directories(simdutf PUBLIC ../cpp/simdutf)
 
 # Add Nitrogen specs :)
 include(${CMAKE_SOURCE_DIR}/../nitrogen/generated/android/nitrofetch+autolinking.cmake)
@@ -57,7 +54,6 @@ find_library(LOG_LIB log)
 target_link_libraries(
         ${PACKAGE_NAME}
         ${LOG_LIB}
-        simdutf
         android # <-- Android core
 )
 

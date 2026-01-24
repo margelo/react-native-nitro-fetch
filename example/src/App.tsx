@@ -11,6 +11,7 @@ import {
 import { fetch as nitroFetch, fetchOnWorklet } from 'react-native-nitro-fetch';
 import { fetchStreamedData } from './stream';
 import TestScreen from './Tests';
+import SpeedTest from './SpeedTest';
 
 // Update this to your computer's local IP address
 // You can find it by running: ipconfig getifaddr en0 (macOS) or ipconfig (Windows)
@@ -40,7 +41,7 @@ export default function App() {
   const [seenRequestIds, setSeenRequestIds] = React.useState<Set<string>>(
     new Set()
   );
-  const [activeTab, setActiveTab] = React.useState<'tests' | 'benchmark'>(
+  const [activeTab, setActiveTab] = React.useState<'tests' | 'benchmark' | 'speed'>(
     'tests'
   );
   const [workletResult, setWorkletResult] = React.useState<string>('');
@@ -490,11 +491,26 @@ export default function App() {
             Benchmark
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'speed' && styles.activeTab]}
+          onPress={() => setActiveTab('speed')}
+        >
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'speed' && styles.activeTabText,
+            ]}
+          >
+            Speed
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Content */}
       {activeTab === 'tests' ? (
         <TestScreen />
+      ) : activeTab === 'speed' ? (
+        <SpeedTest />
       ) : (
         <View style={styles.benchmarkContainer}>
           <View style={styles.buttonContainer}>
