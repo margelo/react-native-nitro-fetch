@@ -328,7 +328,10 @@ DecodeError decodeUTF8(
     }
   }
 
-  decoded->reserve(decoded->size() + processLength);
+  // Only reserve if not already reserved by caller
+  if (decoded->capacity() < decoded->size() + processLength) {
+    decoded->reserve(decoded->size() + processLength);
+  }
 
   // Mark BOM as seen once we actually process bytes (not just buffer them).
   if (!*outBOMSeen && processLength > 0) {

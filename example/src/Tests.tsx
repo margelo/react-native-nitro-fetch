@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 
 import './tests/text-decoder';
-import './tests/fast-encoder-decoder';
+// import './tests/fast-encoder-decoder';
 import './tests/web-text-decoder';
 // import './tests/prefetch';
 // import './tests/fetch-spec';

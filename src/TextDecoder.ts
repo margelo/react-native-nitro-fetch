@@ -12,7 +12,11 @@ export class TextDecoder {
   public readonly encoding: string;
   public readonly fatal: boolean;
   public readonly ignoreBOM: boolean;
-  private readonly decoder: NitroTextDecoder;
+  // The raw decode method handles ArrayBuffer, TypedArray, and DataView directly in C++
+  private readonly _decode: (
+    input?: ArrayBuffer | ArrayBufferView,
+    options?: TextDecodeOptions
+  ) => string;
 
   constructor(label: string = 'utf-8', options?: TextDecoderOptions) {
     if (label === null) {
@@ -22,40 +26,29 @@ export class TextDecoder {
       throw new TypeError('Options must be an object');
     }
 
+    let decoder: NitroTextDecoder;
     try {
-      this.decoder = TextEncoding.createDecoder(label, options);
+      decoder = TextEncoding.createDecoder(label, options);
     } catch (e: any) {
       throw new RangeError(e.message);
     }
-    this.encoding = this.decoder.encoding;
-    this.fatal = this.decoder.fatal;
-    this.ignoreBOM = this.decoder.ignoreBOM;
+    this.encoding = decoder.encoding;
+    this.fatal = decoder.fatal;
+    this.ignoreBOM = decoder.ignoreBOM;
+    // The C++ raw method handles TypedArray directly - no JS conversion needed!
+    this._decode = (decoder as any).decode.bind(decoder);
   }
 
   decode(
     input?: ArrayBuffer | ArrayBufferView,
     options?: TextDecodeOptions
   ): string {
+    // Validate options parameter - must be undefined or an object
+    if (options !== undefined && typeof options !== 'object') {
+      throw new TypeError('Options must be an object');
+    }
     try {
-      // Handle ArrayBufferView (Uint8Array, Int8Array, Uint16Array, etc.)
-      if (
-        input &&
-        'buffer' in input &&
-        'byteOffset' in input &&
-        'byteLength' in input
-      ) {
-        // Create a Uint8Array view of the exact bytes we need to decode
-        const view = new Uint8Array(
-          input.buffer as ArrayBuffer,
-          input.byteOffset,
-          input.byteLength
-        );
-        // Now slice to get a new buffer with just those bytes
-        const sliced = view.slice();
-        return this.decoder.decode(sliced.buffer as ArrayBuffer, options);
-      }
-      // Handle plain ArrayBuffer
-      return this.decoder.decode(input as ArrayBuffer | undefined, options);
+      return this._decode(input, options);
     } catch (e: any) {
       throw new TypeError(e.message);
     }

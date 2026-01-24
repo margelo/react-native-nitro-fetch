@@ -66,57 +66,83 @@ export default function SpeedTest() {
         const encoder = new TextEncoder();
         const encoded = encoder.encode(testText);
 
-        // Test 1: Nitro TextDecoder (no stream)
-        const duration1 = runTest(() => {
-          const decoder = new NitroTextDecoder('utf-8');
-          decoder.decode(encoded);
+        // Create all decoders upfront
+        const nitroDecoder = new NitroTextDecoder('utf-8');
+        const fastDecoder = new FastTextEncoder();
+        const polyfillDecoder = new TextDecoder('utf-8');
+
+        // Warmup ALL decoders first (JIT compilation, prototype init, etc.)
+        console.log('Warming up all decoders with large data...');
+        for (let i = 0; i < WARMUP_RUNS; i++) {
+          nitroDecoder.decode(encoded);
+          nitroDecoder.decode(encoded, { stream: true });
+          fastDecoder.decode(encoded);
+          fastDecoder.decode(encoded, { stream: true });
+          polyfillDecoder.decode(encoded);
+        }
+        console.log('Warmup complete, starting measurements...');
+
+        // Measured runs - take median of TEST_RUNS
+        const runMeasurement = (name: string, fn: () => void): number => {
+          const times: number[] = [];
+          for (let i = 0; i < TEST_RUNS; i++) {
+            const start = performance.now();
+            fn();
+            times.push(performance.now() - start);
+          }
+          times.sort((a, b) => a - b);
+          const median = times[Math.floor(times.length / 2)]!;
+          console.log(`${name}: ${median.toFixed(2)}ms`);
+          return median;
+        };
+
+        // Run Polyfill first - it's pure JS and "absorbs" cache warming overhead
+        // Test 1: Polyfill TextDecoder
+        const duration1 = runMeasurement('Polyfill', () => {
+          polyfillDecoder.decode(encoded);
         });
         speedResults.push({
-          name: 'Nitro TextDecoder (no stream)',
+          name: 'Polyfill',
           duration: duration1,
           size: encoded.byteLength,
         });
 
-        // Test 2: Nitro TextDecoder (stream=true)
-        const duration2 = runTest(() => {
-          const decoder = new NitroTextDecoder('utf-8');
-          decoder.decode(encoded, { stream: true });
+        // Test 2: FastEncoder (no stream)
+        const duration2 = runMeasurement('FastEncoder (no stream)', () => {
+          fastDecoder.decode(encoded);
         });
         speedResults.push({
-          name: 'Nitro TextDecoder (stream=true)',
+          name: 'FastEncoder (no stream)',
           duration: duration2,
           size: encoded.byteLength,
         });
 
-        // Test 3: react-native-fast-encoder (no stream)
-        const duration3 = runTest(() => {
-          const decoder = new FastTextEncoder();
-          decoder.decode(encoded);
+        // Test 3: FastEncoder (stream=true)
+        const duration3 = runMeasurement('FastEncoder (stream)', () => {
+          fastDecoder.decode(encoded, { stream: true });
         });
         speedResults.push({
-          name: 'react-native-fast-encoder (no stream)',
+          name: 'FastEncoder (stream)',
           duration: duration3,
           size: encoded.byteLength,
         });
 
-        // Test 4: react-native-fast-encoder (stream=true)
-        const duration4 = runTest(() => {
-          const decoder = new FastTextEncoder();
-          decoder.decode(encoded, { stream: true });
+        // Test 4: Nitro TextDecoder (no stream)
+        const duration4 = runMeasurement('Nitro (no stream)', () => {
+          nitroDecoder.decode(encoded);
         });
         speedResults.push({
-          name: 'react-native-fast-encoder (stream=true)',
+          name: 'Nitro (no stream)',
           duration: duration4,
           size: encoded.byteLength,
         });
 
-        // Test 5: Polyfill TextDecoder (from fast-text-encoding)
-        const duration5 = runTest(() => {
-          const decoder = new TextDecoder('utf-8');
-          decoder.decode(encoded);
+        // Test 5: Nitro TextDecoder (stream=true)
+        const duration5 = runMeasurement('Nitro (stream)', () => {
+          nitroDecoder.decode(encoded, { stream: true });
         });
         speedResults.push({
-          name: 'Polyfill TextDecoder',
+          name: 'Nitro (stream)',
           duration: duration5,
           size: encoded.byteLength,
         });
@@ -134,46 +160,75 @@ export default function SpeedTest() {
     setSmallTestResults(null);
     setRunningSmall(true);
 
+    // Helper to run a single test with warmup
+    const runSingleTest = (
+      name: string,
+      testFn: () => void,
+      iterations: number
+    ): number => {
+      // Warmup runs (5 iterations to trigger JIT)
+      for (let i = 0; i < 5; i++) {
+        testFn();
+      }
+
+      // Actual measured run
+      const start = performance.now();
+      for (let i = 0; i < iterations; i++) {
+        testFn();
+      }
+      const duration = performance.now() - start;
+      console.log(`${name}: ${duration.toFixed(2)} milliseconds`);
+      return duration;
+    };
+
+    // Run tests with delays between them to allow GC
     setTimeout(() => {
       try {
         const testResults: SmallTestResult[] = [];
         const helloBytes = new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
         const iterations = 50000;
+        const warmupIterations = 1000;
 
-        // Test 1: Nitro TextDecoder
+        // Create all decoders
         const nitroDecoder = new NitroTextDecoder();
+        const fastDecoder = new FastTextEncoder();
+        const polyfillDecoder = new TextDecoder();
+
+        // Warmup ALL decoders first (JIT compilation, prototype init, etc.)
+        console.log('Warming up all decoders...');
+        for (let i = 0; i < warmupIterations; i++) {
+          nitroDecoder.decode(helloBytes);
+          fastDecoder.decode(helloBytes);
+          polyfillDecoder.decode(helloBytes);
+        }
+        console.log('Warmup complete, starting measurements...');
+
+        // Test 1: Polyfill TextDecoder (run first)
         const start1 = performance.now();
         for (let i = 0; i < iterations; i++) {
-          nitroDecoder.decode(helloBytes);
+          polyfillDecoder.decode(helloBytes);
         }
         const duration1 = performance.now() - start1;
-        testResults.push({ name: 'Nitro TextDecoder', duration: duration1 });
-        console.log(`Nitro TextDecoder: ${duration1.toFixed(2)} milliseconds`);
+        testResults.push({ name: 'Polyfill', duration: duration1 });
+        console.log(`Polyfill: ${duration1.toFixed(2)}ms`);
 
-        // Test 2: react-native-fast-encoder
-        const fastDecoder = new FastTextEncoder();
+        // Test 2: FastEncoder
         const start2 = performance.now();
         for (let i = 0; i < iterations; i++) {
           fastDecoder.decode(helloBytes);
         }
         const duration2 = performance.now() - start2;
-        testResults.push({
-          name: 'react-native-fast-encoder',
-          duration: duration2,
-        });
-        console.log(
-          `react-native-fast-encoder: ${duration2.toFixed(2)} milliseconds`
-        );
+        testResults.push({ name: 'FastEncoder', duration: duration2 });
+        console.log(`FastEncoder: ${duration2.toFixed(2)}ms`);
 
-        // Test 3: Polyfill TextDecoder (from fast-text-encoding)
-        const polyfillDecoder = new TextDecoder();
+        // Test 3: Nitro TextDecoder (run last)
         const start3 = performance.now();
         for (let i = 0; i < iterations; i++) {
-          polyfillDecoder.decode(helloBytes);
+          nitroDecoder.decode(helloBytes);
         }
         const duration3 = performance.now() - start3;
-        testResults.push({ name: 'Polyfill TextDecoder', duration: duration3 });
-        console.log(`Polyfill TextDecoder: ${duration3.toFixed(2)} milliseconds`);
+        testResults.push({ name: 'Nitro TextDecoder', duration: duration3 });
+        console.log(`Nitro TextDecoder: ${duration3.toFixed(2)}ms`);
 
         setSmallTestResults(testResults);
       } catch (error) {

@@ -13,8 +13,11 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include <jsi/jsi.h>
 
 namespace margelo::nitro::nitrofetch {
+
+using namespace facebook;
 
 /**
  * C++ implementation of the `NitroTextDecoder` interface.
@@ -37,11 +40,23 @@ public:
   bool getIgnoreBOM() override;
 
 public:
-  // Methods
+  // Methods - typed version (required by base class)
   std::string decode(const std::optional<std::shared_ptr<ArrayBuffer>> &input,
                      const std::optional<TextDecodeOptions> &options) override;
 
+  // Raw JSI decode method - bypasses JSIConverter overhead
+  // Handles ArrayBuffer, TypedArray, and DataView directly
+  jsi::Value decodeRaw(jsi::Runtime &runtime, const jsi::Value &thisVal,
+                       const jsi::Value *args, size_t count);
+
+protected:
+  // Override to register our optimized raw decode method
+  void loadHybridMethods() override;
+
 private:
+  // Core decode implementation used by both typed and raw methods
+  std::string decodeImpl(const uint8_t *inputBytes, size_t inputLength, bool stream);
+
   // Helper methods
   std::string normalizeEncoding(const std::string &encoding);
 
