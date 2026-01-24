@@ -409,3 +409,223 @@ test(
     }
   }
 );
+
+// https://github.com/web-platform-tests/wpt/blob/master/encoding/textdecoder-copy.any.js
+test(SUITE, 'Buffer is copied, not referenced (WPT textdecoder-copy)', () => {
+  const decoder = new TextDecoder('utf-8');
+
+  // Create buffer with start of UTF-8 BOM (0xEF 0xBB)
+  const buf1 = new Uint8Array([0xef, 0xbb]);
+
+  // Decode with stream: true - should return empty string (incomplete BOM)
+  const result1 = decoder.decode(buf1, { stream: true });
+  expect(result1).to.equal('');
+
+  // Modify the buffer after decode - this should NOT affect decoder state
+  buf1[0] = 0x01;
+  buf1[1] = 0x02;
+
+  // Continue with rest of BOM (0xBF) and '@' (0x40)
+  const buf2 = new Uint8Array([0xbf, 0x40]);
+  const result2 = decoder.decode(buf2);
+
+  // If buffer was copied, we get '@' (BOM stripped)
+  // If buffer was referenced, we'd get garbage
+  expect(result2).to.equal('@');
+});
+
+// https://github.com/web-platform-tests/wpt/blob/master/encoding/textdecoder-fatal-streaming.any.js
+test(SUITE, 'Fatal flag with streaming - error mid-stream (WPT)', () => {
+  // Test that fatal errors are thrown even in streaming mode
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+
+  // Start of a 3-byte sequence
+  const part1 = new Uint8Array([0xe0, 0xa0]);
+  // This should work - incomplete sequence buffered
+  const result1 = decoder.decode(part1, { stream: true });
+  expect(result1).to.equal('');
+
+  // Invalid continuation byte - should throw
+  const part2 = new Uint8Array([0x00]); // 0x00 is not a valid continuation
+  expect(() => decoder.decode(part2, { stream: true })).to.throw(TypeError);
+});
+
+test(SUITE, 'Fatal flag with streaming - incomplete at end (WPT)', () => {
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+
+  // Start of a 2-byte sequence
+  const incomplete = new Uint8Array([0xc2]);
+  decoder.decode(incomplete, { stream: true });
+
+  // End stream with incomplete sequence - should throw
+  expect(() => decoder.decode()).to.throw(TypeError);
+});
+
+test(
+  SUITE,
+  'Fatal streaming - valid sequence split across chunks (WPT)',
+  () => {
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+
+    // Valid 3-byte UTF-8 for U+1000 split across calls
+    const part1 = new Uint8Array([0xe1]);
+    const part2 = new Uint8Array([0x80]);
+    const part3 = new Uint8Array([0x80]);
+
+    let result = '';
+    result += decoder.decode(part1, { stream: true });
+    result += decoder.decode(part2, { stream: true });
+    result += decoder.decode(part3, { stream: true });
+    result += decoder.decode();
+
+    expect(result).to.equal('\u1000');
+  }
+);
+
+// https://github.com/web-platform-tests/wpt/blob/master/encoding/textdecoder-eof.any.js
+test(SUITE, 'EOF handling - incomplete sequences produce replacement (WPT)', () => {
+  const decoder = new TextDecoder('utf-8');
+
+  // Various incomplete sequences at EOF
+  const testCases = [
+    { input: [0xf0], expected: '\ufffd' }, // 4-byte start alone
+    { input: [0xf0, 0x90], expected: '\ufffd' }, // 4-byte missing 2
+    { input: [0xf0, 0x90, 0x80], expected: '\ufffd' }, // 4-byte missing 1
+    { input: [0xe0], expected: '\ufffd' }, // 3-byte start alone
+    { input: [0xe0, 0xa0], expected: '\ufffd' }, // 3-byte missing 1
+    { input: [0xc2], expected: '\ufffd' }, // 2-byte start alone
+    { input: [0x41, 0xc2], expected: 'A\ufffd' }, // valid + incomplete
+    { input: [0xc2, 0x41], expected: '\ufffdA' }, // invalid sequence + valid
+  ];
+
+  testCases.forEach(({ input, expected }) => {
+    const result = decoder.decode(new Uint8Array(input));
+    expect(result).to.equal(expected);
+  });
+});
+
+test(SUITE, 'EOF handling with streaming - flush incomplete (WPT)', () => {
+  const decoder = new TextDecoder('utf-8');
+
+  // Stream incomplete sequence then flush
+  decoder.decode(new Uint8Array([0xc2]), { stream: true });
+  const result = decoder.decode(); // flush
+
+  expect(result).to.equal('\ufffd');
+});
+
+// https://github.com/web-platform-tests/wpt/blob/master/encoding/textdecoder-arguments.any.js
+test(SUITE, 'decode() with explicit undefined arguments (WPT)', () => {
+  const decoder = new TextDecoder('utf-8');
+
+  // Explicit undefined first argument
+  expect(decoder.decode(undefined)).to.equal('');
+
+  // Both arguments undefined
+  expect(decoder.decode(undefined, undefined)).to.equal('');
+
+  // Undefined input with empty options
+  expect(decoder.decode(undefined, {})).to.equal('');
+});
+
+test(SUITE, 'decode() undefined flushes incomplete sequence (WPT)', () => {
+  const decoder = new TextDecoder('utf-8');
+
+  // Start incomplete sequence
+  decoder.decode(new Uint8Array([0xc9]), { stream: true });
+
+  // Flush with undefined - should produce replacement character
+  const result = decoder.decode(undefined);
+  expect(result).to.equal('\ufffd');
+});
+
+// Additional fatal mode tests from WPT
+const fatalCases = [
+  // Overlong encodings
+  { input: [0xc0, 0x80], desc: 'overlong encoding of U+0000' },
+  { input: [0xc1, 0xbf], desc: 'overlong encoding of U+007F' },
+  { input: [0xe0, 0x80, 0x80], desc: 'overlong encoding of U+0000 (3-byte)' },
+  { input: [0xe0, 0x9f, 0xbf], desc: 'overlong encoding of U+07FF' },
+  {
+    input: [0xf0, 0x80, 0x80, 0x80],
+    desc: 'overlong encoding of U+0000 (4-byte)',
+  },
+  { input: [0xf0, 0x8f, 0xbf, 0xbf], desc: 'overlong encoding of U+FFFF' },
+  // Surrogates encoded as UTF-8
+  { input: [0xed, 0xa0, 0x80], desc: 'surrogate U+D800' },
+  { input: [0xed, 0xbf, 0xbf], desc: 'surrogate U+DFFF' },
+  // Out of range
+  { input: [0xf4, 0x90, 0x80, 0x80], desc: 'out of range U+110000' },
+  // Invalid start bytes
+  { input: [0x80], desc: 'unexpected continuation byte' },
+  { input: [0xbf], desc: 'unexpected continuation byte (max)' },
+  { input: [0xfe], desc: 'invalid start byte 0xFE' },
+  { input: [0xff], desc: 'invalid start byte 0xFF' },
+];
+
+fatalCases.forEach(({ input, desc }) => {
+  test(SUITE, `Fatal mode - ${desc} (WPT)`, () => {
+    expect(() =>
+      new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(input))
+    ).to.throw(TypeError);
+  });
+});
+
+// Test decoder state is preserved after error in non-fatal mode
+test(SUITE, 'Decoder usable after non-fatal error (WPT)', () => {
+  const decoder = new TextDecoder('utf-8');
+
+  // Decode invalid sequence
+  const result1 = decoder.decode(new Uint8Array([0xff]));
+  expect(result1).to.equal('\ufffd');
+
+  // Decoder should still work
+  const result2 = decoder.decode(new Uint8Array([0x41, 0x42, 0x43]));
+  expect(result2).to.equal('ABC');
+});
+
+// Test ignoreBOM attribute
+test(SUITE, 'ignoreBOM attribute tests (WPT)', () => {
+  // Default is false
+  expect(new TextDecoder().ignoreBOM).to.equal(false);
+  expect(new TextDecoder('utf-8').ignoreBOM).to.equal(false);
+
+  // Can be set to true
+  expect(new TextDecoder('utf-8', { ignoreBOM: true }).ignoreBOM).to.equal(
+    true
+  );
+
+  // Explicit false
+  expect(new TextDecoder('utf-8', { ignoreBOM: false }).ignoreBOM).to.equal(
+    false
+  );
+});
+
+// Test BOM handling in streaming mode
+test(SUITE, 'BOM handling in streaming mode (WPT)', () => {
+  const decoder = new TextDecoder('utf-8');
+  const bom = [0xef, 0xbb, 0xbf];
+  const text = [0x41, 0x42, 0x43]; // ABC
+
+  // BOM split across chunks should still be stripped
+  let result = '';
+  result += decoder.decode(new Uint8Array([bom[0]!]), { stream: true });
+  result += decoder.decode(new Uint8Array([bom[1]!]), { stream: true });
+  result += decoder.decode(new Uint8Array([bom[2]!, ...text]), { stream: true });
+  result += decoder.decode();
+
+  expect(result).to.equal('ABC');
+});
+
+test(SUITE, 'BOM only stripped once in streaming (WPT)', () => {
+  const decoder = new TextDecoder('utf-8');
+  const bom = new Uint8Array([0xef, 0xbb, 0xbf]);
+
+  // First BOM should be stripped
+  const result1 = decoder.decode(bom, { stream: true });
+  expect(result1).to.equal('');
+
+  // Second BOM should NOT be stripped (it's data now)
+  const result2 = decoder.decode(bom);
+  expect(result2).to.equal('\ufeff');
+});
