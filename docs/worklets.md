@@ -1,6 +1,6 @@
 # Worklets
 
-`nitroFetchOnWorklet()` lets you run parsing/mapping off the JS thread using `react-native-worklets-core` (Android). On iOS or when worklets are unavailable, it falls back to running the mapper on the JS thread.
+`nitroFetchOnWorklet()` lets you run parsing/mapping off the JS thread using `react-native-worklets` .
 
 ## Usage
 
@@ -12,7 +12,7 @@ const map = (payload: { bodyString?: string }) => {
   return JSON.parse(payload.bodyString ?? '{}');
 };
 
-const data = await nitroFetchOnWorklet('https://httpbin.org/get', undefined, map, { preferBytes: false });
+const data = nitroFetchOnWorklet('https://httpbin.org/get', undefined, map, { preferBytes: false });
 ```
 
 Options
@@ -22,6 +22,6 @@ Options
 
 Notes
 
-- Ensure `react-native-worklets-core` is installed in your app to get off-thread execution on Android.
-- On iOS, the mapper runs on JS but the API surface remains the same.
+- Ensure `react-native-worklets` is installed in your app to get off-thread.
+
 
