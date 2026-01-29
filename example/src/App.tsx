@@ -17,6 +17,8 @@ import {
   removeAllFromAutoprefetch,
 } from 'react-native-nitro-fetch';
 
+import { getRuntimeKind } from 'react-native-worklets';
+
 type Row = {
   url: string;
   builtinMs: number;
@@ -202,6 +204,7 @@ export default function App() {
     const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids.join(','))}&vs_currencies=usd`;
     const mapper = (payload: { bodyString?: string }) => {
       'worklet';
+      console.log('getRuntimeKind', getRuntimeKind()); // Ensures worklet is running
       const txt = payload.bodyString ?? '';
       const json = JSON.parse(txt) as Record<string, { usd: number }>;
       const entries = Object.entries(json);
