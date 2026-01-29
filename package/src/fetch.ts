@@ -5,8 +5,8 @@ import type {
   NitroResponse,
 } from './NitroFetch.nitro';
 import {
-  boxedNitroFetch,
   NitroFetch as NitroFetchSingleton,
+  boxedNitroFetch,
 } from './NitroInstances';
 import { NativeStorage as NativeStorageSingleton } from './NitroInstances';
 
@@ -517,25 +517,11 @@ export type NitroWorkletMapper<T> = (payload: {
 }) => T;
 
 let nitroRuntime: any | undefined;
-let WorkletsRef: any | undefined;
 function ensureWorkletRuntime(name = 'nitro-fetch'): any | undefined {
   try {
-    const { Worklets } = require('react-native-worklets-core');
-    nitroRuntime = nitroRuntime ?? Worklets.createContext(name);
+    const { createWorkletRuntime } = require('react-native-worklets');
+    nitroRuntime = nitroRuntime ?? createWorkletRuntime(name);
     return nitroRuntime;
-  } catch {
-    console.warn('react-native-worklets-core not available');
-    return undefined;
-  }
-}
-
-function getWorklets(): any | undefined {
-  try {
-    if (WorkletsRef) return WorkletsRef;
-
-    const { Worklets } = require('react-native-worklets-core');
-    WorkletsRef = Worklets;
-    return WorkletsRef;
   } catch {
     console.warn('react-native-worklets-core not available');
     return undefined;
@@ -547,19 +533,31 @@ export async function nitroFetchOnWorklet<T>(
   init: RequestInit | undefined,
   mapWorklet: NitroWorkletMapper<T>,
   options?: { preferBytes?: boolean; runtimeName?: string }
-): Promise<T> {
+) {
   const preferBytes = options?.preferBytes === true; // default true
   let rt: any | undefined;
-  let Worklets: any | undefined;
   try {
     rt = ensureWorkletRuntime(options?.runtimeName);
-    Worklets = getWorklets();
   } catch (e) {
     console.error('nitroFetchOnWorklet: setup failed', e);
   }
 
-  // Fallback: if runtime is not available, do the work on JS
-  if (!rt || !Worklets || typeof rt.runAsync !== 'function') {
+  // Try to get worklet sync functions - prefer runOnRuntimeSync, fallback to runOnUISync
+  let runOnRuntimeSync: any;
+  let runOnUISync: any;
+  try {
+    const worklets = require('react-native-worklets');
+    runOnRuntimeSync = worklets.runOnRuntimeSync;
+    runOnUISync = worklets.runOnUISync;
+  } catch {
+    // Module not available
+  }
+
+  const hasRuntimeSync = typeof runOnRuntimeSync === 'function' && rt;
+  const hasUISync = typeof runOnUISync === 'function';
+
+  // Fallback: if no sync function is available, do the work on JS thread
+  if (!hasRuntimeSync && !hasUISync) {
     console.warn('nitroFetchOnWorklet: no runtime, mapping on JS thread');
     const res = await nitroFetchRaw(input, init);
     const payload = {
@@ -574,12 +572,12 @@ export async function nitroFetchOnWorklet<T>(
     } as const;
     return mapWorklet(payload as any);
   }
-  return await rt.runAsync(() => {
+
+  const workletFn = () => {
     'worklet';
-    const unboxedNitroFetch = boxedNitroFetch.unbox();
-    const unboxedClient = unboxedNitroFetch.createClient();
+    const nitroFetch = boxedNitroFetch.unbox().createClient();
     const request = buildNitroRequestPure(input, init);
-    const res = unboxedClient.requestSync(request);
+    const res = nitroFetch.requestSync(request);
     const payload = {
       url: res.url,
       status: res.status,
@@ -590,12 +588,17 @@ export async function nitroFetchOnWorklet<T>(
       bodyBytes: preferBytes ? res.bodyBytes : undefined,
       bodyString: preferBytes ? undefined : res.bodyString,
     } as const;
-
     return mapWorklet(payload as any);
-  });
+  };
+
+  // Prefer runOnRuntimeSync with background runtime, fallback to runOnUISync
+  if (hasRuntimeSync) {
+    return runOnRuntimeSync(rt, workletFn) as T;
+  }
+
+  return runOnUISync(workletFn) as T;
 }
 
 export const x = ensureWorkletRuntime();
-export const y = getWorklets();
 
 export type { NitroRequest, NitroResponse } from './NitroFetch.nitro';
