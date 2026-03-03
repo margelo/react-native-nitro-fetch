@@ -38,7 +38,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - NitroModules (0.31.4):
+  - NitroModules (0.33.2):
     - boost
     - DoubleConversion
     - fast_float
@@ -1778,7 +1778,7 @@ PODS:
     - React-RCTFBReactNativeSpec
     - ReactCommon/turbomodule/core
     - SocketRocket
-  - react-native-fast-encoder (0.2.2):
+  - react-native-fast-encoder (0.3.1):
     - boost
     - DoubleConversion
     - fast_float
@@ -2707,7 +2707,7 @@ SPEC CHECKSUMS:
   glog: 5683914934d5b6e4240e497e0f4a3b42d1854183
   hermes-engine: e7491a2038f2618c8cd444ed411a6deb350a3742
   NitroFetch: 5427aa4348c06fa9cf591d1638e329ce1472d3ac
-  NitroModules: a08d4fbf973527df2d061c5f02cb192c2c261a09
+  NitroModules: 11bba9d065af151eae51e38a6425e04c3b223ff3
   RCT-Folly: 59ec0ac1f2f39672a0c6e6cecdd39383b764646f
   RCTDeprecation: 0735ab4f6b3ec93a7f98187b5da74d7916e2cf4c
   RCTRequired: 8fcc7801bfc433072287b0f24a662e2816e89d0c
@@ -2741,7 +2741,7 @@ SPEC CHECKSUMS:
   React-logger: 04ce9229cb57db2c2a8164eaec1105f89da7fb22
   React-Mapbuffer: e402e7a0535b2213c50727553621480fe8cd8ade
   React-microtasksnativemodule: a63ce5595016996a9bac1f10c70a7a7fe6506649
-  react-native-fast-encoder: c4acd8054b52cb1b79fddddc2643da1816525485
+  react-native-fast-encoder: f2728ab5e520601ba04df15716722941d941495e
   react-native-mmkv: ac7507625cd74bac0eb5333604a7cd7b08fe9e3e
   react-native-safe-area-context: c6e2edd1c1da07bdce287fa9d9e60c5f7b514616
   react-native-worklets-core: 28a6e2121dcf62543b703e81bc4860e9a0150cee
