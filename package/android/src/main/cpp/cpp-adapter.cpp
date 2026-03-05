@@ -1,6 +1,9 @@
 #include <jni.h>
+#include <fbjni/fbjni.h>
 #include "nitrofetchOnLoad.hpp"
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
-  return margelo::nitro::nitrofetch::initialize(vm);
+  return facebook::jni::initialize(vm, [=] {
+    margelo::nitro::nitrofetch::registerAllNatives();
+  });
 }
