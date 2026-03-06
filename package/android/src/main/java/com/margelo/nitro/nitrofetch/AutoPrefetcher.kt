@@ -39,6 +39,7 @@ object AutoPrefetcher {
           headers = headerObjs,
           bodyString = null,
           bodyBytes = null,
+          bodyFormData = null,
           timeoutMs = null,
           followRedirects = null
         )

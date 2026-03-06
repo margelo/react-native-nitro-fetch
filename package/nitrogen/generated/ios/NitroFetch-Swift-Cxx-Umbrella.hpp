@@ -14,6 +14,8 @@ namespace margelo::nitro::nitrofetch { class HybridNativeStorageSpec; }
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchClientSpec; }
 // Forward declaration of `HybridNitroFetchSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchSpec; }
+// Forward declaration of `NitroFormDataPart` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 // Forward declaration of `NitroHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroHeader; }
 // Forward declaration of `NitroRequestMethod` to properly resolve imports.
@@ -27,6 +29,7 @@ namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 #include "HybridNativeStorageSpec.hpp"
 #include "HybridNitroFetchClientSpec.hpp"
 #include "HybridNitroFetchSpec.hpp"
+#include "NitroFormDataPart.hpp"
 #include "NitroHeader.hpp"
 #include "NitroRequest.hpp"
 #include "NitroRequestMethod.hpp"

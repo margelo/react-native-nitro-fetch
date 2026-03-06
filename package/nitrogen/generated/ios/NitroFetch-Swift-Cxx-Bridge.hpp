@@ -14,6 +14,8 @@ namespace margelo::nitro::nitrofetch { class HybridNativeStorageSpec; }
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchClientSpec; }
 // Forward declaration of `HybridNitroFetchSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchSpec; }
+// Forward declaration of `NitroFormDataPart` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 // Forward declaration of `NitroHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroHeader; }
 // Forward declaration of `NitroRequestMethod` to properly resolve imports.
@@ -33,6 +35,7 @@ namespace NitroFetch { class HybridNitroFetchSpec_cxx; }
 #include "HybridNativeStorageSpec.hpp"
 #include "HybridNitroFetchClientSpec.hpp"
 #include "HybridNitroFetchSpec.hpp"
+#include "NitroFormDataPart.hpp"
 #include "NitroHeader.hpp"
 #include "NitroRequestMethod.hpp"
 #include "NitroResponse.hpp"
@@ -163,6 +166,33 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return optional.has_value();
   }
   inline std::vector<NitroHeader> get_std__optional_std__vector_NitroHeader__(const std::optional<std::vector<NitroHeader>>& optional) noexcept {
+    return *optional;
+  }
+  
+  // pragma MARK: std::vector<NitroFormDataPart>
+  /**
+   * Specialized version of `std::vector<NitroFormDataPart>`.
+   */
+  using std__vector_NitroFormDataPart_ = std::vector<NitroFormDataPart>;
+  inline std::vector<NitroFormDataPart> copy_std__vector_NitroFormDataPart_(const NitroFormDataPart* CONTIGUOUS_MEMORY NON_NULL data, size_t size) noexcept {
+    return margelo::nitro::FastVectorCopy<NitroFormDataPart>(data, size);
+  }
+  inline const NitroFormDataPart* CONTIGUOUS_MEMORY NON_NULL get_data_std__vector_NitroFormDataPart_(const std::vector<NitroFormDataPart>& vector) noexcept {
+    return vector.data();
+  }
+  
+  // pragma MARK: std::optional<std::vector<NitroFormDataPart>>
+  /**
+   * Specialized version of `std::optional<std::vector<NitroFormDataPart>>`.
+   */
+  using std__optional_std__vector_NitroFormDataPart__ = std::optional<std::vector<NitroFormDataPart>>;
+  inline std::optional<std::vector<NitroFormDataPart>> create_std__optional_std__vector_NitroFormDataPart__(const std::vector<NitroFormDataPart>& value) noexcept {
+    return std::optional<std::vector<NitroFormDataPart>>(value);
+  }
+  inline bool has_value_std__optional_std__vector_NitroFormDataPart__(const std::optional<std::vector<NitroFormDataPart>>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline std::vector<NitroFormDataPart> get_std__optional_std__vector_NitroFormDataPart__(const std::optional<std::vector<NitroFormDataPart>>& optional) noexcept {
     return *optional;
   }
   

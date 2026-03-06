@@ -1,14 +1,19 @@
 package com.margelo.nitro.nitrofetch
 
+import android.net.Uri
 import android.util.Log
 import com.facebook.proguard.annotations.DoNotStrip
+import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.ArrayBuffer
 import com.margelo.nitro.core.Promise
 import org.chromium.net.CronetEngine
 import org.chromium.net.CronetException
 import org.chromium.net.UrlRequest
 import org.chromium.net.UrlResponseInfo
+import java.io.ByteArrayOutputStream
+import java.io.File
 import java.nio.ByteBuffer
+import java.util.UUID
 import java.util.concurrent.Executor
 
 fun ByteBuffer.toByteArray(): ByteArray {
@@ -125,33 +130,93 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       val method = req.method?.name ?: "GET"
       builder.setHttpMethod(method)
       req.headers?.forEach { (k, v) -> builder.addHeader(k, v) }
-      val bodyBytes = req.bodyBytes
-      val bodyStr = req.bodyString
-      if ((bodyBytes != null) || !bodyStr.isNullOrEmpty()) {
-        val body: ByteArray = when {
-          bodyBytes != null -> ByteArray(1);//bodyBytes.getBuffer(true).toByteArray()
-          !bodyStr.isNullOrEmpty() -> bodyStr!!.toByteArray(Charsets.UTF_8)
-          else -> ByteArray(0)
-        }
-        val provider = object : org.chromium.net.UploadDataProvider() {
-          private var pos = 0
-          override fun getLength(): Long = body.size.toLong()
-          override fun read(uploadDataSink: org.chromium.net.UploadDataSink, byteBuffer: ByteBuffer) {
-            val remaining = body.size - pos
-            val toWrite = minOf(byteBuffer.remaining(), remaining)
-            byteBuffer.put(body, pos, toWrite)
-            pos += toWrite
-            uploadDataSink.onReadSucceeded(false)
-          }
-          override fun rewind(uploadDataSink: org.chromium.net.UploadDataSink) {
-            pos = 0
-            uploadDataSink.onRewindSucceeded()
-          }
-        }
+
+      val formParts = req.bodyFormData
+      if (formParts != null && formParts.isNotEmpty()) {
+        val (multipartBody, contentType) = buildMultipartBody(formParts)
+        builder.addHeader("Content-Type", contentType)
+        val provider = createUploadProvider(multipartBody)
         builder.setUploadDataProvider(provider, executor)
+      } else {
+        val bodyBytes = req.bodyBytes
+        val bodyStr = req.bodyString
+        if ((bodyBytes != null) || !bodyStr.isNullOrEmpty()) {
+          val body: ByteArray = when {
+            bodyBytes != null -> ByteArray(1)
+            !bodyStr.isNullOrEmpty() -> bodyStr!!.toByteArray(Charsets.UTF_8)
+            else -> ByteArray(0)
+          }
+          val provider = createUploadProvider(body)
+          builder.setUploadDataProvider(provider, executor)
+        }
       }
+
       val request = builder.build()
       request.start()
+    }
+
+    private fun createUploadProvider(body: ByteArray): org.chromium.net.UploadDataProvider {
+      return object : org.chromium.net.UploadDataProvider() {
+        private var pos = 0
+        override fun getLength(): Long = body.size.toLong()
+        override fun read(uploadDataSink: org.chromium.net.UploadDataSink, byteBuffer: ByteBuffer) {
+          val remaining = body.size - pos
+          val toWrite = minOf(byteBuffer.remaining(), remaining)
+          byteBuffer.put(body, pos, toWrite)
+          pos += toWrite
+          uploadDataSink.onReadSucceeded(false)
+        }
+        override fun rewind(uploadDataSink: org.chromium.net.UploadDataSink) {
+          pos = 0
+          uploadDataSink.onRewindSucceeded()
+        }
+      }
+    }
+
+    private fun buildMultipartBody(parts: Array<NitroFormDataPart>): Pair<ByteArray, String> {
+      val boundary = "NitroFetch-${UUID.randomUUID()}"
+      val out = ByteArrayOutputStream()
+      val crlf = "\r\n".toByteArray()
+
+      for (part in parts) {
+        out.write("--$boundary\r\n".toByteArray())
+
+        val fileUri = part.fileUri
+        if (fileUri != null) {
+          val fileName = part.fileName ?: "file"
+          val mimeType = part.mimeType ?: "application/octet-stream"
+          out.write("Content-Disposition: form-data; name=\"${part.name}\"; filename=\"$fileName\"\r\n".toByteArray())
+          out.write("Content-Type: $mimeType\r\n\r\n".toByteArray())
+
+          val fileData = readFileBytes(fileUri)
+          out.write(fileData)
+        } else {
+          val value = part.value ?: ""
+          out.write("Content-Disposition: form-data; name=\"${part.name}\"\r\n\r\n".toByteArray())
+          out.write(value.toByteArray(Charsets.UTF_8))
+        }
+
+        out.write(crlf)
+      }
+
+      out.write("--$boundary--\r\n".toByteArray())
+      return Pair(out.toByteArray(), "multipart/form-data; boundary=$boundary")
+    }
+
+    private fun readFileBytes(uri: String): ByteArray {
+      if (uri.startsWith("http://") || uri.startsWith("https://")) {
+        val url = java.net.URL(uri)
+        return url.openStream().use { it.readBytes() }
+      }
+      if (uri.startsWith("content://")) {
+        val context = NitroModules.applicationContext
+          ?: throw IllegalStateException("Cannot read content:// URI - no Android Context")
+        val inputStream = context.contentResolver.openInputStream(Uri.parse(uri))
+          ?: throw IllegalArgumentException("Cannot open content URI: $uri")
+        return inputStream.use { it.readBytes() }
+      }
+      val path = if (uri.startsWith("file://")) uri.removePrefix("file://") else uri
+      return File(path).readBytes()
     }
   }
 

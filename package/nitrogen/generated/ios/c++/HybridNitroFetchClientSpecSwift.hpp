@@ -20,6 +20,8 @@ namespace margelo::nitro::nitrofetch { struct NitroHeader; }
 namespace margelo::nitro::nitrofetch { struct NitroRequest; }
 // Forward declaration of `NitroRequestMethod` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
+// Forward declaration of `NitroFormDataPart` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 
 #include "NitroResponse.hpp"
 #include <NitroModules/Promise.hpp>
@@ -29,6 +31,7 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 #include <optional>
 #include "NitroRequest.hpp"
 #include "NitroRequestMethod.hpp"
+#include "NitroFormDataPart.hpp"
 
 #include "NitroFetch-Swift-Cxx-Umbrella.hpp"
 
