@@ -14,6 +14,15 @@ export interface NitroHeader {
   key: string;
   value: string;
 }
+
+export interface NitroFormDataPart {
+  name: string;
+  value?: string;
+  fileUri?: string;
+  fileName?: string;
+  mimeType?: string;
+}
+
 export interface NitroRequest {
   url: string;
   method?: NitroRequestMethod;
@@ -22,6 +31,8 @@ export interface NitroRequest {
   // Body as either UTF-8 string or raw bytes.
   bodyString?: string;
   bodyBytes?: string; //will be ArrayBuffer in future
+  // Multipart form data parts (for file uploads)
+  bodyFormData?: NitroFormDataPart[];
   // Controls
   timeoutMs?: number;
   followRedirects?: boolean; // default true

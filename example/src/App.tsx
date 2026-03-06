@@ -346,82 +346,177 @@ export default function App() {
     <View style={styles.container}>
       <Text style={styles.title}>Nitro vs Built-in Fetch</Text>
       <View style={styles.actions}>
-        <Button
-          title={running ? 'Running…' : 'Run Again'}
-          onPress={run}
-          disabled={running}
-        />
-        <View style={{ width: 12 }} />
-        <Button
-          title="Show Crypto Prices"
-          onPress={() => {
-            setShowSheet(true);
-            loadPrices();
-          }}
-        />
-        <View style={{ width: 12 }} />
-        <Button title="POST Request (Worklet)" onPress={sendPostRequest} />
-      </View>
-      <View style={[styles.actions, { marginTop: 0 }]}>
-        <Button
-          title="Prefetch UUID"
-          onPress={async () => {
-            try {
-              await prefetch(PREFETCH_URL, {
-                headers: { prefetchKey: PREFETCH_KEY },
-              });
-              setPrefetchInfo('Prefetch started');
-            } catch (e: any) {
-              setPrefetchInfo(`Prefetch error: ${e?.message ?? String(e)}`);
-            }
-          }}
-        />
-        <View style={{ width: 12 }} />
-        <Button
-          title="Fetch Prefetched"
-          onPress={async () => {
-            try {
-              const res = await nitroFetch(PREFETCH_URL, {
-                headers: { prefetchKey: PREFETCH_KEY },
-              });
-              console.log('res', res);
-              const text = await res.text();
-              const pref = res.headers.get('nitroPrefetched');
-              setPrefetchInfo(
-                `Fetched. nitroPrefetched=${pref ?? 'null'} len=${text.length}`
-              );
-            } catch (e: any) {
-              setPrefetchInfo(`Fetch error: ${e?.message ?? String(e)}`);
-            }
-          }}
-        />
-      </View>
-      <View style={[styles.actions, { marginTop: 0 }]}>
-        <Button
-          title="Schedule Auto-Prefetch (NativeStorage)"
-          onPress={async () => {
-            try {
-              await prefetchOnAppStart(PREFETCH_URL, {
-                prefetchKey: PREFETCH_KEY,
-              });
-              setPrefetchInfo('Scheduled in NativeStorage');
-            } catch (e: any) {
-              setPrefetchInfo(`Schedule error: ${e?.message ?? String(e)}`);
-            }
-          }}
-        />
-        <View style={{ width: 12 }} />
-        <Button
-          title="Clear Auto-Prefetch"
-          onPress={async () => {
-            try {
-              await removeAllFromAutoprefetch();
-              setPrefetchInfo('Cleared auto-prefetch queue');
-            } catch (e: any) {
-              setPrefetchInfo(`Clear error: ${e?.message ?? String(e)}`);
-            }
-          }}
-        />
+        <View style={styles.btnWrap}>
+          <Button
+            title={running ? 'Running…' : 'Run Again'}
+            onPress={run}
+            disabled={running}
+          />
+        </View>
+        <View style={styles.btnWrap}>
+          <Button
+            title="Crypto Prices"
+            onPress={() => {
+              setShowSheet(true);
+              loadPrices();
+            }}
+          />
+        </View>
+        <View style={styles.btnWrap}>
+          <Button title="POST (Worklet)" onPress={sendPostRequest} />
+        </View>
+        <View style={styles.btnWrap}>
+          <Button
+            title="FormData (text)"
+            onPress={async () => {
+              try {
+                setPostResult('Sending FormData (text fields)...');
+                const fd = new FormData();
+                fd.append('username', 'nitro_user');
+                fd.append('message', 'Hello from Nitro Fetch FormData!');
+                fd.append('timestamp', String(Date.now()));
+
+                const res = await nitroFetch('https://httpbin.org/post', {
+                  method: 'POST',
+                  body: fd,
+                });
+                const json = await res.json();
+                const form = json.form ?? {};
+                setPostResult(
+                  `FormData OK! form: ${JSON.stringify(form).substring(0, 150)}`
+                );
+              } catch (e: any) {
+                console.error('FormData error', e);
+                setPostResult(`FormData error: ${e?.message ?? String(e)}`);
+              }
+            }}
+          />
+        </View>
+        <View style={styles.btnWrap}>
+          <Button
+            title="FormData (image)"
+            onPress={async () => {
+              try {
+                setPostResult('Uploading image via FormData...');
+                const fd = new FormData();
+                fd.append('caption', 'Test image upload');
+                fd.append('photo', {
+                  uri: 'https://picsum.photos/id/1/100/100.jpg',
+                  type: 'image/jpeg',
+                  name: 'test_photo.jpg',
+                } as any);
+
+                const res = await nitroFetch('https://httpbin.org/post', {
+                  method: 'POST',
+                  body: fd,
+                });
+                const json = await res.json();
+                const files = Object.keys(json.files ?? {});
+                const form = Object.keys(json.form ?? {});
+                setPostResult(
+                  `Image upload OK! files: [${files.join(', ')}], form: [${form.join(', ')}]`
+                );
+              } catch (e: any) {
+                console.error('Image FormData error', e);
+                setPostResult(`Image FormData: ${e?.message ?? String(e)}`);
+              }
+            }}
+          />
+        </View>
+        <View style={styles.btnWrap}>
+          <Button
+            title="FormData (PDF)"
+            onPress={async () => {
+              try {
+                setPostResult('Uploading PDF via FormData...');
+                const fd = new FormData();
+                fd.append('title', 'Test PDF document');
+                fd.append('document', {
+                  uri: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+                  type: 'application/pdf',
+                  name: 'test_document.pdf',
+                } as any);
+
+                const res = await nitroFetch('https://httpbin.org/post', {
+                  method: 'POST',
+                  body: fd,
+                });
+                const json = await res.json();
+                const files = Object.keys(json.files ?? {});
+                const form = Object.keys(json.form ?? {});
+                setPostResult(
+                  `PDF upload OK! files: [${files.join(', ')}], form: [${form.join(', ')}]`
+                );
+              } catch (e: any) {
+                console.error('PDF FormData error', e);
+                setPostResult(`PDF FormData: ${e?.message ?? String(e)}`);
+              }
+            }}
+          />
+        </View>
+        <View style={styles.btnWrap}>
+          <Button
+            title="Prefetch UUID"
+            onPress={async () => {
+              try {
+                await prefetch(PREFETCH_URL, {
+                  headers: { prefetchKey: PREFETCH_KEY },
+                });
+                setPrefetchInfo('Prefetch started');
+              } catch (e: any) {
+                setPrefetchInfo(`Prefetch error: ${e?.message ?? String(e)}`);
+              }
+            }}
+          />
+        </View>
+        <View style={styles.btnWrap}>
+          <Button
+            title="Fetch Prefetched"
+            onPress={async () => {
+              try {
+                const res = await nitroFetch(PREFETCH_URL, {
+                  headers: { prefetchKey: PREFETCH_KEY },
+                });
+                console.log('res', res);
+                const text = await res.text();
+                const pref = res.headers.get('nitroPrefetched');
+                setPrefetchInfo(
+                  `Fetched. nitroPrefetched=${pref ?? 'null'} len=${text.length}`
+                );
+              } catch (e: any) {
+                setPrefetchInfo(`Fetch error: ${e?.message ?? String(e)}`);
+              }
+            }}
+          />
+        </View>
+        <View style={styles.btnWrap}>
+          <Button
+            title="Schedule Prefetch"
+            onPress={async () => {
+              try {
+                await prefetchOnAppStart(PREFETCH_URL, {
+                  prefetchKey: PREFETCH_KEY,
+                });
+                setPrefetchInfo('Scheduled in NativeStorage');
+              } catch (e: any) {
+                setPrefetchInfo(`Schedule error: ${e?.message ?? String(e)}`);
+              }
+            }}
+          />
+        </View>
+        <View style={styles.btnWrap}>
+          <Button
+            title="Clear Prefetch"
+            onPress={async () => {
+              try {
+                await removeAllFromAutoprefetch();
+                setPrefetchInfo('Cleared auto-prefetch queue');
+              } catch (e: any) {
+                setPrefetchInfo(`Clear error: ${e?.message ?? String(e)}`);
+              }
+            }}
+          />
+        </View>
       </View>
       {!!prefetchInfo && (
         <Text style={{ textAlign: 'center', marginBottom: 8 }}>
@@ -560,7 +655,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 8,
     marginBottom: 8,
+    gap: 6,
+  },
+  btnWrap: {
+    marginVertical: 2,
   },
   backdrop: {
     flex: 1,

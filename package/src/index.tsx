@@ -6,7 +6,7 @@ export {
   removeFromAutoPrefetch,
   removeAllFromAutoprefetch,
 } from './fetch';
-export type { NitroRequest, NitroResponse } from './fetch';
+export type { NitroFormDataPart, NitroRequest, NitroResponse } from './fetch';
 export { NitroFetch } from './NitroInstances';
 import './fetch';
 

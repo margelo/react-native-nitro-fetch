@@ -1,5 +1,6 @@
 import type {
   NitroFetch as NitroFetchModule,
+  NitroFormDataPart,
   NitroHeader,
   NitroRequest,
   NitroResponse,
@@ -65,18 +66,73 @@ function headersToPairs(headers?: HeadersInit): NitroHeader[] | undefined {
   return pairs;
 }
 
-function normalizeBody(
-  body: BodyInit | null | undefined
-): { bodyString?: string; bodyBytes?: ArrayBuffer } | undefined {
+function serializeFormData(fd: FormData): NitroFormDataPart[] {
+  const parts: NitroFormDataPart[] = [];
+
+  if (typeof (fd as any).getParts === 'function') {
+    const rnParts: any[] = (fd as any).getParts();
+    for (const part of rnParts) {
+      if (part.string !== undefined) {
+        parts.push({ name: part.fieldName, value: String(part.string) });
+      } else if (part.uri) {
+        parts.push({
+          name: part.fieldName,
+          fileUri: part.uri,
+          fileName: part.fileName ?? part.name ?? 'file',
+          mimeType: part.type ?? 'application/octet-stream',
+        });
+      }
+    }
+    return parts;
+  }
+
+  fd.forEach((value: any, key: string) => {
+    if (typeof value === 'string') {
+      parts.push({ name: key, value });
+    } else if (value && typeof value === 'object') {
+      parts.push({
+        name: key,
+        fileUri: value.uri ?? value.fileUri,
+        fileName: value.name ?? value.fileName ?? 'file',
+        mimeType: value.type ?? value.mimeType ?? 'application/octet-stream',
+      });
+    }
+  });
+  return parts;
+}
+
+function isFormData(body: unknown): body is FormData {
+  if (typeof FormData !== 'undefined' && body instanceof FormData) return true;
+  if (
+    body &&
+    typeof body === 'object' &&
+    typeof (body as any).append === 'function' &&
+    typeof (body as any).getParts === 'function'
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function normalizeBody(body: BodyInit | null | undefined):
+  | {
+      bodyString?: string;
+      bodyBytes?: ArrayBuffer;
+      bodyFormData?: NitroFormDataPart[];
+    }
+  | undefined {
   'worklet';
   if (body == null) return undefined;
   if (typeof body === 'string') return { bodyString: body };
+
+  if (isFormData(body)) {
+    return { bodyFormData: serializeFormData(body as FormData) };
+  }
   if (body instanceof URLSearchParams) return { bodyString: body.toString() };
   if (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer)
     return { bodyBytes: body };
   if (ArrayBuffer.isView(body)) {
     const view = body as ArrayBufferView;
-    // Pass a copy/slice of the underlying bytes without base64
     return {
       //@ts-ignore
       bodyBytes: view.buffer.slice(
@@ -85,7 +141,6 @@ function normalizeBody(
       ),
     };
   }
-  // TODO: Blob/FormData support can be added later
   throw new Error('Unsupported body type for nitro fetch');
 }
 
@@ -136,8 +191,8 @@ function buildNitroRequest(
     method: (method?.toUpperCase() as any) ?? 'GET',
     headers,
     bodyString: normalized?.bodyString,
-    // Only include bodyBytes when provided to avoid signaling upload data unintentionally
     bodyBytes: undefined as any,
+    bodyFormData: normalized?.bodyFormData,
     followRedirects: true,
   };
 }
@@ -224,7 +279,6 @@ function normalizeBodyPure(
 
   if (ArrayBuffer.isView(body)) {
     const view = body as ArrayBufferView;
-    // Pass a copy/slice of the underlying bytes without base64
     return {
       //@ts-ignore
       bodyBytes: view.buffer.slice(
@@ -233,8 +287,9 @@ function normalizeBodyPure(
       ),
     };
   }
-  // TODO: Blob/FormData support can be added later
-  throw new Error('Unsupported body type for nitro fetch');
+  throw new Error(
+    'Unsupported body type for nitro fetch worklet (FormData is not available in worklets)'
+  );
 }
 // Pure JS version of buildNitroRequest that doesnt use anything that breaks worklets
 export function buildNitroRequestPure(
@@ -598,4 +653,8 @@ export async function nitroFetchOnWorklet<T>(
 export const x = ensureWorkletRuntime();
 export const y = getWorklets();
 
-export type { NitroRequest, NitroResponse } from './NitroFetch.nitro';
+export type {
+  NitroFormDataPart,
+  NitroRequest,
+  NitroResponse,
+} from './NitroFetch.nitro';

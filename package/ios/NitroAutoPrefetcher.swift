@@ -29,6 +29,7 @@ public final class NitroAutoPrefetcher: NSObject {
                              headers: headers,
                              bodyString: nil,
                              bodyBytes: nil,
+                             bodyFormData: nil,
                              timeoutMs: nil,
                              followRedirects: true)
       Task {

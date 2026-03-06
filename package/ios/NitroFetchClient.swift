@@ -119,7 +119,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       }
     }
 
-    let (urlRequest, finalURL) = try buildURLRequest(req)
+    let (urlRequest, finalURL) = try await buildURLRequest(req)
     let (data, response) = try await session.data(for: urlRequest)
     guard let http = response as? HTTPURLResponse else {
       throw NSError(domain: "NitroFetch", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
@@ -167,7 +167,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     FetchCache.addPending(key) { _ in /* ignored here */ }
     Task.detached {
       do {
-        let (urlRequest, finalURL) = try buildURLRequest(req)
+        let (urlRequest, finalURL) = try await buildURLRequest(req)
         let (data, response) = try await session.data(for: urlRequest)
         guard let http = response as? HTTPURLResponse else {
           throw NSError(domain: "NitroFetch", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
@@ -199,7 +199,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     return req.method?.stringValue
   }
 
-  private static func buildURLRequest(_ req: NitroRequest) throws -> (URLRequest, URL?) {
+  private static func buildURLRequest(_ req: NitroRequest) async throws -> (URLRequest, URL?) {
     guard let url = URL(string: req.url) else {
       throw NSError(domain: "NitroFetch", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid URL: \(req.url)"])
     }
@@ -208,11 +208,59 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     if let headers = req.headers {
       for h in headers { r.addValue(h.value, forHTTPHeaderField: h.key) }
     }
-    if let s = req.bodyString {
+    if let parts = req.bodyFormData, !parts.isEmpty {
+      let (body, contentType) = try await buildMultipartBody(parts)
+      r.httpBody = body
+      r.setValue(contentType, forHTTPHeaderField: "Content-Type")
+    } else if let s = req.bodyString {
       r.httpBody = s.data(using: .utf8)
     }
     if let t = req.timeoutMs, t > 0 { r.timeoutInterval = TimeInterval(t) / 1000.0 }
     return (r, nil)
+  }
+
+  private static func buildMultipartBody(_ parts: [NitroFormDataPart]) async throws -> (Data, String) {
+    let boundary = "NitroFetch-\(UUID().uuidString)"
+    var body = Data()
+    let crlf = "\r\n"
+
+    for part in parts {
+      body.append("--\(boundary)\(crlf)".data(using: .utf8)!)
+
+      if let fileUri = part.fileUri {
+        let fileName = part.fileName ?? "file"
+        let mimeType = part.mimeType ?? "application/octet-stream"
+        body.append("Content-Disposition: form-data; name=\"\(part.name)\"; filename=\"\(fileName)\"\(crlf)".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\(crlf)\(crlf)".data(using: .utf8)!)
+
+        let fileData = try await readFileData(fileUri)
+        body.append(fileData)
+      } else {
+        let value = part.value ?? ""
+        body.append("Content-Disposition: form-data; name=\"\(part.name)\"\(crlf)\(crlf)".data(using: .utf8)!)
+        body.append(value.data(using: .utf8)!)
+      }
+
+      body.append(crlf.data(using: .utf8)!)
+    }
+
+    body.append("--\(boundary)--\(crlf)".data(using: .utf8)!)
+    return (body, "multipart/form-data; boundary=\(boundary)")
+  }
+
+  private static func readFileData(_ uri: String) async throws -> Data {
+    if uri.hasPrefix("http://") || uri.hasPrefix("https://") {
+      guard let url = URL(string: uri) else {
+        throw NSError(domain: "NitroFetch", code: -4, userInfo: [NSLocalizedDescriptionKey: "Invalid URL: \(uri)"])
+      }
+      let (data, _) = try await session.data(from: url)
+      return data
+    }
+    let path = uri.hasPrefix("file://") ? String(uri.dropFirst(7)) : uri
+    guard let data = FileManager.default.contents(atPath: path) else {
+      throw NSError(domain: "NitroFetch", code: -4, userInfo: [NSLocalizedDescriptionKey: "Cannot read file at: \(uri)"])
+    }
+    return data
   }
 
   private static func detectCharset(from http: HTTPURLResponse) -> String.Encoding? {
