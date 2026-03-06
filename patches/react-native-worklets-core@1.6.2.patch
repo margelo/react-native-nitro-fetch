@@ -1,0 +1,13 @@
+diff --git a/android/CMakeLists.txt b/android/CMakeLists.txt
+index cc4cbfea0fa561bab2d28c82f090825b3e5655bf..61e1b567bf6035c08709b9165a14e2376ecfa2cb 100644
+--- a/android/CMakeLists.txt
++++ b/android/CMakeLists.txt
+@@ -81,7 +81,7 @@ if(${JS_RUNTIME} STREQUAL "hermes")
+ 
+   target_link_libraries(
+     ${PACKAGE_NAME}
+-    hermes-engine::libhermes
++    hermes-engine::hermesvm
+   )
+ 
+   if(${HERMES_ENABLE_DEBUGGER})
