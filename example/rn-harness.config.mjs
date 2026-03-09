@@ -23,6 +23,9 @@ import {
         bundleId: 'nitrofetch.example', // Your iOS bundle ID
       })
     ],
+    defaultRunner: "android",
+    bridgeTimeout: 180000,
+  
   };
   
   export default config;
