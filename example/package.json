@@ -7,11 +7,13 @@
     "ios": "react-native run-ios",
     "start": "react-native start",
     "build:android": "react-native build-android --extra-params \"--no-daemon --console=plain -PreactNativeArchitectures=arm64-v8a\"",
-    "build:ios": "react-native build-ios --mode Debug"
+    "build:ios": "react-native build-ios --mode Debug",
+    "test:harness": "react-native-harness"
   },
   "dependencies": {
     "react": "19.2.3",
     "react-native": "0.85.0-rc.0",
+    "react-native-harness": "^1.0.0-alpha.25",
     "react-native-nitro-fetch": "workspace:*",
     "react-native-nitro-modules": "^0.29.8",
     "react-native-safe-area-context": "^5.5.2",
@@ -26,6 +28,8 @@
     "@react-native-community/cli": "20.1.0",
     "@react-native-community/cli-platform-android": "20.1.0",
     "@react-native-community/cli-platform-ios": "20.1.0",
+    "@react-native-harness/platform-android": "^1.0.0-alpha.25",
+    "@react-native-harness/platform-apple": "^1.0.0-alpha.25",
     "@react-native/babel-preset": "0.85.0-rc.0",
     "@react-native/metro-config": "0.85.0-rc.0",
     "@react-native/typescript-config": "0.85.0-rc.0",
@@ -38,3 +42,5 @@
     "node": ">=22.11.0"
   }
 }
+
+
