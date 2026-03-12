@@ -41,7 +41,8 @@ object AutoPrefetcher {
           bodyBytes = null,
           bodyFormData = null,
           timeoutMs = null,
-          followRedirects = null
+          followRedirects = null,
+          requestId = null
         )
 
         // If already pending or fresh, skip starting a new one

@@ -337,10 +337,23 @@ export function buildNitroRequestPure(
   };
 }
 
+function createAbortError(): Error {
+  const err = new Error('The operation was aborted.');
+  err.name = 'AbortError';
+  return err;
+}
+
 async function nitroFetchRaw(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<NitroResponse> {
+  const signal = init?.signal as AbortSignal | undefined | null;
+
+  // Fast-abort: reject synchronously before any bridge work.
+  if (signal?.aborted) {
+    throw createAbortError();
+  }
+
   const hasNative =
     typeof (NitroFetchHybrid as any)?.createClient === 'function';
   if (!hasNative) {
@@ -364,11 +377,46 @@ async function nitroFetchRaw(
   }
 
   const req = buildNitroRequest(input, init);
+
+  // Only allocate a requestId when a signal is present — zero overhead otherwise.
+  const requestId = signal ? String(Math.random()) : undefined;
+  if (requestId) req.requestId = requestId;
+
   ensureClient();
   if (!client || typeof (client as any).request !== 'function')
     throw new Error('NitroFetch client not available');
-  const res: NitroResponse = await client.request(req);
-  return res;
+
+  // Wire up the abort listener with { once: true } so it auto-removes
+  // after firing, avoiding a dangling reference to the client closure.
+  let abortListener: (() => void) | undefined;
+  if (signal && requestId) {
+    abortListener = () => {
+      try {
+        client!.cancelRequest(requestId);
+      } catch {
+        // Client may already be torn down — swallow.
+      }
+    };
+    signal.addEventListener('abort', abortListener, { once: true });
+  }
+
+  try {
+    const res: NitroResponse = await client.request(req);
+    return res;
+  } catch (e) {
+    // If the signal was aborted (either before or during the request),
+    // surface a spec-compliant AbortError regardless of what native threw.
+    if (signal?.aborted) {
+      throw createAbortError();
+    }
+    throw e;
+  } finally {
+    // Idempotent cleanup — removeEventListener is a no-op if the listener
+    // already fired (thanks to { once: true }) or was never added.
+    if (signal && abortListener) {
+      signal.removeEventListener('abort', abortListener);
+    }
+  }
 }
 
 // Simple Headers-like class that supports get() method

@@ -96,5 +96,9 @@ namespace margelo::nitro::nitrofetch {
     auto __result = method(_javaPart, JNitroRequest::fromCpp(req));
     return __result->toCpp();
   }
+  void JHybridNitroFetchClientSpec::cancelRequest(const std::string& requestId) {
+    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* requestId */)>("cancelRequest");
+    method(_javaPart, jni::make_jstring(requestId));
+  }
 
 } // namespace margelo::nitro::nitrofetch

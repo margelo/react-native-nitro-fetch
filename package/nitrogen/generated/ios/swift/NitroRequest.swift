@@ -18,7 +18,7 @@ public extension NitroRequest {
   /**
    * Create a new instance of `NitroRequest`.
    */
-  init(url: String, method: NitroRequestMethod?, headers: [NitroHeader]?, bodyString: String?, bodyBytes: String?, bodyFormData: [NitroFormDataPart]?, timeoutMs: Double?, followRedirects: Bool?) {
+  init(url: String, method: NitroRequestMethod?, headers: [NitroHeader]?, bodyString: String?, bodyBytes: String?, bodyFormData: [NitroFormDataPart]?, timeoutMs: Double?, followRedirects: Bool?, requestId: String?) {
     self.init(std.string(url), { () -> bridge.std__optional_NitroRequestMethod_ in
       if let __unwrappedValue = method {
         return bridge.create_std__optional_NitroRequestMethod_(__unwrappedValue)
@@ -27,9 +27,13 @@ public extension NitroRequest {
       }
     }(), { () -> bridge.std__optional_std__vector_NitroHeader__ in
       if let __unwrappedValue = headers {
-        return bridge.create_std__optional_std__vector_NitroHeader__(__unwrappedValue.withUnsafeBufferPointer { __pointer -> bridge.std__vector_NitroHeader_ in
-          return bridge.copy_std__vector_NitroHeader_(__pointer.baseAddress!, __unwrappedValue.count)
-        })
+        return bridge.create_std__optional_std__vector_NitroHeader__({ () -> bridge.std__vector_NitroHeader_ in
+          var __vector = bridge.create_std__vector_NitroHeader_(__unwrappedValue.count)
+          for __item in __unwrappedValue {
+            __vector.push_back(__item)
+          }
+          return __vector
+        }())
       } else {
         return .init()
       }
@@ -47,9 +51,13 @@ public extension NitroRequest {
       }
     }(), { () -> bridge.std__optional_std__vector_NitroFormDataPart__ in
       if let __unwrappedValue = bodyFormData {
-        return bridge.create_std__optional_std__vector_NitroFormDataPart__(__unwrappedValue.withUnsafeBufferPointer { __pointer -> bridge.std__vector_NitroFormDataPart_ in
-          return bridge.copy_std__vector_NitroFormDataPart_(__pointer.baseAddress!, __unwrappedValue.count)
-        })
+        return bridge.create_std__optional_std__vector_NitroFormDataPart__({ () -> bridge.std__vector_NitroFormDataPart_ in
+          var __vector = bridge.create_std__vector_NitroFormDataPart_(__unwrappedValue.count)
+          for __item in __unwrappedValue {
+            __vector.push_back(__item)
+          }
+          return __vector
+        }())
       } else {
         return .init()
       }
@@ -62,6 +70,12 @@ public extension NitroRequest {
     }(), { () -> bridge.std__optional_bool_ in
       if let __unwrappedValue = followRedirects {
         return bridge.create_std__optional_bool_(__unwrappedValue)
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_std__string_ in
+      if let __unwrappedValue = requestId {
+        return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
       } else {
         return .init()
       }
@@ -102,11 +116,7 @@ public extension NitroRequest {
       return { () -> [NitroHeader]? in
         if bridge.has_value_std__optional_std__vector_NitroHeader__(self.__headers) {
           let __unwrapped = bridge.get_std__optional_std__vector_NitroHeader__(self.__headers)
-          return { () -> [NitroHeader] in
-            let __data = bridge.get_data_std__vector_NitroHeader_(__unwrapped)
-            let __size = __unwrapped.size()
-            return Array(UnsafeBufferPointer(start: __data, count: __size))
-          }()
+          return __unwrapped.map({ __item in __item })
         } else {
           return nil
         }
@@ -116,9 +126,13 @@ public extension NitroRequest {
     set {
       self.__headers = { () -> bridge.std__optional_std__vector_NitroHeader__ in
         if let __unwrappedValue = newValue {
-          return bridge.create_std__optional_std__vector_NitroHeader__(__unwrappedValue.withUnsafeBufferPointer { __pointer -> bridge.std__vector_NitroHeader_ in
-            return bridge.copy_std__vector_NitroHeader_(__pointer.baseAddress!, __unwrappedValue.count)
-          })
+          return bridge.create_std__optional_std__vector_NitroHeader__({ () -> bridge.std__vector_NitroHeader_ in
+            var __vector = bridge.create_std__vector_NitroHeader_(__unwrappedValue.count)
+            for __item in __unwrappedValue {
+              __vector.push_back(__item)
+            }
+            return __vector
+          }())
         } else {
           return .init()
         }
@@ -180,11 +194,7 @@ public extension NitroRequest {
       return { () -> [NitroFormDataPart]? in
         if bridge.has_value_std__optional_std__vector_NitroFormDataPart__(self.__bodyFormData) {
           let __unwrapped = bridge.get_std__optional_std__vector_NitroFormDataPart__(self.__bodyFormData)
-          return { () -> [NitroFormDataPart] in
-            let __data = bridge.get_data_std__vector_NitroFormDataPart_(__unwrapped)
-            let __size = __unwrapped.size()
-            return Array(UnsafeBufferPointer(start: __data, count: __size))
-          }()
+          return __unwrapped.map({ __item in __item })
         } else {
           return nil
         }
@@ -194,9 +204,13 @@ public extension NitroRequest {
     set {
       self.__bodyFormData = { () -> bridge.std__optional_std__vector_NitroFormDataPart__ in
         if let __unwrappedValue = newValue {
-          return bridge.create_std__optional_std__vector_NitroFormDataPart__(__unwrappedValue.withUnsafeBufferPointer { __pointer -> bridge.std__vector_NitroFormDataPart_ in
-            return bridge.copy_std__vector_NitroFormDataPart_(__pointer.baseAddress!, __unwrappedValue.count)
-          })
+          return bridge.create_std__optional_std__vector_NitroFormDataPart__({ () -> bridge.std__vector_NitroFormDataPart_ in
+            var __vector = bridge.create_std__vector_NitroFormDataPart_(__unwrappedValue.count)
+            for __item in __unwrappedValue {
+              __vector.push_back(__item)
+            }
+            return __vector
+          }())
         } else {
           return .init()
         }
@@ -231,6 +245,30 @@ public extension NitroRequest {
       self.__followRedirects = { () -> bridge.std__optional_bool_ in
         if let __unwrappedValue = newValue {
           return bridge.create_std__optional_bool_(__unwrappedValue)
+        } else {
+          return .init()
+        }
+      }()
+    }
+  }
+  
+  var requestId: String? {
+    @inline(__always)
+    get {
+      return { () -> String? in
+        if bridge.has_value_std__optional_std__string_(self.__requestId) {
+          let __unwrapped = bridge.get_std__optional_std__string_(self.__requestId)
+          return String(__unwrapped)
+        } else {
+          return nil
+        }
+      }()
+    }
+    @inline(__always)
+    set {
+      self.__requestId = { () -> bridge.std__optional_std__string_ in
+        if let __unwrappedValue = newValue {
+          return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
         } else {
           return .init()
         }

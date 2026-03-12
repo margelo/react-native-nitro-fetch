@@ -44,7 +44,10 @@ data class NitroRequest
     val timeoutMs: Double?,
     @DoNotStrip
     @Keep
-    val followRedirects: Boolean?
+    val followRedirects: Boolean?,
+    @DoNotStrip
+    @Keep
+    val requestId: String?
   ) {
   /* main constructor */
 }

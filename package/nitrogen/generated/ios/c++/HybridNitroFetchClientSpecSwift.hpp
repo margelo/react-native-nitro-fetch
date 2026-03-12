@@ -75,7 +75,7 @@ namespace margelo::nitro::nitrofetch {
   public:
     // Methods
     inline std::shared_ptr<Promise<NitroResponse>> request(const NitroRequest& req) override {
-      auto __result = _swiftPart.request(std::forward<decltype(req)>(req));
+      auto __result = _swiftPart.request(req);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
@@ -83,7 +83,7 @@ namespace margelo::nitro::nitrofetch {
       return __value;
     }
     inline std::shared_ptr<Promise<void>> prefetch(const NitroRequest& req) override {
-      auto __result = _swiftPart.prefetch(std::forward<decltype(req)>(req));
+      auto __result = _swiftPart.prefetch(req);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
@@ -91,12 +91,18 @@ namespace margelo::nitro::nitrofetch {
       return __value;
     }
     inline NitroResponse requestSync(const NitroRequest& req) override {
-      auto __result = _swiftPart.requestSync(std::forward<decltype(req)>(req));
+      auto __result = _swiftPart.requestSync(req);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
       auto __value = std::move(__result.value());
       return __value;
+    }
+    inline void cancelRequest(const std::string& requestId) override {
+      auto __result = _swiftPart.cancelRequest(requestId);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
     }
 
   private:

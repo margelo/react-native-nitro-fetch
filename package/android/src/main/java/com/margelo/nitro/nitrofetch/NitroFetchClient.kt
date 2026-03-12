@@ -14,6 +14,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 
 fun ByteBuffer.toByteArray(): ByteArray {
@@ -27,6 +28,13 @@ fun ByteBuffer.toByteArray(): ByteArray {
 
 @DoNotStrip
 class NitroFetchClient(private val engine: CronetEngine, private val executor: Executor) : HybridNitroFetchClientSpec() {
+  
+  private val activeRequests = ConcurrentHashMap<String, UrlRequest>()
+
+  override fun cancelRequest(requestId: String) {
+    // https://developer.android.com/develop/connectivity/cronet/reference/org/chromium/net/UrlRequest#cancel() 
+    activeRequests.remove(requestId)?.cancel()
+  }
 
   private fun findPrefetchKey(req: NitroRequest): String? {
     val h = req.headers ?: return null
@@ -44,13 +52,14 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       req: NitroRequest,
       onSuccess: (NitroResponse) -> Unit,
       onFail: (Throwable) -> Unit
-    ) {
-      try {
+    ): UrlRequest? {
+      return try {
         val engine = NitroFetch.getEngine()
         val executor = NitroFetch.ioExecutor
         startCronet(engine, executor, req, onSuccess, onFail)
       } catch (t: Throwable) {
         onFail(t)
+        null
       }
     }
 
@@ -60,7 +69,7 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       req: NitroRequest,
       onSuccess: (NitroResponse) -> Unit,
       onFail: (Throwable) -> Unit
-    ) {
+    ): UrlRequest {
       val url = req.url
       val callback = object : UrlRequest.Callback() {
         private val buffer = ByteBuffer.allocateDirect(16 * 1024)
@@ -153,6 +162,7 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
 
       val request = builder.build()
       request.start()
+      return request
     }
 
     private fun createUploadProvider(body: ByteArray): org.chromium.net.UploadDataProvider {
@@ -294,11 +304,23 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         return promise
       }
     }
-    fetch(
+    val requestId = req.requestId
+    val urlRequest = fetch(
       req,
-      onSuccess = { promise.resolve(it) },
-      onFail = { promise.reject(it) }
+      onSuccess = { res ->
+        if (requestId != null) activeRequests.remove(requestId)
+        promise.resolve(res)
+      },
+      onFail = { err ->
+        if (requestId != null) activeRequests.remove(requestId)
+        promise.reject(err)
+      }
     )
+    // Store after start() — if cancelRequest races and misses, the JS
+    // catch block checks signal.aborted and throws AbortError anyway.
+    if (requestId != null && urlRequest != null) {
+      activeRequests[requestId] = urlRequest
+    }
     return promise
   }
 

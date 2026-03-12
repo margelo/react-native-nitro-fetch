@@ -21,6 +21,7 @@ namespace margelo::nitro::nitrofetch { struct NitroRequest; }
 #include "NitroResponse.hpp"
 #include <NitroModules/Promise.hpp>
 #include "NitroRequest.hpp"
+#include <string>
 
 namespace margelo::nitro::nitrofetch {
 
@@ -56,6 +57,7 @@ namespace margelo::nitro::nitrofetch {
       virtual std::shared_ptr<Promise<NitroResponse>> request(const NitroRequest& req) = 0;
       virtual std::shared_ptr<Promise<void>> prefetch(const NitroRequest& req) = 0;
       virtual NitroResponse requestSync(const NitroRequest& req) = 0;
+      virtual void cancelRequest(const std::string& requestId) = 0;
 
     protected:
       // Hybrid Setup
