@@ -120,9 +120,9 @@ jobs:
 
       - name: Setup
         uses: ./.github/actions/setup
-
-      - name: Generate nitrogen code
-        run: bun nitrogen
+      # disabled because I want to test the generated code with the latest Nitro Modules version
+      # - name: Generate nitrogen code
+      #   run: bun nitrogen
 
       - name: Cache turborepo for iOS
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
