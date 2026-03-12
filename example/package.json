@@ -15,7 +15,7 @@
     "react-native": "0.85.0-rc.0",
     "react-native-harness": "^1.0.0-alpha.25",
     "react-native-nitro-fetch": "workspace:*",
-    "react-native-nitro-modules": "^0.29.8",
+    "react-native-nitro-modules": "^0.35.0",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-worklets-core": "^1.6.2"
   },
@@ -42,5 +42,3 @@
     "node": ">=22.11.0"
   }
 }
-
-
