@@ -13,37 +13,31 @@
 
 namespace margelo::nitro::nitrofetch {
 
-  jni::local_ref<JHybridUrlRequestSpec::jhybriddata> JHybridUrlRequestSpec::initHybrid(jni::alias_ref<jhybridobject> jThis) {
+  std::shared_ptr<JHybridUrlRequestSpec> JHybridUrlRequestSpec::JavaPart::getJHybridUrlRequestSpec() {
+    auto hybridObject = JHybridObject::JavaPart::getJHybridObject();
+    auto castHybridObject = std::dynamic_pointer_cast<JHybridUrlRequestSpec>(hybridObject);
+    if (castHybridObject == nullptr) [[unlikely]] {
+      throw std::runtime_error("Failed to downcast JHybridObject to JHybridUrlRequestSpec!");
+    }
+    return castHybridObject;
+  }
+
+  jni::local_ref<JHybridUrlRequestSpec::CxxPart::jhybriddata> JHybridUrlRequestSpec::CxxPart::initHybrid(jni::alias_ref<jhybridobject> jThis) {
     return makeCxxInstance(jThis);
   }
 
-  void JHybridUrlRequestSpec::registerNatives() {
-    registerHybrid({
-      makeNativeMethod("initHybrid", JHybridUrlRequestSpec::initHybrid),
-    });
-  }
-
-  size_t JHybridUrlRequestSpec::getExternalMemorySize() noexcept {
-    static const auto method = javaClassStatic()->getMethod<jlong()>("getMemorySize");
-    return method(_javaPart);
-  }
-
-  bool JHybridUrlRequestSpec::equals(const std::shared_ptr<HybridObject>& other) {
-    if (auto otherCast = std::dynamic_pointer_cast<JHybridUrlRequestSpec>(other)) {
-      return _javaPart == otherCast->_javaPart;
+  std::shared_ptr<JHybridObject> JHybridUrlRequestSpec::CxxPart::createHybridObject(const jni::local_ref<JHybridObject::JavaPart>& javaPart) {
+    auto castJavaPart = jni::dynamic_ref_cast<JHybridUrlRequestSpec::JavaPart>(javaPart);
+    if (castJavaPart == nullptr) [[unlikely]] {
+      throw std::runtime_error("Failed to cast JHybridObject::JavaPart to JHybridUrlRequestSpec::JavaPart!");
     }
-    return false;
+    return std::make_shared<JHybridUrlRequestSpec>(castJavaPart);
   }
 
-  void JHybridUrlRequestSpec::dispose() noexcept {
-    static const auto method = javaClassStatic()->getMethod<void()>("dispose");
-    method(_javaPart);
-  }
-
-  std::string JHybridUrlRequestSpec::toString() {
-    static const auto method = javaClassStatic()->getMethod<jni::JString()>("toString");
-    auto javaString = method(_javaPart);
-    return javaString->toStdString();
+  void JHybridUrlRequestSpec::CxxPart::registerNatives() {
+    registerHybrid({
+      makeNativeMethod("initHybrid", JHybridUrlRequestSpec::CxxPart::initHybrid),
+    });
   }
 
   // Properties
@@ -51,23 +45,23 @@ namespace margelo::nitro::nitrofetch {
 
   // Methods
   void JHybridUrlRequestSpec::start() {
-    static const auto method = javaClassStatic()->getMethod<void()>("start");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("start");
     method(_javaPart);
   }
   void JHybridUrlRequestSpec::followRedirect() {
-    static const auto method = javaClassStatic()->getMethod<void()>("followRedirect");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("followRedirect");
     method(_javaPart);
   }
   void JHybridUrlRequestSpec::read() {
-    static const auto method = javaClassStatic()->getMethod<void()>("read");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("read");
     method(_javaPart);
   }
   void JHybridUrlRequestSpec::cancel() {
-    static const auto method = javaClassStatic()->getMethod<void()>("cancel");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("cancel");
     method(_javaPart);
   }
   bool JHybridUrlRequestSpec::isDone() {
-    static const auto method = javaClassStatic()->getMethod<jboolean()>("isDone");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jboolean()>("isDone");
     auto __result = method(_javaPart);
     return static_cast<bool>(__result);
   }

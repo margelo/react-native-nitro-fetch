@@ -18,34 +18,33 @@ namespace margelo::nitro::nitrofetch {
 
   using namespace facebook;
 
-  class JHybridNitroCronetSpec: public jni::HybridClass<JHybridNitroCronetSpec, JHybridObject>,
-                                public virtual HybridNitroCronetSpec {
+  class JHybridNitroCronetSpec: public virtual HybridNitroCronetSpec, public virtual JHybridObject {
   public:
-    static auto constexpr kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/HybridNitroCronetSpec;";
-    static jni::local_ref<jhybriddata> initHybrid(jni::alias_ref<jhybridobject> jThis);
-    static void registerNatives();
+    struct JavaPart: public jni::JavaClass<JavaPart, JHybridObject::JavaPart> {
+      static auto constexpr kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/HybridNitroCronetSpec;";
+      std::shared_ptr<JHybridNitroCronetSpec> getJHybridNitroCronetSpec();
+    };
+    struct CxxPart: public jni::HybridClass<CxxPart, JHybridObject::CxxPart> {
+      static auto constexpr kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/HybridNitroCronetSpec$CxxPart;";
+      static jni::local_ref<jhybriddata> initHybrid(jni::alias_ref<jhybridobject> jThis);
+      static void registerNatives();
+      using HybridBase::HybridBase;
+    protected:
+      std::shared_ptr<JHybridObject> createHybridObject(const jni::local_ref<JHybridObject::JavaPart>& javaPart) override;
+    };
 
-  protected:
-    // C++ constructor (called from Java via `initHybrid()`)
-    explicit JHybridNitroCronetSpec(jni::alias_ref<jhybridobject> jThis) :
+  public:
+    explicit JHybridNitroCronetSpec(const jni::local_ref<JHybridNitroCronetSpec::JavaPart>& javaPart):
       HybridObject(HybridNitroCronetSpec::TAG),
-      HybridBase(jThis),
-      _javaPart(jni::make_global(jThis)) {}
-
-  public:
+      JHybridObject(javaPart),
+      _javaPart(jni::make_global(javaPart)) {}
     ~JHybridNitroCronetSpec() override {
       // Hermes GC can destroy JS objects on a non-JNI Thread.
       jni::ThreadScope::WithClassLoader([&] { _javaPart.reset(); });
     }
 
   public:
-    size_t getExternalMemorySize() noexcept override;
-    bool equals(const std::shared_ptr<HybridObject>& other) override;
-    void dispose() noexcept override;
-    std::string toString() override;
-
-  public:
-    inline const jni::global_ref<JHybridNitroCronetSpec::javaobject>& getJavaPart() const noexcept {
+    inline const jni::global_ref<JHybridNitroCronetSpec::JavaPart>& getJavaPart() const noexcept {
       return _javaPart;
     }
 
@@ -60,9 +59,7 @@ namespace margelo::nitro::nitrofetch {
     std::shared_ptr<Promise<std::optional<CachedFetchResponse>>> consumeNativePrefetch(const std::string& prefetchKey) override;
 
   private:
-    friend HybridBase;
-    using HybridBase::HybridBase;
-    jni::global_ref<JHybridNitroCronetSpec::javaobject> _javaPart;
+    jni::global_ref<JHybridNitroCronetSpec::JavaPart> _javaPart;
   };
 
 } // namespace margelo::nitro::nitrofetch

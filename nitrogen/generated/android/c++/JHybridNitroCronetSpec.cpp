@@ -30,37 +30,31 @@ namespace margelo::nitro::nitrofetch { struct CachedFetchResponse; }
 
 namespace margelo::nitro::nitrofetch {
 
-  jni::local_ref<JHybridNitroCronetSpec::jhybriddata> JHybridNitroCronetSpec::initHybrid(jni::alias_ref<jhybridobject> jThis) {
+  std::shared_ptr<JHybridNitroCronetSpec> JHybridNitroCronetSpec::JavaPart::getJHybridNitroCronetSpec() {
+    auto hybridObject = JHybridObject::JavaPart::getJHybridObject();
+    auto castHybridObject = std::dynamic_pointer_cast<JHybridNitroCronetSpec>(hybridObject);
+    if (castHybridObject == nullptr) [[unlikely]] {
+      throw std::runtime_error("Failed to downcast JHybridObject to JHybridNitroCronetSpec!");
+    }
+    return castHybridObject;
+  }
+
+  jni::local_ref<JHybridNitroCronetSpec::CxxPart::jhybriddata> JHybridNitroCronetSpec::CxxPart::initHybrid(jni::alias_ref<jhybridobject> jThis) {
     return makeCxxInstance(jThis);
   }
 
-  void JHybridNitroCronetSpec::registerNatives() {
-    registerHybrid({
-      makeNativeMethod("initHybrid", JHybridNitroCronetSpec::initHybrid),
-    });
-  }
-
-  size_t JHybridNitroCronetSpec::getExternalMemorySize() noexcept {
-    static const auto method = javaClassStatic()->getMethod<jlong()>("getMemorySize");
-    return method(_javaPart);
-  }
-
-  bool JHybridNitroCronetSpec::equals(const std::shared_ptr<HybridObject>& other) {
-    if (auto otherCast = std::dynamic_pointer_cast<JHybridNitroCronetSpec>(other)) {
-      return _javaPart == otherCast->_javaPart;
+  std::shared_ptr<JHybridObject> JHybridNitroCronetSpec::CxxPart::createHybridObject(const jni::local_ref<JHybridObject::JavaPart>& javaPart) {
+    auto castJavaPart = jni::dynamic_ref_cast<JHybridNitroCronetSpec::JavaPart>(javaPart);
+    if (castJavaPart == nullptr) [[unlikely]] {
+      throw std::runtime_error("Failed to cast JHybridObject::JavaPart to JHybridNitroCronetSpec::JavaPart!");
     }
-    return false;
+    return std::make_shared<JHybridNitroCronetSpec>(castJavaPart);
   }
 
-  void JHybridNitroCronetSpec::dispose() noexcept {
-    static const auto method = javaClassStatic()->getMethod<void()>("dispose");
-    method(_javaPart);
-  }
-
-  std::string JHybridNitroCronetSpec::toString() {
-    static const auto method = javaClassStatic()->getMethod<jni::JString()>("toString");
-    auto javaString = method(_javaPart);
-    return javaString->toStdString();
+  void JHybridNitroCronetSpec::CxxPart::registerNatives() {
+    registerHybrid({
+      makeNativeMethod("initHybrid", JHybridNitroCronetSpec::CxxPart::initHybrid),
+    });
   }
 
   // Properties
@@ -68,12 +62,12 @@ namespace margelo::nitro::nitrofetch {
 
   // Methods
   std::shared_ptr<HybridUrlRequestBuilderSpec> JHybridNitroCronetSpec::newUrlRequestBuilder(const std::string& url) {
-    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JHybridUrlRequestBuilderSpec::javaobject>(jni::alias_ref<jni::JString> /* url */)>("newUrlRequestBuilder");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JHybridUrlRequestBuilderSpec::JavaPart>(jni::alias_ref<jni::JString> /* url */)>("newUrlRequestBuilder");
     auto __result = method(_javaPart, jni::make_jstring(url));
-    return __result->cthis()->shared_cast<JHybridUrlRequestBuilderSpec>();
+    return __result->getJHybridUrlRequestBuilderSpec();
   }
   std::shared_ptr<Promise<void>> JHybridNitroCronetSpec::prefetch(const std::string& url, const std::string& httpMethod, const std::unordered_map<std::string, std::string>& headers, const std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>>& body, double maxAge) {
-    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* url */, jni::alias_ref<jni::JString> /* httpMethod */, jni::alias_ref<jni::JMap<jni::JString, jni::JString>> /* headers */, jni::alias_ref<JVariant_ArrayBuffer_String> /* body */, double /* maxAge */)>("prefetch");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* url */, jni::alias_ref<jni::JString> /* httpMethod */, jni::alias_ref<jni::JMap<jni::JString, jni::JString>> /* headers */, jni::alias_ref<JVariant_ArrayBuffer_String> /* body */, double /* maxAge */)>("prefetch");
     auto __result = method(_javaPart, jni::make_jstring(url), jni::make_jstring(httpMethod), [&]() -> jni::local_ref<jni::JMap<jni::JString, jni::JString>> {
       auto __map = jni::JHashMap<jni::JString, jni::JString>::create(headers.size());
       for (const auto& __entry : headers) {
@@ -94,7 +88,7 @@ namespace margelo::nitro::nitrofetch {
     }();
   }
   std::shared_ptr<Promise<std::optional<CachedFetchResponse>>> JHybridNitroCronetSpec::consumeNativePrefetch(const std::string& prefetchKey) {
-    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* prefetchKey */)>("consumeNativePrefetch");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* prefetchKey */)>("consumeNativePrefetch");
     auto __result = method(_javaPart, jni::make_jstring(prefetchKey));
     return [&]() {
       auto __promise = Promise<std::optional<CachedFetchResponse>>::create();

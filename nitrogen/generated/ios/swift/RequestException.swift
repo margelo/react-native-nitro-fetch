@@ -5,7 +5,6 @@
 /// Copyright © Marc Rousavy @ Margelo
 ///
 
-import Foundation
 import NitroModules
 
 /**
@@ -99,17 +98,38 @@ public extension RequestException {
   
   @inline(__always)
   var internalErrorCode: Double? {
-    return self.__internalErrorCode.value
+    return { () -> Double? in
+      if bridge.has_value_std__optional_double_(self.__internalErrorCode) {
+        let __unwrapped = bridge.get_std__optional_double_(self.__internalErrorCode)
+        return __unwrapped
+      } else {
+        return nil
+      }
+    }()
   }
   
   @inline(__always)
   var networkErrorCode: Double? {
-    return self.__networkErrorCode.value
+    return { () -> Double? in
+      if bridge.has_value_std__optional_double_(self.__networkErrorCode) {
+        let __unwrapped = bridge.get_std__optional_double_(self.__networkErrorCode)
+        return __unwrapped
+      } else {
+        return nil
+      }
+    }()
   }
   
   @inline(__always)
   var quicErrorCode: Double? {
-    return self.__quicErrorCode.value
+    return { () -> Double? in
+      if bridge.has_value_std__optional_double_(self.__quicErrorCode) {
+        let __unwrapped = bridge.get_std__optional_double_(self.__quicErrorCode)
+        return __unwrapped
+      } else {
+        return nil
+      }
+    }()
   }
   
   @inline(__always)
@@ -126,7 +146,14 @@ public extension RequestException {
   
   @inline(__always)
   var errorDomain: Double? {
-    return self.__errorDomain.value
+    return { () -> Double? in
+      if bridge.has_value_std__optional_double_(self.__errorDomain) {
+        let __unwrapped = bridge.get_std__optional_double_(self.__errorDomain)
+        return __unwrapped
+      } else {
+        return nil
+      }
+    }()
   }
   
   @inline(__always)

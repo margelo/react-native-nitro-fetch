@@ -20,37 +20,31 @@ namespace margelo::nitro::nitrofetch { struct CachedPrefetchResponse; }
 
 namespace margelo::nitro::nitrofetch {
 
-  jni::local_ref<JHybridNitroFetchCacheSpec::jhybriddata> JHybridNitroFetchCacheSpec::initHybrid(jni::alias_ref<jhybridobject> jThis) {
+  std::shared_ptr<JHybridNitroFetchCacheSpec> JHybridNitroFetchCacheSpec::JavaPart::getJHybridNitroFetchCacheSpec() {
+    auto hybridObject = JHybridObject::JavaPart::getJHybridObject();
+    auto castHybridObject = std::dynamic_pointer_cast<JHybridNitroFetchCacheSpec>(hybridObject);
+    if (castHybridObject == nullptr) [[unlikely]] {
+      throw std::runtime_error("Failed to downcast JHybridObject to JHybridNitroFetchCacheSpec!");
+    }
+    return castHybridObject;
+  }
+
+  jni::local_ref<JHybridNitroFetchCacheSpec::CxxPart::jhybriddata> JHybridNitroFetchCacheSpec::CxxPart::initHybrid(jni::alias_ref<jhybridobject> jThis) {
     return makeCxxInstance(jThis);
   }
 
-  void JHybridNitroFetchCacheSpec::registerNatives() {
-    registerHybrid({
-      makeNativeMethod("initHybrid", JHybridNitroFetchCacheSpec::initHybrid),
-    });
-  }
-
-  size_t JHybridNitroFetchCacheSpec::getExternalMemorySize() noexcept {
-    static const auto method = javaClassStatic()->getMethod<jlong()>("getMemorySize");
-    return method(_javaPart);
-  }
-
-  bool JHybridNitroFetchCacheSpec::equals(const std::shared_ptr<HybridObject>& other) {
-    if (auto otherCast = std::dynamic_pointer_cast<JHybridNitroFetchCacheSpec>(other)) {
-      return _javaPart == otherCast->_javaPart;
+  std::shared_ptr<JHybridObject> JHybridNitroFetchCacheSpec::CxxPart::createHybridObject(const jni::local_ref<JHybridObject::JavaPart>& javaPart) {
+    auto castJavaPart = jni::dynamic_ref_cast<JHybridNitroFetchCacheSpec::JavaPart>(javaPart);
+    if (castJavaPart == nullptr) [[unlikely]] {
+      throw std::runtime_error("Failed to cast JHybridObject::JavaPart to JHybridNitroFetchCacheSpec::JavaPart!");
     }
-    return false;
+    return std::make_shared<JHybridNitroFetchCacheSpec>(castJavaPart);
   }
 
-  void JHybridNitroFetchCacheSpec::dispose() noexcept {
-    static const auto method = javaClassStatic()->getMethod<void()>("dispose");
-    method(_javaPart);
-  }
-
-  std::string JHybridNitroFetchCacheSpec::toString() {
-    static const auto method = javaClassStatic()->getMethod<jni::JString()>("toString");
-    auto javaString = method(_javaPart);
-    return javaString->toStdString();
+  void JHybridNitroFetchCacheSpec::CxxPart::registerNatives() {
+    registerHybrid({
+      makeNativeMethod("initHybrid", JHybridNitroFetchCacheSpec::CxxPart::initHybrid),
+    });
   }
 
   // Properties
@@ -58,17 +52,17 @@ namespace margelo::nitro::nitrofetch {
 
   // Methods
   std::optional<CachedPrefetchResponse> JHybridNitroFetchCacheSpec::getCachedPrefetch(const std::string& key, double maxAgeMs) {
-    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JCachedPrefetchResponse>(jni::alias_ref<jni::JString> /* key */, double /* maxAgeMs */)>("getCachedPrefetch");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JCachedPrefetchResponse>(jni::alias_ref<jni::JString> /* key */, double /* maxAgeMs */)>("getCachedPrefetch");
     auto __result = method(_javaPart, jni::make_jstring(key), maxAgeMs);
     return __result != nullptr ? std::make_optional(__result->toCpp()) : std::nullopt;
   }
   bool JHybridNitroFetchCacheSpec::isPrefetchPending(const std::string& key) {
-    static const auto method = javaClassStatic()->getMethod<jboolean(jni::alias_ref<jni::JString> /* key */)>("isPrefetchPending");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jboolean(jni::alias_ref<jni::JString> /* key */)>("isPrefetchPending");
     auto __result = method(_javaPart, jni::make_jstring(key));
     return static_cast<bool>(__result);
   }
   void JHybridNitroFetchCacheSpec::clearAll() {
-    static const auto method = javaClassStatic()->getMethod<void()>("clearAll");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("clearAll");
     method(_javaPart);
   }
 

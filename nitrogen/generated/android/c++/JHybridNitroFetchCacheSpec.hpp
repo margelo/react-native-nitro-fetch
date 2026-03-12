@@ -18,34 +18,33 @@ namespace margelo::nitro::nitrofetch {
 
   using namespace facebook;
 
-  class JHybridNitroFetchCacheSpec: public jni::HybridClass<JHybridNitroFetchCacheSpec, JHybridObject>,
-                                    public virtual HybridNitroFetchCacheSpec {
+  class JHybridNitroFetchCacheSpec: public virtual HybridNitroFetchCacheSpec, public virtual JHybridObject {
   public:
-    static auto constexpr kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/HybridNitroFetchCacheSpec;";
-    static jni::local_ref<jhybriddata> initHybrid(jni::alias_ref<jhybridobject> jThis);
-    static void registerNatives();
+    struct JavaPart: public jni::JavaClass<JavaPart, JHybridObject::JavaPart> {
+      static auto constexpr kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/HybridNitroFetchCacheSpec;";
+      std::shared_ptr<JHybridNitroFetchCacheSpec> getJHybridNitroFetchCacheSpec();
+    };
+    struct CxxPart: public jni::HybridClass<CxxPart, JHybridObject::CxxPart> {
+      static auto constexpr kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/HybridNitroFetchCacheSpec$CxxPart;";
+      static jni::local_ref<jhybriddata> initHybrid(jni::alias_ref<jhybridobject> jThis);
+      static void registerNatives();
+      using HybridBase::HybridBase;
+    protected:
+      std::shared_ptr<JHybridObject> createHybridObject(const jni::local_ref<JHybridObject::JavaPart>& javaPart) override;
+    };
 
-  protected:
-    // C++ constructor (called from Java via `initHybrid()`)
-    explicit JHybridNitroFetchCacheSpec(jni::alias_ref<jhybridobject> jThis) :
+  public:
+    explicit JHybridNitroFetchCacheSpec(const jni::local_ref<JHybridNitroFetchCacheSpec::JavaPart>& javaPart):
       HybridObject(HybridNitroFetchCacheSpec::TAG),
-      HybridBase(jThis),
-      _javaPart(jni::make_global(jThis)) {}
-
-  public:
+      JHybridObject(javaPart),
+      _javaPart(jni::make_global(javaPart)) {}
     ~JHybridNitroFetchCacheSpec() override {
       // Hermes GC can destroy JS objects on a non-JNI Thread.
       jni::ThreadScope::WithClassLoader([&] { _javaPart.reset(); });
     }
 
   public:
-    size_t getExternalMemorySize() noexcept override;
-    bool equals(const std::shared_ptr<HybridObject>& other) override;
-    void dispose() noexcept override;
-    std::string toString() override;
-
-  public:
-    inline const jni::global_ref<JHybridNitroFetchCacheSpec::javaobject>& getJavaPart() const noexcept {
+    inline const jni::global_ref<JHybridNitroFetchCacheSpec::JavaPart>& getJavaPart() const noexcept {
       return _javaPart;
     }
 
@@ -60,9 +59,7 @@ namespace margelo::nitro::nitrofetch {
     void clearAll() override;
 
   private:
-    friend HybridBase;
-    using HybridBase::HybridBase;
-    jni::global_ref<JHybridNitroFetchCacheSpec::javaobject> _javaPart;
+    jni::global_ref<JHybridNitroFetchCacheSpec::JavaPart> _javaPart;
   };
 
 } // namespace margelo::nitro::nitrofetch

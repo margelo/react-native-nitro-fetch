@@ -215,7 +215,7 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return optional.has_value();
   }
   inline UrlResponseInfo get_std__optional_UrlResponseInfo_(const std::optional<UrlResponseInfo>& optional) noexcept {
-    return *optional;
+    return optional.value();
   }
   
   // pragma MARK: std::optional<double>
@@ -230,7 +230,7 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return optional.has_value();
   }
   inline double get_std__optional_double_(const std::optional<double>& optional) noexcept {
-    return *optional;
+    return optional.value();
   }
   
   // pragma MARK: std::optional<std::string>
@@ -245,7 +245,7 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return optional.has_value();
   }
   inline std::string get_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
-    return *optional;
+    return optional.value();
   }
   
   // pragma MARK: std::function<void(const std::optional<UrlResponseInfo>& /* info */, const RequestException& /* error */)>
@@ -425,7 +425,7 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return optional.has_value();
   }
   inline std::variant<std::shared_ptr<ArrayBuffer>, std::string> get_std__optional_std__variant_std__shared_ptr_ArrayBuffer___std__string__(const std::optional<std::variant<std::shared_ptr<ArrayBuffer>, std::string>>& optional) noexcept {
-    return *optional;
+    return optional.value();
   }
   
   // pragma MARK: std::optional<CachedFetchResponse>
@@ -440,7 +440,7 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return optional.has_value();
   }
   inline CachedFetchResponse get_std__optional_CachedFetchResponse_(const std::optional<CachedFetchResponse>& optional) noexcept {
-    return *optional;
+    return optional.value();
   }
   
   // pragma MARK: std::shared_ptr<Promise<std::optional<CachedFetchResponse>>>
@@ -528,7 +528,7 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return optional.has_value();
   }
   inline CachedPrefetchResponse get_std__optional_CachedPrefetchResponse_(const std::optional<CachedPrefetchResponse>& optional) noexcept {
-    return *optional;
+    return optional.value();
   }
   
   // pragma MARK: std::shared_ptr<HybridNitroFetchCacheSpec>

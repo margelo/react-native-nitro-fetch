@@ -51,37 +51,31 @@ namespace margelo::nitro::nitrofetch { enum class ErrorType; }
 
 namespace margelo::nitro::nitrofetch {
 
-  jni::local_ref<JHybridUrlRequestBuilderSpec::jhybriddata> JHybridUrlRequestBuilderSpec::initHybrid(jni::alias_ref<jhybridobject> jThis) {
+  std::shared_ptr<JHybridUrlRequestBuilderSpec> JHybridUrlRequestBuilderSpec::JavaPart::getJHybridUrlRequestBuilderSpec() {
+    auto hybridObject = JHybridObject::JavaPart::getJHybridObject();
+    auto castHybridObject = std::dynamic_pointer_cast<JHybridUrlRequestBuilderSpec>(hybridObject);
+    if (castHybridObject == nullptr) [[unlikely]] {
+      throw std::runtime_error("Failed to downcast JHybridObject to JHybridUrlRequestBuilderSpec!");
+    }
+    return castHybridObject;
+  }
+
+  jni::local_ref<JHybridUrlRequestBuilderSpec::CxxPart::jhybriddata> JHybridUrlRequestBuilderSpec::CxxPart::initHybrid(jni::alias_ref<jhybridobject> jThis) {
     return makeCxxInstance(jThis);
   }
 
-  void JHybridUrlRequestBuilderSpec::registerNatives() {
-    registerHybrid({
-      makeNativeMethod("initHybrid", JHybridUrlRequestBuilderSpec::initHybrid),
-    });
-  }
-
-  size_t JHybridUrlRequestBuilderSpec::getExternalMemorySize() noexcept {
-    static const auto method = javaClassStatic()->getMethod<jlong()>("getMemorySize");
-    return method(_javaPart);
-  }
-
-  bool JHybridUrlRequestBuilderSpec::equals(const std::shared_ptr<HybridObject>& other) {
-    if (auto otherCast = std::dynamic_pointer_cast<JHybridUrlRequestBuilderSpec>(other)) {
-      return _javaPart == otherCast->_javaPart;
+  std::shared_ptr<JHybridObject> JHybridUrlRequestBuilderSpec::CxxPart::createHybridObject(const jni::local_ref<JHybridObject::JavaPart>& javaPart) {
+    auto castJavaPart = jni::dynamic_ref_cast<JHybridUrlRequestBuilderSpec::JavaPart>(javaPart);
+    if (castJavaPart == nullptr) [[unlikely]] {
+      throw std::runtime_error("Failed to cast JHybridObject::JavaPart to JHybridUrlRequestBuilderSpec::JavaPart!");
     }
-    return false;
+    return std::make_shared<JHybridUrlRequestBuilderSpec>(castJavaPart);
   }
 
-  void JHybridUrlRequestBuilderSpec::dispose() noexcept {
-    static const auto method = javaClassStatic()->getMethod<void()>("dispose");
-    method(_javaPart);
-  }
-
-  std::string JHybridUrlRequestBuilderSpec::toString() {
-    static const auto method = javaClassStatic()->getMethod<jni::JString()>("toString");
-    auto javaString = method(_javaPart);
-    return javaString->toStdString();
+  void JHybridUrlRequestBuilderSpec::CxxPart::registerNatives() {
+    registerHybrid({
+      makeNativeMethod("initHybrid", JHybridUrlRequestBuilderSpec::CxxPart::initHybrid),
+    });
   }
 
   // Properties
@@ -89,57 +83,57 @@ namespace margelo::nitro::nitrofetch {
 
   // Methods
   void JHybridUrlRequestBuilderSpec::setHttpMethod(const std::string& httpMethod) {
-    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* httpMethod */)>("setHttpMethod");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* httpMethod */)>("setHttpMethod");
     method(_javaPart, jni::make_jstring(httpMethod));
   }
   void JHybridUrlRequestBuilderSpec::addHeader(const std::string& name, const std::string& value) {
-    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* name */, jni::alias_ref<jni::JString> /* value */)>("addHeader");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* name */, jni::alias_ref<jni::JString> /* value */)>("addHeader");
     method(_javaPart, jni::make_jstring(name), jni::make_jstring(value));
   }
   void JHybridUrlRequestBuilderSpec::setUploadBody(const std::variant<std::shared_ptr<ArrayBuffer>, std::string>& body) {
-    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JVariant_ArrayBuffer_String> /* body */)>("setUploadBody");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JVariant_ArrayBuffer_String> /* body */)>("setUploadBody");
     method(_javaPart, JVariant_ArrayBuffer_String::fromCpp(body));
   }
   void JHybridUrlRequestBuilderSpec::disableCache() {
-    static const auto method = javaClassStatic()->getMethod<void()>("disableCache");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("disableCache");
     method(_javaPart);
   }
   void JHybridUrlRequestBuilderSpec::setPriority(double priority) {
-    static const auto method = javaClassStatic()->getMethod<void(double /* priority */)>("setPriority");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(double /* priority */)>("setPriority");
     method(_javaPart, priority);
   }
   void JHybridUrlRequestBuilderSpec::allowDirectExecutor() {
-    static const auto method = javaClassStatic()->getMethod<void()>("allowDirectExecutor");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("allowDirectExecutor");
     method(_javaPart);
   }
   void JHybridUrlRequestBuilderSpec::onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) {
-    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo::javaobject> /* callback */)>("onSucceeded_cxx");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo::javaobject> /* callback */)>("onSucceeded_cxx");
     method(_javaPart, JFunc_void_UrlResponseInfo_cxx::fromCpp(callback));
   }
   void JHybridUrlRequestBuilderSpec::onFailed(const std::function<void(const std::optional<UrlResponseInfo>& /* info */, const RequestException& /* error */)>& callback) {
-    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_std__optional_UrlResponseInfo__RequestException::javaobject> /* callback */)>("onFailed_cxx");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_std__optional_UrlResponseInfo__RequestException::javaobject> /* callback */)>("onFailed_cxx");
     method(_javaPart, JFunc_void_std__optional_UrlResponseInfo__RequestException_cxx::fromCpp(callback));
   }
   void JHybridUrlRequestBuilderSpec::onCanceled(const std::function<void(const std::optional<UrlResponseInfo>& /* info */)>& callback) {
-    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_std__optional_UrlResponseInfo_::javaobject> /* callback */)>("onCanceled_cxx");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_std__optional_UrlResponseInfo_::javaobject> /* callback */)>("onCanceled_cxx");
     method(_javaPart, JFunc_void_std__optional_UrlResponseInfo__cxx::fromCpp(callback));
   }
   void JHybridUrlRequestBuilderSpec::onRedirectReceived(const std::function<void(const UrlResponseInfo& /* info */, const std::string& /* newLocationUrl */)>& callback) {
-    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo_std__string::javaobject> /* callback */)>("onRedirectReceived_cxx");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo_std__string::javaobject> /* callback */)>("onRedirectReceived_cxx");
     method(_javaPart, JFunc_void_UrlResponseInfo_std__string_cxx::fromCpp(callback));
   }
   void JHybridUrlRequestBuilderSpec::onResponseStarted(const std::function<void(const UrlResponseInfo& /* info */)>& callback) {
-    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo::javaobject> /* callback */)>("onResponseStarted_cxx");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo::javaobject> /* callback */)>("onResponseStarted_cxx");
     method(_javaPart, JFunc_void_UrlResponseInfo_cxx::fromCpp(callback));
   }
   void JHybridUrlRequestBuilderSpec::onReadCompleted(const std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */, double /* bytesRead */)>& callback) {
-    static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double::javaobject> /* callback */)>("onReadCompleted_cxx");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double::javaobject> /* callback */)>("onReadCompleted_cxx");
     method(_javaPart, JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double_cxx::fromCpp(callback));
   }
   std::shared_ptr<HybridUrlRequestSpec> JHybridUrlRequestBuilderSpec::build() {
-    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JHybridUrlRequestSpec::javaobject>()>("build");
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JHybridUrlRequestSpec::JavaPart>()>("build");
     auto __result = method(_javaPart);
-    return __result->cthis()->shared_cast<JHybridUrlRequestSpec>();
+    return __result->getJHybridUrlRequestSpec();
   }
 
 } // namespace margelo::nitro::nitrofetch

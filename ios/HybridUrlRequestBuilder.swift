@@ -237,7 +237,14 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
           callback(info)
         }
       }
+
+      // Clean up to break retain cycles
+      self.receivedData = Data()
+      self.response = nil
     }
+
+    // Invalidate the session to release the strong delegate reference
+    session.finishTasksAndInvalidate()
   }
 
   // MARK: - URLSessionDataDelegate
@@ -274,8 +281,6 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     dataTask: URLSessionDataTask,
     didReceive data: Data
   ) {
-    receivedData.append(data)
-
     // If onReadCompleted callback is set, notify with the chunk
     if let callback = self.onReadCompleted {
       // Use sync to ensure ordering - data callbacks fire in order before completion
