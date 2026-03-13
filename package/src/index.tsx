@@ -1,17 +1,18 @@
+import 'web-streams-polyfill/polyfill';
+import { TextDecoder } from './TextDecoder';
+
+export { TextDecoder };
 export {
-  nitroFetch as fetch,
-  nitroFetchOnWorklet,
+  fetch,
   prefetch,
   prefetchOnAppStart,
   removeFromAutoPrefetch,
-  removeAllFromAutoprefetch,
+  clearAutoPrefetchQueue,
+  fetchOnWorklet as nitroFetchOnWorklet,
 } from './fetch';
-export type { NitroFormDataPart, NitroRequest, NitroResponse } from './fetch';
-export { NitroFetch } from './NitroInstances';
-import './fetch';
-
-// Keep legacy export to avoid breaking any local tests/usages during scaffolding.
-// Will be removed once native Cronet path is ready.
-export function multiply(a: number, b: number): number {
-  return a * b;
-}
+export type {
+  FetchOptions,
+  FetchResponse,
+  PrefetchOptions,
+  WorkletMapper,
+} from './fetch';

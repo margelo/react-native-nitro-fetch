@@ -22,12 +22,12 @@ export function PostAndUploadScreen() {
       data: { userId: 123, action: 'test' },
     };
 
-    const mapper = (payload: { bodyString?: string; status: number }) => {
+    const mapper = (payload: { body?: string; status: number }) => {
       'worklet';
       if (payload.status !== 200) {
         return { success: false, error: `HTTP ${payload.status}` };
       }
-      const txt = payload.bodyString ?? '';
+      const txt = payload.body ?? '';
       const json = JSON.parse(txt) as {
         json?: typeof requestBody;
         data?: string;

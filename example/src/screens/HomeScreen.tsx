@@ -43,6 +43,13 @@ const EXAMPLES = [
     screen: 'BasicFetchScreen' as const,
     icon: '🌐',
   },
+  {
+    id: 'stream',
+    title: 'Stream Fetch',
+    description: 'Fetch and decode a chunked stream response using TextDecoder.',
+    screen: 'StreamScreen' as const,
+    icon: '🌊',
+  },
 ];
 
 export function HomeScreen() {

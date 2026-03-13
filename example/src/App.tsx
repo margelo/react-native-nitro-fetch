@@ -14,6 +14,7 @@ import { PostAndUploadScreen } from './screens/PostAndUploadScreen';
 import { PrefetchScreen } from './screens/PrefetchScreen';
 import { AbortScreen } from './screens/AbortScreen';
 import { BasicFetchScreen } from './screens/BasicFetchScreen';
+import { StreamScreen } from './screens/StreamScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -113,6 +114,11 @@ export default function App() {
           name="BasicFetchScreen"
           component={BasicFetchScreen}
           options={{ title: 'Basic Fetch' }}
+        />
+        <Stack.Screen
+          name="StreamScreen"
+          component={StreamScreen}
+          options={{ title: 'Stream Fetch' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

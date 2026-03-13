@@ -10,8 +10,8 @@
 #import "NitroFetch-Swift-Cxx-Umbrella.hpp"
 #import <type_traits>
 
-#include "HybridNitroFetchSpecSwift.hpp"
-#include "HybridNitroFetchClientSpecSwift.hpp"
+#include "HybridNitroCronetSpecSwift.hpp"
+#include "HybridTextEncoding.hpp"
 #include "HybridNativeStorageSpecSwift.hpp"
 
 @interface NitroFetchAutolinking : NSObject
@@ -24,17 +24,19 @@
   using namespace margelo::nitro::nitrofetch;
 
   HybridObjectRegistry::registerHybridObjectConstructor(
-    "NitroFetch",
+    "NitroCronet",
     []() -> std::shared_ptr<HybridObject> {
-      std::shared_ptr<HybridNitroFetchSpec> hybridObject = NitroFetch::NitroFetchAutolinking::createNitroFetch();
+      std::shared_ptr<HybridNitroCronetSpec> hybridObject = NitroFetch::NitroFetchAutolinking::createNitroCronet();
       return hybridObject;
     }
   );
   HybridObjectRegistry::registerHybridObjectConstructor(
-    "NitroFetchClient",
+    "NitroTextEncoding",
     []() -> std::shared_ptr<HybridObject> {
-      std::shared_ptr<HybridNitroFetchClientSpec> hybridObject = NitroFetch::NitroFetchAutolinking::createNitroFetchClient();
-      return hybridObject;
+      static_assert(std::is_default_constructible_v<HybridTextEncoding>,
+                    "The HybridObject \"HybridTextEncoding\" is not default-constructible! "
+                    "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
+      return std::make_shared<HybridTextEncoding>();
     }
   );
   HybridObjectRegistry::registerHybridObjectConstructor(

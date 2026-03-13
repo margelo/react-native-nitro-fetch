@@ -265,9 +265,9 @@ describe('NitroFetch - AbortController', () => {
 
 describe('NitroFetch - nitroFetchOnWorklet', () => {
   const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(['bitcoin'].join(','))}&vs_currencies=usd`;
-  const mapper = (payload: { bodyString?: string }) => {
+  const mapper = (payload: { body?: string }) => {
     'worklet';
-    const txt = payload.bodyString ?? '';
+    const txt = payload.body ?? '';
     const json = JSON.parse(txt) as Record<string, { usd: number }>;
     const entries = Object.entries(json);
     const arr = [];
