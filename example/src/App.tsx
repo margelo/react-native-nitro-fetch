@@ -1,828 +1,113 @@
-/* eslint-disable react-native/no-inline-styles */
 import React from 'react';
-import {
-  Text,
-  View,
-  StyleSheet,
-  Button,
-  ScrollView,
-  Modal,
-  Pressable,
-} from 'react-native';
-import {
-  fetch as nitroFetch,
-  nitroFetchOnWorklet,
-  prefetch,
-  prefetchOnAppStart,
-  removeAllFromAutoprefetch,
-} from 'react-native-nitro-fetch';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
-type Row = {
-  url: string;
-  builtinMs: number;
-  nitroMs: number;
-  errorBuiltin?: string;
-  errorNitro?: string;
-  cachedBuiltin?: boolean;
-  cachedNitro?: boolean;
-};
+import type { RootStackParamList, MainTabParamList } from './navigation';
+import { theme } from './theme';
 
-const CANDIDATES: string[] = [
-  // Small HTML/text
-  'https://example.com',
-  'https://example.org',
-  'https://www.google.com/robots.txt',
-  'https://www.wikipedia.org',
-  'https://news.ycombinator.com',
-  'https://developer.mozilla.org',
-  'https://www.cloudflare.com/cdn-cgi/trace',
-  'https://www.apple.com',
-  'https://www.microsoft.com',
-  'https://www.reddit.com/.json',
-  // httpbin
-  'https://httpbin.org/get',
-  'https://httpbin.org/uuid',
-  'https://httpbin.org/ip',
-  'https://httpbin.org/headers',
-  // jsonplaceholder
-  'https://jsonplaceholder.typicode.com/todos/1',
-  'https://jsonplaceholder.typicode.com/todos/2',
-  'https://jsonplaceholder.typicode.com/todos/3',
-  'https://jsonplaceholder.typicode.com/posts/1',
-  'https://jsonplaceholder.typicode.com/posts/2',
-  'https://jsonplaceholder.typicode.com/posts/3',
-  'https://jsonplaceholder.typicode.com/users/1',
-  'https://jsonplaceholder.typicode.com/users/2',
-  'https://jsonplaceholder.typicode.com/users/3',
-  // status pages (small bodies)
-  'https://httpstat.us/200',
-  'https://httpstat.us/204',
-  'https://httpstat.us/301',
-  'https://httpstat.us/302',
-  'https://httpstat.us/404',
-  'https://httpstat.us/418',
-  'https://httpstat.us/500',
-  'https://httpstat.us/503',
-  // raw small files
-  'https://raw.githubusercontent.com/github/gitignore/main/Node.gitignore',
-  'https://raw.githubusercontent.com/github/gitignore/main/Android.gitignore',
-  'https://raw.githubusercontent.com/github/gitignore/main/Swift.gitignore',
-  'https://raw.githubusercontent.com/github/gitignore/main/Go.gitignore',
-  'https://raw.githubusercontent.com/github/gitignore/main/Python.gitignore',
-  'https://raw.githubusercontent.com/github/gitignore/main/Ruby.gitignore',
-  // CDN JS (moderate size)
-  'https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js',
-  'https://cdn.jsdelivr.net/npm/lodash-es/lodash.js',
-  'https://unpkg.com/react/umd/react.production.min.js',
-  'https://unpkg.com/react-dom/umd/react-dom.production.min.js',
-  // IP/info
-  'https://icanhazip.com',
-  'https://ipapi.co/json/',
-  'https://wttr.in/?format=3',
-  // robots from various sites
-  'https://github.com/robots.txt',
-  'https://www.youtube.com/robots.txt',
-  'https://www.npmjs.com/robots.txt',
-  'https://www.cloudflare.com/robots.txt',
-  'https://www.netflix.com/robots.txt',
-  'https://www.bbc.co.uk/robots.txt',
-  'https://www.nytimes.com/robots.txt',
-  'https://www.stackoverflow.com/robots.txt',
-  'https://www.stackexchange.com/robots.txt',
-  'https://www.cloudflarestatus.com/robots.txt',
-  // misc
-  'https://api.github.com',
-  'https://api.ipify.org?format=json',
-  'https://httpbingo.org/get',
-  'https://httpbingo.org/headers',
-  'https://httpbingo.org/uuid',
-  'https://ifconfig.co/json',
-  'https://get.geojs.io/v1/ip.json',
-  'https://get.geojs.io/v1/ip/geo.json',
-];
+import { HomeScreen } from './screens/HomeScreen';
+import { BenchmarkScreen } from './screens/BenchmarkScreen';
+import { CryptoScreen } from './screens/CryptoScreen';
+import { PostAndUploadScreen } from './screens/PostAndUploadScreen';
+import { PrefetchScreen } from './screens/PrefetchScreen';
+import { AbortScreen } from './screens/AbortScreen';
+import { BasicFetchScreen } from './screens/BasicFetchScreen';
 
-function pickRandomUrls(n: number): string[] {
-  // Choose without replacement to avoid duplicates
-  const arr = [...CANDIDATES];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr.slice(0, Math.min(n, arr.length));
-}
+const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<MainTabParamList>();
 
-function trimmedAverage(values: number[], trimFraction = 0.1): number | null {
-  const valid = values.filter((v) => Number.isFinite(v));
-  if (valid.length === 0) return null;
-  const sorted = valid.slice().sort((a, b) => a - b);
-  const k = Math.floor(sorted.length * trimFraction);
-  const start = Math.min(k, sorted.length);
-  const end = Math.max(start, sorted.length - k);
-  const sliced = sorted.slice(start, end);
-  if (sliced.length === 0) return null;
-  const sum = sliced.reduce((s, v) => s + v, 0);
-  return sum / sliced.length;
-}
-
-function detectCached(headers: Headers): boolean {
-  const get = (k: string) => headers.get(k);
-  const age = get('age');
-  if (age && Number(age) > 0) return true;
-  const hits = get('x-cache-hits');
-  if (hits && Number(hits) > 0) return true;
-  const combined = (
-    (get('x-cache') || '') +
-    ' ' +
-    (get('x-cache-status') || '') +
-    ' ' +
-    (get('x-cache-remote') || '') +
-    ' ' +
-    (get('cf-cache-status') || '') +
-    ' ' +
-    (get('via') || '')
-  ).toUpperCase();
-  if (combined.includes('HIT') || combined.includes('REVALIDATED')) return true;
-  if (combined.includes('MISS')) return false;
-  return false;
-}
-
-async function measure(
-  fn: (url: string) => Promise<Response>,
-  url: string
-): Promise<
-  { ms: number } & (
-    | { ok: true; cached: boolean }
-    | { ok: false; error: string }
-  )
-> {
-  const t0 = global.performance ? global.performance.now() : Date.now();
-  try {
-    const res = await fn(`${url}?timestamp=${performance.now()}`);
-    // Ensure body read to make timing comparable
-    await res.arrayBuffer();
-    const t1 = global.performance ? global.performance.now() : Date.now();
-    const cached = detectCached(res.headers);
-    return { ok: true, ms: t1 - t0, cached } as const;
-  } catch (e: any) {
-    const t1 = global.performance ? global.performance.now() : Date.now();
-    return { ok: false, ms: t1 - t0, error: e?.message ?? String(e) } as const;
-  }
-}
-
-export default function App() {
-  const [rows, setRows] = React.useState<Row[] | null>(null);
-  const [avgBuiltinAll, setAvgBuiltinAll] = React.useState<number | null>(null);
-  const [avgNitroAll, setAvgNitroAll] = React.useState<number | null>(null);
-  const [avgBuiltinNC, setAvgBuiltinNC] = React.useState<number | null>(null);
-  const [avgNitroNC, setAvgNitroNC] = React.useState<number | null>(null);
-  const [running, setRunning] = React.useState(false);
-  const [showSheet, setShowSheet] = React.useState(false);
-  const [prices, setPrices] = React.useState<
-    Array<{ id: string; usd: number }>
-  >([]);
-  const [prefetchInfo, setPrefetchInfo] = React.useState<string>('');
-  const [postResult, setPostResult] = React.useState<string>('');
-  const [abortResult, setAbortResult] = React.useState<string>('');
-  const PREFETCH_URL = 'https://httpbin.org/uuid';
-  const PREFETCH_KEY = 'uuid';
-
-  const loadPrices = React.useCallback(async () => {
-    console.log('Loading crypto prices from coingecko start');
-    const ids = [
-      'bitcoin',
-      'ethereum',
-      'solana',
-      'dogecoin',
-      'litecoin',
-      'cardano',
-      'ripple',
-      'polkadot',
-      'chainlink',
-      'polygon-pos',
-    ];
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids.join(','))}&vs_currencies=usd`;
-    const mapper = (payload: { bodyString?: string }) => {
-      'worklet';
-      const txt = payload.bodyString ?? '';
-      const json = JSON.parse(txt) as Record<string, { usd: number }>;
-      const entries = Object.entries(json);
-      const arr = [];
-      for (let i = 0; i < entries.length; ++i) {
-        const entry = entries[i];
-        arr.push({ id: entry[0], usd: entry[1].usd });
-      }
-      // Manual sort (localeCompare not available in worklets, use plain compare)
-      for (let i = 0; i < arr.length - 1; ++i) {
-        for (let j = i + 1; j < arr.length; ++j) {
-          if (arr[i].id > arr[j].id) {
-            const tmp = arr[i] as { id: string; usd: number };
-            arr[i] = arr[j];
-            arr[j] = tmp;
-          }
-        }
-      }
-      return arr;
-    };
-    console.log('Loading crypto prices from coingecko');
-    try {
-      const data = await nitroFetchOnWorklet(url, undefined, mapper, {
-        preferBytes: false,
-      });
-      console.log('Loaded crypto prices:', data);
-      setPrices(data);
-    } catch (e: any) {
-      console.error('Loading crypto prices error', e);
-    }
-  }, []);
-
-  const sendPostRequest = React.useCallback(async () => {
-    console.log('Sending POST request with worklet');
-    const url = 'https://httpbin.org/post';
-    const requestBody = {
-      message: 'Hello from Nitro Fetch!',
-      timestamp: Date.now(),
-      data: { userId: 123, action: 'test' },
-    };
-
-    const mapper = (payload: { bodyString?: string; status: number }) => {
-      'worklet';
-      if (payload.status !== 200) {
-        return { success: false, error: `HTTP ${payload.status}` };
-      }
-      const txt = payload.bodyString ?? '';
-      const json = JSON.parse(txt) as {
-        json?: typeof requestBody;
-        data?: string;
-      };
-      // Extract the parsed JSON from httpbin response
-      const sentData = json.json ?? (json.data ? JSON.parse(json.data) : null);
-      return {
-        success: true,
-        sent: sentData,
-        received: json,
-      };
-    };
-
-    try {
-      setPostResult('Sending POST request...');
-      const data = await nitroFetchOnWorklet(
-        url,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        },
-        mapper,
-        {
-          preferBytes: false,
-        }
-      );
-      console.log('POST request result:', data);
-      setPostResult(
-        `Success! Sent: ${JSON.stringify(data.sent, null, 2).substring(0, 100)}...`
-      );
-    } catch (e: any) {
-      console.error('POST request error', e);
-      setPostResult(`Error: ${e?.message ?? String(e)}`);
-    }
-  }, []);
-
-  const run = React.useCallback(async () => {
-    if (running) return;
-    setRunning(true);
-    try {
-      const urls = pickRandomUrls(50);
-      const out = await Promise.all(
-        urls.map(async (url): Promise<Row> => {
-          const [b, n] = await Promise.all([
-            measure(global.fetch, url),
-            measure(nitroFetch, url),
-          ]);
-          return {
-            url,
-            builtinMs: b.ms,
-            nitroMs: n.ms,
-            errorBuiltin: b.ok ? undefined : b.error,
-            errorNitro: n.ok ? undefined : n.error,
-            cachedBuiltin: b.ok ? b.cached : undefined,
-            cachedNitro: n.ok ? n.cached : undefined,
-          };
-        })
-      );
-      setRows(out);
-      const okRows = out.filter(
-        (r) => r.errorBuiltin == null && r.errorNitro == null
-      );
-      const avgBAll = trimmedAverage(okRows.map((r) => r.builtinMs));
-      const avgNAll = trimmedAverage(okRows.map((r) => r.nitroMs));
-      const avgBNC = trimmedAverage(
-        okRows.filter((r) => r.cachedBuiltin === false).map((r) => r.builtinMs)
-      );
-      const avgNNC = trimmedAverage(
-        okRows.filter((r) => r.cachedNitro === false).map((r) => r.nitroMs)
-      );
-      setAvgBuiltinAll(avgBAll);
-      setAvgNitroAll(avgNAll);
-      setAvgBuiltinNC(avgBNC);
-      setAvgNitroNC(avgNNC);
-      console.log(
-        'trimmed avgs (all, not-cached)',
-        avgBAll,
-        avgNAll,
-        avgBNC,
-        avgNNC
-      );
-    } finally {
-      setRunning(false);
-    }
-  }, [running]);
-
-  React.useEffect(() => {
-    run();
-  }, [run]);
-
+function MainTabs() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Nitro vs Built-in Fetch</Text>
-      <View style={styles.actions}>
-        <View style={styles.btnWrap}>
-          <Button
-            title={running ? 'Running…' : 'Run Again'}
-            onPress={run}
-            disabled={running}
-          />
-        </View>
-        <View style={styles.btnWrap}>
-          <Button
-            title="Crypto Prices"
-            onPress={() => {
-              setShowSheet(true);
-              loadPrices();
-            }}
-          />
-        </View>
-        <View style={styles.btnWrap}>
-          <Button title="POST (Worklet)" onPress={sendPostRequest} />
-        </View>
-        <View style={styles.btnWrap}>
-          <Button
-            title="FormData (text)"
-            onPress={async () => {
-              try {
-                setPostResult('Sending FormData (text fields)...');
-                const fd = new FormData();
-                fd.append('username', 'nitro_user');
-                fd.append('message', 'Hello from Nitro Fetch FormData!');
-                fd.append('timestamp', String(Date.now()));
-
-                const res = await nitroFetch('https://httpbin.org/post', {
-                  method: 'POST',
-                  body: fd,
-                });
-                const json = await res.json();
-                const form = json.form ?? {};
-                setPostResult(
-                  `FormData OK! form: ${JSON.stringify(form).substring(0, 150)}`
-                );
-              } catch (e: any) {
-                console.error('FormData error', e);
-                setPostResult(`FormData error: ${e?.message ?? String(e)}`);
-              }
-            }}
-          />
-        </View>
-        <View style={styles.btnWrap}>
-          <Button
-            title="FormData (image)"
-            onPress={async () => {
-              try {
-                setPostResult('Uploading image via FormData...');
-                const fd = new FormData();
-                fd.append('caption', 'Test image upload');
-                fd.append('photo', {
-                  uri: 'https://picsum.photos/id/1/100/100.jpg',
-                  type: 'image/jpeg',
-                  name: 'test_photo.jpg',
-                } as any);
-
-                const res = await nitroFetch('https://httpbin.org/post', {
-                  method: 'POST',
-                  body: fd,
-                });
-                const json = await res.json();
-                const files = Object.keys(json.files ?? {});
-                const form = Object.keys(json.form ?? {});
-                setPostResult(
-                  `Image upload OK! files: [${files.join(', ')}], form: [${form.join(', ')}]`
-                );
-              } catch (e: any) {
-                console.error('Image FormData error', e);
-                setPostResult(`Image FormData: ${e?.message ?? String(e)}`);
-              }
-            }}
-          />
-        </View>
-        <View style={styles.btnWrap}>
-          <Button
-            title="FormData (PDF)"
-            onPress={async () => {
-              try {
-                setPostResult('Uploading PDF via FormData...');
-                const fd = new FormData();
-                fd.append('title', 'Test PDF document');
-                fd.append('document', {
-                  uri: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
-                  type: 'application/pdf',
-                  name: 'test_document.pdf',
-                } as any);
-
-                const res = await nitroFetch('https://httpbin.org/post', {
-                  method: 'POST',
-                  body: fd,
-                });
-                const json = await res.json();
-                const files = Object.keys(json.files ?? {});
-                const form = Object.keys(json.form ?? {});
-                setPostResult(
-                  `PDF upload OK! files: [${files.join(', ')}], form: [${form.join(', ')}]`
-                );
-              } catch (e: any) {
-                console.error('PDF FormData error', e);
-                setPostResult(`PDF FormData: ${e?.message ?? String(e)}`);
-              }
-            }}
-          />
-        </View>
-        <View style={styles.btnWrap}>
-          <Button
-            title="Prefetch UUID"
-            onPress={async () => {
-              try {
-                await prefetch(PREFETCH_URL, {
-                  headers: { prefetchKey: PREFETCH_KEY },
-                });
-                setPrefetchInfo('Prefetch started');
-              } catch (e: any) {
-                setPrefetchInfo(`Prefetch error: ${e?.message ?? String(e)}`);
-              }
-            }}
-          />
-        </View>
-        <View style={styles.btnWrap}>
-          <Button
-            title="Fetch Prefetched"
-            onPress={async () => {
-              try {
-                const res = await nitroFetch(PREFETCH_URL, {
-                  headers: { prefetchKey: PREFETCH_KEY },
-                });
-                console.log('res', res);
-                const text = await res.text();
-                const pref = res.headers.get('nitroPrefetched');
-                setPrefetchInfo(
-                  `Fetched. nitroPrefetched=${pref ?? 'null'} len=${text.length}`
-                );
-              } catch (e: any) {
-                setPrefetchInfo(`Fetch error: ${e?.message ?? String(e)}`);
-              }
-            }}
-          />
-        </View>
-        <View style={styles.btnWrap}>
-          <Button
-            title="Schedule Prefetch"
-            onPress={async () => {
-              try {
-                await prefetchOnAppStart(PREFETCH_URL, {
-                  prefetchKey: PREFETCH_KEY,
-                });
-                setPrefetchInfo('Scheduled in NativeStorage');
-              } catch (e: any) {
-                setPrefetchInfo(`Schedule error: ${e?.message ?? String(e)}`);
-              }
-            }}
-          />
-        </View>
-        <View style={styles.btnWrap}>
-          <Button
-            title="Clear Prefetch"
-            onPress={async () => {
-              try {
-                await removeAllFromAutoprefetch();
-                setPrefetchInfo('Cleared auto-prefetch queue');
-              } catch (e: any) {
-                setPrefetchInfo(`Clear error: ${e?.message ?? String(e)}`);
-              }
-            }}
-          />
-        </View>
-        <View style={styles.btnWrap}>
-          <Button
-            title="Abort (immediate)"
-            onPress={async () => {
-              setAbortResult('Aborting immediately...');
-              const controller = new AbortController();
-              controller.abort();
-              try {
-                await nitroFetch('https://httpbin.org/delay/20', {
-                  signal: controller.signal,
-                });
-                setAbortResult('ERROR: Request should have been aborted!');
-              } catch (e: any) {
-                setAbortResult(
-                  `Immediate abort: ${e?.name ?? 'Error'} — ${e?.message ?? String(e)}`
-                );
-              }
-            }}
-          />
-        </View>
-        <View style={styles.btnWrap}>
-          <Button
-            title="Abort (100ms)"
-            onPress={async () => {
-              setAbortResult('Fetching (will abort in 100ms)...');
-              const controller = new AbortController();
-              setTimeout(() => controller.abort(), 100);
-              const t0 = performance.now();
-              try {
-                await nitroFetch('https://httpbin.org/delay/20', {
-                  signal: controller.signal,
-                });
-                setAbortResult('ERROR: Request should have been aborted!');
-              } catch (e: any) {
-                const elapsed = (performance.now() - t0).toFixed(0);
-                setAbortResult(
-                  `Abort after ${elapsed}ms: ${e?.name ?? 'Error'} — ${e?.message ?? String(e)}`
-                );
-              }
-            }}
-          />
-        </View>
-        <View style={styles.btnWrap}>
-          <Button
-            title="No-abort (normal)"
-            onPress={async () => {
-              setAbortResult('Fetching with signal (no abort)...');
-              const controller = new AbortController();
-              const t0 = performance.now();
-              try {
-                const res = await nitroFetch('https://httpbin.org/get', {
-                  signal: controller.signal,
-                });
-                const elapsed = (performance.now() - t0).toFixed(0);
-                setAbortResult(
-                  `OK ${res.status} in ${elapsed}ms (signal present, not aborted)`
-                );
-              } catch (e: any) {
-                setAbortResult(`Unexpected error: ${e?.message ?? String(e)}`);
-              }
-            }}
-          />
-        </View>
-      </View>
-      {!!prefetchInfo && (
-        <Text style={{ textAlign: 'center', marginBottom: 8 }}>
-          {prefetchInfo}
-        </Text>
-      )}
-      {!!postResult && (
-        <Text
-          style={{
-            textAlign: 'center',
-            marginBottom: 8,
-            paddingHorizontal: 12,
-          }}
-        >
-          POST Result: {postResult}
-        </Text>
-      )}
-      {!!abortResult && (
-        <Text
-          style={{
-            textAlign: 'center',
-            marginBottom: 8,
-            paddingHorizontal: 12,
-          }}
-        >
-          Abort: {abortResult}
-        </Text>
-      )}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {rows == null ? (
-          <Text>Measuring…</Text>
-        ) : (
-          <>
-            <View style={styles.headerRow}>
-              <Text style={[styles.cell, styles.url]}>URL</Text>
-              <Text style={styles.cell}>Built-in (ms)</Text>
-              <Text style={styles.cell}>Nitro (ms)</Text>
-              <Text style={styles.cell}>Cache B/N</Text>
-            </View>
-            {rows.map((r) => {
-              const builtinWins = r.builtinMs < r.nitroMs;
-              const nitroWins = r.nitroMs < r.builtinMs;
-              return (
-                <View key={r.url} style={styles.row}>
-                  <Text style={[styles.cell, styles.url]} numberOfLines={1}>
-                    {r.url}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.cell,
-                      builtinWins ? styles.winner : undefined,
-                    ]}
-                  >
-                    {r.errorBuiltin
-                      ? 'Err'
-                      : Number.isFinite(r.builtinMs)
-                        ? r.builtinMs.toFixed(1)
-                        : '—'}
-                  </Text>
-                  <Text
-                    style={[styles.cell, nitroWins ? styles.winner : undefined]}
-                  >
-                    {r.errorNitro
-                      ? 'Err'
-                      : Number.isFinite(r.nitroMs)
-                        ? r.nitroMs.toFixed(1)
-                        : '—'}
-                  </Text>
-                  <Text style={styles.cell}>
-                    {r.cachedBuiltin == null
-                      ? '?'
-                      : r.cachedBuiltin
-                        ? 'B✓'
-                        : 'B✗'}{' '}
-                    {r.cachedNitro == null ? '?' : r.cachedNitro ? 'N✓' : 'N✗'}
-                  </Text>
-                </View>
-              );
-            })}
-            <View style={styles.footer}>
-              <Text style={styles.avg}>
-                Built-in avg (all / not cached):{' '}
-                {avgBuiltinAll != null ? avgBuiltinAll.toFixed(1) : '—'} ms /{' '}
-                {avgBuiltinNC != null ? avgBuiltinNC.toFixed(1) : '—'} ms
-              </Text>
-              <Text style={styles.avg}>
-                Nitro avg (all / not cached):{' '}
-                {avgNitroAll != null ? avgNitroAll.toFixed(1) : '—'} ms /{' '}
-                {avgNitroNC != null ? avgNitroNC.toFixed(1) : '—'} ms
-              </Text>
-            </View>
-          </>
-        )}
-      </ScrollView>
-      <Modal
-        visible={showSheet}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowSheet(false)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setShowSheet(false)}>
-          <View />
-        </Pressable>
-        <View style={styles.sheet}>
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Crypto Prices (USD)</Text>
-            <Button title="Close" onPress={() => setShowSheet(false)} />
-          </View>
-          <ScrollView style={{ maxHeight: 360 }}>
-            {prices.length === 0 ? (
-              <Text style={{ padding: 12 }}>Loading…</Text>
-            ) : (
-              prices.map((p) => (
-                <View key={p.id} style={styles.priceRow}>
-                  <Text style={styles.priceId}>{p.id}</Text>
-                  <Text style={styles.priceVal}>
-                    $
-                    {p.usd.toLocaleString(undefined, {
-                      maximumFractionDigits: 6,
-                    })}
-                  </Text>
-                </View>
-              ))
-            )}
-          </ScrollView>
-        </View>
-      </Modal>
-    </View>
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textSecondary,
+        tabBarStyle: {
+          backgroundColor: theme.colors.card,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.border,
+        },
+      }}
+    >
+      <Tab.Screen
+        name="Examples"
+        component={HomeScreen}
+        options={{
+          tabBarIcon: ({ color }) => <TabBarIcon icon="📱" color={color} />,
+        }}
+      />
+      <Tab.Screen
+        name="Benchmark"
+        component={BenchmarkScreen}
+        options={{
+          tabBarIcon: ({ color }) => <TabBarIcon icon="⚡" color={color} />,
+        }}
+      />
+    </Tab.Navigator>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 48,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  actions: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 8,
-    marginBottom: 8,
-    gap: 6,
-  },
-  btnWrap: {
-    marginVertical: 2,
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  sheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    paddingBottom: 24,
-  },
-  sheetHeader: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#eee',
-  },
-  sheetTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#f1f1f1',
-  },
-  priceId: {
-    fontSize: 14,
-  },
-  priceVal: {
-    fontSize: 14,
-    fontVariant: ['tabular-nums'],
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 12,
-    paddingBottom: 24,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ccc',
-    paddingVertical: 6,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: '#eee',
-  },
-  cell: {
-    width: 100,
-    fontVariant: ['tabular-nums'],
-  },
-  winner: {
-    color: 'green',
-    fontWeight: '600',
-  },
-  url: {
-    flex: 1,
-    width: undefined,
-    marginRight: 8,
-  },
-  footer: {
-    marginTop: 12,
-  },
-  avg: {
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  error: {
-    color: 'red',
-    marginLeft: 8,
-  },
-});
+const TabBarIcon = ({ icon, color }: { icon: string; color: string }) => (
+  <React.Fragment>
+    {/* Using text emoji due to lack of vector icons in raw setup, colored via wrapper if possible */}
+    <Text
+      style={{
+        fontSize: 20,
+        opacity: color === theme.colors.primary ? 1 : 0.5,
+      }}
+    >
+      {icon}
+    </Text>
+  </React.Fragment>
+);
+import { Text } from 'react-native';
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: theme.colors.card,
+          },
+          headerTintColor: theme.colors.text,
+          headerShadowVisible: false,
+          headerBackTitle: 'Back',
+        }}
+      >
+        <Stack.Screen
+          name="MainTabs"
+          component={MainTabs}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="CryptoScreen"
+          component={CryptoScreen}
+          options={{ title: 'Crypto Prices' }}
+        />
+        <Stack.Screen
+          name="PostAndUploadScreen"
+          component={PostAndUploadScreen}
+          options={{ title: 'POST & Uploads' }}
+        />
+        <Stack.Screen
+          name="PrefetchScreen"
+          component={PrefetchScreen}
+          options={{ title: 'Prefetching' }}
+        />
+        <Stack.Screen
+          name="AbortScreen"
+          component={AbortScreen}
+          options={{ title: 'Abort Handling' }}
+        />
+        <Stack.Screen
+          name="BasicFetchScreen"
+          component={BasicFetchScreen}
+          options={{ title: 'Basic Fetch' }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}

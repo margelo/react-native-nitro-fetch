@@ -11,12 +11,16 @@
     "test:harness": "react-native-harness"
   },
   "dependencies": {
+    "@react-navigation/bottom-tabs": "^7.15.5",
+    "@react-navigation/native": "^7.1.33",
+    "@react-navigation/native-stack": "^7.14.5",
     "react": "19.2.3",
     "react-native": "0.85.0-rc.0",
     "react-native-harness": "^1.0.0-alpha.25",
     "react-native-nitro-fetch": "workspace:*",
     "react-native-nitro-modules": "^0.29.8",
-    "react-native-safe-area-context": "^5.5.2",
+    "react-native-safe-area-context": "^5.7.0",
+    "react-native-screens": "^4.24.0",
     "react-native-worklets-core": "^1.6.2"
   },
   "devDependencies": {
@@ -42,5 +46,3 @@
     "node": ">=22.11.0"
   }
 }
-
-

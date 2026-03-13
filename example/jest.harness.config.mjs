@@ -1,3 +1,3 @@
 export default {
-    preset: 'react-native-harness',
-  };
+  preset: 'react-native-harness',
+};
