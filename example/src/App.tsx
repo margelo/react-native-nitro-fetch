@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -16,6 +17,13 @@ import { BasicFetchScreen } from './screens/BasicFetchScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
+
+const ExamplesIcon = ({ color }: { color: string }) => (
+  <TabBarIcon icon="📱" color={color} />
+);
+const BenchmarkIcon = ({ color }: { color: string }) => (
+  <TabBarIcon icon="⚡" color={color} />
+);
 
 function MainTabs() {
   return (
@@ -35,14 +43,14 @@ function MainTabs() {
         name="Examples"
         component={HomeScreen}
         options={{
-          tabBarIcon: ({ color }) => <TabBarIcon icon="📱" color={color} />,
+          tabBarIcon: ExamplesIcon,
         }}
       />
       <Tab.Screen
         name="Benchmark"
         component={BenchmarkScreen}
         options={{
-          tabBarIcon: ({ color }) => <TabBarIcon icon="⚡" color={color} />,
+          tabBarIcon: BenchmarkIcon,
         }}
       />
     </Tab.Navigator>
@@ -53,16 +61,15 @@ const TabBarIcon = ({ icon, color }: { icon: string; color: string }) => (
   <React.Fragment>
     {/* Using text emoji due to lack of vector icons in raw setup, colored via wrapper if possible */}
     <Text
-      style={{
-        fontSize: 20,
-        opacity: color === theme.colors.primary ? 1 : 0.5,
-      }}
+      style={[
+        styles.tabIcon,
+        color === theme.colors.primary && styles.tabIconActive,
+      ]}
     >
       {icon}
     </Text>
   </React.Fragment>
 );
-import { Text } from 'react-native';
 
 export default function App() {
   return (
@@ -111,3 +118,13 @@ export default function App() {
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  tabIcon: {
+    fontSize: 20,
+    opacity: 0.5,
+  },
+  tabIconActive: {
+    opacity: 1,
+  },
+});
