@@ -216,6 +216,53 @@ describe('NitroFetch - Prefetch', () => {
   });
 });
 
+describe('NitroFetch - AbortController', () => {
+  it('pre-aborted signal throws AbortError synchronously', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    let threw = false;
+    try {
+      await nitroFetch(`${BASE}/get`, { signal: controller.signal });
+    } catch (e: any) {
+      threw = true;
+      expect(e.name).toBe('AbortError');
+    }
+    expect(threw).toBe(true);
+  });
+
+  it('abort mid-flight cancels a slow request', async () => {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(), 100);
+    const t0 = Date.now();
+    let threw = false;
+    try {
+      await nitroFetch(`${BASE}/delay/20`, { signal: controller.signal });
+    } catch (e: any) {
+      threw = true;
+      expect(e.name).toBe('AbortError');
+    }
+    const elapsed = Date.now() - t0;
+    expect(threw).toBe(true);
+    // Should cancel well before the 20s delay completes
+    expect(elapsed).toBeLessThan(5000);
+  });
+
+  it('normal fetch with signal (not aborted) succeeds', async () => {
+    const controller = new AbortController();
+    const res = await nitroFetch(`${BASE}/get`, {
+      signal: controller.signal,
+    });
+    expect(res.status).toBe(200);
+    expect(res.ok).toBe(true);
+  });
+
+  it('fetch without signal still works', async () => {
+    const res = await nitroFetch(`${BASE}/get`);
+    expect(res.status).toBe(200);
+    expect(res.ok).toBe(true);
+  });
+});
+
 describe('NitroFetch - nitroFetchOnWorklet', () => {
   const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(['bitcoin'].join(','))}&vs_currencies=usd`;
   const mapper = (payload: { bodyString?: string }) => {

@@ -51,6 +51,10 @@ abstract class HybridNitroFetchClientSpec: HybridObject() {
   @DoNotStrip
   @Keep
   abstract fun requestSync(req: NitroRequest): NitroResponse
+  
+  @DoNotStrip
+  @Keep
+  abstract fun cancelRequest(requestId: String): Unit
 
   private external fun initHybrid(): HybridData
 

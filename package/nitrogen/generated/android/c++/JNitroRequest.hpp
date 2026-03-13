@@ -55,6 +55,8 @@ namespace margelo::nitro::nitrofetch {
       jni::local_ref<jni::JDouble> timeoutMs = this->getFieldValue(fieldTimeoutMs);
       static const auto fieldFollowRedirects = clazz->getField<jni::JBoolean>("followRedirects");
       jni::local_ref<jni::JBoolean> followRedirects = this->getFieldValue(fieldFollowRedirects);
+      static const auto fieldRequestId = clazz->getField<jni::JString>("requestId");
+      jni::local_ref<jni::JString> requestId = this->getFieldValue(fieldRequestId);
       return NitroRequest(
         url->toStdString(),
         method != nullptr ? std::make_optional(method->toCpp()) : std::nullopt,
@@ -81,7 +83,8 @@ namespace margelo::nitro::nitrofetch {
           return __vector;
         }()) : std::nullopt,
         timeoutMs != nullptr ? std::make_optional(timeoutMs->value()) : std::nullopt,
-        followRedirects != nullptr ? std::make_optional(static_cast<bool>(followRedirects->value())) : std::nullopt
+        followRedirects != nullptr ? std::make_optional(static_cast<bool>(followRedirects->value())) : std::nullopt,
+        requestId != nullptr ? std::make_optional(requestId->toStdString()) : std::nullopt
       );
     }
 
@@ -115,7 +118,8 @@ namespace margelo::nitro::nitrofetch {
           return __array;
         }() : nullptr,
         value.timeoutMs.has_value() ? jni::JDouble::valueOf(value.timeoutMs.value()) : nullptr,
-        value.followRedirects.has_value() ? jni::JBoolean::valueOf(value.followRedirects.value()) : nullptr
+        value.followRedirects.has_value() ? jni::JBoolean::valueOf(value.followRedirects.value()) : nullptr,
+        value.requestId.has_value() ? jni::make_jstring(value.requestId.value()) : nullptr
       );
     }
   };

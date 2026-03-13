@@ -19,9 +19,13 @@ public extension NitroResponse {
    * Create a new instance of `NitroResponse`.
    */
   init(url: String, status: Double, statusText: String, ok: Bool, redirected: Bool, headers: [NitroHeader], bodyString: String?, bodyBytes: String?) {
-    self.init(std.string(url), status, std.string(statusText), ok, redirected, headers.withUnsafeBufferPointer { __pointer -> bridge.std__vector_NitroHeader_ in
-      return bridge.copy_std__vector_NitroHeader_(__pointer.baseAddress!, headers.count)
-    }, { () -> bridge.std__optional_std__string_ in
+    self.init(std.string(url), status, std.string(statusText), ok, redirected, { () -> bridge.std__vector_NitroHeader_ in
+      var __vector = bridge.create_std__vector_NitroHeader_(headers.count)
+      for __item in headers {
+        __vector.push_back(__item)
+      }
+      return __vector
+    }(), { () -> bridge.std__optional_std__string_ in
       if let __unwrappedValue = bodyString {
         return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
       } else {
@@ -94,17 +98,17 @@ public extension NitroResponse {
   var headers: [NitroHeader] {
     @inline(__always)
     get {
-      return { () -> [NitroHeader] in
-        let __data = bridge.get_data_std__vector_NitroHeader_(self.__headers)
-        let __size = self.__headers.size()
-        return Array(UnsafeBufferPointer(start: __data, count: __size))
-      }()
+      return self.__headers.map({ __item in __item })
     }
     @inline(__always)
     set {
-      self.__headers = newValue.withUnsafeBufferPointer { __pointer -> bridge.std__vector_NitroHeader_ in
-        return bridge.copy_std__vector_NitroHeader_(__pointer.baseAddress!, newValue.count)
-      }
+      self.__headers = { () -> bridge.std__vector_NitroHeader_ in
+        var __vector = bridge.create_std__vector_NitroHeader_(newValue.count)
+        for __item in newValue {
+          __vector.push_back(__item)
+        }
+        return __vector
+      }()
     }
   }
   

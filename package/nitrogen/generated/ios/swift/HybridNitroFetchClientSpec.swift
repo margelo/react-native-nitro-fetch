@@ -17,6 +17,7 @@ public protocol HybridNitroFetchClientSpec_protocol: HybridObject {
   func request(req: NitroRequest) throws -> Promise<NitroResponse>
   func prefetch(req: NitroRequest) throws -> Promise<Void>
   func requestSync(req: NitroRequest) throws -> NitroResponse
+  func cancelRequest(requestId: String) throws -> Void
 }
 
 /// See ``HybridNitroFetchClientSpec``

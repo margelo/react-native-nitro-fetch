@@ -36,6 +36,8 @@ export interface NitroRequest {
   // Controls
   timeoutMs?: number;
   followRedirects?: boolean; // default true
+  // Optional ID used for cancellation via cancelRequest()
+  requestId?: string;
 }
 
 export interface NitroResponse {
@@ -59,6 +61,9 @@ export interface NitroFetchClient
 
   // Synchronous version of request for worklets
   requestSync(req: NitroRequest): NitroResponse;
+
+  // Cancel an in-flight request by its requestId
+  cancelRequest(requestId: string): void;
 }
 
 export interface NitroFetch

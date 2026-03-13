@@ -16,7 +16,7 @@
 namespace margelo::nitro::nitrofetch::bridge::swift {
 
   // pragma MARK: std::function<void(const NitroResponse& /* result */)>
-  Func_void_NitroResponse create_Func_void_NitroResponse(void* NON_NULL swiftClosureWrapper) noexcept {
+  Func_void_NitroResponse create_Func_void_NitroResponse(void* _Nonnull swiftClosureWrapper) noexcept {
     auto swiftClosure = NitroFetch::Func_void_NitroResponse::fromUnsafe(swiftClosureWrapper);
     return [swiftClosure = std::move(swiftClosure)](const NitroResponse& result) mutable -> void {
       swiftClosure.call(result);
@@ -24,7 +24,7 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   }
   
   // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>
-  Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept {
+  Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* _Nonnull swiftClosureWrapper) noexcept {
     auto swiftClosure = NitroFetch::Func_void_std__exception_ptr::fromUnsafe(swiftClosureWrapper);
     return [swiftClosure = std::move(swiftClosure)](const std::exception_ptr& error) mutable -> void {
       swiftClosure.call(error);
@@ -32,7 +32,7 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   }
   
   // pragma MARK: std::function<void()>
-  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept {
+  Func_void create_Func_void(void* _Nonnull swiftClosureWrapper) noexcept {
     auto swiftClosure = NitroFetch::Func_void::fromUnsafe(swiftClosureWrapper);
     return [swiftClosure = std::move(swiftClosure)]() mutable -> void {
       swiftClosure.call();
@@ -40,11 +40,11 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   }
   
   // pragma MARK: std::shared_ptr<HybridNitroFetchClientSpec>
-  std::shared_ptr<HybridNitroFetchClientSpec> create_std__shared_ptr_HybridNitroFetchClientSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+  std::shared_ptr<HybridNitroFetchClientSpec> create_std__shared_ptr_HybridNitroFetchClientSpec_(void* _Nonnull swiftUnsafePointer) noexcept {
     NitroFetch::HybridNitroFetchClientSpec_cxx swiftPart = NitroFetch::HybridNitroFetchClientSpec_cxx::fromUnsafe(swiftUnsafePointer);
     return std::make_shared<margelo::nitro::nitrofetch::HybridNitroFetchClientSpecSwift>(swiftPart);
   }
-  void* NON_NULL get_std__shared_ptr_HybridNitroFetchClientSpec_(std__shared_ptr_HybridNitroFetchClientSpec_ cppType) noexcept {
+  void* _Nonnull get_std__shared_ptr_HybridNitroFetchClientSpec_(std__shared_ptr_HybridNitroFetchClientSpec_ cppType) noexcept {
     std::shared_ptr<margelo::nitro::nitrofetch::HybridNitroFetchClientSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::nitrofetch::HybridNitroFetchClientSpecSwift>(cppType);
     #ifdef NITRO_DEBUG
     if (swiftWrapper == nullptr) [[unlikely]] {
@@ -56,11 +56,11 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   }
   
   // pragma MARK: std::shared_ptr<HybridNitroFetchSpec>
-  std::shared_ptr<HybridNitroFetchSpec> create_std__shared_ptr_HybridNitroFetchSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+  std::shared_ptr<HybridNitroFetchSpec> create_std__shared_ptr_HybridNitroFetchSpec_(void* _Nonnull swiftUnsafePointer) noexcept {
     NitroFetch::HybridNitroFetchSpec_cxx swiftPart = NitroFetch::HybridNitroFetchSpec_cxx::fromUnsafe(swiftUnsafePointer);
     return std::make_shared<margelo::nitro::nitrofetch::HybridNitroFetchSpecSwift>(swiftPart);
   }
-  void* NON_NULL get_std__shared_ptr_HybridNitroFetchSpec_(std__shared_ptr_HybridNitroFetchSpec_ cppType) noexcept {
+  void* _Nonnull get_std__shared_ptr_HybridNitroFetchSpec_(std__shared_ptr_HybridNitroFetchSpec_ cppType) noexcept {
     std::shared_ptr<margelo::nitro::nitrofetch::HybridNitroFetchSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::nitrofetch::HybridNitroFetchSpecSwift>(cppType);
     #ifdef NITRO_DEBUG
     if (swiftWrapper == nullptr) [[unlikely]] {
@@ -72,11 +72,11 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   }
   
   // pragma MARK: std::shared_ptr<HybridNativeStorageSpec>
-  std::shared_ptr<HybridNativeStorageSpec> create_std__shared_ptr_HybridNativeStorageSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+  std::shared_ptr<HybridNativeStorageSpec> create_std__shared_ptr_HybridNativeStorageSpec_(void* _Nonnull swiftUnsafePointer) noexcept {
     NitroFetch::HybridNativeStorageSpec_cxx swiftPart = NitroFetch::HybridNativeStorageSpec_cxx::fromUnsafe(swiftUnsafePointer);
     return std::make_shared<margelo::nitro::nitrofetch::HybridNativeStorageSpecSwift>(swiftPart);
   }
-  void* NON_NULL get_std__shared_ptr_HybridNativeStorageSpec_(std__shared_ptr_HybridNativeStorageSpec_ cppType) noexcept {
+  void* _Nonnull get_std__shared_ptr_HybridNativeStorageSpec_(std__shared_ptr_HybridNativeStorageSpec_ cppType) noexcept {
     std::shared_ptr<margelo::nitro::nitrofetch::HybridNativeStorageSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::nitrofetch::HybridNativeStorageSpecSwift>(cppType);
     #ifdef NITRO_DEBUG
     if (swiftWrapper == nullptr) [[unlikely]] {

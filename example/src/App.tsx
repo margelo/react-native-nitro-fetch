@@ -182,6 +182,7 @@ export default function App() {
   >([]);
   const [prefetchInfo, setPrefetchInfo] = React.useState<string>('');
   const [postResult, setPostResult] = React.useState<string>('');
+  const [abortResult, setAbortResult] = React.useState<string>('');
   const PREFETCH_URL = 'https://httpbin.org/uuid';
   const PREFETCH_KEY = 'uuid';
 
@@ -517,6 +518,69 @@ export default function App() {
             }}
           />
         </View>
+        <View style={styles.btnWrap}>
+          <Button
+            title="Abort (immediate)"
+            onPress={async () => {
+              setAbortResult('Aborting immediately...');
+              const controller = new AbortController();
+              controller.abort();
+              try {
+                await nitroFetch('https://httpbin.org/delay/20', {
+                  signal: controller.signal,
+                });
+                setAbortResult('ERROR: Request should have been aborted!');
+              } catch (e: any) {
+                setAbortResult(
+                  `Immediate abort: ${e?.name ?? 'Error'} — ${e?.message ?? String(e)}`
+                );
+              }
+            }}
+          />
+        </View>
+        <View style={styles.btnWrap}>
+          <Button
+            title="Abort (100ms)"
+            onPress={async () => {
+              setAbortResult('Fetching (will abort in 100ms)...');
+              const controller = new AbortController();
+              setTimeout(() => controller.abort(), 100);
+              const t0 = performance.now();
+              try {
+                await nitroFetch('https://httpbin.org/delay/20', {
+                  signal: controller.signal,
+                });
+                setAbortResult('ERROR: Request should have been aborted!');
+              } catch (e: any) {
+                const elapsed = (performance.now() - t0).toFixed(0);
+                setAbortResult(
+                  `Abort after ${elapsed}ms: ${e?.name ?? 'Error'} — ${e?.message ?? String(e)}`
+                );
+              }
+            }}
+          />
+        </View>
+        <View style={styles.btnWrap}>
+          <Button
+            title="No-abort (normal)"
+            onPress={async () => {
+              setAbortResult('Fetching with signal (no abort)...');
+              const controller = new AbortController();
+              const t0 = performance.now();
+              try {
+                const res = await nitroFetch('https://httpbin.org/get', {
+                  signal: controller.signal,
+                });
+                const elapsed = (performance.now() - t0).toFixed(0);
+                setAbortResult(
+                  `OK ${res.status} in ${elapsed}ms (signal present, not aborted)`
+                );
+              } catch (e: any) {
+                setAbortResult(`Unexpected error: ${e?.message ?? String(e)}`);
+              }
+            }}
+          />
+        </View>
       </View>
       {!!prefetchInfo && (
         <Text style={{ textAlign: 'center', marginBottom: 8 }}>
@@ -532,6 +596,17 @@ export default function App() {
           }}
         >
           POST Result: {postResult}
+        </Text>
+      )}
+      {!!abortResult && (
+        <Text
+          style={{
+            textAlign: 'center',
+            marginBottom: 8,
+            paddingHorizontal: 12,
+          }}
+        >
+          Abort: {abortResult}
         </Text>
       )}
       <ScrollView

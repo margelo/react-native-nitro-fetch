@@ -31,7 +31,8 @@ public final class NitroAutoPrefetcher: NSObject {
                              bodyBytes: nil,
                              bodyFormData: nil,
                              timeoutMs: nil,
-                             followRedirects: true)
+                             followRedirects: true,
+                             requestId: nil)
       Task {
         do { try await NitroFetchClient.prefetchStatic(req) } catch { /* ignore – best effort */ }
       }

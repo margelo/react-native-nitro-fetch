@@ -2,6 +2,29 @@ import Foundation
 import NitroModules
 
 final class NitroFetchClient: HybridNitroFetchClientSpec {
+
+  private var _lock = os_unfair_lock()
+  private var activeTasks: [String: Task<Void, Never>] = [:]
+
+  private func storeTask(_ task: Task<Void, Never>, forKey key: String) {
+    os_unfair_lock_lock(&_lock)
+    activeTasks[key] = task
+    os_unfair_lock_unlock(&_lock)
+  }
+
+  private func removeTask(forKey key: String) {
+    os_unfair_lock_lock(&_lock)
+    activeTasks.removeValue(forKey: key)
+    os_unfair_lock_unlock(&_lock)
+  }
+
+  func cancelRequest(requestId: String) throws {
+    os_unfair_lock_lock(&_lock)
+    let task = activeTasks.removeValue(forKey: requestId)
+    os_unfair_lock_unlock(&_lock)
+    task?.cancel()
+  }
+
   func requestSync(req: NitroRequest) throws -> NitroResponse {
     let semaphore = DispatchSemaphore(value: 0)
     var result: Result<NitroResponse, Error>?
@@ -29,13 +52,24 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
   // Async version - returns Promise<NitroResponse>
   func request(req: NitroRequest) throws -> Promise<NitroResponse> {
     let promise = Promise<NitroResponse>.init()
-    Task {
+    let requestId = req.requestId
+
+    let task = Task { [weak self] in
+      defer {
+        if let rid = requestId {
+          self?.removeTask(forKey: rid)
+        }
+      }
       do {
         let response = try await NitroFetchClient.requestStatic(req)
         promise.resolve(withResult: response)
       } catch {
         promise.reject(withError: error)
       }
+    }
+
+    if let rid = requestId {
+      storeTask(task, forKey: rid)
     }
     return promise
   }
