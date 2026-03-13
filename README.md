@@ -88,6 +88,60 @@ console.log('prefetched header:', res.headers.get('nitroPrefetched'))
 
 In our tests, prefetching alone yielded a **~220 ms** faster TTI (time-to-interactive) time! 🤯
 
+### AbortController
+
+Cancel in-flight requests using the standard `AbortController` API:
+
+```ts
+import { fetch } from 'react-native-nitro-fetch'
+
+const controller = new AbortController()
+
+// Abort after 500ms
+setTimeout(() => controller.abort(), 500)
+
+try {
+  const res = await fetch('https://httpbin.org/delay/20', {
+    signal: controller.signal,
+  })
+} catch (e) {
+  if (e.name === 'AbortError') {
+    console.log('Request was cancelled')
+  }
+}
+```
+
+Pre-aborted signals are also supported — the request will throw immediately without making a network call:
+
+```ts
+const controller = new AbortController()
+controller.abort()
+
+await fetch(url, { signal: controller.signal }) // throws AbortError
+```
+
+### FormData
+
+Upload files and form fields using `FormData`:
+
+```ts
+import { fetch } from 'react-native-nitro-fetch'
+
+const fd = new FormData()
+fd.append('username', 'nitro_user')
+fd.append('avatar', {
+  uri: 'file:///path/to/photo.jpg',
+  type: 'image/jpeg',
+  name: 'avatar.jpg',
+} as any)
+
+const res = await fetch('https://httpbin.org/post', {
+  method: 'POST',
+  body: fd,
+})
+const json = await res.json()
+```
+
 ### Worklet Mapping
 
 Since Nitro Fetch is a [Nitro Module](https://nitro.margelo.com), it can be used from Worklets.
