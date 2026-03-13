@@ -35,6 +35,8 @@ export default defineConfig([
       '**/metro.config.js',
       '**/react-native.config.js',
       '**/babel.config.js',
+      '.yarn/**',
+      'eslint.config.mjs',
     ],
   },
 ]);

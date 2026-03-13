@@ -1,31 +1,30 @@
 import {
-    androidPlatform,
-    androidEmulator,
-  } from '@react-native-harness/platform-android';
-  import {
-    applePlatform,
-    appleSimulator,
-  } from '@react-native-harness/platform-apple';
-  
-  const config = {
-    entryPoint: './index.js',
-    appRegistryComponentName: 'NitroFetchExample',
-  
-    runners: [
-      androidPlatform({
-        name: 'android',
-        device: androidEmulator('Pixel_8_API_35'), // Your Android emulator name
-        bundleId: 'nitrofetch.example', // Your Android bundle ID
-      }),
-      applePlatform({
-        name: 'ios',
-        device: appleSimulator('iPhone 17 Pro', '26.2'), // Your iOS simulator name and version
-        bundleId: 'nitrofetch.example', // Your iOS bundle ID
-      })
-    ],
-    defaultRunner: "android",
-    bridgeTimeout: 180000,
-  
-  };
-  
-  export default config;
+  androidPlatform,
+  androidEmulator,
+} from '@react-native-harness/platform-android';
+import {
+  applePlatform,
+  appleSimulator,
+} from '@react-native-harness/platform-apple';
+
+const config = {
+  entryPoint: './index.js',
+  appRegistryComponentName: 'NitroFetchExample',
+
+  runners: [
+    androidPlatform({
+      name: 'android',
+      device: androidEmulator('Pixel_8_API_35'), // Your Android emulator name
+      bundleId: 'nitrofetch.example', // Your Android bundle ID
+    }),
+    applePlatform({
+      name: 'ios',
+      device: appleSimulator('iPhone 17 Pro', '26.2'), // Your iOS simulator name and version
+      bundleId: 'nitrofetch.example', // Your iOS bundle ID
+    }),
+  ],
+  defaultRunner: 'android',
+  bridgeTimeout: 180000,
+};
+
+export default config;
