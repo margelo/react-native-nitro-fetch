@@ -13,6 +13,8 @@
 #include "HybridNitroFetchSpecSwift.hpp"
 #include "HybridNitroFetchClientSpecSwift.hpp"
 #include "HybridNativeStorageSpecSwift.hpp"
+#include "HybridNitroCronetSpecSwift.hpp"
+#include "HybridTextEncoding.hpp"
 
 @interface NitroFetchAutolinking : NSObject
 @end
@@ -42,6 +44,22 @@
     []() -> std::shared_ptr<HybridObject> {
       std::shared_ptr<HybridNativeStorageSpec> hybridObject = NitroFetch::NitroFetchAutolinking::createNativeStorage();
       return hybridObject;
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "NitroCronet",
+    []() -> std::shared_ptr<HybridObject> {
+      std::shared_ptr<HybridNitroCronetSpec> hybridObject = NitroFetch::NitroFetchAutolinking::createNitroCronet();
+      return hybridObject;
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "NitroTextEncoding",
+    []() -> std::shared_ptr<HybridObject> {
+      static_assert(std::is_default_constructible_v<HybridTextEncoding>,
+                    "The HybridObject \"HybridTextEncoding\" is not default-constructible! "
+                    "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
+      return std::make_shared<HybridTextEncoding>();
     }
   );
 }

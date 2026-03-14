@@ -15,10 +15,19 @@
 #include <fbjni/fbjni.h>
 #include <NitroModules/HybridObjectRegistry.hpp>
 
+#include "JHybridUrlRequestSpec.hpp"
+#include "JHybridUrlRequestBuilderSpec.hpp"
+#include "JFunc_void_UrlResponseInfo.hpp"
+#include "JFunc_void_std__optional_UrlResponseInfo__RequestException.hpp"
+#include "JFunc_void_std__optional_UrlResponseInfo_.hpp"
+#include "JFunc_void_UrlResponseInfo_std__string.hpp"
+#include "JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double.hpp"
+#include "JHybridNitroCronetSpec.hpp"
 #include "JHybridNitroFetchClientSpec.hpp"
 #include "JHybridNitroFetchSpec.hpp"
 #include "JHybridNativeStorageSpec.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
+#include "HybridTextEncoding.hpp"
 
 namespace margelo::nitro::nitrofetch {
 
@@ -29,6 +38,14 @@ int initialize(JavaVM* vm) {
 
   return facebook::jni::initialize(vm, [] {
     // Register native JNI methods
+    margelo::nitro::nitrofetch::JHybridUrlRequestSpec::registerNatives();
+    margelo::nitro::nitrofetch::JHybridUrlRequestBuilderSpec::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_cxx::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_std__optional_UrlResponseInfo__RequestException_cxx::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_std__optional_UrlResponseInfo__cxx::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_std__string_cxx::registerNatives();
+    margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double_cxx::registerNatives();
+    margelo::nitro::nitrofetch::JHybridNitroCronetSpec::registerNatives();
     margelo::nitro::nitrofetch::JHybridNitroFetchClientSpec::registerNatives();
     margelo::nitro::nitrofetch::JHybridNitroFetchSpec::registerNatives();
     margelo::nitro::nitrofetch::JHybridNativeStorageSpec::registerNatives();
@@ -56,6 +73,23 @@ int initialize(JavaVM* vm) {
         static DefaultConstructableObject<JHybridNativeStorageSpec::javaobject> object("com/margelo/nitro/nitrofetch/NativeStorage");
         auto instance = object.create();
         return instance->cthis()->shared();
+      }
+    );
+    HybridObjectRegistry::registerHybridObjectConstructor(
+      "NitroCronet",
+      []() -> std::shared_ptr<HybridObject> {
+        static DefaultConstructableObject<JHybridNitroCronetSpec::javaobject> object("com/margelo/nitro/nitrofetch/NitroCronet");
+        auto instance = object.create();
+        return instance->cthis()->shared();
+      }
+    );
+    HybridObjectRegistry::registerHybridObjectConstructor(
+      "NitroTextEncoding",
+      []() -> std::shared_ptr<HybridObject> {
+        static_assert(std::is_default_constructible_v<HybridTextEncoding>,
+                      "The HybridObject \"HybridTextEncoding\" is not default-constructible! "
+                      "Create a public constructor that takes zero arguments to be able to autolink this HybridObject.");
+        return std::make_shared<HybridTextEncoding>();
       }
     );
   });

@@ -1,3 +1,4 @@
+import 'web-streams-polyfill/polyfill';
 import type {
   NitroFetch as NitroFetchModule,
   NitroFormDataPart,
@@ -8,6 +9,7 @@ import type {
 import {
   boxedNitroFetch,
   NitroFetch as NitroFetchSingleton,
+  NitroCronetSingleton,
 } from './NitroInstances';
 import { NativeStorage as NativeStorageSingleton } from './NitroInstances';
 
@@ -456,10 +458,102 @@ class NitroHeaders {
   }
 }
 
-export async function nitroFetch(
+async function nitroStreamFetch(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<Response> {
+  const url = typeof input === 'string' ? input : String(input);
+  const method = init?.method?.toUpperCase() ?? 'GET';
+  const headers = headersToPairs(init?.headers);
+
+  const builder = NitroCronetSingleton.newUrlRequestBuilder(url);
+  builder.setHttpMethod(method);
+  headers?.forEach((h) => builder.addHeader(h.key, h.value));
+
+  const body = init?.body;
+  if (body != null) {
+    if (typeof body === 'string') builder.setUploadBody(body);
+    else if (body instanceof ArrayBuffer) builder.setUploadBody(body);
+  }
+
+  return new Promise((resolveResponse, rejectResponse) => {
+    let streamController: ReadableStreamDefaultController<Uint8Array>;
+
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        streamController = controller;
+      },
+    });
+
+    let responseResolved = false;
+
+    builder.onResponseStarted((info) => {
+      if (responseResolved) return;
+      responseResolved = true;
+      const status = info.httpStatusCode;
+      const responseHeaders = new NitroHeaders(
+        Object.entries(info.allHeaders).map(([key, value]) => ({ key, value }))
+      );
+      // Use a plain object — React Native's Response constructor does not
+      // propagate a ReadableStream to .body, so we set it explicitly.
+      const response: any = {
+        url: info.url,
+        ok: status >= 200 && status < 300,
+        status,
+        statusText: info.httpStatusText,
+        headers: responseHeaders,
+        redirected: false,
+        body: stream,
+        bodyUsed: false,
+      };
+      resolveResponse(response as Response);
+      // Android/Cronet: kick off the first buffer read.
+      // iOS/URLSession handles reading automatically so this is a no-op there.
+      request.read();
+    });
+
+    builder.onReadCompleted((_info, byteBuffer, bytesRead) => {
+      const chunk = new Uint8Array(byteBuffer, 0, bytesRead).slice();
+      streamController.enqueue(chunk);
+      if (!request.isDone()) {
+        request.read();
+      }
+    });
+
+    builder.onSucceeded(() => streamController.close());
+
+    builder.onFailed((_info, error) => {
+      const err = new Error(error.message);
+      if (!responseResolved) {
+        responseResolved = true;
+        rejectResponse(err);
+      } else {
+        streamController.error(err);
+      }
+    });
+
+    builder.onCanceled(() => {
+      const err = createAbortError();
+      if (!responseResolved) {
+        responseResolved = true;
+        rejectResponse(err);
+      } else {
+        streamController.error(err);
+      }
+    });
+
+    const request = builder.build();
+    request.start();
+  });
+}
+
+export async function nitroFetch(
+  input: RequestInfo | URL,
+  init?: RequestInit & { stream?: boolean }
+): Promise<Response> {
+  if ((init as any)?.stream === true) {
+    return nitroStreamFetch(input, init);
+  }
   const res = await nitroFetchRaw(input, init);
 
   const headersObj = new NitroHeaders(res.headers);

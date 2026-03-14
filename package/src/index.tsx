@@ -8,6 +8,7 @@ export {
 } from './fetch';
 export type { NitroFormDataPart, NitroRequest, NitroResponse } from './fetch';
 export { NitroFetch } from './NitroInstances';
+export { TextDecoder } from './TextDecoder';
 import './fetch';
 
 // Keep legacy export to avoid breaking any local tests/usages during scaffolding.

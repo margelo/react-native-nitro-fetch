@@ -19,6 +19,13 @@
     "NativeStorage": {
       "kotlin": "NativeStorage",
       "swift": "NativeStorage"
+    },
+    "NitroCronet": {
+      "kotlin": "NitroCronet",
+      "swift": "HybridNitroCronet"
+    },
+    "NitroTextEncoding": {
+      "cpp": "HybridTextEncoding"
     }
   },
   "ignorePaths": ["node_modules"]

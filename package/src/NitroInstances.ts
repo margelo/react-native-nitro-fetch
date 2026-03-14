@@ -3,6 +3,7 @@ import type {
   NitroFetch as NitroFetchType,
   NativeStorage as NativeStorageType,
 } from './NitroFetch.nitro';
+import type { NitroCronet } from './NitroCronet.nitro';
 
 // Create singletons once per JS runtime
 export const NitroFetch: NitroFetchType =
@@ -12,3 +13,6 @@ export const NativeStorage: NativeStorageType =
   NitroModules.createHybridObject<NativeStorageType>('NativeStorage');
 
 export const boxedNitroFetch = NitroModules.box(NitroFetch);
+
+export const NitroCronetSingleton =
+  NitroModules.createHybridObject<NitroCronet>('NitroCronet');
