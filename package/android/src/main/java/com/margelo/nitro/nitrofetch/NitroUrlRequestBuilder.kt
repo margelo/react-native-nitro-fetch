@@ -2,6 +2,7 @@ package com.margelo.nitro.nitrofetch
 
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.core.ArrayBuffer
+import com.margelo.nitro.core.Promise
 import org.chromium.net.CronetEngine
 import org.chromium.net.UrlRequest as CronetUrlRequest
 import org.chromium.net.UrlResponseInfo as CronetUrlResponseInfo
@@ -153,6 +154,81 @@ class NitroUrlRequestBuilder(
     }
 
     builder.setUploadDataProvider(provider, executor)
+  }
+
+  override fun setUploadBodyFormData(parts: Array<NitroFormDataPart>): Promise<Unit> {
+    return Promise.async {
+      val (bodyBytes, contentType) = buildMultipartBody(parts)
+
+      // Set Content-Type header with boundary
+      builder.addHeader("Content-Type", contentType)
+
+      val provider = object : org.chromium.net.UploadDataProvider() {
+        private var position = 0
+
+        override fun getLength(): Long = bodyBytes.size.toLong()
+
+        override fun read(uploadDataSink: org.chromium.net.UploadDataSink, byteBuffer: ByteBuffer) {
+          val remaining = bodyBytes.size - position
+          val toWrite = minOf(byteBuffer.remaining(), remaining)
+          if (toWrite > 0) {
+            byteBuffer.put(bodyBytes, position, toWrite)
+            position += toWrite
+          }
+          uploadDataSink.onReadSucceeded(false)
+        }
+
+        override fun rewind(uploadDataSink: org.chromium.net.UploadDataSink) {
+          position = 0
+          uploadDataSink.onRewindSucceeded()
+        }
+      }
+
+      builder.setUploadDataProvider(provider, executor)
+    }
+  }
+
+  private fun buildMultipartBody(parts: Array<NitroFormDataPart>): Pair<ByteArray, String> {
+    val boundary = "NitroFetch-${java.util.UUID.randomUUID()}"
+    val out = java.io.ByteArrayOutputStream()
+
+    for (part in parts) {
+      out.write("--$boundary\r\n".toByteArray())
+
+      val fileUri = part.fileUri
+      if (fileUri != null) {
+        val fileName = part.fileName ?: "file"
+        val mimeType = part.mimeType ?: "application/octet-stream"
+        out.write("Content-Disposition: form-data; name=\"${part.name}\"; filename=\"$fileName\"\r\n".toByteArray())
+        out.write("Content-Type: $mimeType\r\n\r\n".toByteArray())
+        out.write(readFileBytes(fileUri))
+      } else {
+        val value = part.value ?: ""
+        out.write("Content-Disposition: form-data; name=\"${part.name}\"\r\n\r\n".toByteArray())
+        out.write(value.toByteArray(Charsets.UTF_8))
+      }
+
+      out.write("\r\n".toByteArray())
+    }
+
+    out.write("--$boundary--\r\n".toByteArray())
+
+    return Pair(out.toByteArray(), "multipart/form-data; boundary=$boundary")
+  }
+
+  private fun readFileBytes(uri: String): ByteArray {
+    return if (uri.startsWith("http://") || uri.startsWith("https://")) {
+      // For remote URLs, download the bytes
+      val connection = java.net.URL(uri).openConnection() as java.net.HttpURLConnection
+      connection.connect()
+      val bytes = connection.inputStream.readBytes()
+      connection.disconnect()
+      bytes
+    } else {
+      // Local file URI - strip file:// prefix if present
+      val path = uri.removePrefix("file://")
+      java.io.File(path).readBytes()
+    }
   }
 
 

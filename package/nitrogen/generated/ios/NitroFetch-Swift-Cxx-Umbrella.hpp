@@ -30,6 +30,8 @@ namespace margelo::nitro::nitrofetch { class HybridNitroFetchCacheSpec; }
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestBuilderSpec; }
 // Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
+// Forward declaration of `NitroFormDataPart` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 // Forward declaration of `RequestException` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct RequestException; }
 // Forward declaration of `SyncFetchResponse` to properly resolve imports.
@@ -48,6 +50,7 @@ namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 #include "HybridNitroFetchCacheSpec.hpp"
 #include "HybridUrlRequestBuilderSpec.hpp"
 #include "HybridUrlRequestSpec.hpp"
+#include "NitroFormDataPart.hpp"
 #include "RequestException.hpp"
 #include "SyncFetchResponse.hpp"
 #include "UrlResponseInfo.hpp"

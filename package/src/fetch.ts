@@ -25,7 +25,7 @@ export const boxedNitroCronet = NitroModules.box(NitroCronet);
 export interface FetchOptions {
   method?: string;
   headers?: Record<string, string>;
-  body?: ArrayBuffer | Uint8Array | string;
+  body?: ArrayBuffer | Uint8Array | string | FormData;
   cache?: 'default' | 'no-cache';
   signal?: AbortSignal;
 }
@@ -38,6 +38,11 @@ export interface PrefetchOptions {
   prefetchKey: string;
   maxAge?: number;
 }
+
+export type WorkletRuntimeOptions = {
+  runtimeName?: string;
+  preferBytes?: boolean;
+};
 
 export class FetchResponse {
   private _info: UrlResponseInfo;
@@ -200,7 +205,20 @@ export class FetchResponse {
   }
 }
 
-export async function prefetch(options: PrefetchOptions): Promise<void> {
+export async function prefetch(
+  urlOrOptions: string | PrefetchOptions,
+  init?: Omit<PrefetchOptions, 'url'>
+): Promise<void> {
+  let options: PrefetchOptions;
+  if (typeof urlOrOptions === 'string') {
+    if (!init?.prefetchKey && !init?.headers?.prefetchKey) {
+      throw new Error('prefetch requires a prefetchKey in options or headers');
+    }
+    options = { ...init, url: urlOrOptions, prefetchKey: init?.prefetchKey ?? '' };
+  } else {
+    options = urlOrOptions;
+  }
+
   const {
     url,
     method = 'GET',
@@ -210,12 +228,16 @@ export async function prefetch(options: PrefetchOptions): Promise<void> {
     maxAge = 5000,
   } = options;
 
+  if (!prefetchKey && !headers?.prefetchKey) {
+    throw new Error('prefetch requires a prefetchKey in options or headers');
+  }
+
   const headersWithKey = {
     ...headers,
-    prefetchKey,
+    ...(prefetchKey ? { prefetchKey } : {}),
   };
 
-  await NitroCronet.prefetch(url, method, headersWithKey, body, maxAge);
+  await NitroCronet.prefetch(url, method, headersWithKey, body as ArrayBuffer | string | undefined, maxAge);
 }
 
 export async function prefetchOnAppStart(
@@ -339,7 +361,7 @@ export async function fetchOnWorklet<T>(
   url: string,
   options: FetchOptions | undefined,
   mapWorklet: WorkletMapper<T>,
-  runtimeOptions?: { runtimeName?: string }
+  runtimeOptions?: WorkletRuntimeOptions
 ): Promise<T> {
   let rt: any | undefined;
   let Worklets: any | undefined;
@@ -440,6 +462,55 @@ async function tryConsumePrefetch(
   }
 }
 
+import type { NitroFormDataPart } from './NitroCronet.nitro';
+
+function serializeFormData(fd: FormData): NitroFormDataPart[] {
+  const parts: NitroFormDataPart[] = [];
+  if (typeof (fd as any).getParts === 'function') {
+    const rnParts: any[] = (fd as any).getParts();
+    for (const part of rnParts) {
+      if (part.string !== undefined) {
+        parts.push({ name: part.fieldName, value: String(part.string) });
+      } else if (part.uri) {
+        parts.push({
+          name: part.fieldName,
+          fileUri: part.uri,
+          fileName: part.name ?? 'file',
+          mimeType: part.type ?? 'application/octet-stream',
+        });
+      }
+    }
+  } else {
+    // Web fallback if polyfilled correctly (rare in React Native without NetworkModule)
+    fd.forEach((value, key) => {
+      if (typeof value === 'string') {
+        parts.push({ name: key, value });
+      } else {
+        parts.push({
+          name: key,
+          fileUri: (value as any).uri ?? (value as unknown as File).name,
+          fileName: (value as unknown as File).name ?? 'file',
+          mimeType: value.type ?? 'application/octet-stream',
+        });
+      }
+    });
+  }
+  return parts;
+}
+
+function isFormData(body: any): boolean {
+  if (!body) return false;
+  if (typeof FormData !== 'undefined' && body instanceof FormData) return true;
+  if (
+    typeof body === 'object' &&
+    typeof (body as any).append === 'function' &&
+    typeof (body as any).getParts === 'function'
+  ) {
+    return true;
+  }
+  return false;
+}
+
 export async function fetch(
   url: string,
   options?: FetchOptions
@@ -448,6 +519,8 @@ export async function fetch(
   if (options?.signal?.aborted) {
     return Promise.reject(new AbortError());
   }
+
+
 
   const prefetchKey = options?.headers?.prefetchKey;
   if (prefetchKey) {
@@ -563,38 +636,61 @@ export async function fetch(
       builder.disableCache();
     }
 
+    let hasContentType = false;
     if (options?.headers) {
       const headers = new Headers(options.headers);
       headers.forEach((value, key) => {
         builder.addHeader(key, value);
+        if (key.toLowerCase() === 'content-type') {
+          hasContentType = true;
+        }
       });
     }
 
-    // Handle request body if provided
-    if (options?.body) {
-      if (typeof options.body === 'string') {
-        builder.setUploadBody(options.body);
-      } else if (options.body instanceof ArrayBuffer) {
-        builder.setUploadBody(options.body);
-      } else {
-        // Uint8Array - convert to ArrayBuffer
-        const arrayBuffer = options.body.buffer.slice(
-          options.body.byteOffset,
-          options.body.byteOffset + options.body.byteLength
-        ) as ArrayBuffer;
-        builder.setUploadBody(arrayBuffer);
+    // Handle request body configuration asynchronously if needed
+    (async () => {
+      try {
+        if (options?.body) {
+          if (isFormData(options.body)) {
+            // Native serialization for FormData (multi-part generation)
+            const parts = serializeFormData(options.body as FormData);
+            await builder.setUploadBodyFormData(parts);
+          } else {
+            // Cronet crashes on upload bodies missing a Content-Type, so we supply a default here.
+            if (!hasContentType) {
+              builder.addHeader('Content-Type', 'text/plain;charset=UTF-8');
+            }
+
+            if (typeof options.body === 'string') {
+              builder.setUploadBody(options.body);
+            } else if (options.body instanceof ArrayBuffer) {
+              builder.setUploadBody(options.body);
+            } else if (ArrayBuffer.isView(options.body)) {
+              const arrayBuffer = options.body.buffer.slice(
+                options.body.byteOffset,
+                options.body.byteOffset + options.body.byteLength
+              ) as ArrayBuffer;
+              builder.setUploadBody(arrayBuffer);
+            } else {
+              builder.setUploadBody(JSON.stringify(options.body));
+            }
+          }
+        }
+
+        request = builder.build();
+
+        // Check if aborted before starting
+        if (options?.signal?.aborted) {
+          cleanup();
+          reject(new AbortError());
+          return;
+        }
+
+        request.start();
+      } catch (err) {
+        cleanup();
+        reject(err);
       }
-    }
-
-    request = builder.build();
-
-    // Check if aborted before starting
-    if (options?.signal?.aborted) {
-      cleanup();
-      reject(new AbortError());
-      return;
-    }
-
-    request.start();
+    })();
   });
 }

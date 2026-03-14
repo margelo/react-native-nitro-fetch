@@ -11,6 +11,8 @@
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
 // Forward declaration of `ArrayBuffer` to properly resolve imports.
 namespace NitroModules { class ArrayBuffer; }
+// Forward declaration of `NitroFormDataPart` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 // Forward declaration of `UrlResponseInfo` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 // Forward declaration of `HttpHeader` to properly resolve imports.
@@ -22,6 +24,8 @@ namespace margelo::nitro::nitrofetch { enum class ExceptionPlatform; }
 // Forward declaration of `ErrorType` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { enum class ErrorType; }
 
+#include <NitroModules/Promise.hpp>
+#include <NitroModules/JPromise.hpp>
 #include <memory>
 #include "HybridUrlRequestSpec.hpp"
 #include "JHybridUrlRequestSpec.hpp"
@@ -31,15 +35,17 @@ namespace margelo::nitro::nitrofetch { enum class ErrorType; }
 #include "JVariant_String_ArrayBuffer.hpp"
 #include <NitroModules/JArrayBuffer.hpp>
 #include <NitroModules/JUnit.hpp>
+#include "NitroFormDataPart.hpp"
+#include <vector>
+#include "JNitroFormDataPart.hpp"
+#include <optional>
 #include "UrlResponseInfo.hpp"
 #include <functional>
 #include "JFunc_void_UrlResponseInfo.hpp"
 #include "JUrlResponseInfo.hpp"
 #include <unordered_map>
 #include "HttpHeader.hpp"
-#include <vector>
 #include "JHttpHeader.hpp"
-#include <optional>
 #include "RequestException.hpp"
 #include "JFunc_void_std__optional_UrlResponseInfo__RequestException.hpp"
 #include "JRequestException.hpp"
@@ -88,6 +94,29 @@ namespace margelo::nitro::nitrofetch {
   void JHybridUrlRequestBuilderSpec::setUploadBody(const std::variant<std::string, std::shared_ptr<ArrayBuffer>>& body) {
     static const auto method = javaClassStatic()->getMethod<void(jni::alias_ref<JVariant_String_ArrayBuffer> /* body */)>("setUploadBody");
     method(_javaPart, JVariant_String_ArrayBuffer::fromCpp(body));
+  }
+  std::shared_ptr<Promise<void>> JHybridUrlRequestBuilderSpec::setUploadBodyFormData(const std::vector<NitroFormDataPart>& parts) {
+    static const auto method = javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JArrayClass<JNitroFormDataPart>> /* parts */)>("setUploadBodyFormData");
+    auto __result = method(_javaPart, [&]() {
+      size_t __size = parts.size();
+      jni::local_ref<jni::JArrayClass<JNitroFormDataPart>> __array = jni::JArrayClass<JNitroFormDataPart>::newArray(__size);
+      for (size_t __i = 0; __i < __size; __i++) {
+        const auto& __element = parts[__i];
+        __array->setElement(__i, *JNitroFormDataPart::fromCpp(__element));
+      }
+      return __array;
+    }());
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
   }
   void JHybridUrlRequestBuilderSpec::disableCache() {
     static const auto method = javaClassStatic()->getMethod<void()>("disableCache");

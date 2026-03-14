@@ -80,6 +80,54 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     }
   }
 
+  func setUploadBodyFormData(parts: [NitroFormDataPart]) -> Promise<Void> {
+    return Promise.async {
+      let (bodyData, contentType) = try await HybridUrlRequestBuilder.buildMultipartBody(parts)
+      self.urlRequest.setValue(contentType, forHTTPHeaderField: "Content-Type")
+      self.urlRequest.httpBody = bodyData
+    }
+  }
+
+  private static func buildMultipartBody(_ parts: [NitroFormDataPart]) async throws -> (Data, String) {
+    let boundary = "NitroFetch-\(UUID().uuidString)"
+    var body = Data()
+    let crlf = "\r\n"
+
+    for part in parts {
+      body.append("--\(boundary)\(crlf)".data(using: .utf8)!)
+
+      if let fileUri = part.fileUri {
+        let fileName = part.fileName ?? "file"
+        let mimeType = part.mimeType ?? "application/octet-stream"
+        body.append("Content-Disposition: form-data; name=\"\(part.name)\"; filename=\"\(fileName)\"\(crlf)".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\(crlf)\(crlf)".data(using: .utf8)!)
+        let fileData = try await readFileData(fileUri)
+        body.append(fileData)
+      } else {
+        let value = part.value ?? ""
+        body.append("Content-Disposition: form-data; name=\"\(part.name)\"\(crlf)\(crlf)".data(using: .utf8)!)
+        body.append(value.data(using: .utf8)!)
+      }
+
+      body.append(crlf.data(using: .utf8)!)
+    }
+
+    body.append("--\(boundary)--\(crlf)".data(using: .utf8)!)
+
+    return (body, "multipart/form-data; boundary=\(boundary)")
+  }
+
+  private static func readFileData(_ uri: String) async throws -> Data {
+    if uri.hasPrefix("http://") || uri.hasPrefix("https://") {
+      let url = URL(string: uri)!
+      let (data, _) = try await URLSession.shared.data(from: url)
+      return data
+    } else {
+      let path = uri.hasPrefix("file://") ? String(uri.dropFirst(7)) : uri
+      return try Data(contentsOf: URL(fileURLWithPath: path))
+    }
+  }
+
   func disableCache() throws {
     self.urlRequest.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
   }

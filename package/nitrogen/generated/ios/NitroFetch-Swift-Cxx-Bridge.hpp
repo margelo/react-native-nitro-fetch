@@ -32,6 +32,8 @@ namespace margelo::nitro::nitrofetch { class HybridNitroFetchCacheSpec; }
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestBuilderSpec; }
 // Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
+// Forward declaration of `NitroFormDataPart` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 // Forward declaration of `RequestException` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct RequestException; }
 // Forward declaration of `SyncFetchResponse` to properly resolve imports.
@@ -62,6 +64,7 @@ namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 #include "HybridNitroFetchCacheSpec.hpp"
 #include "HybridUrlRequestBuilderSpec.hpp"
 #include "HybridUrlRequestSpec.hpp"
+#include "NitroFormDataPart.hpp"
 #include "RequestException.hpp"
 #include "SyncFetchResponse.hpp"
 #include "UrlResponseInfo.hpp"
@@ -166,6 +169,89 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return std__variant_std__string__std__shared_ptr_ArrayBuffer__(value);
   }
   
+  // pragma MARK: std::shared_ptr<Promise<void>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<void>>`.
+   */
+  using std__shared_ptr_Promise_void__ = std::shared_ptr<Promise<void>>;
+  inline std::shared_ptr<Promise<void>> create_std__shared_ptr_Promise_void__() noexcept {
+    return Promise<void>::create();
+  }
+  inline PromiseHolder<void> wrap_std__shared_ptr_Promise_void__(std::shared_ptr<Promise<void>> promise) noexcept {
+    return PromiseHolder<void>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void()>
+  /**
+   * Specialized version of `std::function<void()>`.
+   */
+  using Func_void = std::function<void()>;
+  /**
+   * Wrapper class for a `std::function<void()>`, this can be used from Swift.
+   */
+  class Func_void_Wrapper final {
+  public:
+    explicit Func_void_Wrapper(std::function<void()>&& func): _function(std::make_unique<std::function<void()>>(std::move(func))) {}
+    inline void call() const noexcept {
+      _function->operator()();
+    }
+  private:
+    std::unique_ptr<std::function<void()>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_Wrapper wrap_Func_void(Func_void value) noexcept {
+    return Func_void_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>
+  /**
+   * Specialized version of `std::function<void(const std::exception_ptr&)>`.
+   */
+  using Func_void_std__exception_ptr = std::function<void(const std::exception_ptr& /* error */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::exception_ptr& / * error * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__exception_ptr_Wrapper final {
+  public:
+    explicit Func_void_std__exception_ptr_Wrapper(std::function<void(const std::exception_ptr& /* error */)>&& func): _function(std::make_unique<std::function<void(const std::exception_ptr& /* error */)>>(std::move(func))) {}
+    inline void call(std::exception_ptr error) const noexcept {
+      _function->operator()(error);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::exception_ptr& /* error */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__exception_ptr_Wrapper wrap_Func_void_std__exception_ptr(Func_void_std__exception_ptr value) noexcept {
+    return Func_void_std__exception_ptr_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::optional<std::string>
+  /**
+   * Specialized version of `std::optional<std::string>`.
+   */
+  using std__optional_std__string_ = std::optional<std::string>;
+  inline std::optional<std::string> create_std__optional_std__string_(const std::string& value) noexcept {
+    return std::optional<std::string>(value);
+  }
+  inline bool has_value_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline std::string get_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
+    return *optional;
+  }
+  
+  // pragma MARK: std::vector<NitroFormDataPart>
+  /**
+   * Specialized version of `std::vector<NitroFormDataPart>`.
+   */
+  using std__vector_NitroFormDataPart_ = std::vector<NitroFormDataPart>;
+  inline std::vector<NitroFormDataPart> copy_std__vector_NitroFormDataPart_(const NitroFormDataPart* CONTIGUOUS_MEMORY NON_NULL data, size_t size) noexcept {
+    return margelo::nitro::FastVectorCopy<NitroFormDataPart>(data, size);
+  }
+  inline const NitroFormDataPart* CONTIGUOUS_MEMORY NON_NULL get_data_std__vector_NitroFormDataPart_(const std::vector<NitroFormDataPart>& vector) noexcept {
+    return vector.data();
+  }
+  
   // pragma MARK: std::unordered_map<std::string, std::string>
   /**
    * Specialized version of `std::unordered_map<std::string, std::string>`.
@@ -263,21 +349,6 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return optional.has_value();
   }
   inline double get_std__optional_double_(const std::optional<double>& optional) noexcept {
-    return *optional;
-  }
-  
-  // pragma MARK: std::optional<std::string>
-  /**
-   * Specialized version of `std::optional<std::string>`.
-   */
-  using std__optional_std__string_ = std::optional<std::string>;
-  inline std::optional<std::string> create_std__optional_std__string_(const std::string& value) noexcept {
-    return std::optional<std::string>(value);
-  }
-  inline bool has_value_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
-    return optional.has_value();
-  }
-  inline std::string get_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
     return *optional;
   }
   
@@ -381,6 +452,15 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   using std__weak_ptr_HybridUrlRequestBuilderSpec_ = std::weak_ptr<HybridUrlRequestBuilderSpec>;
   inline std__weak_ptr_HybridUrlRequestBuilderSpec_ weakify_std__shared_ptr_HybridUrlRequestBuilderSpec_(const std::shared_ptr<HybridUrlRequestBuilderSpec>& strong) noexcept { return strong; }
   
+  // pragma MARK: Result<std::shared_ptr<Promise<void>>>
+  using Result_std__shared_ptr_Promise_void___ = Result<std::shared_ptr<Promise<void>>>;
+  inline Result_std__shared_ptr_Promise_void___ create_Result_std__shared_ptr_Promise_void___(const std::shared_ptr<Promise<void>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<void>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_void___ create_Result_std__shared_ptr_Promise_void___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<void>>>::withError(error);
+  }
+  
   // pragma MARK: Result<std::shared_ptr<HybridUrlRequestSpec>>
   using Result_std__shared_ptr_HybridUrlRequestSpec__ = Result<std::shared_ptr<HybridUrlRequestSpec>>;
   inline Result_std__shared_ptr_HybridUrlRequestSpec__ create_Result_std__shared_ptr_HybridUrlRequestSpec__(const std::shared_ptr<HybridUrlRequestSpec>& value) noexcept {
@@ -388,62 +468,6 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   }
   inline Result_std__shared_ptr_HybridUrlRequestSpec__ create_Result_std__shared_ptr_HybridUrlRequestSpec__(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<HybridUrlRequestSpec>>::withError(error);
-  }
-  
-  // pragma MARK: std::shared_ptr<Promise<void>>
-  /**
-   * Specialized version of `std::shared_ptr<Promise<void>>`.
-   */
-  using std__shared_ptr_Promise_void__ = std::shared_ptr<Promise<void>>;
-  inline std::shared_ptr<Promise<void>> create_std__shared_ptr_Promise_void__() noexcept {
-    return Promise<void>::create();
-  }
-  inline PromiseHolder<void> wrap_std__shared_ptr_Promise_void__(std::shared_ptr<Promise<void>> promise) noexcept {
-    return PromiseHolder<void>(std::move(promise));
-  }
-  
-  // pragma MARK: std::function<void()>
-  /**
-   * Specialized version of `std::function<void()>`.
-   */
-  using Func_void = std::function<void()>;
-  /**
-   * Wrapper class for a `std::function<void()>`, this can be used from Swift.
-   */
-  class Func_void_Wrapper final {
-  public:
-    explicit Func_void_Wrapper(std::function<void()>&& func): _function(std::make_unique<std::function<void()>>(std::move(func))) {}
-    inline void call() const noexcept {
-      _function->operator()();
-    }
-  private:
-    std::unique_ptr<std::function<void()>> _function;
-  } SWIFT_NONCOPYABLE;
-  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept;
-  inline Func_void_Wrapper wrap_Func_void(Func_void value) noexcept {
-    return Func_void_Wrapper(std::move(value));
-  }
-  
-  // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>
-  /**
-   * Specialized version of `std::function<void(const std::exception_ptr&)>`.
-   */
-  using Func_void_std__exception_ptr = std::function<void(const std::exception_ptr& /* error */)>;
-  /**
-   * Wrapper class for a `std::function<void(const std::exception_ptr& / * error * /)>`, this can be used from Swift.
-   */
-  class Func_void_std__exception_ptr_Wrapper final {
-  public:
-    explicit Func_void_std__exception_ptr_Wrapper(std::function<void(const std::exception_ptr& /* error */)>&& func): _function(std::make_unique<std::function<void(const std::exception_ptr& /* error */)>>(std::move(func))) {}
-    inline void call(std::exception_ptr error) const noexcept {
-      _function->operator()(error);
-    }
-  private:
-    std::unique_ptr<std::function<void(const std::exception_ptr& /* error */)>> _function;
-  } SWIFT_NONCOPYABLE;
-  Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept;
-  inline Func_void_std__exception_ptr_Wrapper wrap_Func_void_std__exception_ptr(Func_void_std__exception_ptr value) noexcept {
-    return Func_void_std__exception_ptr_Wrapper(std::move(value));
   }
   
   // pragma MARK: std::optional<std::variant<std::string, std::shared_ptr<ArrayBuffer>>>
@@ -529,15 +553,6 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   }
   inline Result_std__shared_ptr_HybridUrlRequestBuilderSpec__ create_Result_std__shared_ptr_HybridUrlRequestBuilderSpec__(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<HybridUrlRequestBuilderSpec>>::withError(error);
-  }
-  
-  // pragma MARK: Result<std::shared_ptr<Promise<void>>>
-  using Result_std__shared_ptr_Promise_void___ = Result<std::shared_ptr<Promise<void>>>;
-  inline Result_std__shared_ptr_Promise_void___ create_Result_std__shared_ptr_Promise_void___(const std::shared_ptr<Promise<void>>& value) noexcept {
-    return Result<std::shared_ptr<Promise<void>>>::withValue(value);
-  }
-  inline Result_std__shared_ptr_Promise_void___ create_Result_std__shared_ptr_Promise_void___(const std::exception_ptr& error) noexcept {
-    return Result<std::shared_ptr<Promise<void>>>::withError(error);
   }
   
   // pragma MARK: Result<SyncFetchResponse>

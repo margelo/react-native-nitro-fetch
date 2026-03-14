@@ -54,6 +54,10 @@ abstract class HybridUrlRequestBuilderSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun setUploadBodyFormData(parts: Array<NitroFormDataPart>): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
   abstract fun disableCache(): Unit
   
   @DoNotStrip

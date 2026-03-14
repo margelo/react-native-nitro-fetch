@@ -15,6 +15,8 @@
 
 // Forward declaration of `ArrayBuffer` to properly resolve imports.
 namespace NitroModules { class ArrayBuffer; }
+// Forward declaration of `NitroFormDataPart` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 // Forward declaration of `UrlResponseInfo` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 // Forward declaration of `RequestException` to properly resolve imports.
@@ -25,6 +27,9 @@ namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
 #include <string>
 #include <NitroModules/ArrayBuffer.hpp>
 #include <variant>
+#include <NitroModules/Promise.hpp>
+#include "NitroFormDataPart.hpp"
+#include <vector>
 #include "UrlResponseInfo.hpp"
 #include <functional>
 #include <optional>
@@ -66,6 +71,7 @@ namespace margelo::nitro::nitrofetch {
       virtual void setHttpMethod(const std::string& httpMethod) = 0;
       virtual void addHeader(const std::string& name, const std::string& value) = 0;
       virtual void setUploadBody(const std::variant<std::string, std::shared_ptr<ArrayBuffer>>& body) = 0;
+      virtual std::shared_ptr<Promise<void>> setUploadBodyFormData(const std::vector<NitroFormDataPart>& parts) = 0;
       virtual void disableCache() = 0;
       virtual void setPriority(double priority) = 0;
       virtual void allowDirectExecutor() = 0;

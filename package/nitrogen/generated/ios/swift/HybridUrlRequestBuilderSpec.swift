@@ -17,6 +17,7 @@ public protocol HybridUrlRequestBuilderSpec_protocol: HybridObject {
   func setHttpMethod(httpMethod: String) throws -> Void
   func addHeader(name: String, value: String) throws -> Void
   func setUploadBody(body: Variant_String_ArrayBuffer) throws -> Void
+  func setUploadBodyFormData(parts: [NitroFormDataPart]) throws -> Promise<Void>
   func disableCache() throws -> Void
   func setPriority(priority: Double) throws -> Void
   func allowDirectExecutor() throws -> Void

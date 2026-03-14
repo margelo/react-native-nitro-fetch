@@ -8,7 +8,7 @@
 package com.margelo.nitro.nitrofetch
 
 import com.facebook.proguard.annotations.DoNotStrip
-
+import com.margelo.nitro.core.ArrayBuffer
 
 /**
  * Represents the TypeScript variant "String|ArrayBuffer".

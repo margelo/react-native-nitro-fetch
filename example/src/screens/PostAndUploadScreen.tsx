@@ -102,6 +102,7 @@ export function PostAndUploadScreen() {
           `\nText fields: ${Object.keys(json.form ?? {}).join(', ')}`
       );
     } catch (e: any) {
+      console.error(e);
       logResult(`Image FormData error: ${e?.message ?? String(e)}`);
     }
   };

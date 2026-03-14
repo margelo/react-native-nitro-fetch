@@ -49,6 +49,22 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return swiftPart.toUnsafe();
   }
   
+  // pragma MARK: std::function<void()>
+  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)]() mutable -> void {
+      swiftClosure.call();
+    };
+  }
+  
+  // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>
+  Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_std__exception_ptr::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::exception_ptr& error) mutable -> void {
+      swiftClosure.call(error);
+    };
+  }
+  
   // pragma MARK: std::function<void(const UrlResponseInfo& /* info */)>
   Func_void_UrlResponseInfo create_Func_void_UrlResponseInfo(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = NitroFetch::Func_void_UrlResponseInfo::fromUnsafe(swiftClosureWrapper);
@@ -103,22 +119,6 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     #endif
     NitroFetch::HybridUrlRequestBuilderSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
     return swiftPart.toUnsafe();
-  }
-  
-  // pragma MARK: std::function<void()>
-  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = NitroFetch::Func_void::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)]() mutable -> void {
-      swiftClosure.call();
-    };
-  }
-  
-  // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>
-  Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = NitroFetch::Func_void_std__exception_ptr::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)](const std::exception_ptr& error) mutable -> void {
-      swiftClosure.call(error);
-    };
   }
   
   // pragma MARK: std::function<void(const std::optional<CachedFetchResponse>& /* result */)>

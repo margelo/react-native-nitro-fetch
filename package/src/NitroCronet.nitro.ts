@@ -6,6 +6,14 @@ export interface HttpHeader {
     value: string;
 }
 
+export interface NitroFormDataPart {
+    name: string;
+    value?: string;
+    fileUri?: string;
+    fileName?: string;
+    mimeType?: string;
+}
+
 export interface UrlResponseInfo {
     url: string;
     httpStatusCode: number;
@@ -34,6 +42,7 @@ export interface UrlRequestBuilder
     setHttpMethod(httpMethod: string): void;
     addHeader(name: string, value: string): void;
     setUploadBody(body: ArrayBuffer | string): void;
+    setUploadBodyFormData(parts: NitroFormDataPart[]): Promise<void>;
     disableCache(): void;
     setPriority(priority: number): void; // 0=IDLE, 1=LOWEST, 2=LOW, 3=MEDIUM, 4=HIGHEST
     allowDirectExecutor(): void;
