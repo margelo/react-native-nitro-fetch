@@ -96,6 +96,7 @@
         "release-it": "^17.10.0",
         "turbo": "^1.10.7",
         "typescript": "^5.8.3",
+        "web-streams-polyfill": "^4.2.0",
       },
       "peerDependencies": {
         "react": "*",
@@ -2171,6 +2172,8 @@
     "warn-once": ["warn-once@0.1.1", "", {}, "sha512-VkQZJbO8zVImzYFteBXvBOZEl1qL175WH8VmZcxF2fZAoudNhNDvHi+doCaAEdU2l2vtcIwa2zn0QK5+I1HQ3Q=="],
 
     "wcwidth": ["wcwidth@1.0.1", "", { "dependencies": { "defaults": "^1.0.3" } }, "sha512-XHPEwS0q6TaxcvG85+8EYkbiCux2XtWG2mkc47Ng2A77BQu9+DqIOJldST4HgPkuea7dvKSj5VgX3P1d4rW8Tg=="],
+
+    "web-streams-polyfill": ["web-streams-polyfill@4.2.0", "", {}, "sha512-0rYDzGOh9EZpig92umN5g5D/9A1Kff7k0/mzPSSCY8jEQeYkgRMoY7LhbXtUCWzLCMX0TUE9aoHkjFNB7D9pfA=="],
 
     "whatwg-fetch": ["whatwg-fetch@3.6.20", "", {}, "sha512-EqhiFU6daOA8kpjOWTL0olhVOF3i7OrFzSYiGsEMB8GcXS+RrzauAERX65xMeNWVqxA6HXH2m69Z9LaKKdisfg=="],
 

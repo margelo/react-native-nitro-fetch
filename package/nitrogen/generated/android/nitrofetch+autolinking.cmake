@@ -36,6 +36,8 @@ target_sources(
   ../nitrogen/generated/shared/c++/HybridNitroFetchClientSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNitroFetchSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNativeStorageSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridNitroTextDecoderSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridNitroTextEncodingSpec.cpp
   # Android-specific Nitrogen C++ sources
   ../nitrogen/generated/android/c++/JHybridNitroFetchClientSpec.cpp
   ../nitrogen/generated/android/c++/JHybridNitroFetchSpec.cpp
