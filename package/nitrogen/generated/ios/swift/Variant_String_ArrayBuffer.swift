@@ -11,6 +11,7 @@
  * An Swift enum with associated values representing a Variant/Union type.
  * JS type: `string | array-buffer`
  */
+import NitroModules
 @frozen
 public indirect enum Variant_String_ArrayBuffer {
   case first(String)

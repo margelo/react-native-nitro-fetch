@@ -80,7 +80,7 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     }
   }
 
-  func setUploadBodyFormData(parts: [NitroFormDataPart]) -> Promise<Void> {
+  func setUploadBodyFormData(parts: [NitroFormDataPart]) throws -> Promise<Void> {
     return Promise.async {
       let (bodyData, contentType) = try await HybridUrlRequestBuilder.buildMultipartBody(parts)
       self.urlRequest.setValue(contentType, forHTTPHeaderField: "Content-Type")

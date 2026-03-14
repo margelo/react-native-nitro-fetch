@@ -36,132 +36,122 @@ class HybridNitroCronet: HybridNitroCronetSpec {
     body: Variant_String_ArrayBuffer?,
     maxAge: Double
   ) throws -> Promise<Void> {
-    let promise = Promise<Void>()
     let maxAgeMs = Int64(maxAge)
 
     // Extract prefetchKey from headers
-    let prefetchKey = headers.first { key, _ in
+    let prefetchKey = headers.first { (key, _) in
       key.caseInsensitiveCompare("prefetchKey") == .orderedSame
     }?.value
 
     guard let prefetchKey = prefetchKey, !prefetchKey.isEmpty else {
-      promise.reject(withError: NSError(
+      throw NSError(
         domain: "HybridNitroCronet",
         code: -1,
         userInfo: [NSLocalizedDescriptionKey: "prefetch requires a 'prefetchKey' header"]
-      ))
-      return promise
+      )
     }
 
-    // Check if already have a fresh result
-    if FetchCache.getResultIfFresh(prefetchKey, maxAgeMs: maxAgeMs) != nil {
-      promise.resolve(withResult: ())
-      return promise
-    }
+    return Promise.async {
+      // Check if already have a fresh result
+      if FetchCache.getResultIfFresh(prefetchKey, maxAgeMs: maxAgeMs) != nil {
+        return
+      }
 
-    // Check if already pending
-    if FetchCache.getPending(prefetchKey) {
-      FetchCache.addPending(prefetchKey) { result in
-        switch result {
-        case .success:
-          promise.resolve(withResult: ())
-        case .failure(let error):
-          promise.reject(withError: error)
+      // Convert body to Data if provided
+      var bodyData: Data?
+      if let body = body {
+        switch body {
+        case .first(let string):
+          bodyData = string.data(using: .utf8)
+        case .second(let arrayBuffer):
+          bodyData = arrayBuffer.toData(copyIfNeeded: true)
         }
       }
-      return promise
-    }
 
-    // Convert body to Data if provided
-    var bodyData: Data?
-    if let body = body {
-      switch body {
-      case .first(let string):
-        bodyData = string.data(using: .utf8)
-      case .second(let arrayBuffer):
-        bodyData = arrayBuffer.toData(copyIfNeeded: true)
+      // Wait for pending fetch or start a new one
+      try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        if FetchCache.getPending(prefetchKey) {
+          FetchCache.addPending(prefetchKey) { result in
+            switch result {
+            case .success:
+              continuation.resume()
+            case .failure(let error):
+              continuation.resume(throwing: error)
+            }
+          }
+        } else {
+          SimpleFetch.prefetch(
+            url: url,
+            method: httpMethod,
+            headers: headers,
+            body: bodyData,
+            prefetchKey: prefetchKey,
+            maxAgeMs: maxAgeMs
+          ) { result in
+            switch result {
+            case .success:
+              continuation.resume()
+            case .failure(let error):
+              continuation.resume(throwing: error)
+            }
+          }
+        }
       }
     }
-
-    // Start the prefetch
-    SimpleFetch.prefetch(
-      url: url,
-      method: httpMethod,
-      headers: headers,
-      body: bodyData,
-      prefetchKey: prefetchKey,
-      maxAgeMs: maxAgeMs
-    ) { result in
-      switch result {
-      case .success:
-        promise.resolve(withResult: ())
-      case .failure(let error):
-        promise.reject(withError: error)
-      }
-    }
-
-    return promise
   }
 
   func consumeNativePrefetch(prefetchKey: String) throws -> Promise<CachedFetchResponse?> {
-    let promise = Promise<CachedFetchResponse?>()
-
-    // Try to get a fresh cached result (uses the entry's stored maxAge)
-    if let cached = FetchCache.getResultIfFresh(prefetchKey) {
-      var headersDict = cached.headers
-      headersDict["nitroPrefetched"] = "true"
-
-      // Convert Data to ArrayBuffer
-      do {
+    return Promise.async { () -> CachedFetchResponse? in
+      // Try to get a fresh cached result (uses the entry's stored maxAge)
+      if let cached = FetchCache.getResultIfFresh(prefetchKey) {
+        var headersDict = cached.headers
+        headersDict["nitroPrefetched"] = "true"
         let arrayBuffer = try ArrayBuffer.copy(data: cached.body)
-        let result = CachedFetchResponse(
+        return CachedFetchResponse(
           url: cached.url,
           status: Double(cached.statusCode),
           statusText: cached.statusText,
           headers: headersDict,
           body: arrayBuffer
         )
-        promise.resolve(withResult: result)
-      } catch {
-        promise.reject(withError: error)
       }
-      return promise
-    }
 
-    // Check if a prefetch is pending
-    if FetchCache.getPending(prefetchKey) {
-      FetchCache.addPending(prefetchKey) { result in
-        switch result {
-        case .success(let cached):
-          var headersDict = cached.headers
-          headersDict["nitroPrefetched"] = "true"
-
-          // Convert Data to ArrayBuffer
-          do {
-            let arrayBuffer = try ArrayBuffer.copy(data: cached.body)
-            let response = CachedFetchResponse(
-              url: cached.url,
-              status: Double(cached.statusCode),
-              statusText: cached.statusText,
-              headers: headersDict,
-              body: arrayBuffer
-            )
-            promise.resolve(withResult: response)
-          } catch {
-            promise.reject(withError: error)
+      // Check if a prefetch is pending
+      if FetchCache.getPending(prefetchKey) {
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<CachedFetchResponse?, Error>) in
+          FetchCache.addPending(prefetchKey) { result in
+            switch result {
+            case .success(let cached):
+              var headersDict = cached.headers
+              headersDict["nitroPrefetched"] = "true"
+              do {
+                let arrayBuffer = try ArrayBuffer.copy(data: cached.body)
+                continuation.resume(returning: CachedFetchResponse(
+                  url: cached.url,
+                  status: Double(cached.statusCode),
+                  statusText: cached.statusText,
+                  headers: headersDict,
+                  body: arrayBuffer
+                ))
+              } catch {
+                continuation.resume(throwing: error)
+              }
+            case .failure(let error):
+              continuation.resume(throwing: error)
+            }
           }
-        case .failure(let error):
-          promise.reject(withError: error)
         }
       }
-      return promise
-    }
 
-    // Not found in cache and not pending - return nil for graceful fallback
-    // This allows the JS layer to automatically fall back to a normal fetch
+      // Not found in cache and not pending - return nil for graceful fallback
+      // This allows the JS layer to automatically fall back to a normal fetch
+      return nil
+    }
+  }
+
   func fetchSync(
     url: String,
-    httpMethod: string,
+    httpMethod: String,
     headers: Dictionary<String, String>,
     body: String?
   ) throws -> SyncFetchResponse {
@@ -186,7 +176,7 @@ class HybridNitroCronet: HybridNitroCronetSpec {
 
       if FetchCache.getPending(prefetchKey) {
         let sem = DispatchSemaphore(value: 0)
-        var pendingResult: Result<CachedFetchResponse, Error>?
+        var pendingResult: Result<SyncFetchResponse, Error>?
         FetchCache.addPending(prefetchKey) { res in
           switch res {
           case .success(let cached):
@@ -216,7 +206,7 @@ class HybridNitroCronet: HybridNitroCronetSpec {
 
     // 2. Perform Synchronous Fetch
     let semaphore = DispatchSemaphore(value: 0)
-    var result: Result<CachedFetchResponse, Error>?
+    var result: Result<SyncFetchResponse, Error>?
 
     guard let urlObj = URL(string: url) else {
       throw NSError(domain: "HybridNitroCronet", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
@@ -236,23 +226,19 @@ class HybridNitroCronet: HybridNitroCronetSpec {
       if let error = error {
         result = .failure(error)
       } else if let data = data, let httpResponse = response as? HTTPURLResponse {
-        do {
-          var responseHeaders: [String: String] = [:]
-          for (k, v) in httpResponse.allHeaderFields {
-            responseHeaders[String(describing: k)] = String(describing: v)
-          }
-          let bodyStr = String(data: data, encoding: .utf8) ?? ""
-          let fetchResponse = SyncFetchResponse(
-            url: httpResponse.url?.absoluteString ?? url,
-            status: Double(httpResponse.statusCode),
-            statusText: HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode),
-            headers: responseHeaders,
-            body: bodyStr
-          )
-          result = .success(fetchResponse)
-        } catch {
-          result = .failure(error)
+        var responseHeaders: [String: String] = [:]
+        for (k, v) in httpResponse.allHeaderFields {
+          responseHeaders[String(describing: k)] = String(describing: v)
         }
+        let bodyStr = String(data: data, encoding: .utf8) ?? ""
+        let fetchResponse = SyncFetchResponse(
+          url: httpResponse.url?.absoluteString ?? url,
+          status: Double(httpResponse.statusCode),
+          statusText: HTTPURLResponse.localizedString(forStatusCode: httpResponse.statusCode),
+          headers: responseHeaders,
+          body: bodyStr
+        )
+        result = .success(fetchResponse)
       } else {
         result = .failure(NSError(domain: "HybridNitroCronet", code: -1, userInfo: [NSLocalizedDescriptionKey: "Unknown error"]))
       }
