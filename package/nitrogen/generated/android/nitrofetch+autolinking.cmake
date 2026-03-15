@@ -33,10 +33,19 @@ target_sources(
   # Autolinking Setup
   ../nitrogen/generated/android/nitrofetchOnLoad.cpp
   # Shared Nitrogen C++ sources
+  ../nitrogen/generated/shared/c++/HybridUrlRequestSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridUrlRequestBuilderSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridNitroCronetSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNitroFetchClientSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNitroFetchSpec.cpp
   ../nitrogen/generated/shared/c++/HybridNativeStorageSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridNitroTextDecoderSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridNitroTextEncodingSpec.cpp
   # Android-specific Nitrogen C++ sources
+  ../nitrogen/generated/android/c++/JHybridUrlRequestSpec.cpp
+  ../nitrogen/generated/android/c++/JHybridUrlRequestBuilderSpec.cpp
+  ../nitrogen/generated/android/c++/JVariant_String_ArrayBuffer.cpp
+  ../nitrogen/generated/android/c++/JHybridNitroCronetSpec.cpp
   ../nitrogen/generated/android/c++/JHybridNitroFetchClientSpec.cpp
   ../nitrogen/generated/android/c++/JHybridNitroFetchSpec.cpp
   ../nitrogen/generated/android/c++/JHybridNativeStorageSpec.cpp

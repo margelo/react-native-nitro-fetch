@@ -88,7 +88,8 @@
     "react-native-nitro-modules": "^0.29.2",
     "release-it": "^17.10.0",
     "turbo": "^1.10.7",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "web-streams-polyfill": "^4.2.0"
   },
   "peerDependencies": {
     "react": "*",

@@ -8,12 +8,22 @@
 #pragma once
 
 // Forward declarations of C++ defined types
+// Forward declaration of `ArrayBuffer` to properly resolve imports.
+namespace NitroModules { class ArrayBuffer; }
+// Forward declaration of `HttpHeader` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct HttpHeader; }
 // Forward declaration of `HybridNativeStorageSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNativeStorageSpec; }
+// Forward declaration of `HybridNitroCronetSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridNitroCronetSpec; }
 // Forward declaration of `HybridNitroFetchClientSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchClientSpec; }
 // Forward declaration of `HybridNitroFetchSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridNitroFetchSpec; }
+// Forward declaration of `HybridUrlRequestBuilderSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridUrlRequestBuilderSpec; }
+// Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
 // Forward declaration of `NitroFormDataPart` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 // Forward declaration of `NitroHeader` to properly resolve imports.
@@ -24,22 +34,36 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 namespace margelo::nitro::nitrofetch { struct NitroRequest; }
 // Forward declaration of `NitroResponse` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroResponse; }
+// Forward declaration of `RequestException` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct RequestException; }
+// Forward declaration of `UrlResponseInfo` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 
 // Include C++ defined types
+#include "HttpHeader.hpp"
 #include "HybridNativeStorageSpec.hpp"
+#include "HybridNitroCronetSpec.hpp"
 #include "HybridNitroFetchClientSpec.hpp"
 #include "HybridNitroFetchSpec.hpp"
+#include "HybridUrlRequestBuilderSpec.hpp"
+#include "HybridUrlRequestSpec.hpp"
 #include "NitroFormDataPart.hpp"
 #include "NitroHeader.hpp"
 #include "NitroRequest.hpp"
 #include "NitroRequestMethod.hpp"
 #include "NitroResponse.hpp"
+#include "RequestException.hpp"
+#include "UrlResponseInfo.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/Result.hpp>
 #include <exception>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_map>
+#include <variant>
 #include <vector>
 
 // C++ helpers for Swift
@@ -54,10 +78,16 @@ namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 // Forward declarations of Swift defined types
 // Forward declaration of `HybridNativeStorageSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridNativeStorageSpec_cxx; }
+// Forward declaration of `HybridNitroCronetSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridNitroCronetSpec_cxx; }
 // Forward declaration of `HybridNitroFetchClientSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridNitroFetchClientSpec_cxx; }
 // Forward declaration of `HybridNitroFetchSpec_cxx` to properly resolve imports.
 namespace NitroFetch { class HybridNitroFetchSpec_cxx; }
+// Forward declaration of `HybridUrlRequestBuilderSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridUrlRequestBuilderSpec_cxx; }
+// Forward declaration of `HybridUrlRequestSpec_cxx` to properly resolve imports.
+namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 
 // Include Swift defined types
 #if __has_include("NitroFetch-Swift.h")
