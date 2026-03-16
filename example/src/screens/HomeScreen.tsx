@@ -43,6 +43,13 @@ const EXAMPLES = [
     screen: 'BasicFetchScreen' as const,
     icon: '🌐',
   },
+  {
+    id: 'streaming',
+    title: 'Streaming',
+    description: 'Real-time HTTP streaming via ReadableStream chunks.',
+    screen: 'StreamingScreen' as const,
+    icon: '🌊',
+  },
 ];
 
 export function HomeScreen() {

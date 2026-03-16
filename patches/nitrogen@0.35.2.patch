@@ -1,0 +1,138 @@
+diff --git a/lib/index.js b/lib/index.js
+old mode 100755
+new mode 100644
+diff --git a/lib/syntax/swift/SwiftCxxBridgedType.js b/lib/syntax/swift/SwiftCxxBridgedType.js
+index 9ad571e6b79050e5c0fdbe340605859f100a3aa5..07010b4ce0d780c98a5bf6d0cd24252036aeac4a 100644
+--- a/lib/syntax/swift/SwiftCxxBridgedType.js
++++ b/lib/syntax/swift/SwiftCxxBridgedType.js
+@@ -466,11 +466,25 @@ export class SwiftCxxBridgedType {
+             }
+             case 'array': {
+                 const array = getTypeAs(this.type, ArrayType);
++                const bridge = this.getBridgeOrThrow();
+                 const wrapping = new SwiftCxxBridgedType(array.itemType, true);
++                const swiftArrayType = array.getCode('swift');
++                const getFunc = `bridge.get_${bridge.specializationName}`;
+                 switch (language) {
+                     case 'swift':
+-                        // We have to iterate the element one by one to create a resulting Array (mapped)
+-                        return `${cppParameterName}.map({ __item in ${wrapping.parseFromCppToSwift('__item', 'swift')} })`.trim();
++                        // Use index-based loop with bridge helper instead of .map() or for-in to work around
++                        // Swift compiler bug where C++ vector types lose Sequence/.map conformance (https://github.com/swiftlang/swift/issues/76949)
++                        return `
++            { () -> ${swiftArrayType} in
++              var __array = ${swiftArrayType}()
++              let __count = ${cppParameterName}.size()
++              __array.reserveCapacity(Int(__count))
++              for __i in 0..<__count {
++                let __item = ${getFunc}(${cppParameterName}, __i)
++                __array.append(${wrapping.parseFromCppToSwift('__item', 'swift')})
++              }
++              return __array
++            }()`.trim();
+                     default:
+                         return cppParameterName;
+                 }
+diff --git a/lib/syntax/swift/SwiftCxxTypeHelper.js b/lib/syntax/swift/SwiftCxxTypeHelper.js
+index 6d12c0cb607c058dc45be5ed4460e6c627f90256..0f7ab4a938d9d54116ff75336e9ed2ed07566b2b 100644
+--- a/lib/syntax/swift/SwiftCxxTypeHelper.js
++++ b/lib/syntax/swift/SwiftCxxTypeHelper.js
+@@ -241,6 +241,9 @@ inline ${actualType} create_${name}(size_t size) noexcept {
+   ${actualType} vector;
+   vector.reserve(size);
+   return vector;
++}
++inline ${type.itemType.getCode('c++')} get_${name}(const ${actualType}& vector, size_t index) noexcept {
++  return vector[index];
+ }`.trim();
+     return {
+         cxxType: actualType,
+diff --git a/lib/syntax/swift/SwiftHybridObjectBridge.js b/lib/syntax/swift/SwiftHybridObjectBridge.js
+index 79905ff90b03a8d80ff6b15def916ee9bc0664df..99dd4210ec3c96ebc60495c928e908fcb9a527b5 100644
+--- a/lib/syntax/swift/SwiftHybridObjectBridge.js
++++ b/lib/syntax/swift/SwiftHybridObjectBridge.js
+@@ -46,10 +46,6 @@ public final func maybePrepareForRecycle() {
+   guard let recyclable = __implementation as? any RecyclableView else { return }
+   recyclable.prepareForRecycle()
+ }
+-`.trim(), `
+-public final func onDropView() {
+-  __implementation.onDropView()
+-}
+ `.trim());
+     }
+     const hybridObject = new HybridObjectType(spec);
+diff --git a/lib/views/kotlin/KotlinHybridViewManager.js b/lib/views/kotlin/KotlinHybridViewManager.js
+index c03b9be2899c0a3c259e696d9bd64e391cdf1530..2a2eca854f89180f306e69bae68c71f1c8b97779 100644
+--- a/lib/views/kotlin/KotlinHybridViewManager.js
++++ b/lib/views/kotlin/KotlinHybridViewManager.js
+@@ -53,7 +53,7 @@ public class ${manager}: SimpleViewManager<View>() {
+   }
+ 
+   override fun updateState(view: View, props: ReactStylesDiffMap, stateWrapper: StateWrapper): Any? {
+-    val hybridView = getHybridView(view)
++    val hybridView = view.getTag(associated_hybrid_view_tag) as? ${viewImplementation}
+       ?: throw Error("Couldn't find view $view in local views table!")
+ 
+     // 1. Update each prop individually
+@@ -65,15 +65,9 @@ public class ${manager}: SimpleViewManager<View>() {
+     return super.updateState(view, props, stateWrapper)
+   }
+ 
+-  override fun onDropViewInstance(view: View) {
+-    val hybridView = getHybridView(view)
+-    hybridView?.onDropView()
+-    return super.onDropViewInstance(view)
+-  }
+-
+   protected override fun prepareToRecycleView(reactContext: ThemedReactContext, view: View): View? {
+     super.prepareToRecycleView(reactContext, view)
+-    val hybridView = getHybridView(view)
++    val hybridView = view.getTag(associated_hybrid_view_tag) as? ${viewImplementation}
+       ?: return null
+ 
+     @Suppress("USELESS_IS_CHECK")
+@@ -87,10 +81,6 @@ public class ${manager}: SimpleViewManager<View>() {
+       return null
+     }
+   }
+-
+-  private fun getHybridView(view: View): ${viewImplementation}? {
+-    return view.getTag(associated_hybrid_view_tag) as? ${viewImplementation}
+-  }
+ }
+   `.trim();
+     const updaterKotlinCode = `
+diff --git a/lib/views/swift/SwiftHybridViewManager.js b/lib/views/swift/SwiftHybridViewManager.js
+index e5033ab4ccb6b87722c84b6b9d0e50ebf713e2ea..a735d6daa95e2158dad5e2970c72710672046843 100644
+--- a/lib/views/swift/SwiftHybridViewManager.js
++++ b/lib/views/swift/SwiftHybridViewManager.js
+@@ -43,13 +43,6 @@ ${createFileMetadataString(`${component}.mm`)}
+ #import "${HybridTSpecSwift}.hpp"
+ #import "${getUmbrellaHeaderName()}"
+ 
+-#if __has_include(<cxxreact/ReactNativeVersion.h>)
+-#include <cxxreact/ReactNativeVersion.h>
+-#if REACT_NATIVE_VERSION_MINOR >= 82
+-#define ENABLE_RCT_COMPONENT_VIEW_INVALIDATE
+-#endif
+-#endif
+-
+ using namespace facebook;
+ using namespace ${namespace};
+ using namespace ${namespace}::views;
+@@ -133,14 +126,6 @@ using namespace ${namespace}::views;
+   swiftPart.maybePrepareForRecycle();
+ }
+ 
+-#ifdef ENABLE_RCT_COMPONENT_VIEW_INVALIDATE
+-- (void)invalidate {
+-  ${swiftNamespace}::${HybridTSpecCxx}& swiftPart = _hybridView->getSwiftPart();
+-  swiftPart.onDropView();
+-  [super invalidate];
+-}
+-#endif
+-
+ @end
+   `;
+     return [

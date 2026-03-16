@@ -1,0 +1,53 @@
+{
+  "cxxNamespace": ["nitrofetch"],
+  "ios": {
+    "iosModuleName": "NitroFetch"
+  },
+  "android": {
+    "androidNamespace": ["nitrofetch"],
+    "androidCxxLibName": "nitrofetch"
+  },
+  "autolinking": {
+    "NitroFetch": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "NitroFetch"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "NitroFetch"
+      }
+    },
+    "NitroFetchClient": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "NitroFetchClient"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "NitroFetchClient"
+      }
+    },
+    "NativeStorage": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "NativeStorage"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "NativeStorage"
+      }
+    },
+    "NitroCronet": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "HybridNitroCronet"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "NitroCronet"
+      }
+    }
+  },
+  "ignorePaths": ["node_modules"]
+}
