@@ -297,3 +297,67 @@ describe('NitroFetch - nitroFetchOnWorklet', () => {
     expect(result[0].usd).toBeGreaterThan(0);
   });
 });
+
+describe('NitroFetch - Streaming', () => {
+  it('streams JSON lines from /stream/5 and produces non-empty text', async () => {
+    const res = (await (nitroFetch as any)(
+      `${BASE}/stream/5`,
+      { stream: true }
+    )) as any;
+
+    const readable = res.body?.getReader?.();
+    expect(readable).toBeDefined();
+
+    const decoder = new (require('react-native-nitro-text-decoder').TextDecoder)();
+    let aggregated = '';
+    let chunks = 0;
+
+    // Read until done, accumulating decoded text
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { done, value } = await readable.read();
+      if (done) break;
+      chunks++;
+      if (value) {
+        aggregated += decoder.decode(value, { stream: true });
+      }
+    }
+
+    expect(chunks).toBeGreaterThan(0);
+    expect(aggregated.length).toBeGreaterThan(0);
+    // Basic sanity: each line should be valid JSON when split
+    const lines = aggregated
+      .split('\n')
+      .map((l: string) => l.trim())
+      .filter(Boolean);
+    expect(lines.length).toBeGreaterThan(0);
+    const first = JSON.parse(lines[0]);
+    expect(typeof first).toBe('object');
+  });
+
+  it('streams bytes from /drip and accumulates total length', async () => {
+    const durationSeconds = 2;
+    const numBytes = 64;
+    const res = (await (nitroFetch as any)(
+      `${BASE}/drip?duration=${durationSeconds}&numbytes=${numBytes}&delay=0`,
+      { stream: true }
+    )) as any;
+
+    const readable = res.body?.getReader?.();
+    expect(readable).toBeDefined();
+
+    let total = 0;
+    let chunks = 0;
+
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const { done, value } = await readable.read();
+      if (done) break;
+      chunks++;
+      total += value?.byteLength ?? 0;
+    }
+
+    expect(chunks).toBeGreaterThan(0);
+    expect(total).toBe(numBytes);
+  });
+});

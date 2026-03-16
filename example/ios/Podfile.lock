@@ -27,8 +27,32 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - NitroModules (0.29.8):
+  - NitroModules (0.35.2):
     - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-callinvoker
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
+  - NitroTextDecoder (0.0.1):
+    - hermes-engine
+    - NitroModules
     - RCTRequired
     - RCTTypeSafety
     - React-callinvoker
@@ -1477,7 +1501,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - react-native-worklets-core (1.6.2):
+  - react-native-worklets-core (1.6.3):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -1937,7 +1961,8 @@ DEPENDENCIES:
   - FBLazyVector (from `../../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - NitroFetch (from `../../node_modules/react-native-nitro-fetch`)
-  - NitroModules (from `../node_modules/react-native-nitro-modules`)
+  - NitroModules (from `../../node_modules/react-native-nitro-modules`)
+  - NitroTextDecoder (from `../../node_modules/react-native-nitro-text-decoder`)
   - RCTDeprecation (from `../../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
   - RCTRequired (from `../../node_modules/react-native/Libraries/Required`)
   - RCTSwiftUI (from `../../node_modules/react-native/ReactApple/RCTSwiftUI`)
@@ -2023,7 +2048,9 @@ EXTERNAL SOURCES:
   NitroFetch:
     :path: "../../node_modules/react-native-nitro-fetch"
   NitroModules:
-    :path: "../node_modules/react-native-nitro-modules"
+    :path: "../../node_modules/react-native-nitro-modules"
+  NitroTextDecoder:
+    :path: "../../node_modules/react-native-nitro-text-decoder"
   RCTDeprecation:
     :path: "../../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation"
   RCTRequired:
@@ -2177,7 +2204,8 @@ SPEC CHECKSUMS:
   FBLazyVector: 4ee5f665093abe339f4b579fc3d59f65c8af196c
   hermes-engine: 6e73b6dc6e9f908925b064fcfed5d7ae87f93a6e
   NitroFetch: 439b3c58d44e1160c5c2c34e9b02eda08c92014b
-  NitroModules: 243647de5cfdc3084b20d7b9ac8afc214181242e
+  NitroModules: 2d92eeea80a5afdebe7b4fd2443b5bd4d7ba1a44
+  NitroTextDecoder: 89fbbb4ac82c4279fd78f0c651cba1ca1a0e9445
   RCTDeprecation: b73940ea69ab57c2c59f845b37b09e1d8b0d0588
   RCTRequired: f3a52c914af5f19f04d02b2091d83e43cf71676c
   RCTSwiftUI: 6dea7b613e8930a973b723c121aa8646374ee694
@@ -2215,7 +2243,7 @@ SPEC CHECKSUMS:
   React-Mapbuffer: dcba72d14148a9e1146ff5fe4d6a8d1417ff88b9
   React-microtasksnativemodule: 8eb3bc8e9b0a008096c12695ab8d5b5ba193db27
   react-native-safe-area-context: 6b4966397ada0f7dd481e4486a2ef936834861a1
-  react-native-worklets-core: ef226db5329621f858eacf95713dfdabdce72f49
+  react-native-worklets-core: 89a42b9bbce25698c6fb3f36fa61181377655e6c
   React-NativeModulesApple: f8da6e477ffca7ad38869d16d7fd0b4289771f6a
   React-networking: 718dd7d2ca3326a8250a91a0a7378473f5cdadc0
   React-oscompat: cd94b54475962e212178f0648fd2cdf233b323c8

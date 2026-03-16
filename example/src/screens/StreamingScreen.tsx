@@ -7,8 +7,11 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { fetch as nitroFetch, TextDecoder } from 'react-native-nitro-fetch';
+import { fetch as nitroFetch } from 'react-native-nitro-fetch';
+import { TextDecoder } from 'react-native-nitro-text-decoder';
 import { theme } from '../theme';
+
+
 
 export function StreamingScreen() {
   const [output, setOutput] = React.useState('');
@@ -25,7 +28,7 @@ export function StreamingScreen() {
     setOutput('');
     decoder.current = new TextDecoder();
   };
-
+  console.log('TextDecoder', TextDecoder);
   const stopStream = () => {
     abortRef.current?.abort();
     abortRef.current = null;

@@ -7,7 +7,8 @@
   "author": "Szymon Kapala <szymon20000@gmail.com'> (https://x.com/Turbo_Szymon)",
   "workspaces": [
     "example",
-    "package"
+    "packages/react-native-nitro-fetch",
+    "packages/react-native-nitro-text-decoder"
   ],
   "repository": "https://github.com/margelo/react-native-nitro-fetch.git",
   "scripts": {
@@ -16,8 +17,8 @@
     "typecheck": "bun --cwd package tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
-    "prepare": "bun --cwd package bob build",
-    "nitrogen": "bun --cwd package nitrogen",
+    "prepare": "bun --cwd packages/react-native-nitro-fetch bob build && bun --cwd packages/react-native-nitro-text-decoder specs",
+    "nitrogen": "bun --cwd packages/react-native-nitro-fetch nitrogen && bun --cwd packages/react-native-nitro-text-decoder specs",
     "release": "release-it --only-version"
   },
   "devDependencies": {
@@ -42,7 +43,7 @@
     "react": "19.2.3",
     "react-native": "0.85.0-rc.0",
     "react-native-builder-bob": "^0.40.13",
-    "react-native-nitro-modules": "^0.29.2",
+    "react-native-nitro-modules": "^0.35.2",
     "release-it": "^17.10.0",
     "turbo": "^1.10.7",
     "typescript": "^5.8.3"
@@ -79,6 +80,7 @@
     "useTabs": false
   },
   "patchedDependencies": {
-    "react-native-worklets-core@1.6.2": "patches/react-native-worklets-core@1.6.2.patch"
+    "react-native-worklets-core@1.6.2": "patches/react-native-worklets-core@1.6.2.patch",
+    "nitrogen@0.35.2": "patches/nitrogen@0.35.2.patch"
   }
 }
