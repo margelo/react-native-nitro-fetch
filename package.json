@@ -14,7 +14,7 @@
   "scripts": {
     "example": "bun --cwd example",
     "test": "jest",
-    "typecheck": "bun --cwd package tsc",
+    "typecheck": "bun --cwd packages/react-native-nitro-fetch tsc && bun --cwd packages/react-native-nitro-text-decoder tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
     "prepare": "bun --cwd packages/react-native-nitro-fetch bob build && bun --cwd packages/react-native-nitro-text-decoder specs",
