@@ -16,10 +16,10 @@ runs:
         path: |
           **/node_modules
           ~/.bun/install/cache
-        key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}-${{ hashFiles('**/package.json', '!node_modules/**') }}
+        key: ${{ runner.os }}-bun-cache-${{ hashFiles('bun.lock') }}-${{ hashFiles('**/package.json', '!node_modules/**') }}
         restore-keys: |
-          ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
-          ${{ runner.os }}-bun-
+          ${{ runner.os }}-bun-cache-${{ hashFiles('bun.lock') }}
+          ${{ runner.os }}-bun-cache-
 
     - name: Install dependencies
       if: steps.bun-cache.outputs.cache-hit != 'true'
@@ -33,4 +33,4 @@ runs:
         path: |
           **/node_modules
           ~/.bun/install/cache
-        key: ${{ steps.bun-cache.outputs.cache-primary-key }}
+        key: ${{ steps.bun-cache.outputs.cache-primary-key }}-cache
