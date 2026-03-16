@@ -1,5 +1,5 @@
 // TODO: Export all HybridObjects here for the user
 
-import { TextDecoder } from './TextDecoder';
+import { TextDecoder } from './TextDecoder'
 
-export { TextDecoder };
+export { TextDecoder }

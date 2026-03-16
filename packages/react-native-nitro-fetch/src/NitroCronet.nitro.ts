@@ -22,8 +22,10 @@ export interface RequestException {
   message: string;
 }
 
-export interface UrlRequest
-  extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
+export interface UrlRequest extends HybridObject<{
+  android: 'kotlin';
+  ios: 'swift';
+}> {
   start(): void;
   followRedirect(): void;
   read(): void;
@@ -31,8 +33,10 @@ export interface UrlRequest
   isDone(): boolean;
 }
 
-export interface UrlRequestBuilder
-  extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
+export interface UrlRequestBuilder extends HybridObject<{
+  android: 'kotlin';
+  ios: 'swift';
+}> {
   setHttpMethod(httpMethod: string): void;
   addHeader(name: string, value: string): void;
   setUploadBody(body: ArrayBuffer | string): void;
@@ -60,7 +64,9 @@ export interface UrlRequestBuilder
 }
 
 // The new streaming client — separate from NitroFetchClient
-export interface NitroCronet
-  extends HybridObject<{ android: 'kotlin'; ios: 'swift' }> {
+export interface NitroCronet extends HybridObject<{
+  android: 'kotlin';
+  ios: 'swift';
+}> {
   newUrlRequestBuilder(url: string): UrlRequestBuilder;
 }

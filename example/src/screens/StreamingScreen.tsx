@@ -11,8 +11,6 @@ import { fetch as nitroFetch } from 'react-native-nitro-fetch';
 import { TextDecoder } from 'react-native-nitro-text-decoder';
 import { theme } from '../theme';
 
-
-
 export function StreamingScreen() {
   const [output, setOutput] = React.useState('');
   const [streaming, setStreaming] = React.useState(false);
@@ -69,7 +67,7 @@ export function StreamingScreen() {
           let chunkCount = 0;
           console.log('Console');
           while (true) {
-            try{
+            try {
               const { done, value } = await reader.read();
               console.log('value', value);
               if (done) break;

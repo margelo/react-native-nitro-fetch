@@ -52,8 +52,10 @@ export interface NitroResponse {
   bodyBytes?: string; //will be ArrayBuffer in future
 }
 
-export interface NitroFetchClient
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+export interface NitroFetchClient extends HybridObject<{
+  ios: 'swift';
+  android: 'kotlin';
+}> {
   // Client-binded request that uses the env configured at creation.
   request(req: NitroRequest): Promise<NitroResponse>;
   // Start a prefetch for a given request; expects a header `prefetchKey`.
@@ -66,8 +68,10 @@ export interface NitroFetchClient
   cancelRequest(requestId: string): void;
 }
 
-export interface NitroFetch
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+export interface NitroFetch extends HybridObject<{
+  ios: 'swift';
+  android: 'kotlin';
+}> {
   // Create a client bound to a given environment (e.g., cache dir).
   createClient(): NitroFetchClient;
 
@@ -75,8 +79,10 @@ export interface NitroFetch
   // shutdown(): void;
 }
 
-export interface NativeStorage
-  extends HybridObject<{ ios: 'swift'; android: 'kotlin' }> {
+export interface NativeStorage extends HybridObject<{
+  ios: 'swift';
+  android: 'kotlin';
+}> {
   getString(key: string): string;
   setString(key: string, value: string): void;
   removeString(key: string): void;

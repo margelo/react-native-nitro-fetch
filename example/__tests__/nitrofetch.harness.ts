@@ -300,20 +300,20 @@ describe('NitroFetch - nitroFetchOnWorklet', () => {
 
 describe('NitroFetch - Streaming', () => {
   it('streams JSON lines from /stream/5 and produces non-empty text', async () => {
-    const res = (await (nitroFetch as any)(
-      `${BASE}/stream/5`,
-      { stream: true }
-    )) as any;
+    const res = (await (nitroFetch as any)(`${BASE}/stream/5`, {
+      stream: true,
+    })) as any;
 
     const readable = res.body?.getReader?.();
     expect(readable).toBeDefined();
 
-    const decoder = new (require('react-native-nitro-text-decoder').TextDecoder)();
+    const decoder =
+      new (require('react-native-nitro-text-decoder').TextDecoder)();
     let aggregated = '';
     let chunks = 0;
 
     // Read until done, accumulating decoded text
-    // eslint-disable-next-line no-constant-condition
+
     while (true) {
       const { done, value } = await readable.read();
       if (done) break;
@@ -349,7 +349,6 @@ describe('NitroFetch - Streaming', () => {
     let total = 0;
     let chunks = 0;
 
-    // eslint-disable-next-line no-constant-condition
     while (true) {
       const { done, value } = await readable.read();
       if (done) break;
