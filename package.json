@@ -19,7 +19,9 @@
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
     "prepare": "bun --cwd packages/react-native-nitro-fetch bob build && bun --cwd packages/react-native-nitro-text-decoder specs",
     "nitrogen": "bun --cwd packages/react-native-nitro-fetch nitrogen && bun --cwd packages/react-native-nitro-text-decoder specs",
-    "release": "release-it --only-version"
+    "release": "release-it --only-version",
+    "release:fetch": "bun --cwd packages/react-native-nitro-fetch release-it --only-version",
+    "release:textdecoder": "bun --cwd packages/react-native-nitro-text-decoder release-it --only-version"
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^19.6.0",

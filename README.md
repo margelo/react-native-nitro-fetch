@@ -160,13 +160,59 @@ const data = await nitroFetchOnWorklet(
 )
 ```
 
+### Streaming with `TextDecoder` 
+
+Nitro Fetch can also expose an streaming mode that returns a `ReadableStream` body.  
+Combined with [`react-native-nitro-text-decoder`](https://github.com/margelo/react-native-nitro-fetch/tree/main/packages/react-native-nitro-text-decoder), you can incrementally decode UTF‑8 chunks:
+
+```tsx
+import { useRef, useState } from 'react'
+import { fetch as nitroFetch } from 'react-native-nitro-fetch'
+import { TextDecoder } from 'react-native-nitro-text-decoder'
+
+export function StreamingExample() {
+  const [output, setOutput] = useState('')
+  const decoder = useRef(new TextDecoder())
+
+  const append = (text: string) => {
+    setOutput(prev => prev + text)
+  }
+
+  const runStream = async () => {
+    // `stream: true` enables the streaming transport
+    const res = await nitrofetch('https://httpbin.org/stream/20', {
+      stream: true,
+    })
+
+    const reader = res.body?.getReader()
+    if (!reader) {
+      append('No readable stream!')
+      return
+    }
+
+    let chunks = 0
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks++
+      const text = decoder.current.decode(value, { stream: true })
+      append(text)
+    }
+
+    append(`\n\n✅ Done — ${chunks} chunk(s) received`)
+  }
+
+  // Call `runStream()` from a button handler in your UI
+}
+```
+
 ## Project Status
 
 Nitro Fetch is currently in an alpha stage. You can adopt it in production, but keep in mind that the library and it's API is subject to change.
 
 ## Limitations & Alternatives
 
-- [HTTP streaming](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) is not yet supported. As an alternative, use Expo's [expo-fetch](https://docs.expo.dev/versions/latest/sdk/expo/). Streaming is on the roadmap.
+
 - [WebSockets](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket) are not supported. For high‑performance sockets and binary streams, consider using [react-native-fast-io](https://github.com/callstackincubator/react-native-fast-io) by our friends at Callstack.
 
 ## Documentation
