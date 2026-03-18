@@ -7,6 +7,7 @@
  */
 
  #include "TextDecoderUtils.hpp"
+ #include "TextDecoderSIMD.hpp"
 
  #include <algorithm>
  #include <cctype>
@@ -18,6 +19,7 @@
  // Returns 0 for invalid lead bytes (continuation bytes, 0xC0-0xC1, 0xF5-0xFF).
  // This is stricter than some implementations which return non-zero for
  // some invalid lead bytes.
+ __attribute__((always_inline))
  unsigned validUTF8SequenceLength(uint8_t byte) {
    if (byte < 0x80) {
      return 1; // ASCII
@@ -202,85 +204,60 @@
  };
  
  // Append the replacement character (U+FFFD) as UTF-8
+ __attribute__((always_inline))
  static inline void appendReplacementChar(std::string &out) {
    out.append(kReplacementCharUTF8, 3);
  }
  
- // Find the length of ASCII-only bytes starting at ptr, up to maxLen.
- // This is the hot path optimization - most data is ASCII.
- static inline size_t findASCIIRunLength(const uint8_t *ptr, size_t maxLen) {
-   size_t len = 0;
- 
-   // Process 8 bytes at a time for better performance
-   while (len + 8 <= maxLen) {
-     // Check if any byte has high bit set (non-ASCII)
-     uint64_t chunk;
-     std::memcpy(&chunk, ptr + len, 8);
-     if (chunk & 0x8080808080808080ULL) {
-       break;
+ // Find the length of contiguous valid UTF-8 bytes (ASCII + multi-byte)
+ // starting at ptr, up to maxLen. Stops at the first invalid byte.
+ // This enables bulk-copy: decoded->append(ptr, validLen).
+ size_t findValidUTF8RunLength(const uint8_t *ptr, size_t maxLen) {
+   size_t i = 0;
+
+   while (i < maxLen) {
+     uint8_t b0 = ptr[i];
+
+     // ASCII fast path: use SIMD-accelerated scan (16 bytes/iter on NEON/SSE2)
+     if (b0 < 0x80) [[likely]] {
+       size_t asciiLen = findASCIIRunLengthSIMD(ptr + i, maxLen - i);
+       i += asciiLen;
+       continue;
      }
-     len += 8;
-   }
- 
-   // Handle remaining bytes
-   while (len < maxLen && ptr[len] < 0x80) {
-     ++len;
-   }
- 
-   return len;
- }
- 
- // Decode a complete valid UTF-8 sequence starting at bytes and return the
- // code point. Assumes the sequence is valid.
- static char32_t decodeUTF8Sequence(const uint8_t *bytes, unsigned len) {
-   if (len == 1) {
-     return bytes[0];
-   } else if (len == 2) {
-     return ((bytes[0] & 0x1F) << 6) | (bytes[1] & 0x3F);
-   } else if (len == 3) {
-     return ((bytes[0] & 0x0F) << 12) | ((bytes[1] & 0x3F) << 6) |
-            (bytes[2] & 0x3F);
-   } else {
-     return ((bytes[0] & 0x07) << 18) | ((bytes[1] & 0x3F) << 12) |
-            ((bytes[2] & 0x3F) << 6) | (bytes[3] & 0x3F);
-   }
- }
- 
- // Check if a complete sequence is valid (not overlong, not surrogate, not > U+10FFFF)
- static bool isValidCompleteSequence(const uint8_t *bytes, unsigned len) {
-   if (len == 0) return false;
- 
-   uint8_t b0 = bytes[0];
-   unsigned expectedLen = validUTF8SequenceLength(b0);
-   if (expectedLen == 0 || expectedLen != len) {
-     return false;
-   }
- 
-   // Check continuation bytes
-   for (unsigned i = 1; i < len; ++i) {
-     if ((bytes[i] & 0xC0) != 0x80) {
-       return false;
+
+     // Multi-byte sequence
+     unsigned seqLen = validUTF8SequenceLength(b0);
+     if (seqLen == 0 || i + seqLen > maxLen) {
+       break; // Invalid lead byte or incomplete sequence
      }
+
+     // Check continuation bytes
+     bool valid = true;
+     for (unsigned j = 1; j < seqLen; ++j) {
+       if ((ptr[i + j] & 0xC0) != 0x80) {
+         valid = false;
+         break;
+       }
+     }
+     if (!valid) break;
+
+     // Check for overlong encodings and invalid code points
+     if (seqLen == 3) {
+       if ((b0 == 0xE0 && ptr[i + 1] < 0xA0) ||
+           (b0 == 0xED && ptr[i + 1] > 0x9F)) {
+         break;
+       }
+     } else if (seqLen == 4) {
+       if ((b0 == 0xF0 && ptr[i + 1] < 0x90) ||
+           (b0 == 0xF4 && ptr[i + 1] > 0x8F)) {
+         break;
+       }
+     }
+
+     i += seqLen;
    }
- 
-   // Check for overlong encodings and invalid code points
-   if (len == 3) {
-     if (b0 == 0xE0 && bytes[1] < 0xA0) {
-       return false; // Overlong
-     }
-     if (b0 == 0xED && bytes[1] > 0x9F) {
-       return false; // Surrogate
-     }
-   } else if (len == 4) {
-     if (b0 == 0xF0 && bytes[1] < 0x90) {
-       return false; // Overlong
-     }
-     if (b0 == 0xF4 && bytes[1] > 0x8F) {
-       return false; // > U+10FFFF
-     }
-   }
- 
-   return true;
+
+   return i;
  }
  
  // Decode UTF-8 bytes to a UTF-8 string (with validation and error handling).
@@ -336,84 +313,23 @@
  
    size_t i = 0;
    while (i < processLength) {
-     // OPTIMIZATION: Try to find and bulk-copy ASCII runs first
-     // This is the hot path - most text data is ASCII
-     size_t asciiLen = findASCIIRunLength(bytes + i, processLength - i);
-     if (asciiLen > 0) {
-       decoded->append(reinterpret_cast<const char *>(bytes + i), asciiLen);
-       i += asciiLen;
+     // Bulk validate + copy: find the longest run of valid UTF-8 and copy at once
+     size_t validLen = findValidUTF8RunLength(bytes + i, processLength - i);
+     if (validLen > 0) [[likely]] {
+       decoded->append(reinterpret_cast<const char *>(bytes + i), validLen);
+       i += validLen;
        if (i >= processLength) {
          break;
        }
      }
- 
-     // Now we're at a non-ASCII byte
-     uint8_t b0 = bytes[i];
-     unsigned seqLen = validUTF8SequenceLength(b0);
- 
-     if (seqLen == 0) [[unlikely]] {
-       // Invalid lead byte (continuation byte or 0xC0-0xC1 or 0xF5-0xFF)
-       if (fatal) {
-         return DecodeError::InvalidSequence;
-       }
-       appendReplacementChar(*decoded);
-       ++i;
-       continue;
+
+     // We're at an invalid byte — handle error
+     if (fatal) [[unlikely]] {
+       return DecodeError::InvalidSequence;
      }
- 
-     // seqLen >= 2 at this point (we already handled ASCII above)
- 
-     // Check if we have enough bytes for the complete sequence
-     if (i + seqLen > processLength) [[unlikely]] {
-       // Incomplete sequence in the middle (not at end) - invalid
-       if (fatal) {
-         return DecodeError::InvalidSequence;
-       }
-       appendReplacementChar(*decoded);
-       i += maximalSubpartLength(bytes + i, processLength - i);
-       continue;
-     }
- 
-     // Quick validation of continuation bytes and special cases
-     // This is faster than calling isValidCompleteSequence for the common case
-     bool valid = true;
- 
-     // Check all continuation bytes have correct prefix (10xxxxxx)
-     for (unsigned j = 1; j < seqLen; ++j) {
-       if ((bytes[i + j] & 0xC0) != 0x80) {
-         valid = false;
-         break;
-       }
-     }
- 
-     if (valid) [[likely]] {
-       // Check for overlong encodings and invalid code points
-       uint8_t b1 = bytes[i + 1];
-       if (seqLen == 3) {
-         if ((b0 == 0xE0 && b1 < 0xA0) ||  // Overlong 3-byte
-             (b0 == 0xED && b1 > 0x9F)) {   // Surrogate
-           valid = false;
-         }
-       } else if (seqLen == 4) {
-         if ((b0 == 0xF0 && b1 < 0x90) ||  // Overlong 4-byte
-             (b0 == 0xF4 && b1 > 0x8F)) {   // > U+10FFFF
-           valid = false;
-         }
-       }
-     }
- 
-     if (valid) [[likely]] {
-       // Valid sequence - copy bytes directly (UTF-8 in = UTF-8 out)
-       decoded->append(reinterpret_cast<const char *>(bytes + i), seqLen);
-       i += seqLen;
-     } else {
-       // Invalid sequence
-       if (fatal) {
-         return DecodeError::InvalidSequence;
-       }
-       appendReplacementChar(*decoded);
-       i += maximalSubpartLength(bytes + i, processLength - i);
-     }
+
+     appendReplacementChar(*decoded);
+     i += maximalSubpartLength(bytes + i, processLength - i);
    }
  
    // Store pending bytes if streaming; else emit replacement char.

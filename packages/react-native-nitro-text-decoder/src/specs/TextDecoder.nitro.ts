@@ -14,7 +14,7 @@ export interface NitroTextDecoder extends HybridObject<{
   readonly encoding: string
   readonly fatal: boolean
   readonly ignoreBOM: boolean
-  decode(input?: ArrayBuffer, options?: TextDecodeOptions): string
+  decode(input?: ArrayBuffer, byteOffset?: number, byteLength?: number, options?: TextDecodeOptions): string
 }
 export interface NitroTextEncoding extends HybridObject<{
   ios: 'c++'

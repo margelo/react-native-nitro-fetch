@@ -13,7 +13,6 @@
  #include <NitroModules/HybridObject.hpp>
  
  #include <algorithm>
- #include <cstring>
  #include <stdexcept>
  
  namespace margelo::nitro::nitrotextdecoder {
@@ -40,56 +39,41 @@
  
  bool HybridTextDecoder::getIgnoreBOM() { return _ignoreBOM; }
  
- // Fast path: check if all bytes are ASCII (no high bit set)
- static inline bool isAllASCII(const uint8_t *bytes, size_t length) {
-   size_t i = 0;
- 
-   // Check 8 bytes at a time
-   while (i + 8 <= length) {
-     uint64_t chunk;
-     std::memcpy(&chunk, bytes + i, 8);
-     if (chunk & 0x8080808080808080ULL) {
-       return false;
-     }
-     i += 8;
-   }
- 
-   // Check remaining bytes
-   while (i < length) {
-     if (bytes[i] & 0x80) {
-       return false;
-     }
-     ++i;
-   }
- 
-   return true;
- }
- 
- // Main decode method - typed version (required by base class, but we use raw
- // method instead)
+ // Main decode method - typed version (required by base class)
  std::string HybridTextDecoder::decode(
      const std::optional<std::shared_ptr<ArrayBuffer>> &input,
+     std::optional<double> byteOffset,
+     std::optional<double> byteLength,
      const std::optional<TextDecodeOptions> &options) {
    // Parse stream option
    bool stream = options.has_value() && options->stream.has_value() &&
                  options->stream.value();
- 
+
    // Get input bytes
    const uint8_t *inputBytes = nullptr;
    size_t inputLength = 0;
- 
+
    if (input.has_value() && input.value() && input.value()->data() &&
        input.value()->size() > 0) {
      auto buffer = input.value();
-     inputLength = buffer->size();
- 
-     if (inputLength > 2147483648UL) [[unlikely]] {
+     size_t bufferSize = buffer->size();
+
+     // Apply byteOffset and byteLength for zero-copy ArrayBufferView support
+     size_t offset = byteOffset.has_value() ? static_cast<size_t>(byteOffset.value()) : 0;
+     size_t length = byteLength.has_value() ? static_cast<size_t>(byteLength.value()) : (bufferSize - offset);
+
+     if (offset + length > bufferSize) [[unlikely]] {
+       throw std::invalid_argument("byteOffset + byteLength exceeds buffer size");
+     }
+
+     if (length > 2147483648UL) [[unlikely]] {
        throw std::invalid_argument("Input buffer size is too large");
      }
- 
-     inputBytes = buffer->data();
+
+     inputBytes = buffer->data() + offset;
+     inputLength = length;
    }
- 
+
    return decodeImpl(inputBytes, inputLength, stream);
  }
  
@@ -109,16 +93,31 @@
  // Core decode implementation - shared by typed and raw methods
  std::string HybridTextDecoder::decodeImpl(const uint8_t *inputBytes,
                                            size_t inputLength, bool stream) {
-   // FAST PATH: No pending bytes and all ASCII with no BOM
-   if (_pendingCount == 0 && inputBytes && inputLength > 0) {
-     bool canSkipBOM = _ignoreBOM || inputLength < 3 ||
-                       !(inputBytes[0] == 0xEF && inputBytes[1] == 0xBB &&
-                         inputBytes[2] == 0xBF);
- 
-     if (canSkipBOM && isAllASCII(inputBytes, inputLength)) [[likely]] {
-       return std::string(reinterpret_cast<const char *>(inputBytes),
-                          inputLength);
+   // ULTRA-FAST PATH: No pending bytes, no BOM to strip → validate entire buffer at once
+   // If all bytes are valid UTF-8, return immediately without state machine
+   if (_pendingCount == 0 && inputBytes && inputLength > 0) [[likely]] {
+     // Check for BOM that needs stripping
+     const uint8_t *dataStart = inputBytes;
+     size_t dataLen = inputLength;
+     if (!_ignoreBOM && !_bomSeen && dataLen >= 3 &&
+         dataStart[0] == 0xEF && dataStart[1] == 0xBB && dataStart[2] == 0xBF) {
+       dataStart += 3;
+       dataLen -= 3;
+       // Note: _bomSeen will be set below if we take the fast path
      }
+
+     size_t validLen = findValidUTF8RunLength(dataStart, dataLen);
+     if (validLen == dataLen) [[likely]] {
+       // Entire buffer is valid UTF-8 — direct return, skip state machine
+       if (!stream) {
+         _bomSeen = false; // Reset for non-streaming
+       } else {
+         _bomSeen = true;
+       }
+       return std::string(reinterpret_cast<const char *>(dataStart), dataLen);
+     }
+     // If not fully valid but non-fatal, fall through to full decode path
+     // If fatal, the full decode path will throw the proper error
    }
  
    // Combine pending bytes with new input if needed

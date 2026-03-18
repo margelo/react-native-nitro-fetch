@@ -116,6 +116,7 @@
       },
       "devDependencies": {
         "@react-native/eslint-config": "^0.85.0-rc.0",
+        "@release-it/conventional-changelog": "^9.0.2",
         "@types/react": "^19.2.0",
         "eslint": "^9.22.0",
         "eslint-config-prettier": "^10.1.1",
@@ -125,6 +126,7 @@
         "react": "19.2.3",
         "react-native": "0.85.0-rc.0",
         "react-native-nitro-modules": "^0.35.2",
+        "release-it": "^17.10.0",
         "typescript": "^5.8.3",
       },
       "peerDependencies": {

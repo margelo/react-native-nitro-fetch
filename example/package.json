@@ -18,8 +18,8 @@
     "react-native": "0.85.0-rc.0",
     "react-native-harness": "^1.0.0-alpha.25",
     "react-native-nitro-fetch": "../packages/react-native-nitro-fetch",
-    "react-native-nitro-text-decoder": "../packages/react-native-nitro-text-decoder",
     "react-native-nitro-modules": "^0.35.2",
+    "react-native-nitro-text-decoder": "../packages/react-native-nitro-text-decoder",
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.24.0",
     "react-native-worklets-core": "^1.6.2"

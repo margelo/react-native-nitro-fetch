@@ -53,6 +53,10 @@
  // Unicode 6.3.0, D93b:
  // Maximal subpart of an ill-formed subsequence.
  unsigned maximalSubpartLength(const uint8_t *bytes, size_t available);
+
+ // Find the length of contiguous valid UTF-8 bytes (ASCII + multi-byte)
+ // starting at ptr, up to maxLen. Stops at the first invalid byte.
+ size_t findValidUTF8RunLength(const uint8_t *ptr, size_t maxLen);
  
  // Decode UTF-8 bytes to a UTF-8 string (with validation and error handling).
  // This differs from Hermes which outputs UTF-16 - we keep UTF-8 output

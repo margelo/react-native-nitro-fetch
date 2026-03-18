@@ -42,19 +42,20 @@ export class TextDecoder {
       throw new TypeError('Options must be an object')
     }
     try {
-      // Ensure input is ArrayBuffer
+      // Pass buffer + offset/length to avoid copying
       let buffer: ArrayBuffer | undefined
+      let byteOffset: number | undefined
+      let byteLength: number | undefined
       if (input) {
         if (input instanceof ArrayBuffer) {
           buffer = input
         } else if (ArrayBuffer.isView(input)) {
-          buffer = input.buffer.slice(
-            input.byteOffset,
-            input.byteOffset + input.byteLength
-          ) as ArrayBuffer
+          buffer = input.buffer as ArrayBuffer
+          byteOffset = input.byteOffset
+          byteLength = input.byteLength
         }
       }
-      return this.decoder.decode(buffer, options)
+      return this.decoder.decode(buffer, byteOffset, byteLength, options)
     } catch (e: any) {
       throw new TypeError(e.message)
     }

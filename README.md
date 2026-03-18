@@ -160,10 +160,10 @@ const data = await nitroFetchOnWorklet(
 )
 ```
 
-### Streaming with `TextDecoder` 
+### Streaming with `TextDecoder`
 
-Nitro Fetch can also expose an streaming mode that returns a `ReadableStream` body.  
-Combined with [`react-native-nitro-text-decoder`](https://github.com/margelo/react-native-nitro-fetch/tree/main/packages/react-native-nitro-text-decoder), you can incrementally decode UTF‑8 chunks:
+Nitro Fetch can also expose a streaming mode that returns a `ReadableStream` body.
+Combined with [`react-native-nitro-text-decoder`](https://github.com/margelo/react-native-nitro-fetch/tree/main/packages/react-native-nitro-text-decoder), you can incrementally decode UTF-8 chunks:
 
 ```tsx
 import { useRef, useState } from 'react'
@@ -180,7 +180,7 @@ export function StreamingExample() {
 
   const runStream = async () => {
     // `stream: true` enables the streaming transport
-    const res = await nitrofetch('https://httpbin.org/stream/20', {
+    const res = await nitroFetch('https://httpbin.org/stream/20', {
       stream: true,
     })
 
@@ -199,7 +199,7 @@ export function StreamingExample() {
       append(text)
     }
 
-    append(`\n\n✅ Done — ${chunks} chunk(s) received`)
+    append(`\n\n✅ Done - ${chunks} chunk(s) received`)
   }
 
   // Call `runStream()` from a button handler in your UI

@@ -22,6 +22,11 @@ include_directories(
         "../cpp"
 )
 
+# Enable NEON SIMD for ARM64
+if(CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+  target_compile_options(${PACKAGE_NAME} PRIVATE -march=armv8-a+simd)
+endif()
+
 find_library(LOG_LIB log)
 
 # Link all libraries together
