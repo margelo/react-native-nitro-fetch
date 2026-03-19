@@ -4,6 +4,7 @@ import {
   nitroFetchOnWorklet,
   prefetch,
 } from 'react-native-nitro-fetch';
+import { getRuntimeKind, RuntimeKind } from 'react-native-worklets';
 
 const image = 'https://httpbin.org/image/jpeg';
 
@@ -285,16 +286,22 @@ describe('NitroFetch - nitroFetchOnWorklet', () => {
         }
       }
     }
-    return arr;
+    return { result: arr, runtimeKind: getRuntimeKind() };
   };
 
   it('GET with string mapper returns non-empty string', async () => {
-    const result = await nitroFetchOnWorklet(url, undefined, mapper, {
-      preferBytes: false,
-    });
+    const { result, runtimeKind } = await nitroFetchOnWorklet(
+      url,
+      undefined,
+      mapper,
+      {
+        preferBytes: false,
+      }
+    );
     expect(result.length).toBeGreaterThan(0);
-    expect(result[0].id).toBe('bitcoin');
-    expect(result[0].usd).toBeGreaterThan(0);
+    expect((result as any)[0].id).toBe('bitcoin');
+    expect((result as any)[0].usd).toBeGreaterThan(0);
+    expect(runtimeKind).toBe(RuntimeKind.Worker); // Worker Runtime only
   });
 });
 

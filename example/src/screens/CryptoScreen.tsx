@@ -2,6 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet, Button, ScrollView } from 'react-native';
 import { nitroFetchOnWorklet } from 'react-native-nitro-fetch';
 import { theme } from '../theme';
+import {
+  getRuntimeKind,
+  RuntimeKind,
+  scheduleOnRN,
+} from 'react-native-worklets';
 
 export function CryptoScreen() {
   const [prices, setPrices] = React.useState<
@@ -9,6 +14,9 @@ export function CryptoScreen() {
   >([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [runtimeKind, setRuntimeKind] = React.useState<RuntimeKind | null>(
+    null
+  );
 
   const loadPrices = React.useCallback(async () => {
     setLoading(true);
@@ -46,6 +54,7 @@ export function CryptoScreen() {
           }
         }
       }
+      scheduleOnRN(setRuntimeKind, getRuntimeKind());
       return arr;
     };
 
@@ -73,6 +82,9 @@ export function CryptoScreen() {
           onPress={loadPrices}
           disabled={loading}
         />
+        {runtimeKind != null && (
+          <Text style={styles.runtimeKind}>Runtime Kind: {runtimeKind}</Text>
+        )}
       </View>
 
       {error ? (
@@ -181,5 +193,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: theme.colors.textSecondary,
     marginTop: theme.spacing.xl,
+  },
+  runtimeKind: {
+    fontSize: 15,
+    color: theme.colors.text,
+    marginTop: 2,
   },
 });

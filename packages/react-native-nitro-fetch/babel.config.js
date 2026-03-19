@@ -3,7 +3,7 @@ module.exports = {
     {
       exclude: /\/node_modules\//,
       presets: ['module:react-native-builder-bob/babel-preset'],
-      plugins: ['react-native-worklets-core/plugin'],
+      plugins: ['react-native-worklets/plugin'],
     },
   ],
 };

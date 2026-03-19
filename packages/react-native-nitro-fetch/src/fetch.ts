@@ -714,25 +714,11 @@ export type NitroWorkletMapper<T> = (payload: {
 }) => T;
 
 let nitroRuntime: any | undefined;
-let WorkletsRef: any | undefined;
 function ensureWorkletRuntime(name = 'nitro-fetch'): any | undefined {
   try {
-    const { Worklets } = require('react-native-worklets-core');
-    nitroRuntime = nitroRuntime ?? Worklets.createContext(name);
+    const { createWorkletRuntime } = require('react-native-worklets');
+    nitroRuntime = nitroRuntime ?? createWorkletRuntime(name);
     return nitroRuntime;
-  } catch {
-    console.warn('react-native-worklets-core not available');
-    return undefined;
-  }
-}
-
-function getWorklets(): any | undefined {
-  try {
-    if (WorkletsRef) return WorkletsRef;
-
-    const { Worklets } = require('react-native-worklets-core');
-    WorkletsRef = Worklets;
-    return WorkletsRef;
   } catch {
     console.warn('react-native-worklets-core not available');
     return undefined;
@@ -746,17 +732,19 @@ export async function nitroFetchOnWorklet<T>(
   options?: { preferBytes?: boolean; runtimeName?: string }
 ): Promise<T> {
   const preferBytes = options?.preferBytes === true; // default true
-  let rt: any | undefined;
-  let Worklets: any | undefined;
+  let runOnRuntimeAsync: any;
+  let rt: any;
   try {
     rt = ensureWorkletRuntime(options?.runtimeName);
-    Worklets = getWorklets();
-  } catch (e) {
-    console.error('nitroFetchOnWorklet: setup failed', e);
+    const worklets = require('react-native-worklets');
+    runOnRuntimeAsync = worklets.runOnRuntimeAsync;
+  } catch {
+    // Module not available
   }
-
+  console.log('runOnRuntimeAsync', runOnRuntimeAsync);
+  console.log('rt', rt);
   // Fallback: if runtime is not available, do the work on JS
-  if (!rt || !Worklets || typeof rt.runAsync !== 'function') {
+  if (!runOnRuntimeAsync) {
     console.warn('nitroFetchOnWorklet: no runtime, mapping on JS thread');
     const res = await nitroFetchRaw(input, init);
     const payload = {
@@ -771,7 +759,7 @@ export async function nitroFetchOnWorklet<T>(
     } as const;
     return mapWorklet(payload as any);
   }
-  return await rt.runAsync(() => {
+  return await runOnRuntimeAsync(rt, () => {
     'worklet';
     const unboxedNitroFetch = boxedNitroFetch.unbox();
     const unboxedClient = unboxedNitroFetch.createClient();
@@ -791,9 +779,6 @@ export async function nitroFetchOnWorklet<T>(
     return mapWorklet(payload as any);
   });
 }
-
-export const x = ensureWorkletRuntime();
-export const y = getWorklets();
 
 export type {
   NitroFormDataPart,
