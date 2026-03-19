@@ -6,7 +6,7 @@ pre-commit:
       run: npx eslint --no-warn-ignored {staged_files}
     types:
       glob: "*.{js,ts, jsx, tsx}"
-      run: npx tsc --noEmit --project package/tsconfig.json
+      run: npx tsc --noEmit --project packages/react-native-nitro-fetch/tsconfig.json && npx tsc --noEmit --project packages/react-native-nitro-text-decoder/tsconfig.json
 commit-msg:
   parallel: true
   commands:
