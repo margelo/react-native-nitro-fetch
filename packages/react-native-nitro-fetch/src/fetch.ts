@@ -741,10 +741,8 @@ export async function nitroFetchOnWorklet<T>(
   } catch {
     // Module not available
   }
-  console.log('runOnRuntimeAsync', runOnRuntimeAsync);
-  console.log('rt', rt);
   // Fallback: if runtime is not available, do the work on JS
-  if (!runOnRuntimeAsync) {
+  if (!runOnRuntimeAsync || !rt) {
     console.warn('nitroFetchOnWorklet: no runtime, mapping on JS thread');
     const res = await nitroFetchRaw(input, init);
     const payload = {
