@@ -1,6 +1,6 @@
 {
   "name": "react-native-nitro-fetch",
-  "version": "0.1.7",
+  "version": "0.2.1",
   "description": "Awesome Fetch :)",
   "main": "./lib/module/index.js",
   "module": "./lib/module/index.js",
@@ -101,6 +101,9 @@
       "optional": true
     }
   },
+  "dependencies": {
+    "web-streams-polyfill": "^4.2.0"
+  },
   "workspaces": [
     "example"
   ],
@@ -118,7 +121,7 @@
       "publish": true
     },
     "github": {
-      "release": false
+      "release": true
     }
   },
   "prettier": {

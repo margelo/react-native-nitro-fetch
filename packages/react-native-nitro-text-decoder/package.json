@@ -1,6 +1,6 @@
 {
   "name": "react-native-nitro-text-decoder",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "react-native-nitro-text-decoder",
   "main": "lib/index",
   "module": "lib/index",

@@ -70,7 +70,10 @@
     },
     "packages/react-native-nitro-fetch": {
       "name": "react-native-nitro-fetch",
-      "version": "0.1.7",
+      "version": "0.2.0",
+      "dependencies": {
+        "web-streams-polyfill": "^4.2.0",
+      },
       "devDependencies": {
         "@commitlint/config-conventional": "^19.6.0",
         "@eslint/compat": "^1.2.7",
@@ -110,7 +113,7 @@
     },
     "packages/react-native-nitro-text-decoder": {
       "name": "react-native-nitro-text-decoder",
-      "version": "0.0.1",
+      "version": "0.1.0",
       "dependencies": {
         "web-streams-polyfill": "^4.2.0",
       },
