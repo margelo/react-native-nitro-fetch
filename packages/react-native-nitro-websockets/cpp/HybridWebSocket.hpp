@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "HybridNitroWebSocketSpec.hpp"
+#include "HybridHybridWebSocketSpec.hpp"
 #include "WebSocketConnection.hpp"
 
 #include <functional>
@@ -17,7 +17,7 @@
 namespace margelo::nitro::nitrofetchwebsockets {
 
 
-class HybridWebSocket : public HybridNitroWebSocketSpec {
+class HybridWebSocket : public HybridHybridWebSocketSpec {
 public:
   HybridWebSocket();
   ~HybridWebSocket() override;

@@ -70,8 +70,8 @@ int nitroWsCallback(lws* wsi, enum lws_callback_reasons reason,
       break;
 
     case LWS_CALLBACK_CLIENT_WRITEABLE:
-      if (conn) conn->handleWriteable(wsi);
-      break;
+      if (conn) return conn->handleWriteable(wsi);
+      return 0;
 
     case LWS_CALLBACK_CLIENT_CLOSED:
       if (conn) conn->handleClose(0, nullptr, 0);
@@ -285,15 +285,14 @@ void WebSocketConnection::handleReceive(const void* in, size_t len, bool isBinar
   }
 }
 
-void WebSocketConnection::handleWriteable(lws* wsi) {
+int WebSocketConnection::handleWriteable(lws* wsi) {
   OutMessage msg;
   {
     std::lock_guard<std::mutex> lock(_writeMu);
     if (_writeQueue.empty()) {
-      if (_state == State::CLOSING) {
-        lws_close_reason(wsi, LWS_CLOSE_STATUS_NORMAL, nullptr, 0);
-      }
-      return;
+      // Returning -1 tells lws to send the close frame (set earlier via
+      // lws_close_reason) and then fire LWS_CALLBACK_CLIENT_CLOSED.
+      return (_state == State::CLOSING) ? -1 : 0;
     }
     msg = std::move(_writeQueue.front());
     _writeQueue.pop_front();
@@ -308,8 +307,13 @@ void WebSocketConnection::handleWriteable(lws* wsi) {
 
   {
     std::lock_guard<std::mutex> lock(_writeMu);
-    if (!_writeQueue.empty()) lws_callback_on_writable(wsi);
+    // Re-request writeable if there's more data OR if we still need to close
+    // (so the next callback fires with an empty queue and returns -1).
+    if (!_writeQueue.empty() || _state == State::CLOSING) {
+      lws_callback_on_writable(wsi);
+    }
   }
+  return 0;
 }
 
 void WebSocketConnection::handleClose(int code, const char* reason, size_t len) {

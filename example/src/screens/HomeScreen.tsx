@@ -57,6 +57,13 @@ const EXAMPLES = [
     screen: 'WebSocketScreen' as const,
     icon: '🔌',
   },
+  {
+    id: 'ws-benchmark',
+    title: 'WS Benchmark',
+    description: 'Connect + 20 echo messages + disconnect: Nitro vs built-in.',
+    screen: 'WebSocketBenchmarkScreen' as const,
+    icon: '📡',
+  },
 ];
 
 export function HomeScreen() {

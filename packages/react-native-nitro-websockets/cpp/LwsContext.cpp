@@ -36,14 +36,9 @@ LwsContext::LwsContext() {
   info.gid      = -1;
   info.uid      = -1;
 
-#if defined(__ANDROID__)
+#if defined(__ANDROID__) || defined(__APPLE__)
   info.client_ssl_ca_mem     = kCacertPemData;
   info.client_ssl_ca_mem_len = kCacertPemLen;
-#else
-  std::string caPath = getCaBundlePath();
-  if (!caPath.empty()) {
-    info.client_ssl_ca_filepath = caPath.c_str();
-  }
 #endif
 
   _ctx = lws_create_context(&info);

@@ -15,6 +15,22 @@ add_subdirectory(
   ${CMAKE_BINARY_DIR}/mbedtls
 )
 
+# ── Pre-seed libwebsockets mbedTLS capability checks ─────────────────────────
+# When mbedTLS is compiled in-tree via add_subdirectory, the .a files don't
+# exist at cmake configure time, so libwebsockets' CHECK_FUNCTION_EXISTS link
+# tests all fail. We know which APIs are present in mbedTLS 3.6.5 and pre-seed
+# the cache so the checks are skipped.
+foreach(_sym
+    mbedtls_md_setup mbedtls_net_init mbedtls_rsa_complete
+    mbedtls_ssl_conf_alpn_protocols mbedtls_ssl_get_alpn_protocol
+    mbedtls_ssl_conf_sni mbedtls_ssl_set_hs_ca_chain
+    mbedtls_ssl_set_hs_own_cert mbedtls_ssl_set_hs_authmode
+    mbedtls_ssl_set_verify mbedtls_x509_crt_parse_file)
+  set(LWS_HAVE_${_sym} 1 CACHE BOOL "" FORCE)
+endforeach()
+# mbedtls_internal_aes_encrypt was removed in mbedTLS 3.x; leave it as 0.
+set(LWS_HAVE_mbedtls_internal_aes_encrypt 0 CACHE BOOL "" FORCE)
+
 # ── libwebsockets ─────────────────────────────────────────────────────────────
 set(LWS_WITH_MBEDTLS          ON  CACHE BOOL "" FORCE)
 set(LWS_WITH_SSL              ON  CACHE BOOL "" FORCE)
@@ -27,16 +43,9 @@ set(LWS_WITHOUT_DAEMONIZE     ON  CACHE BOOL "" FORCE)
 set(LWS_WITH_LIBUV            OFF CACHE BOOL "" FORCE)
 set(LWS_WITH_ZLIB             OFF CACHE BOOL "" FORCE)
 set(LWS_WITH_HTTP2            OFF CACHE BOOL "" FORCE)
-# Tell libwebsockets where to find mbedTLS headers and libs
-set(MBEDTLS_INCLUDE_DIRS
-  "${CMAKE_SOURCE_DIR}/../thirdparty/mbedtls/include"
-  CACHE PATH "" FORCE)
-set(MBEDTLS_LIBRARIES
-  mbedtls mbedx509 mbedcrypto
-  CACHE STRING "" FORCE)
-# Disable export target installation (mbedtls targets aren't in any export set)
+set(MBEDTLS_INCLUDE_DIRS      "${CMAKE_SOURCE_DIR}/../thirdparty/mbedtls/include" CACHE PATH "" FORCE)
+set(MBEDTLS_LIBRARIES         mbedtls mbedx509 mbedcrypto CACHE STRING "" FORCE)
 set(LWS_WITH_EXPORT_LWSTARGETS OFF CACHE BOOL "" FORCE)
-# Allow source-tree paths in INTERFACE_INCLUDE_DIRECTORIES (CMP0052 old behavior)
 set(CMAKE_POLICY_DEFAULT_CMP0052 OLD)
 add_subdirectory(
   ${CMAKE_SOURCE_DIR}/../thirdparty/libwebsockets

@@ -50,6 +50,11 @@
     "url": "https://github.com/mrousavy/nitro/issues"
   },
   "homepage": "https://github.com/mrousavy/nitro#readme",
+  "codegenConfig": {
+    "name": "NitroFetchWebsocketsSpec",
+    "type": "modules",
+    "jsSrcsDir": "src"
+  },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },

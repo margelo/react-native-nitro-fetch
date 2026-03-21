@@ -8,7 +8,8 @@
   "workspaces": [
     "example",
     "packages/react-native-nitro-fetch",
-    "packages/react-native-nitro-text-decoder"
+    "packages/react-native-nitro-text-decoder",
+    "packages/react-native-nitro-websockets"
   ],
   "repository": "https://github.com/margelo/react-native-nitro-fetch.git",
   "scripts": {
@@ -17,11 +18,15 @@
     "typecheck": "bun --cwd packages/react-native-nitro-fetch tsc && bun --cwd packages/react-native-nitro-text-decoder tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
-    "prepare": "bun --cwd packages/react-native-nitro-fetch bob build && bun --cwd packages/react-native-nitro-text-decoder specs",
-    "nitrogen": "bun --cwd packages/react-native-nitro-fetch nitrogen && bun --cwd packages/react-native-nitro-text-decoder specs",
+    "textDecoder": "bun --cwd packages/react-native-nitro-text-decoder",
+    "websockets": "bun --cwd packages/react-native-nitro-websockets",
+    "fetch": "bun --cwd packages/react-native-nitro-fetch",
+    "prepare": "bun fetch spc",
+    "nitrogen": "bun --cwd packages/react-native-nitro-fetch nitrogen && bun --cwd packages/react-native-nitro-text-decoder specs && bun --cwd packages/react-native-nitro-websockets specs",
     "release": "release-it --only-version",
     "release:fetch": "bun --cwd packages/react-native-nitro-fetch release-it --only-version",
-    "release:textdecoder": "bun --cwd packages/react-native-nitro-text-decoder release-it --only-version"
+    "release:textdecoder": "bun --cwd packages/react-native-nitro-text-decoder release-it --only-version",
+    "release:websockets": "bun --cwd packages/react-native-nitro-websockets release-it --only-version"
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^19.6.0",

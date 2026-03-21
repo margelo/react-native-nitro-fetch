@@ -7,6 +7,7 @@ import {
   ScrollView,
   TextInput,
   ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import {
   NitroWebSocket,
@@ -19,6 +20,10 @@ type LogEntry = { time: string; direction: 'in' | 'out' | 'sys'; text: string };
 
 const ECHO_URL = 'wss://echo.websocket.org';
 
+// Module-level: survives navigation (component unmount/remount).
+// The socket keeps the C++ object alive even when the screen is not visible.
+let _ws: NitroWebSocket | null = null;
+
 function timestamp() {
   return new Date().toLocaleTimeString([], {
     hour: '2-digit',
@@ -28,12 +33,42 @@ function timestamp() {
 }
 
 export function WebSocketScreen() {
-  const wsRef = React.useRef<NitroWebSocket | null>(null);
-  const [connected, setConnected] = React.useState(false);
-  const [connecting, setConnecting] = React.useState(false);
+  // Derive initial state from the live socket so navigation back shows the
+  // correct status without re-connecting.
+  const [connected, setConnected] = React.useState(
+    () => _ws?.readyState === 'OPEN'
+  );
+  const [connecting, setConnecting] = React.useState(
+    () => _ws?.readyState === 'CONNECTING'
+  );
   const [logs, setLogs] = React.useState<LogEntry[]>([]);
   const [input, setInput] = React.useState('Hello, WebSocket!');
   const scrollRef = React.useRef<ScrollView>(null);
+
+  // Re-attach callbacks whenever the screen mounts so state updates reach
+  // this component instance (e.g. after navigating away and back).
+  React.useEffect(() => {
+    if (!_ws) return;
+    _ws.onopen = () => {
+      setConnected(true);
+      setConnecting(false);
+      addLog('sys', 'Connected');
+    };
+    _ws.onmessage = (evt: WebSocketMessageEvent) => addLog('in', evt.data);
+    _ws.onerror = (err: string) => {
+      addLog('sys', `Error: ${err}`);
+      setConnected(false);
+      setConnecting(false);
+      _ws = null;
+    };
+    _ws.onclose = (evt: WebSocketCloseEvent) => {
+      addLog('sys', `Closed (code ${evt.code}${evt.reason ? ` — ${evt.reason}` : ''})`);
+      setConnected(false);
+      setConnecting(false);
+      _ws = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const addLog = (direction: LogEntry['direction'], text: string) => {
     setLogs((prev) => [...prev, { time: timestamp(), direction, text }]);
@@ -41,11 +76,12 @@ export function WebSocketScreen() {
   };
 
   const connect = () => {
-    if (wsRef.current) return;
+    if (_ws) return;
     setConnecting(true);
     addLog('sys', `Connecting to ${ECHO_URL}…`);
 
     const ws = new NitroWebSocket(ECHO_URL);
+    _ws = ws;
 
     ws.onopen = () => {
       setConnected(true);
@@ -62,27 +98,25 @@ export function WebSocketScreen() {
       console.error('Error: ', err);
       setConnected(false);
       setConnecting(false);
-      wsRef.current = null;
+      _ws = null;
     };
 
     ws.onclose = (evt: WebSocketCloseEvent) => {
       addLog('sys', `Closed (code ${evt.code}${evt.reason ? ` — ${evt.reason}` : ''})`);
       setConnected(false);
       setConnecting(false);
-      wsRef.current = null;
+      _ws = null;
     };
-
-    wsRef.current = ws;
   };
 
   const disconnect = () => {
-    wsRef.current?.close(1000, 'user closed');
+    _ws?.close(1000, 'user closed');
   };
 
   const sendMessage = () => {
     const msg = input.trim();
     if (!msg || !connected) return;
-    wsRef.current?.send(msg);
+    _ws?.send(msg);
     addLog('out', msg);
   };
 
@@ -125,14 +159,14 @@ export function WebSocketScreen() {
             <Text style={styles.actionBtnText}>Connect</Text>
           </Pressable>
         ) : connected ? (
-          <Pressable
+          <TouchableOpacity
             style={[styles.actionBtn, styles.actionBtnDanger]}
             onPress={disconnect}
           >
             <Text style={[styles.actionBtnText, styles.actionBtnDangerText]}>
               Disconnect
             </Text>
-          </Pressable>
+          </TouchableOpacity>
         ) : (
           <ActivityIndicator size="small" color={theme.colors.primary} />
         )}

@@ -63,7 +63,7 @@ public:
 
   void handleEstablished(lws* wsi);
   void handleReceive(const void* in, size_t len, bool isBinary);
-  void handleWriteable(lws* wsi);
+  int  handleWriteable(lws* wsi);  // returns -1 to tell lws to send the close frame
   void handleClose(int code, const char* reason, size_t len);
   void handleError(const char* msg);
   void handleAppendHandshakeHeader(uint8_t** p, uint8_t* end, lws* wsi);

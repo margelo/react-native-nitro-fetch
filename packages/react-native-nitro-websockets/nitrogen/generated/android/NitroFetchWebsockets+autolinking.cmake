@@ -33,7 +33,7 @@ target_sources(
   # Autolinking Setup
   ../nitrogen/generated/android/NitroFetchWebsocketsOnLoad.cpp
   # Shared Nitrogen C++ sources
-  ../nitrogen/generated/shared/c++/HybridNitroWebSocketSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridHybridWebSocketSpec.cpp
   # Android-specific Nitrogen C++ sources
   
 )
