@@ -15,6 +15,7 @@ import { PrefetchScreen } from './screens/PrefetchScreen';
 import { AbortScreen } from './screens/AbortScreen';
 import { BasicFetchScreen } from './screens/BasicFetchScreen';
 import { StreamingScreen } from './screens/StreamingScreen';
+import { WebSocketScreen } from './screens/WebSocketScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -119,6 +120,11 @@ export default function App() {
           name="StreamingScreen"
           component={StreamingScreen}
           options={{ title: 'Streaming' }}
+        />
+        <Stack.Screen
+          name="WebSocketScreen"
+          component={WebSocketScreen}
+          options={{ title: 'WebSocket' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

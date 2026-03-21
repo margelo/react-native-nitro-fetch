@@ -1,0 +1,23 @@
+{
+  "$schema": "https://nitro.margelo.com/nitro.schema.json",
+  "cxxNamespace": [
+    "nitrofetchwebsockets"
+  ],
+  "ios": {
+    "iosModuleName": "NitroFetchWebsockets"
+  },
+  "android": {
+    "androidNamespace": [
+      "nitrofetchwebsockets"
+    ],
+    "androidCxxLibName": "NitroFetchWebsockets"
+  },
+  "autolinking": {
+    "WebSocket": {
+      "cpp": "HybridWebSocket"
+    }
+  },
+  "ignorePaths": [
+    "**/node_modules"
+  ]
+}

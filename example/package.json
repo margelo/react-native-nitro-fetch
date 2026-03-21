@@ -20,6 +20,7 @@
     "react-native-nitro-fetch": "../packages/react-native-nitro-fetch",
     "react-native-nitro-modules": "^0.35.2",
     "react-native-nitro-text-decoder": "../packages/react-native-nitro-text-decoder",
+    "react-native-nitro-websockets": "../packages/react-native-nitro-websockets",
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.24.0",
     "react-native-worklets": "^0.8.0"

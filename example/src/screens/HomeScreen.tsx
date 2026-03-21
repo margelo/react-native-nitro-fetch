@@ -50,6 +50,13 @@ const EXAMPLES = [
     screen: 'StreamingScreen' as const,
     icon: '🌊',
   },
+  {
+    id: 'websocket',
+    title: 'WebSocket',
+    description: 'Full-duplex WebSocket echo test with libwebsockets + mbedTLS.',
+    screen: 'WebSocketScreen' as const,
+    icon: '🔌',
+  },
 ];
 
 export function HomeScreen() {

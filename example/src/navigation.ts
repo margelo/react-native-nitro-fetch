@@ -6,6 +6,7 @@ export type RootStackParamList = {
   AbortScreen: undefined;
   BasicFetchScreen: undefined;
   StreamingScreen: undefined;
+  WebSocketScreen: undefined;
 };
 
 export type MainTabParamList = {
