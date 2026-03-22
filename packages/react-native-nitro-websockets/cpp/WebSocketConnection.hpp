@@ -67,6 +67,8 @@ public:
   void handleClose(int code, const char* reason, size_t len);
   void handleError(const char* msg);
   void handleAppendHandshakeHeader(uint8_t** p, uint8_t* end, lws* wsi);
+  void handleRedirect(const std::string& location);
+  bool consumeRedirectFlag() { return _isRedirecting.exchange(false); }
 
 private:
   void requestWrite();
@@ -83,6 +85,9 @@ private:
   OnError   _onError;
 
   std::atomic<bool> _openFired{false};
+  std::atomic<bool> _isRedirecting{false};
+  std::atomic<int>  _redirectCount{0};
+  static constexpr int kMaxRedirects = 5;
 
   struct BufferedMessage { std::vector<uint8_t> data; bool isBinary; };
   std::deque<BufferedMessage> _msgBuffer;
@@ -97,7 +102,8 @@ private:
     std::string host;
     int port;
     std::string path;
-    std::string protocolStr;
+    std::string protocolStr;       // comma-joined, used by lws_client_connect_info
+    std::vector<std::string> protocols; // original list, used by handleRedirect
     bool isWss;
     std::unordered_map<std::string, std::string> headers;
   };

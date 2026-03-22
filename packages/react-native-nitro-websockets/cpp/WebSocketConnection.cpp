@@ -79,12 +79,21 @@ int nitroWsCallback(lws* wsi, enum lws_callback_reasons reason,
 
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR: {
       if (conn) {
+        if (conn->consumeRedirectFlag()) break;
         const char* msg = (in && len > 0)
           ? static_cast<const char*>(in)
           : "connection error";
         conn->handleError(msg);
       }
       break;
+    }
+
+    case LWS_CALLBACK_CLIENT_HTTP_REDIRECT: {
+      if (conn && in && len > 0) {
+        std::string location(static_cast<const char*>(in), len);
+        conn->handleRedirect(location);
+      }
+      return -1;  // tell lws we handle the redirect ourselves
     }
 
     case LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER: {
@@ -142,7 +151,7 @@ void WebSocketConnection::connect(
   {
     std::lock_guard<std::mutex> lock(_pendingConnectMu);
     _pendingConnect = PendingConnect{
-      parsed.host, parsed.port, parsed.path, protocolStr, parsed.isWss, headers
+      parsed.host, parsed.port, parsed.path, protocolStr, protocols, parsed.isWss, headers
     };
   }
 
@@ -228,8 +237,7 @@ void WebSocketConnection::requestWrite() {
 
 void WebSocketConnection::setOnOpen(OnOpen cb) {
   _onOpen = std::move(cb);
-  // Replay: connection already opened before this callback was registered
-  if (_openFired.exchange(false) && _onOpen) {
+  if (_onOpen && _openFired.exchange(false)) {
     _onOpen();
   }
 }
@@ -261,6 +269,7 @@ void WebSocketConnection::setOnError(OnError cb) {
 void WebSocketConnection::handleEstablished(lws* wsi) {
   _wsi   = wsi;
   _state = State::OPEN;
+  _redirectCount = 0;
 
   const lws_protocols* proto = lws_get_protocol(wsi);
   if (proto && proto->name) _negotiatedProtocol = proto->name;
@@ -329,6 +338,35 @@ void WebSocketConnection::handleError(const char* msg) {
   _state = State::CLOSED;
   _wsi   = nullptr;
   if (_onError) _onError(msg ? std::string(msg) : "WebSocket error");
+}
+
+void WebSocketConnection::handleRedirect(const std::string& location) {
+  if (_redirectCount.fetch_add(1) >= kMaxRedirects) {
+    _isRedirecting = false;
+    handleError("too many redirects");
+    return;
+  }
+
+  _isRedirecting = true;
+  _wsi   = nullptr;
+  _state = State::CONNECTING;
+
+  // Normalise http(s):// → ws(s):// so parseUrl() accepts it
+  std::string url = location;
+  if      (url.rfind("https://", 0) == 0) url = "wss://" + url.substr(8);
+  else if (url.rfind("http://",  0) == 0) url = "ws://"  + url.substr(7);
+
+  std::vector<std::string> protocols;
+  std::unordered_map<std::string, std::string> headers;
+  {
+    std::lock_guard<std::mutex> lock(_pendingConnectMu);
+    if (_pendingConnect) {
+      protocols = _pendingConnect->protocols;
+      headers   = _pendingConnect->headers;
+    }
+  }
+
+  connect(url, protocols, headers);
 }
 
 void WebSocketConnection::handleAppendHandshakeHeader(uint8_t** p, uint8_t* end, lws* wsi) {
