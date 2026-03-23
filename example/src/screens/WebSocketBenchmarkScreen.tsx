@@ -18,10 +18,10 @@ const MESSAGE_COUNT = 20;
 const RUNS = 3;
 
 type RunResult = {
-  connectMs: number;   // time from start → onopen
+  connectMs: number; // time from start → onopen
   roundtripMs: number; // time from first send → last echo received
-  closeMs: number;     // time from ws.close() → onclose
-  totalMs: number;     // end-to-end
+  closeMs: number; // time from ws.close() → onclose
+  totalMs: number; // end-to-end
 };
 
 type BenchResult = {
@@ -32,17 +32,20 @@ type BenchResult = {
 function avgResults(runs: RunResult[]): RunResult {
   const n = runs.length;
   return {
-    connectMs:    runs.reduce((s, r) => s + r.connectMs,    0) / n,
-    roundtripMs:  runs.reduce((s, r) => s + r.roundtripMs,  0) / n,
-    closeMs:      runs.reduce((s, r) => s + r.closeMs,      0) / n,
-    totalMs:      runs.reduce((s, r) => s + r.totalMs,      0) / n,
+    connectMs: runs.reduce((s, r) => s + r.connectMs, 0) / n,
+    roundtripMs: runs.reduce((s, r) => s + r.roundtripMs, 0) / n,
+    closeMs: runs.reduce((s, r) => s + r.closeMs, 0) / n,
+    totalMs: runs.reduce((s, r) => s + r.totalMs, 0) / n,
   };
 }
 
 function runNitro(): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     const t0 = performance.now();
-    let tOpen = 0, tSend = 0, tLastEcho = 0, tClose = 0;
+    let tOpen = 0,
+      tSend = 0,
+      tLastEcho = 0,
+      tClose = 0;
     let received = 0;
 
     const ws = new NitroWebSocket(ECHO_URL);
@@ -64,10 +67,10 @@ function runNitro(): Promise<RunResult> {
 
     ws.onclose = () => {
       resolve({
-        connectMs:   tOpen     - t0,
+        connectMs: tOpen - t0,
         roundtripMs: tLastEcho - tSend,
-        closeMs:     performance.now() - tClose,
-        totalMs:     performance.now() - t0,
+        closeMs: performance.now() - tClose,
+        totalMs: performance.now() - t0,
       });
     };
 
@@ -78,7 +81,10 @@ function runNitro(): Promise<RunResult> {
 function runBuiltin(): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     const t0 = performance.now();
-    let tOpen = 0, tSend = 0, tLastEcho = 0, tClose = 0;
+    let tOpen = 0,
+      tSend = 0,
+      tLastEcho = 0,
+      tClose = 0;
     let received = 0;
 
     const ws: any = new global.WebSocket(ECHO_URL);
@@ -100,10 +106,10 @@ function runBuiltin(): Promise<RunResult> {
 
     ws.onclose = () => {
       resolve({
-        connectMs:   tOpen     - t0,
+        connectMs: tOpen - t0,
         roundtripMs: tLastEcho - tSend,
-        closeMs:     performance.now() - tClose,
-        totalMs:     performance.now() - t0,
+        closeMs: performance.now() - tClose,
+        totalMs: performance.now() - t0,
       });
     };
 
@@ -113,7 +119,7 @@ function runBuiltin(): Promise<RunResult> {
 
 async function runAll(
   runner: () => Promise<RunResult>,
-  onProgress: (run: number) => void,
+  onProgress: (run: number) => void
 ): Promise<BenchResult> {
   const runs: RunResult[] = [];
   for (let i = 0; i < RUNS; i++) {
@@ -130,8 +136,12 @@ type Phase = 'idle' | 'nitro' | 'builtin' | 'done';
 export function WebSocketBenchmarkScreen() {
   const [phase, setPhase] = React.useState<Phase>('idle');
   const [run, setRun] = React.useState(0);
-  const [nitroResult, setNitroResult] = React.useState<BenchResult | null>(null);
-  const [builtinResult, setBuiltinResult] = React.useState<BenchResult | null>(null);
+  const [nitroResult, setNitroResult] = React.useState<BenchResult | null>(
+    null
+  );
+  const [builtinResult, setBuiltinResult] = React.useState<BenchResult | null>(
+    null
+  );
   const [error, setError] = React.useState<string | null>(null);
 
   const start = async () => {
@@ -163,10 +173,7 @@ export function WebSocketBenchmarkScreen() {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-    >
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>WebSocket Benchmark</Text>
@@ -184,7 +191,11 @@ export function WebSocketBenchmarkScreen() {
       >
         {running ? (
           <View style={styles.btnRow}>
-            <ActivityIndicator size="small" color="#FFF" style={styles.spinner} />
+            <ActivityIndicator
+              size="small"
+              color="#FFF"
+              style={styles.spinner}
+            />
             <Text style={styles.btnText}>
               {phase === 'nitro' ? 'Nitro' : 'Built-in'} — run {run}/{RUNS}
             </Text>
@@ -243,11 +254,7 @@ export function WebSocketBenchmarkScreen() {
                     styles.cell,
                     styles.diffCol,
                     styles.mono,
-                    d
-                      ? d.faster
-                        ? styles.faster
-                        : styles.slower
-                      : undefined,
+                    d ? (d.faster ? styles.faster : styles.slower) : undefined,
                   ]}
                 >
                   {d
@@ -267,7 +274,10 @@ export function WebSocketBenchmarkScreen() {
           <View style={styles.row}>
             <Text style={[styles.cell, styles.labelCell]} />
             {Array.from({ length: RUNS }, (_, i) => (
-              <Text key={i} style={[styles.cell, styles.runCol, styles.colHead]}>
+              <Text
+                key={i}
+                style={[styles.cell, styles.runCol, styles.colHead]}
+              >
                 Run {i + 1}
               </Text>
             ))}
@@ -276,18 +286,20 @@ export function WebSocketBenchmarkScreen() {
             { label: 'Nitro', result: nitroResult },
             { label: 'Built-in', result: builtinResult },
           ].map(({ label, result }, ri) => (
-            <View key={label} style={[styles.row, ri % 2 === 1 && styles.rowAlt]}>
+            <View
+              key={label}
+              style={[styles.row, ri % 2 === 1 && styles.rowAlt]}
+            >
               <Text style={[styles.cell, styles.labelCell]}>{label}</Text>
               {Array.from({ length: RUNS }, (_, i) => (
-                <Text
-                  key={i}
-                  style={[styles.cell, styles.runCol, styles.mono]}
-                >
+                <Text key={i} style={[styles.cell, styles.runCol, styles.mono]}>
                   {result?.runs[i] != null
                     ? result.runs[i]!.totalMs.toFixed(1)
-                    : result == null && running && phase === (ri === 0 ? 'nitro' : 'builtin')
-                    ? '…'
-                    : '—'}
+                    : result == null &&
+                        running &&
+                        phase === (ri === 0 ? 'nitro' : 'builtin')
+                      ? '…'
+                      : '—'}
                 </Text>
               ))}
             </View>

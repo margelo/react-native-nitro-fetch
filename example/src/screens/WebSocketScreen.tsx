@@ -62,12 +62,14 @@ export function WebSocketScreen() {
       _ws = null;
     };
     _ws.onclose = (evt: WebSocketCloseEvent) => {
-      addLog('sys', `Closed (code ${evt.code}${evt.reason ? ` — ${evt.reason}` : ''})`);
+      addLog(
+        'sys',
+        `Closed (code ${evt.code}${evt.reason ? ` — ${evt.reason}` : ''})`
+      );
       setConnected(false);
       setConnecting(false);
       _ws = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const addLog = (direction: LogEntry['direction'], text: string) => {
@@ -102,7 +104,10 @@ export function WebSocketScreen() {
     };
 
     ws.onclose = (evt: WebSocketCloseEvent) => {
-      addLog('sys', `Closed (code ${evt.code}${evt.reason ? ` — ${evt.reason}` : ''})`);
+      addLog(
+        'sys',
+        `Closed (code ${evt.code}${evt.reason ? ` — ${evt.reason}` : ''})`
+      );
       setConnected(false);
       setConnecting(false);
       _ws = null;
@@ -191,7 +196,10 @@ export function WebSocketScreen() {
             </Text>
           ) : (
             logs.map((entry, i) => (
-              <Text key={i} style={[styles.logLine, { color: logColor(entry.direction) }]}>
+              <Text
+                key={i}
+                style={[styles.logLine, { color: logColor(entry.direction) }]}
+              >
                 <Text style={styles.logTime}>{entry.time} </Text>
                 {logPrefix(entry.direction)}
                 {entry.text}

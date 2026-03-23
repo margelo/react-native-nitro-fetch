@@ -37,6 +37,7 @@ export default defineConfig([
       '**/react-native.config.js',
       '**/babel.config.js',
       '.yarn/**',
+      '**/thirdparty/**',
       'eslint.config.mjs',
     ],
   },

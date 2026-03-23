@@ -53,7 +53,8 @@ const EXAMPLES = [
   {
     id: 'websocket',
     title: 'WebSocket',
-    description: 'Full-duplex WebSocket echo test with libwebsockets + mbedTLS.',
+    description:
+      'Full-duplex WebSocket echo test with libwebsockets + mbedTLS.',
     screen: 'WebSocketScreen' as const,
     icon: '🔌',
   },

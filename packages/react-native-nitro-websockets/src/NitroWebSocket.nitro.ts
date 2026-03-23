@@ -14,8 +14,10 @@ export interface WebSocketCloseEvent {
   wasClean: boolean
 }
 
-export interface HybridWebSocket
-  extends HybridObject<{ ios: 'c++'; android: 'c++' }> {
+export interface HybridWebSocket extends HybridObject<{
+  ios: 'c++'
+  android: 'c++'
+}> {
   readonly readyState: WebSocketReadyState
   readonly url: string
   readonly bufferedAmount: number
