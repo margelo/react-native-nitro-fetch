@@ -51,6 +51,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - NitroFetchWebsocketsPrewarmer (0.0.1):
+    - NitroFetchWebsockets
   - NitroModules (0.35.2):
     - hermes-engine
     - RCTRequired
@@ -2035,6 +2037,7 @@ DEPENDENCIES:
   - hermes-engine (from `../../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
   - NitroFetch (from `../../node_modules/react-native-nitro-fetch`)
   - NitroFetchWebsockets (from `../../node_modules/react-native-nitro-websockets`)
+  - NitroFetchWebsocketsPrewarmer (from `../../packages/react-native-nitro-websockets`)
   - NitroModules (from `../../node_modules/react-native-nitro-modules`)
   - NitroTextDecoder (from `../../node_modules/react-native-nitro-text-decoder`)
   - RCTDeprecation (from `../../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -2123,6 +2126,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/react-native-nitro-fetch"
   NitroFetchWebsockets:
     :path: "../../node_modules/react-native-nitro-websockets"
+  NitroFetchWebsocketsPrewarmer:
+    :path: "../../packages/react-native-nitro-websockets"
   NitroModules:
     :path: "../../node_modules/react-native-nitro-modules"
   NitroTextDecoder:
@@ -2280,7 +2285,8 @@ SPEC CHECKSUMS:
   FBLazyVector: 4ee5f665093abe339f4b579fc3d59f65c8af196c
   hermes-engine: 6e73b6dc6e9f908925b064fcfed5d7ae87f93a6e
   NitroFetch: fbbbc61ad92977bd6620ad52e2d1b094cf7408d8
-  NitroFetchWebsockets: 5097002c79ba3579fb0c7569c110dd60a9a35124
+  NitroFetchWebsockets: 864f9f089f0e555736f9e2a995dd0eaeef1d19e3
+  NitroFetchWebsocketsPrewarmer: 4df7bc0de1b88993e0b46cf3e0cf0668a7cb6148
   NitroModules: 2d92eeea80a5afdebe7b4fd2443b5bd4d7ba1a44
   NitroTextDecoder: f01469b8de6606c311227f0ccc070283f6d0a5ca
   RCTDeprecation: b73940ea69ab57c2c59f845b37b09e1d8b0d0588
@@ -2358,6 +2364,6 @@ SPEC CHECKSUMS:
   RNWorklets: 996ccc52b3280acc4798ded64d3b4771358ddce2
   Yoga: 1c38e066a91a4397f2979abcaf62ac497625a929
 
-PODFILE CHECKSUM: f6b2f5ca4d68c74f4081d0eba4760bc3e276a477
+PODFILE CHECKSUM: fa71247404a8e5590f36fb566c5fb13a2e0f4de4
 
 COCOAPODS: 1.15.2

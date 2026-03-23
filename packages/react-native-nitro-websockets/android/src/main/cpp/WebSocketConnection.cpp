@@ -93,7 +93,7 @@ int nitroWsCallback(lws* wsi, enum lws_callback_reasons reason,
         std::string location(static_cast<const char*>(in), len);
         conn->handleRedirect(location);
       }
-      return -1;  // tell lws we handle the redirect ourselves
+      return -1;
     }
 
     case LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER: {
@@ -117,7 +117,6 @@ WebSocketConnection::WebSocketConnection() {}
 
 WebSocketConnection::~WebSocketConnection() {
   if (_wsi != nullptr) {
-    // Detach: stop the callback from accessing a destroyed object
     lws_set_wsi_user(_wsi, nullptr);
     lws_cancel_service(LwsContext::instance().ctx());
     _wsi = nullptr;
@@ -155,7 +154,7 @@ void WebSocketConnection::connect(
     };
   }
 
-  auto self        = shared_from_this();
+  auto self        = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
   auto host        = parsed.host;
   auto port        = parsed.port;
   auto path        = parsed.path;
@@ -171,7 +170,7 @@ void WebSocketConnection::connect(
     i.host         = host.c_str();
     i.origin       = host.c_str();
     i.protocol     = protoStr.empty() ? "nitro-ws" : protoStr.c_str();
-    i.userdata     = self.get();          // WebSocketConnection*
+    i.userdata     = self.get();
     i.ssl_connection = isWss ? LCCSCF_USE_SSL : 0;
 
     lws* wsi = lws_client_connect_via_info(&i);
@@ -189,7 +188,7 @@ void WebSocketConnection::close(int code, const std::string& reason) {
   if (_state == State::CLOSED || _state == State::CLOSING) return;
   _state = State::CLOSING;
 
-  auto self = shared_from_this();
+  auto self = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
   LwsContext::instance().schedule([self, code, reason]() {
     if (!self->_wsi) return;
     int closeCode = (code >= 1000 && code <= 4999) ? code : LWS_CLOSE_STATUS_NORMAL;
@@ -226,7 +225,7 @@ void WebSocketConnection::sendBinary(const uint8_t* data, size_t len) {
 }
 
 void WebSocketConnection::requestWrite() {
-  auto self = shared_from_this();
+  auto self = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
   LwsContext::instance().schedule([self]() {
     if (self->_wsi && self->_state == State::OPEN) {
       lws_callback_on_writable(self->_wsi);
@@ -277,7 +276,6 @@ void WebSocketConnection::handleEstablished(lws* wsi) {
   if (_onOpen) {
     _onOpen();
   } else {
-    // Mark so setOnOpen() fires it as soon as the callback is set
     _openFired = true;
   }
 }
@@ -286,7 +284,6 @@ void WebSocketConnection::handleReceive(const void* in, size_t len, bool isBinar
   if (_onMessage) {
     _onMessage(static_cast<const uint8_t*>(in), len, isBinary);
   } else {
-    // Buffer for replay when setOnMessage() is called
     std::vector<uint8_t> copy(static_cast<const uint8_t*>(in),
                                static_cast<const uint8_t*>(in) + len);
     std::lock_guard<std::mutex> lock(_msgMu);
@@ -299,8 +296,6 @@ int WebSocketConnection::handleWriteable(lws* wsi) {
   {
     std::lock_guard<std::mutex> lock(_writeMu);
     if (_writeQueue.empty()) {
-      // Returning -1 tells lws to send the close frame (set earlier via
-      // lws_close_reason) and then fire LWS_CALLBACK_CLIENT_CLOSED.
       return (_state == State::CLOSING) ? -1 : 0;
     }
     msg = std::move(_writeQueue.front());
@@ -316,8 +311,6 @@ int WebSocketConnection::handleWriteable(lws* wsi) {
 
   {
     std::lock_guard<std::mutex> lock(_writeMu);
-    // Re-request writeable if there's more data OR if we still need to close
-    // (so the next callback fires with an empty queue and returns -1).
     if (!_writeQueue.empty() || _state == State::CLOSING) {
       lws_callback_on_writable(wsi);
     }
@@ -351,7 +344,6 @@ void WebSocketConnection::handleRedirect(const std::string& location) {
   _wsi   = nullptr;
   _state = State::CONNECTING;
 
-  // Normalise http(s):// → ws(s):// so parseUrl() accepts it
   std::string url = location;
   if      (url.rfind("https://", 0) == 0) url = "wss://" + url.substr(8);
   else if (url.rfind("http://",  0) == 0) url = "ws://"  + url.substr(7);

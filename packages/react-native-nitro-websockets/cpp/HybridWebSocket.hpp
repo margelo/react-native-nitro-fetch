@@ -8,7 +8,7 @@
 #pragma once
 
 #include "HybridHybridWebSocketSpec.hpp"
-#include "WebSocketConnection.hpp"
+#include "WebSocketConnectionBase.hpp"
 
 #include <functional>
 #include <optional>
@@ -22,13 +22,11 @@ public:
   HybridWebSocket();
   ~HybridWebSocket() override;
 
-
   WebSocketReadyState getReadyState() override;
   std::string getUrl() override;
   double getBufferedAmount() override;
   std::string getProtocol() override;
   std::string getExtensions() override;
-
 
   std::optional<std::function<void()>> getOnOpen() override;
   void setOnOpen(const std::optional<std::function<void()>>& cb) override;
@@ -42,7 +40,6 @@ public:
   std::optional<std::function<void(const std::string&)>> getOnError() override;
   void setOnError(const std::optional<std::function<void(const std::string&)>>& cb) override;
 
-
   void connect(const std::string& url,
                const std::vector<std::string>& protocols,
                const std::unordered_map<std::string, std::string>& headers) override;
@@ -51,13 +48,14 @@ public:
   void send(const std::string& data) override;
   void sendBinary(const std::shared_ptr<ArrayBuffer>& data) override;
 
+  static std::shared_ptr<WebSocketConnectionBase> createConnection();
+
   inline static const char* TAG = "WebSocket";
 
 private:
-
   void bindCallbacks();
 
-  std::shared_ptr<WebSocketConnection> _conn;
+  std::shared_ptr<WebSocketConnectionBase> _conn;
   std::optional<std::function<void()>> _onOpen;
   std::optional<std::function<void(const WebSocketMessageEvent&)>> _onMessage;
   std::optional<std::function<void(const WebSocketCloseEvent&)>> _onClose;

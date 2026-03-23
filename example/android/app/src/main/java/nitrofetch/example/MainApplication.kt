@@ -24,7 +24,7 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
-    NitroWebSocketPrewarmer.preWarm("wss://synsia.fourrnexus.com/sockets")
+    NitroWebSocketPrewarmer.preWarm("wss://echo.websocket.org")
     // Best-effort auto prefetch when engine initializes (app start)
     try { AutoPrefetcher.prefetchOnStart(this) } catch (_: Throwable) {}
     loadReactNative(this)

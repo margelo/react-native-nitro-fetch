@@ -14,7 +14,10 @@
   },
   "autolinking": {
     "WebSocket": {
-      "cpp": "HybridWebSocket"
+      "all": {
+        "language": "c++",
+        "implementationClassName": "HybridWebSocket"
+      }
     }
   },
   "ignorePaths": [

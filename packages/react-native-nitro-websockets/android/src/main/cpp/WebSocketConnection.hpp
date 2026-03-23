@@ -7,63 +7,47 @@
 
 #pragma once
 
+#include "WebSocketConnectionBase.hpp"
+
 #include <libwebsockets.h>
 #include <deque>
 #include <mutex>
 #include <atomic>
-#include <string>
-#include <vector>
-#include <functional>
 #include <optional>
-#include <memory>
-#include <unordered_map>
 
 namespace margelo::nitro::nitrofetchwebsockets {
 
 
-class WebSocketConnection : public std::enable_shared_from_this<WebSocketConnection> {
+class WebSocketConnection : public WebSocketConnectionBase {
 public:
-  // ── Ready state (mirrors the browser WebSocket spec) ─────────────────────
-  enum class State { CONNECTING = 0, OPEN = 1, CLOSING = 2, CLOSED = 3 };
-
-  // ── Callback types ────────────────────────────────────────────────────────
-  using OnOpen    = std::function<void()>;
-  using OnMessage = std::function<void(const uint8_t* data, size_t len, bool isBinary)>;
-  using OnClose   = std::function<void(int code, const std::string& reason, bool wasClean)>;
-  using OnError   = std::function<void(const std::string& msg)>;
-
   WebSocketConnection();
-  ~WebSocketConnection();
+  ~WebSocketConnection() override;
 
   WebSocketConnection(const WebSocketConnection&) = delete;
   WebSocketConnection& operator=(const WebSocketConnection&) = delete;
 
-
   void connect(const std::string& url,
                const std::vector<std::string>& protocols,
-               const std::unordered_map<std::string, std::string>& headers);
+               const std::unordered_map<std::string, std::string>& headers) override;
+  void close(int code, const std::string& reason) override;
+  void send(const std::string& data) override;
+  void sendBinary(const uint8_t* data, size_t len) override;
 
-  void close(int code, const std::string& reason);
-  void send(const std::string& data);
-  void sendBinary(const uint8_t* data, size_t len);
+  State state() const override { return _state; }
+  std::string url() const override { return _url; }
+  std::string protocol() const override { return _negotiatedProtocol; }
+  std::string extensions() const override { return _extensions; }
+  size_t bufferedAmount() const override { return _bufferedAmount.load(); }
 
+  void setOnOpen(OnOpen cb) override;
+  void setOnMessage(OnMessage cb) override;
+  void setOnClose(OnClose cb) override;
+  void setOnError(OnError cb) override;
 
-  State state() const { return _state; }
-  const std::string& url()        const { return _url; }
-  const std::string& protocol()   const { return _negotiatedProtocol; }
-  const std::string& extensions() const { return _extensions; }
-  size_t bufferedAmount() const { return _bufferedAmount.load(); }
-
-
-  void setOnOpen(OnOpen cb);
-  void setOnMessage(OnMessage cb);
-  void setOnClose(OnClose cb);
-  void setOnError(OnError cb);
-
-
+  // lws callback handlers (internal, not part of the base interface)
   void handleEstablished(lws* wsi);
   void handleReceive(const void* in, size_t len, bool isBinary);
-  int  handleWriteable(lws* wsi);  // returns -1 to tell lws to send the close frame
+  int  handleWriteable(lws* wsi);
   void handleClose(int code, const char* reason, size_t len);
   void handleError(const char* msg);
   void handleAppendHandshakeHeader(uint8_t** p, uint8_t* end, lws* wsi);
@@ -102,8 +86,8 @@ private:
     std::string host;
     int port;
     std::string path;
-    std::string protocolStr;       // comma-joined, used by lws_client_connect_info
-    std::vector<std::string> protocols; // original list, used by handleRedirect
+    std::string protocolStr;
+    std::vector<std::string> protocols;
     bool isWss;
     std::unordered_map<std::string, std::string> headers;
   };

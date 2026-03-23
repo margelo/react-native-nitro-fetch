@@ -19,6 +19,8 @@ end
 target 'NitroFetchExample' do
   config = use_native_modules!
 
+  pod 'NitroFetchWebsocketsPrewarmer', :path => '../../packages/react-native-nitro-websockets'
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.

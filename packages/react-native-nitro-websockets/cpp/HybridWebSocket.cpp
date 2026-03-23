@@ -8,13 +8,29 @@
 #include "HybridWebSocket.hpp"
 #include "WebSocketPrewarmer.hpp"
 
+#if defined(__APPLE__)
+namespace margelo::nitro::nitrofetchwebsockets {
+  std::shared_ptr<WebSocketConnectionBase> createNWConnection();
+}
+#else
+#include "WebSocketConnection.hpp"
+#endif
+
 #include <NitroModules/ArrayBuffer.hpp>
 #include <cstring>
 
 namespace margelo::nitro::nitrofetchwebsockets {
 
+std::shared_ptr<WebSocketConnectionBase> HybridWebSocket::createConnection() {
+#if defined(__APPLE__)
+  return createNWConnection();
+#else
+  return std::make_shared<WebSocketConnection>();
+#endif
+}
+
 HybridWebSocket::HybridWebSocket() : HybridObject(TAG) {
-  _conn = std::make_shared<WebSocketConnection>();
+  _conn = createConnection();
   bindCallbacks();
 }
 
@@ -25,8 +41,8 @@ HybridWebSocket::~HybridWebSocket() {
   _conn->setOnError(nullptr);
 
   auto s = _conn->state();
-  if (s != WebSocketConnection::State::CLOSED &&
-      s != WebSocketConnection::State::CLOSING) {
+  if (s != WebSocketConnectionBase::State::CLOSED &&
+      s != WebSocketConnectionBase::State::CLOSING) {
     _conn->close(1001, "");
   }
 }
@@ -56,7 +72,7 @@ std::optional<std::function<void()>> HybridWebSocket::getOnOpen() {
 }
 void HybridWebSocket::setOnOpen(const std::optional<std::function<void()>>& cb) {
   _onOpen = cb;
-  _conn->setOnOpen(cb ? [cb = *cb]() { cb(); } : WebSocketConnection::OnOpen{});
+  _conn->setOnOpen(cb ? [cb = *cb]() { cb(); } : WebSocketConnectionBase::OnOpen{});
 }
 
 std::optional<std::function<void(const WebSocketMessageEvent&)>> HybridWebSocket::getOnMessage() {
@@ -105,7 +121,7 @@ std::optional<std::function<void(const std::string&)>> HybridWebSocket::getOnErr
 void HybridWebSocket::setOnError(const std::optional<std::function<void(const std::string&)>>& cb) {
   _onError = cb;
   _conn->setOnError(cb ? [cb = *cb](const std::string& msg) { cb(msg); }
-                       : WebSocketConnection::OnError{});
+                       : WebSocketConnectionBase::OnError{});
 }
 
 
@@ -124,7 +140,7 @@ void HybridWebSocket::connect(
 
     _conn = std::move(existing);
     bindCallbacks();
-    return; 
+    return;
   }
 
   _conn->connect(url, protocols, headers);
@@ -147,7 +163,7 @@ void HybridWebSocket::bindCallbacks() {
 
   auto onOpen = _onOpen;
   _conn->setOnOpen(onOpen ? [onOpen = *onOpen]() { onOpen(); }
-                           : WebSocketConnection::OnOpen{});
+                           : WebSocketConnectionBase::OnOpen{});
 
   auto onMsg = _onMessage;
   if (onMsg) {
@@ -179,7 +195,7 @@ void HybridWebSocket::bindCallbacks() {
 
   auto onError = _onError;
   _conn->setOnError(onError ? [onError = *onError](const std::string& msg) { onError(msg); }
-                             : WebSocketConnection::OnError{});
+                             : WebSocketConnectionBase::OnError{});
 }
 
 } // namespace margelo::nitro::nitrofetchwebsockets
