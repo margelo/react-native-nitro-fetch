@@ -34,6 +34,25 @@ Pod::Spec.new do |s|
   s.prepare_command = <<-CMD
     set -e
     ROOT="$(pwd)/thirdparty"
+    XCFW="$ROOT/xcframeworks"
+
+    # ── Fast path: pre-built xcframeworks shipped with the npm package ──────────
+    # If all four xcframeworks are present, skip every cmake invocation.
+    # Only generate cacert_pem.cpp if it's absent (first install or clean checkout).
+    ALL_PREBUILT=true
+    for LIB in libwebsockets libmbedtls libmbedx509 libmbedcrypto; do
+      [ -d "$XCFW/${LIB}.xcframework" ] || { ALL_PREBUILT=false; break; }
+    done
+
+    if $ALL_PREBUILT; then
+      echo "=== Pre-built xcframeworks present — skipping cmake ==="
+      if [ ! -f "cpp/cacert_pem.cpp" ]; then
+        python3 -c 'n=chr(10); q=chr(34); pem=open("cpp/cacert.pem").read(); open("cpp/cacert_pem.cpp","w").write("namespace margelo::nitro::nitrofetchwebsockets {"+n+"extern const char kCacertPemData[] = R"+q+"CACERT("+pem+")CACERT"+q+";"+n+"extern const unsigned int kCacertPemLen = sizeof(kCacertPemData) - 1;"+n+"}"+n)'
+      fi
+      exit 0
+    fi
+
+    # ── Full build (only runs when xcframeworks are absent) ─────────────────────
 
     build_for_arch() {
       local ARCH="$1"
@@ -101,9 +120,14 @@ Pod::Spec.new do |s|
       find "$DEST/lws" -name "libwebsockets.a" | head -1 | xargs -I{} cp {} "$DEST/install/lib/"
     }
 
-    [ -f "$ROOT/build_arm64/install/lib/libwebsockets.a" ]    || build_for_arch arm64 iphoneos
-    [ -f "$ROOT/build_x86_64/install/lib/libwebsockets.a" ]   || build_for_arch x86_64 iphonesimulator
-    [ -f "$ROOT/build_arm64_sim/install/lib/libwebsockets.a" ] || build_for_arch arm64 iphonesimulator arm64_sim
+    # Run all three arch builds in parallel — each writes to its own DEST dir.
+    build_for_arch arm64  iphoneos        &
+    build_for_arch x86_64 iphonesimulator &
+    build_for_arch arm64  iphonesimulator arm64_sim &
+    wait
+
+    # After a fresh build, copy lws_config.h to the stable tracked location.
+    cp "$ROOT/build_arm64/lws/lws_config.h" "$ROOT/lws_config.h"
 
     # Create fat simulator lib (x86_64 + arm64 simulator slices)
     SIM_FAT="$ROOT/build_sim_fat/lib"
@@ -116,7 +140,6 @@ Pod::Spec.new do |s|
     done
 
     # Wrap into XCFrameworks so CocoaPods selects the right slice automatically.
-    XCFW="$ROOT/xcframeworks"
     mkdir -p "$XCFW"
     for LIB in libwebsockets libmbedtls libmbedx509 libmbedcrypto; do
       [ -d "$XCFW/${LIB}.xcframework" ] && continue
@@ -172,8 +195,8 @@ Pod::Spec.new do |s|
   s.pod_target_xcconfig = current_xcconfig.merge({
     'HEADER_SEARCH_PATHS' => [
       '"${PODS_TARGET_SRCROOT}/thirdparty/libwebsockets/include"',
-      '"${PODS_TARGET_SRCROOT}/thirdparty/build_arm64/lws"',
-      '"${PODS_TARGET_SRCROOT}/thirdparty/build_arm64/install/include"',
+      '"${PODS_TARGET_SRCROOT}/thirdparty"',
+      '"${PODS_TARGET_SRCROOT}/thirdparty/mbedtls/include"',
     ].join(' '),
     'OTHER_LDFLAGS' => '-lc++',
   })

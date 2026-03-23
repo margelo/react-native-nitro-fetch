@@ -89,5 +89,5 @@ thirdparty/build_arm64/
 thirdparty/build_arm64_sim/
 thirdparty/build_x86_64/
 thirdparty/build_sim_fat/
-thirdparty/xcframeworks/
+# thirdparty/xcframeworks/ — tracked: pre-built for fast pod install
 
