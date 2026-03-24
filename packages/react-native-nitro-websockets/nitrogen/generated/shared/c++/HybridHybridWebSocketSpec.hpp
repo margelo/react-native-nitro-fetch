@@ -15,8 +15,8 @@
 
 // Forward declaration of `WebSocketReadyState` to properly resolve imports.
 namespace margelo::nitro::nitrofetchwebsockets { enum class WebSocketReadyState; }
-// Forward declaration of `WebSocketMessageEvent` to properly resolve imports.
-namespace margelo::nitro::nitrofetchwebsockets { struct WebSocketMessageEvent; }
+// Forward declaration of `HybridWebSocketMessageEvent` to properly resolve imports.
+namespace margelo::nitro::nitrofetchwebsockets { struct HybridWebSocketMessageEvent; }
 // Forward declaration of `WebSocketCloseEvent` to properly resolve imports.
 namespace margelo::nitro::nitrofetchwebsockets { struct WebSocketCloseEvent; }
 
@@ -24,7 +24,7 @@ namespace margelo::nitro::nitrofetchwebsockets { struct WebSocketCloseEvent; }
 #include <string>
 #include <functional>
 #include <optional>
-#include "WebSocketMessageEvent.hpp"
+#include "HybridWebSocketMessageEvent.hpp"
 #include "WebSocketCloseEvent.hpp"
 #include <vector>
 #include <unordered_map>
@@ -64,8 +64,8 @@ namespace margelo::nitro::nitrofetchwebsockets {
       virtual std::string getExtensions() = 0;
       virtual std::optional<std::function<void()>> getOnOpen() = 0;
       virtual void setOnOpen(const std::optional<std::function<void()>>& onOpen) = 0;
-      virtual std::optional<std::function<void(const WebSocketMessageEvent& /* event */)>> getOnMessage() = 0;
-      virtual void setOnMessage(const std::optional<std::function<void(const WebSocketMessageEvent& /* event */)>>& onMessage) = 0;
+      virtual std::optional<std::function<void(const HybridWebSocketMessageEvent& /* event */)>> getOnMessage() = 0;
+      virtual void setOnMessage(const std::optional<std::function<void(const HybridWebSocketMessageEvent& /* event */)>>& onMessage) = 0;
       virtual std::optional<std::function<void(const WebSocketCloseEvent& /* event */)>> getOnClose() = 0;
       virtual void setOnClose(const std::optional<std::function<void(const WebSocketCloseEvent& /* event */)>>& onClose) = 0;
       virtual std::optional<std::function<void(const std::string& /* error */)>> getOnError() = 0;

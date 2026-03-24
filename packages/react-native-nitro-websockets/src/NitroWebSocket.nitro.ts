@@ -2,10 +2,9 @@ import { type HybridObject, NitroModules } from 'react-native-nitro-modules'
 
 export type WebSocketReadyState = 'CONNECTING' | 'OPEN' | 'CLOSING' | 'CLOSED'
 
-export interface WebSocketMessageEvent {
-  data: string
+export interface HybridWebSocketMessageEvent {
+  data: ArrayBuffer
   isBinary: boolean
-  binaryData?: ArrayBuffer
 }
 
 export interface WebSocketCloseEvent {
@@ -33,7 +32,7 @@ export interface HybridWebSocket extends HybridObject<{
   send(data: string): void
   sendBinary(data: ArrayBuffer): void
   onOpen: (() => void) | undefined
-  onMessage: ((event: WebSocketMessageEvent) => void) | undefined
+  onMessage: ((event: HybridWebSocketMessageEvent) => void) | undefined
   onClose: ((event: WebSocketCloseEvent) => void) | undefined
   onError: ((error: string) => void) | undefined
 }

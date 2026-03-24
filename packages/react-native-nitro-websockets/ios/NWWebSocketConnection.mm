@@ -338,12 +338,14 @@ void NWWebSocketConnection::scheduleReceive() {
 
       switch (message.type) {
         case NSURLSessionWebSocketMessageTypeString: {
-          // UTF8String avoids the NSData heap allocation that
-          // dataUsingEncoding:NSUTF8StringEncoding would incur per message.
-          const char* utf8 = [message.string UTF8String];
-          if (!utf8) { conn->scheduleReceive(); return; }
-          size_t len = strlen(utf8);
-          const auto* bytes = reinterpret_cast<const uint8_t*>(utf8);
+          NSData* utf8 =
+            [message.string dataUsingEncoding:NSUTF8StringEncoding];
+          if (!utf8) {
+            conn->scheduleReceive();
+            return;
+          }
+          const auto* bytes = static_cast<const uint8_t*>(utf8.bytes);
+          size_t len = utf8.length;
 
           if (onMsg) {
             onMsg(bytes, len, false);

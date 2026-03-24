@@ -1,23 +1,32 @@
 import { NitroModules } from 'react-native-nitro-modules'
+import { TextDecoder } from 'react-native-nitro-text-decoder'
 import type {
   HybridWebSocket,
-  WebSocketMessageEvent as NitroWSMessageEvent,
+  HybridWebSocketMessageEvent,
   WebSocketCloseEvent as NitroWSCloseEvent,
 } from './NitroWebSocket.nitro'
 
 export { createWebSocket } from './NitroWebSocket.nitro'
 export type {
   HybridWebSocket,
-  WebSocketMessageEvent,
+  HybridWebSocketMessageEvent,
   WebSocketCloseEvent,
   WebSocketReadyState,
 } from './NitroWebSocket.nitro'
+
+export type WebSocketMessageEvent = {
+  data: string
+  isBinary: boolean
+  binaryData?: ArrayBuffer
+}
 
 export {
   prewarmOnAppStart,
   removeFromPrewarmQueue,
   clearPrewarmQueue,
 } from './prewarm'
+
+const utf8Decoder = new TextDecoder('utf-8', { fatal: false, ignoreBOM: true })
 
 /**
  * Browser-compatible WebSocket wrapper backed by a Nitro HybridObject
@@ -59,8 +68,29 @@ export class NitroWebSocket {
   set onopen(fn: (() => void) | null) {
     this._ws.onOpen = fn ?? undefined
   }
-  set onmessage(fn: ((e: NitroWSMessageEvent) => void) | null) {
-    this._ws.onMessage = fn ?? undefined
+  set onmessage(fn: ((e: WebSocketMessageEvent) => void) | null) {
+    if (fn == null) {
+      this._ws.onMessage = undefined
+      return
+    }
+    this._ws.onMessage = (native: HybridWebSocketMessageEvent) => {
+      if (native.isBinary) {
+        fn({
+          data: '',
+          isBinary: true,
+          binaryData: native.data,
+        })
+      } else {
+        const buf = native.data
+        fn({
+          data:
+            buf.byteLength === 0
+              ? ''
+              : utf8Decoder.decode(buf, { stream: false }),
+          isBinary: false,
+        })
+      }
+    }
   }
   set onclose(fn: ((e: NitroWSCloseEvent) => void) | null) {
     this._ws.onClose = fn ?? undefined
