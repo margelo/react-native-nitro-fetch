@@ -54,6 +54,9 @@ struct NWWebSocketConnection::Impl {
   NSURLSession* session = nil;
   NSURLSessionWebSocketTask* task = nil;
   NWWSDelegate* delegate = nil;
+  // Cached once at connect() — avoids shared_from_this() + weak_ptr construction
+  // on every scheduleReceive() call (every received message).
+  std::weak_ptr<WebSocketConnectionBase> selfWeak;
 };
 
 
@@ -132,9 +135,12 @@ void NWWebSocketConnection::connect(
 
   NSURLSessionConfiguration* config =
     [NSURLSessionConfiguration defaultSessionConfiguration];
+  NSOperationQueue* delegateQueue = [[NSOperationQueue alloc] init];
+  delegateQueue.qualityOfService = NSQualityOfServiceUserInteractive;
+  delegateQueue.maxConcurrentOperationCount = 1;
   _impl->session = [NSURLSession sessionWithConfiguration:config
                                                  delegate:_impl->delegate
-                                            delegateQueue:nil];
+                                            delegateQueue:delegateQueue];
 
   _impl->task = [_impl->session webSocketTaskWithRequest:request];
 
@@ -208,6 +214,7 @@ void NWWebSocketConnection::connect(
     }
   };
 
+  _impl->selfWeak = shared_from_this();
   [_impl->task resume];
 }
 
@@ -307,8 +314,9 @@ void NWWebSocketConnection::scheduleReceive() {
   State s = _state.load(std::memory_order_acquire);
   if (s == State::CLOSED || s == State::CLOSING) return;
 
-  auto weakSelf =
-    std::weak_ptr<WebSocketConnectionBase>(shared_from_this());
+  // Use the cached weak_ptr — avoids shared_from_this() + weak_ptr
+  // construction overhead on every received message.
+  auto weakSelf = _impl->selfWeak;
 
   [_impl->task receiveMessageWithCompletionHandler:
     ^(NSURLSessionWebSocketMessage* message, NSError* error) {
@@ -330,11 +338,12 @@ void NWWebSocketConnection::scheduleReceive() {
 
       switch (message.type) {
         case NSURLSessionWebSocketMessageTypeString: {
-          NSData* strData =
-            [message.string dataUsingEncoding:NSUTF8StringEncoding];
-          const auto* bytes =
-            static_cast<const uint8_t*>(strData.bytes);
-          size_t len = strData.length;
+          // UTF8String avoids the NSData heap allocation that
+          // dataUsingEncoding:NSUTF8StringEncoding would incur per message.
+          const char* utf8 = [message.string UTF8String];
+          if (!utf8) { conn->scheduleReceive(); return; }
+          size_t len = strlen(utf8);
+          const auto* bytes = reinterpret_cast<const uint8_t*>(utf8);
 
           if (onMsg) {
             onMsg(bytes, len, false);
