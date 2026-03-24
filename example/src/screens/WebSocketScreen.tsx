@@ -11,6 +11,8 @@ import {
 } from 'react-native';
 import {
   NitroWebSocket,
+  prewarmOnAppStart,
+  clearPrewarmQueue,
   type WebSocketMessageEvent,
   type WebSocketCloseEvent,
 } from 'react-native-nitro-websockets';
@@ -127,6 +129,26 @@ export function WebSocketScreen() {
 
   const clearLogs = () => setLogs([]);
 
+  const [prewarmStatus, setPrewarmStatus] = React.useState<string | null>(null);
+
+  const handlePrewarm = () => {
+    try {
+      prewarmOnAppStart(ECHO_URL);
+      setPrewarmStatus(`Queued: ${ECHO_URL}`);
+    } catch (e: any) {
+      setPrewarmStatus(`Error: ${e?.message ?? 'unknown'}`);
+    }
+  };
+
+  const handleClearPrewarm = () => {
+    try {
+      clearPrewarmQueue();
+      setPrewarmStatus('Queue cleared');
+    } catch (e: any) {
+      setPrewarmStatus(`Error: ${e?.message ?? 'unknown'}`);
+    }
+  };
+
   const logColor = (dir: LogEntry['direction']) => {
     if (dir === 'in') return '#4EC9B0';
     if (dir === 'out') return '#CE9178';
@@ -174,6 +196,24 @@ export function WebSocketScreen() {
           </TouchableOpacity>
         ) : (
           <ActivityIndicator size="small" color={theme.colors.primary} />
+        )}
+      </View>
+
+      {/* Prewarm controls */}
+      <View style={styles.prewarmSection}>
+        <View style={styles.prewarmRow}>
+          <Pressable style={[styles.prewarmBtn]} onPress={handlePrewarm}>
+            <Text style={styles.prewarmBtnText}>Queue URL</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.prewarmBtn, styles.clearBtn]}
+            onPress={handleClearPrewarm}
+          >
+            <Text style={styles.prewarmBtnText}>Clear Queue</Text>
+          </Pressable>
+        </View>
+        {prewarmStatus != null && (
+          <Text style={styles.prewarmStatus}>{prewarmStatus}</Text>
         )}
       </View>
 
@@ -356,5 +396,32 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  prewarmSection: {
+    gap: 6,
+  },
+  prewarmRow: {
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  prewarmBtn: {
+    flex: 1,
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.borderRadius.sm,
+    paddingVertical: theme.spacing.sm,
+    alignItems: 'center',
+  },
+  clearBtn: {
+    backgroundColor: theme.colors.error,
+  },
+  prewarmBtnText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  prewarmStatus: {
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    fontFamily: 'monospace',
   },
 });

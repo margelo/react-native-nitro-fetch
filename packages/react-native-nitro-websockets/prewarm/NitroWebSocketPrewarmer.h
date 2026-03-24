@@ -12,6 +12,10 @@ NS_ASSUME_NONNULL_BEGIN
 @interface NitroWebSocketPrewarmer : NSObject
 
 + (void)preWarmURL:(NSString *)url
+         protocols:(NSArray<NSString *> *)protocols
+           headers:(NSDictionary<NSString *, NSString *> *)headers;
+
++ (void)preWarmURL:(NSString *)url
          protocols:(NSArray<NSString *> *)protocols;
 
 + (void)preWarmURL:(NSString *)url;

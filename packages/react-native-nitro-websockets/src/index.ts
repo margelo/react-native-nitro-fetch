@@ -13,6 +13,12 @@ export type {
   WebSocketReadyState,
 } from './NitroWebSocket.nitro'
 
+export {
+  prewarmOnAppStart,
+  removeFromPrewarmQueue,
+  clearPrewarmQueue,
+} from './prewarm'
+
 /**
  * Browser-compatible WebSocket wrapper backed by a Nitro HybridObject
  * using libwebsockets + mbedTLS under the hood.
@@ -20,14 +26,18 @@ export type {
 export class NitroWebSocket {
   private _ws: HybridWebSocket
 
-  constructor(url: string, protocols?: string | string[]) {
+  constructor(
+    url: string,
+    protocols?: string | string[],
+    headers?: Record<string, string>
+  ) {
     this._ws = NitroModules.createHybridObject<HybridWebSocket>('WebSocket')
     const protocolList = protocols
       ? Array.isArray(protocols)
         ? protocols
         : [protocols]
       : []
-    this._ws.connect(url, protocolList, {})
+    this._ws.connect(url, protocolList, headers ?? {})
   }
 
   get readyState() {

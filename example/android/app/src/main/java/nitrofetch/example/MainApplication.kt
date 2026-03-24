@@ -7,7 +7,7 @@ import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.margelo.nitro.nitrofetch.AutoPrefetcher
-import com.margelo.nitro.nitrofetchwebsockets.NitroWebSocketPrewarmer
+import com.margelo.nitro.nitrofetchwebsockets.NitroWebSocketAutoPrewarmer
 
 class MainApplication : Application(), ReactApplication {
 
@@ -24,7 +24,7 @@ class MainApplication : Application(), ReactApplication {
 
   override fun onCreate() {
     super.onCreate()
-    NitroWebSocketPrewarmer.preWarm("wss://echo.websocket.org")
+    NitroWebSocketAutoPrewarmer.prewarmOnStart(this)
     // Best-effort auto prefetch when engine initializes (app start)
     try { AutoPrefetcher.prefetchOnStart(this) } catch (_: Throwable) {}
     loadReactNative(this)

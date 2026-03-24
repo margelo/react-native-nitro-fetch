@@ -16,6 +16,7 @@ Pod::Spec.new do |s|
   s.source_files = [
     "ios/**/*.{swift,h,m,mm,hpp}",
     "cpp/*.{hpp,cpp}",
+    "prewarm/**/*.{h,m,mm}",
   ]
 
   load 'nitrogen/generated/ios/NitroFetchWebsockets+autolinking.rb'
@@ -23,7 +24,7 @@ Pod::Spec.new do |s|
 
   s.public_header_files = [
     "nitrogen/generated/ios/NitroFetchWebsockets-Swift-Cxx-Bridge.hpp",
-    "ios/NitroWebSocketPrewarmer.h",
+    "prewarm/NitroWebSocketPrewarmer.h",
   ]
   s.private_header_files = [
     "cpp/*.hpp",
@@ -37,6 +38,7 @@ Pod::Spec.new do |s|
     'HEADER_SEARCH_PATHS' => [
       '"${PODS_TARGET_SRCROOT}/cpp"',
       '"${PODS_TARGET_SRCROOT}/ios"',
+      '"${PODS_TARGET_SRCROOT}/prewarm"',
     ].join(' '),
     'OTHER_LDFLAGS' => '-lc++',
   })

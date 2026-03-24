@@ -24,9 +24,10 @@ object NitroWebSocketPrewarmer {
    *
    * @param url       The WebSocket URL (ws:// or wss://)
    * @param protocols Optional list of subprotocols
+   * @param headers   Optional map of HTTP headers to include in the handshake
    */
   @JvmStatic
-  fun preWarm(url: String, protocols: List<String> = emptyList()) {
+  fun preWarm(url: String, protocols: List<String> = emptyList(), headers: Map<String, String> = emptyMap()) {
     // Load the native library if it hasn't been loaded yet.
     // System.loadLibrary is idempotent — safe to call multiple times.
     try {
@@ -34,9 +35,10 @@ object NitroWebSocketPrewarmer {
     } catch (_: UnsatisfiedLinkError) {
       // Already loaded — ignore.
     }
-    nativePreWarm(url, protocols.toTypedArray())
+    val flatHeaders = headers.flatMap { (k, v) -> listOf(k, v) }.toTypedArray()
+    nativePreWarm(url, protocols.toTypedArray(), flatHeaders)
   }
 
   @JvmStatic
-  private external fun nativePreWarm(url: String, protocols: Array<String>)
+  private external fun nativePreWarm(url: String, protocols: Array<String>, headers: Array<String>)
 }

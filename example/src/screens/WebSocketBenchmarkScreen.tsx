@@ -7,7 +7,10 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { NitroWebSocket } from 'react-native-nitro-websockets';
+import {
+  NitroWebSocket,
+  prewarmOnAppStart,
+} from 'react-native-nitro-websockets';
 import { theme } from '../theme';
 
 declare const performance: { now(): number };
@@ -15,6 +18,10 @@ declare const global: any;
 
 const ECHO_URL = 'wss://echo.websocket.org';
 const MESSAGE_COUNT = 20;
+
+// Persist the echo URL to the prewarm queue so native auto-bootstrap
+// can pre-connect on the next cold launch — runs once per install.
+prewarmOnAppStart(ECHO_URL);
 const RUNS = 3;
 
 type RunResult = {
@@ -117,25 +124,42 @@ function runBuiltin(): Promise<RunResult> {
   });
 }
 
-async function runAll(
-  runner: () => Promise<RunResult>,
-  onProgress: (run: number) => void
-): Promise<BenchResult> {
-  const runs: RunResult[] = [];
+const PAUSE_MS = 300;
+
+async function runAlternating(
+  onProgress: (index: number, kind: 'nitro' | 'builtin') => void,
+  onPartial: (nitro: RunResult[], builtin: RunResult[]) => void
+): Promise<{ nitro: BenchResult; builtin: BenchResult }> {
+  const nitroRuns: RunResult[] = [];
+  const builtinRuns: RunResult[] = [];
+  let step = 0;
+
   for (let i = 0; i < RUNS; i++) {
-    onProgress(i + 1);
-    runs.push(await runner());
-    // Brief pause between runs so the echo server doesn't rate-limit us
-    await new Promise<void>((r) => setTimeout(r, 300));
+    step += 1;
+    onProgress(step, 'nitro');
+    nitroRuns.push(await runNitro());
+    onPartial(nitroRuns, builtinRuns);
+    await new Promise<void>((r) => setTimeout(r, PAUSE_MS));
+
+    step += 1;
+    onProgress(step, 'builtin');
+    builtinRuns.push(await runBuiltin());
+    onPartial(nitroRuns, builtinRuns);
+    await new Promise<void>((r) => setTimeout(r, PAUSE_MS));
   }
-  return { runs, avg: avgResults(runs) };
+
+  return {
+    nitro: { runs: nitroRuns, avg: avgResults(nitroRuns) },
+    builtin: { runs: builtinRuns, avg: avgResults(builtinRuns) },
+  };
 }
 
-type Phase = 'idle' | 'nitro' | 'builtin' | 'done';
+type Phase = 'idle' | 'running' | 'done';
 
 export function WebSocketBenchmarkScreen() {
   const [phase, setPhase] = React.useState<Phase>('idle');
   const [run, setRun] = React.useState(0);
+  const [runKind, setRunKind] = React.useState<'nitro' | 'builtin'>('nitro');
   const [nitroResult, setNitroResult] = React.useState<BenchResult | null>(
     null
   );
@@ -150,12 +174,22 @@ export function WebSocketBenchmarkScreen() {
     setBuiltinResult(null);
 
     try {
-      setPhase('nitro');
-      const nr = await runAll(runNitro, setRun);
+      setPhase('running');
+      const { nitro: nr, builtin: br } = await runAlternating(
+        (index, kind) => {
+          setRun(index);
+          setRunKind(kind);
+        },
+        (nRuns, bRuns) => {
+          if (nRuns.length > 0) {
+            setNitroResult({ runs: [...nRuns], avg: avgResults(nRuns) });
+          }
+          if (bRuns.length > 0) {
+            setBuiltinResult({ runs: [...bRuns], avg: avgResults(bRuns) });
+          }
+        }
+      );
       setNitroResult(nr);
-
-      setPhase('builtin');
-      const br = await runAll(runBuiltin, setRun);
       setBuiltinResult(br);
 
       setPhase('done');
@@ -165,7 +199,8 @@ export function WebSocketBenchmarkScreen() {
     }
   };
 
-  const running = phase === 'nitro' || phase === 'builtin';
+  const running = phase === 'running';
+  const totalAlternateRuns = RUNS * 2;
 
   const diff = (nitro: number, builtin: number) => {
     const pct = ((builtin - nitro) / builtin) * 100;
@@ -178,7 +213,8 @@ export function WebSocketBenchmarkScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>WebSocket Benchmark</Text>
         <Text style={styles.subtitle}>
-          connect → send {MESSAGE_COUNT} messages → disconnect ({RUNS} runs avg)
+          connect → send {MESSAGE_COUNT} messages → disconnect ({RUNS}× each,
+          nitro / built-in alternating)
         </Text>
         <Text style={styles.server}>{ECHO_URL}</Text>
       </View>
@@ -197,7 +233,8 @@ export function WebSocketBenchmarkScreen() {
               style={styles.spinner}
             />
             <Text style={styles.btnText}>
-              {phase === 'nitro' ? 'Nitro' : 'Built-in'} — run {run}/{RUNS}
+              {runKind === 'nitro' ? 'Nitro' : 'Built-in'} — {run}/
+              {totalAlternateRuns}
             </Text>
           </View>
         ) : (
@@ -291,17 +328,25 @@ export function WebSocketBenchmarkScreen() {
               style={[styles.row, ri % 2 === 1 && styles.rowAlt]}
             >
               <Text style={[styles.cell, styles.labelCell]}>{label}</Text>
-              {Array.from({ length: RUNS }, (_, i) => (
-                <Text key={i} style={[styles.cell, styles.runCol, styles.mono]}>
-                  {result?.runs[i] != null
-                    ? result.runs[i]!.totalMs.toFixed(1)
-                    : result == null &&
-                        running &&
-                        phase === (ri === 0 ? 'nitro' : 'builtin')
-                      ? '…'
-                      : '—'}
-                </Text>
-              ))}
+              {Array.from({ length: RUNS }, (_, i) => {
+                const done = result?.runs[i];
+                const inFlight =
+                  running &&
+                  runKind === (ri === 0 ? 'nitro' : 'builtin') &&
+                  (result?.runs.length ?? 0) === i;
+                return (
+                  <Text
+                    key={i}
+                    style={[styles.cell, styles.runCol, styles.mono]}
+                  >
+                    {done != null
+                      ? done.totalMs.toFixed(1)
+                      : inFlight
+                        ? '…'
+                        : '—'}
+                  </Text>
+                );
+              })}
             </View>
           ))}
         </View>

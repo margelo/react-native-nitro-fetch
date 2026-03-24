@@ -4,6 +4,7 @@
 #include "WebSocketPrewarmer.hpp"
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
@@ -20,7 +21,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
  */
 extern "C" JNIEXPORT void JNICALL
 Java_com_margelo_nitro_nitrofetchwebsockets_NitroWebSocketPrewarmer_nativePreWarm(
-    JNIEnv* env, jclass, jstring urlJs, jobjectArray protocolsJs) {
+    JNIEnv* env, jclass, jstring urlJs, jobjectArray protocolsJs, jobjectArray headersJs) {
 
   const char* urlCStr = env->GetStringUTFChars(urlJs, nullptr);
   std::string url(urlCStr);
@@ -38,6 +39,22 @@ Java_com_margelo_nitro_nitrofetchwebsockets_NitroWebSocketPrewarmer_nativePreWar
     }
   }
 
+  std::unordered_map<std::string, std::string> headers;
+  if (headersJs != nullptr) {
+    jsize count = env->GetArrayLength(headersJs);
+    for (jsize i = 0; i + 1 < count; i += 2) {
+      auto keyJs = static_cast<jstring>(env->GetObjectArrayElement(headersJs, i));
+      auto valJs = static_cast<jstring>(env->GetObjectArrayElement(headersJs, i + 1));
+      const char* k = env->GetStringUTFChars(keyJs, nullptr);
+      const char* v = env->GetStringUTFChars(valJs, nullptr);
+      headers[k] = v;
+      env->ReleaseStringUTFChars(keyJs, k);
+      env->ReleaseStringUTFChars(valJs, v);
+      env->DeleteLocalRef(keyJs);
+      env->DeleteLocalRef(valJs);
+    }
+  }
+
   margelo::nitro::nitrofetchwebsockets::WebSocketPrewarmer::instance()
-    .preConnect(url, protocols, {});
+    .preConnect(url, protocols, headers);
 }
