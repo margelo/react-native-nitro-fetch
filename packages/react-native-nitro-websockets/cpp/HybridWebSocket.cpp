@@ -18,8 +18,38 @@ namespace margelo::nitro::nitrofetchwebsockets {
 
 #include <NitroModules/ArrayBuffer.hpp>
 #include <cstring>
+#include <memory>
 
 namespace margelo::nitro::nitrofetchwebsockets {
+
+namespace {
+
+std::shared_ptr<ArrayBuffer> sharedEmptyPayload() {
+  static std::shared_ptr<ArrayBuffer> empty = [] {
+    auto* raw = new uint8_t[1];
+    raw[0] = 0;
+    return std::make_shared<NativeArrayBuffer>(raw, 0, [raw]() { delete[] raw; });
+  }();
+  return empty;
+}
+
+std::shared_ptr<ArrayBuffer> copyPayloadToArrayBuffer(const uint8_t* data, size_t len) {
+  if (len == 0) {
+    return sharedEmptyPayload();
+  }
+  auto* raw = new uint8_t[len];
+  std::memcpy(raw, data, len);
+  return std::make_shared<NativeArrayBuffer>(raw, len, [raw]() { delete[] raw; });
+}
+
+WebSocketConnectionBase::OnMessage makeHybridMessageBridge(
+    std::function<void(const HybridWebSocketMessageEvent&)> cb) {
+  return [cb = std::move(cb)](const uint8_t* data, size_t len, bool isBinary) {
+    cb(HybridWebSocketMessageEvent{ copyPayloadToArrayBuffer(data, len), isBinary });
+  };
+}
+
+} // namespace
 
 std::shared_ptr<WebSocketConnectionBase> HybridWebSocket::createConnection() {
 #if defined(__APPLE__)
@@ -75,26 +105,14 @@ void HybridWebSocket::setOnOpen(const std::optional<std::function<void()>>& cb) 
   _conn->setOnOpen(cb ? [cb = *cb]() { cb(); } : WebSocketConnectionBase::OnOpen{});
 }
 
-std::optional<std::function<void(const WebSocketMessageEvent&)>> HybridWebSocket::getOnMessage() {
+std::optional<std::function<void(const HybridWebSocketMessageEvent&)>> HybridWebSocket::getOnMessage() {
   return _onMessage;
 }
 void HybridWebSocket::setOnMessage(
-    const std::optional<std::function<void(const WebSocketMessageEvent&)>>& cb) {
+    const std::optional<std::function<void(const HybridWebSocketMessageEvent&)>>& cb) {
   _onMessage = cb;
   if (cb) {
-    _conn->setOnMessage([cb = *cb](const uint8_t* data, size_t len, bool isBinary) {
-      std::string text;
-      std::optional<std::shared_ptr<ArrayBuffer>> binaryData;
-      if (isBinary) {
-        auto* raw = new uint8_t[len];
-        std::memcpy(raw, data, len);
-        binaryData = std::make_shared<NativeArrayBuffer>(
-          raw, len, [raw]() { delete[] raw; });
-      } else {
-        text = std::string(reinterpret_cast<const char*>(data), len);
-      }
-      cb(WebSocketMessageEvent{ text, isBinary, binaryData });
-    });
+    _conn->setOnMessage(makeHybridMessageBridge(*cb));
   } else {
     _conn->setOnMessage({});
   }
@@ -167,19 +185,7 @@ void HybridWebSocket::bindCallbacks() {
 
   auto onMsg = _onMessage;
   if (onMsg) {
-    _conn->setOnMessage([onMsg = *onMsg](const uint8_t* data, size_t len, bool isBinary) {
-      std::string text;
-      std::optional<std::shared_ptr<ArrayBuffer>> binaryData;
-      if (isBinary) {
-        auto* raw = new uint8_t[len];
-        std::memcpy(raw, data, len);
-        binaryData = std::make_shared<NativeArrayBuffer>(
-          raw, len, [raw]() { delete[] raw; });
-      } else {
-        text = std::string(reinterpret_cast<const char*>(data), len);
-      }
-      onMsg(WebSocketMessageEvent{ text, isBinary, binaryData });
-    });
+    _conn->setOnMessage(makeHybridMessageBridge(*onMsg));
   } else {
     _conn->setOnMessage({});
   }

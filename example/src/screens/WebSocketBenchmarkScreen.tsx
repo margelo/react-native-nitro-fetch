@@ -17,7 +17,7 @@ declare const performance: { now(): number };
 declare const global: any;
 
 const ECHO_URL = 'wss://echo.websocket.org';
-const MESSAGE_COUNT = 20;
+const MESSAGE_COUNT = 200;
 
 // Persist the echo URL to the prewarm queue so native auto-bootstrap
 // can pre-connect on the next cold launch — runs once per install.
