@@ -1,0 +1,6 @@
+[submodule "packages/react-native-nitro-websockets/thirdparty/mbedtls"]
+	path = packages/react-native-nitro-websockets/thirdparty/mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls.git
+[submodule "packages/react-native-nitro-websockets/thirdparty/libwebsockets"]
+	path = packages/react-native-nitro-websockets/thirdparty/libwebsockets
+	url = https://github.com/warmcat/libwebsockets.git

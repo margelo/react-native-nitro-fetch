@@ -31,12 +31,12 @@ export default defineConfig([
   {
     ignores: [
       'node_modules/',
-      'packages/react-native-nitro-fetch/lib/',
-      'packages/react-native-nitro-text-decoder/lib/',
+      'packages/**/lib/',
       '**/metro.config.js',
       '**/react-native.config.js',
       '**/babel.config.js',
       '.yarn/**',
+      '**/thirdparty/**',
       'eslint.config.mjs',
     ],
   },
