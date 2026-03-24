@@ -1,4 +1,5 @@
 import { NitroModules } from 'react-native-nitro-modules'
+import { TextDecoder } from 'react-native-nitro-text-decoder'
 import type {
   HybridWebSocket,
   HybridWebSocketMessageEvent,
@@ -18,7 +19,6 @@ export type WebSocketMessageEvent = {
   isBinary: boolean
   binaryData?: ArrayBuffer
 }
-import { TextDecoder } from 'react-native-nitro-text-decoder'
 
 export {
   prewarmOnAppStart,
