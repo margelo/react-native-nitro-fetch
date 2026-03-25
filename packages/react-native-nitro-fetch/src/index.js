@@ -6,7 +6,6 @@ export {
   removeFromAutoPrefetch,
   removeAllFromAutoprefetch,
 } from './fetch';
-export type { NitroFormDataPart, NitroRequest, NitroResponse } from './fetch';
 export { NitroFetch } from './NitroInstances';
 export {
   registerTokenRefresh,
@@ -16,11 +15,9 @@ export {
   getNestedField,
   applyTemplate,
 } from './tokenRefresh';
-export type { TokenRefreshConfig } from './tokenRefresh';
 import './fetch';
-
 // Keep legacy export to avoid breaking any local tests/usages during scaffolding.
 // Will be removed once native Cronet path is ready.
-export function multiply(a: number, b: number): number {
+export function multiply(a, b) {
   return a * b;
 }

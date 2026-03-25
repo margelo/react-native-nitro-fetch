@@ -57,5 +57,18 @@ namespace margelo::nitro::nitrofetch {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* key */)>("removeString");
     method(_javaPart, jni::make_jstring(key));
   }
+  std::string JHybridNativeStorageSpec::getSecureString(const std::string& key) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<jni::JString>(jni::alias_ref<jni::JString> /* key */)>("getSecureString");
+    auto __result = method(_javaPart, jni::make_jstring(key));
+    return __result->toStdString();
+  }
+  void JHybridNativeStorageSpec::setSecureString(const std::string& key, const std::string& value) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* key */, jni::alias_ref<jni::JString> /* value */)>("setSecureString");
+    method(_javaPart, jni::make_jstring(key), jni::make_jstring(value));
+  }
+  void JHybridNativeStorageSpec::removeSecureString(const std::string& key) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<jni::JString> /* key */)>("removeSecureString");
+    method(_javaPart, jni::make_jstring(key));
+  }
 
 } // namespace margelo::nitro::nitrofetch

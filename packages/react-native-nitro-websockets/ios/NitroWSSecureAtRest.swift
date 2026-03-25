@@ -1,14 +1,13 @@
 //
-//  NativeStorage.swift
+//  Duplicate of nitro-fetch NativeStorage.swift `NitroFetchSecureAtRest` — keep
+//  `keychainService`, `encPrefix`, and Keychain account in sync.
 //
 
 import CryptoKit
 import Foundation
 import Security
 
-/// AES-GCM at rest in UserDefaults; 256-bit key in Keychain.
-/// Keep `keychainService` and `encPrefix` in sync with `NitroWSSecureAtRest.swift` in nitro-websockets.
-internal enum NitroFetchSecureAtRest {
+enum NitroWSSecureAtRest {
   static let encPrefix = "nfc1:"
   private static let keychainService = "com.margelo.nitrofetch.aesgcm.v1"
   private static let keychainAccount = "master"
@@ -20,7 +19,7 @@ internal enum NitroFetchSecureAtRest {
     var bytes = [UInt8](repeating: 0, count: 32)
     let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
     guard status == errSecSuccess else {
-      throw NSError(domain: "NitroFetchSecure", code: Int(status), userInfo: nil)
+      throw NSError(domain: "NitroWSSecure", code: Int(status), userInfo: nil)
     }
     let data = Data(bytes)
     try saveKeyData(data)
@@ -38,7 +37,7 @@ internal enum NitroFetchSecureAtRest {
     var out: CFTypeRef?
     let status = SecItemCopyMatching(query as CFDictionary, &out)
     guard status == errSecSuccess, let d = out as? Data else {
-      throw NSError(domain: "NitroFetchSecure", code: Int(status), userInfo: nil)
+      throw NSError(domain: "NitroWSSecure", code: Int(status), userInfo: nil)
     }
     return d
   }
@@ -59,7 +58,7 @@ internal enum NitroFetchSecureAtRest {
     ]
     let status = SecItemAdd(add as CFDictionary, nil)
     guard status == errSecSuccess else {
-      throw NSError(domain: "NitroFetchSecure", code: Int(status), userInfo: nil)
+      throw NSError(domain: "NitroWSSecure", code: Int(status), userInfo: nil)
     }
   }
 
@@ -67,25 +66,24 @@ internal enum NitroFetchSecureAtRest {
     let key = try loadOrCreateSymmetricKey()
     let sealed = try AES.GCM.seal(Data(plain.utf8), using: key)
     guard let combined = sealed.combined else {
-      throw NSError(domain: "NitroFetchSecure", code: -1, userInfo: nil)
+      throw NSError(domain: "NitroWSSecure", code: -1, userInfo: nil)
     }
     return encPrefix + combined.base64EncodedString()
   }
 
   private static func decryptPayload(_ b64: String) throws -> String {
     guard let raw = Data(base64Encoded: b64) else {
-      throw NSError(domain: "NitroFetchSecure", code: -2, userInfo: nil)
+      throw NSError(domain: "NitroWSSecure", code: -2, userInfo: nil)
     }
     let key = try loadOrCreateSymmetricKey()
     let box = try AES.GCM.SealedBox(combined: raw)
     let data = try AES.GCM.open(box, using: key)
     guard let s = String(data: data, encoding: .utf8) else {
-      throw NSError(domain: "NitroFetchSecure", code: -3, userInfo: nil)
+      throw NSError(domain: "NitroWSSecure", code: -3, userInfo: nil)
     }
     return s
   }
 
-  /// Plaintext, or nil if missing.
   static func decryptedString(forKey key: String, defaults: UserDefaults) -> String? {
     guard let stored = defaults.string(forKey: key) else { return nil }
     if stored.isEmpty { return "" }
@@ -103,53 +101,17 @@ internal enum NitroFetchSecureAtRest {
     defaults.set(enc, forKey: key)
     defaults.synchronize()
   }
-
-  static func remove(forKey key: String, defaults: UserDefaults) {
-    defaults.removeObject(forKey: key)
-    defaults.synchronize()
-  }
 }
 
-final class NativeStorage: HybridNativeStorageSpec {
-  private static let suiteName = "nitro_fetch_storage"
-
-  private let userDefaults: UserDefaults
-
-  public override init() {
-    if let suite = UserDefaults(suiteName: NativeStorage.suiteName) {
-      self.userDefaults = suite
-    } else {
-      self.userDefaults = UserDefaults.standard
-    }
-    super.init()
+@objc(NitroWSSecureAtRestBridge)
+public final class NitroWSSecureAtRestBridge: NSObject {
+  @objc public static func decryptedString(forKey key: String, suiteName: String) -> String? {
+    let ud = UserDefaults(suiteName: suiteName) ?? .standard
+    return NitroWSSecureAtRest.decryptedString(forKey: key, defaults: ud)
   }
 
-  func getString(key: String) throws -> String {
-    guard let value = userDefaults.string(forKey: key) else {
-      return ""
-    }
-    return value
-  }
-
-  func setString(key: String, value: String) throws {
-    userDefaults.set(value, forKey: key)
-    userDefaults.synchronize()
-  }
-
-  func removeString(key: String) throws {
-    userDefaults.removeObject(forKey: key)
-    userDefaults.synchronize()
-  }
-
-  func getSecureString(key: String) throws -> String {
-    NitroFetchSecureAtRest.decryptedString(forKey: key, defaults: userDefaults) ?? ""
-  }
-
-  func setSecureString(key: String, value: String) throws {
-    try NitroFetchSecureAtRest.setEncrypted(value, forKey: key, defaults: userDefaults)
-  }
-
-  func removeSecureString(key: String) throws {
-    NitroFetchSecureAtRest.remove(forKey: key, defaults: userDefaults)
+  @objc public static func setEncrypted(_ plain: String, forKey key: String, suiteName: String) {
+    let ud = UserDefaults(suiteName: suiteName) ?? .standard
+    try? NitroWSSecureAtRest.setEncrypted(plain, forKey: key, defaults: ud)
   }
 }
