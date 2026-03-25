@@ -17,6 +17,7 @@
 - 💪 Supports HTTP/1, HTTP/2 and [HTTP/3](https://en.wikipedia.org/wiki/HTTP/3) over [QUIC](https://www.chromium.org/quic/), [Brotli](https://github.com/google/brotli), and disk cache
 - ⏰ Prefetching on app-startup for even faster initialization
 - 🧵 Worklet support for parallel data mapping without blocking the JS Thread
+- 🔌 Optional **WebSockets** via [`react-native-nitro-websockets`](docs/websockets.md) (see [WebSockets & prewarm](#websockets--prewarm) below)
 - 🔥 Powered by [Nitro Modules](https://github.com/mrousavy/nitro)
 
 ## Installation
@@ -26,6 +27,14 @@ npm i react-native-nitro-fetch react-native-nitro-modules
 ```
 
 > [Nitro Modules](https://github.com/mrousavy/nitro) requires react-native 0.75+ or higher
+
+**WebSockets (optional)** — add the companion socket package plus **text decoder** (peer dependency of websockets):
+
+```sh
+npm i react-native-nitro-websockets react-native-nitro-text-decoder
+```
+
+Full setup, native hooks, prewarm, and API details: **[docs/websockets.md](docs/websockets.md)** · UI: [`example/src/screens/WebSocketScreen.tsx`](example/src/screens/WebSocketScreen.tsx) · auth + prewarm: [Token refresh](#token-refresh-cold-start) (example block).
 
 ## Usage
 
@@ -121,6 +130,31 @@ registerTokenRefresh({
 - For a plain-text body, set `responseType: 'text'` and use **`textHeader`** / optional **`textTemplate`** (with `{{value}}`).
 
 
+
+**Example: token refresh + WebSocket prewarm**
+
+```ts
+import { registerTokenRefresh } from 'react-native-nitro-fetch'
+import { prewarmOnAppStart, NitroWebSocket } from 'react-native-nitro-websockets'
+
+const WSS = 'wss://api.example.com/live'
+
+registerTokenRefresh({
+  target: 'websocket', // use 'all' if you also use prefetchOnAppStart with the same token flow
+  url: 'https://api.example.com/oauth/token',
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    grant_type: 'client_credentials',
+    client_id: '…',
+    client_secret: '…',
+  }),
+  mappings: [
+    { jsonPath: 'access_token', header: 'Authorization', valueTemplate: 'Bearer {{value}}' },
+  ],
+})
+
+```
 
 **3. Optional JS helpers**
 
@@ -262,14 +296,39 @@ export function StreamingExample() {
 }
 ```
 
+### WebSockets & prewarm
+
+Use **[react-native-nitro-websockets](docs/websockets.md)** for `NitroWebSocket` (browser-like API: `onopen`, `onmessage`, `send`, `close`, …). Install **`react-native-nitro-text-decoder`** alongside it — the socket package uses it to decode UTF-8 text frames.
+
+**Prewarm on next launch** — queue URLs from JS so native code can start the handshake before React loads:
+
+```ts
+import {
+  prewarmOnAppStart,
+  removeFromPrewarmQueue,
+  clearPrewarmQueue,
+} from 'react-native-nitro-websockets'
+
+prewarmOnAppStart('wss://echo.websocket.org')
+// optional: prewarmOnAppStart(url, ['subproto'], { Authorization: 'Bearer …' })
+
+clearPrewarmQueue()
+removeFromPrewarmQueue('wss://echo.websocket.org')
+```
+
+On **Android**, call `NitroWebSocketAutoPrewarmer.prewarmOnStart(this)` in `Application.onCreate` (see [example `MainApplication.kt`](example/android/app/src/main/java/nitrofetch/example/MainApplication.kt)). **iOS** picks up the queue via the linked pod.
+
+Authenticated prewarms: use **`registerTokenRefresh`** with `target: 'websocket'` or `'all'` — see [Token refresh (cold start)](#token-refresh-cold-start) for a **small `registerTokenRefresh` + `prewarmOnAppStart` + `NitroWebSocket` example**.
+
+More detail: **[docs/websockets.md](docs/websockets.md)** · UI sample: **[example/src/screens/WebSocketScreen.tsx](example/src/screens/WebSocketScreen.tsx)**.
+
 ## Project Status
 
 Nitro Fetch is currently in an alpha stage. You can adopt it in production, but keep in mind that the library and it's API is subject to change.
 
 ## Limitations & Alternatives
 
-
-- [WebSockets](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket) are not supported. For high‑performance sockets and binary streams, consider using [react-native-fast-io](https://github.com/callstackincubator/react-native-fast-io) by our friends at Callstack.
+- **WebSockets** are not part of `react-native-nitro-fetch` itself; use the companion package **[react-native-nitro-websockets](docs/websockets.md)** (with **react-native-nitro-text-decoder**). For other stacks, [react-native-fast-io](https://github.com/callstackincubator/react-native-fast-io) is another option.
 
 ## Documentation
 
@@ -278,6 +337,7 @@ Nitro Fetch is currently in an alpha stage. You can adopt it in production, but 
 - [Android Details](docs/android.md)
 - [iOS Details](docs/ios.md)
 - [Prefetch & Auto-Prefetch](docs/prefetch.md)
+- [WebSockets & prewarm](docs/websockets.md)
 - [Worklets](docs/worklets.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Cronet (Android) notes](docs/cronet-android.md)
