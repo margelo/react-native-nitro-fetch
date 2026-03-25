@@ -120,10 +120,7 @@ registerTokenRefresh({
 - Use **`compositeHeaders`** to build a header from a template and multiple JSON paths (`{{placeholder}}` in the template).
 - For a plain-text body, set `responseType: 'text'` and use **`textHeader`** / optional **`textTemplate`** (with `{{value}}`).
 
-**2. Ensure native cold-start hooks run**
 
-- **Android** (example pattern): in `Application.onCreate`, call `AutoPrefetcher.prefetchOnStart(this)` and, if you use nitro-websockets prewarm, `NitroWebSocketAutoPrewarmer.prewarmOnStart(this)`.
-- **iOS**: in `AppDelegate`, call `NitroAutoPrefetcher.prefetchOnStart()`. WebSocket auto-prewarm is wired inside the websockets pod.
 
 **3. Optional JS helpers**
 
