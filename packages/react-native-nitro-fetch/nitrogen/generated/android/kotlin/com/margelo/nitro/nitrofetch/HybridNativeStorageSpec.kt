@@ -39,6 +39,18 @@ abstract class HybridNativeStorageSpec: HybridObject() {
   @DoNotStrip
   @Keep
   abstract fun removeString(key: String): Unit
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getSecureString(key: String): String
+  
+  @DoNotStrip
+  @Keep
+  abstract fun setSecureString(key: String, value: String): Unit
+  
+  @DoNotStrip
+  @Keep
+  abstract fun removeSecureString(key: String): Unit
 
   // Default implementation of `HybridObject.toString()`
   override fun toString(): String {

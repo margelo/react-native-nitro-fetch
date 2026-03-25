@@ -57,6 +57,9 @@ namespace margelo::nitro::nitrofetch {
     std::string getString(const std::string& key) override;
     void setString(const std::string& key, const std::string& value) override;
     void removeString(const std::string& key) override;
+    std::string getSecureString(const std::string& key) override;
+    void setSecureString(const std::string& key, const std::string& value) override;
+    void removeSecureString(const std::string& key) override;
 
   private:
     jni::global_ref<JHybridNativeStorageSpec::JavaPart> _javaPart;

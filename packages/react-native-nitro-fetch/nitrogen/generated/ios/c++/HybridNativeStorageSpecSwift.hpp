@@ -86,6 +86,26 @@ namespace margelo::nitro::nitrofetch {
         std::rethrow_exception(__result.error());
       }
     }
+    inline std::string getSecureString(const std::string& key) override {
+      auto __result = _swiftPart.getSecureString(key);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline void setSecureString(const std::string& key, const std::string& value) override {
+      auto __result = _swiftPart.setSecureString(key, value);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline void removeSecureString(const std::string& key) override {
+      auto __result = _swiftPart.removeSecureString(key);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
 
   private:
     NitroFetch::HybridNativeStorageSpec_cxx _swiftPart;

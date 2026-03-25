@@ -2280,7 +2280,7 @@ SPEC CHECKSUMS:
   FBLazyVector: 4ee5f665093abe339f4b579fc3d59f65c8af196c
   hermes-engine: 6e73b6dc6e9f908925b064fcfed5d7ae87f93a6e
   NitroFetch: fbbbc61ad92977bd6620ad52e2d1b094cf7408d8
-  NitroFetchWebsockets: 639c85cc1fd93485b884643f159c06a90df1df69
+  NitroFetchWebsockets: 350cc00474d40716f7aef656aeeb5db50e3fcfda
   NitroModules: 2d92eeea80a5afdebe7b4fd2443b5bd4d7ba1a44
   NitroTextDecoder: f01469b8de6606c311227f0ccc070283f6d0a5ca
   RCTDeprecation: b73940ea69ab57c2c59f845b37b09e1d8b0d0588

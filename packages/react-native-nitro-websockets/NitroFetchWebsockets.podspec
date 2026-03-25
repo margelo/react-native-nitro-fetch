@@ -36,9 +36,11 @@ Pod::Spec.new do |s|
   current_xcconfig = s.attributes_hash['pod_target_xcconfig'] || {}
   s.pod_target_xcconfig = current_xcconfig.merge({
     'HEADER_SEARCH_PATHS' => [
+      '$(inherited)',
       '"${PODS_TARGET_SRCROOT}/cpp"',
       '"${PODS_TARGET_SRCROOT}/ios"',
       '"${PODS_TARGET_SRCROOT}/prewarm"',
+      '"$(PODS_CONFIGURATION_BUILD_DIR)/NitroFetchWebsockets"',
     ].join(' '),
     'OTHER_LDFLAGS' => '-lc++',
   })

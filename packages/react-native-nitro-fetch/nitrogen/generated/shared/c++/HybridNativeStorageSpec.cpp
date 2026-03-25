@@ -17,6 +17,9 @@ namespace margelo::nitro::nitrofetch {
       prototype.registerHybridMethod("getString", &HybridNativeStorageSpec::getString);
       prototype.registerHybridMethod("setString", &HybridNativeStorageSpec::setString);
       prototype.registerHybridMethod("removeString", &HybridNativeStorageSpec::removeString);
+      prototype.registerHybridMethod("getSecureString", &HybridNativeStorageSpec::getSecureString);
+      prototype.registerHybridMethod("setSecureString", &HybridNativeStorageSpec::setSecureString);
+      prototype.registerHybridMethod("removeSecureString", &HybridNativeStorageSpec::removeSecureString);
     });
   }
 

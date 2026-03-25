@@ -16,6 +16,9 @@ public protocol HybridNativeStorageSpec_protocol: HybridObject {
   func getString(key: String) throws -> String
   func setString(key: String, value: String) throws -> Void
   func removeString(key: String) throws -> Void
+  func getSecureString(key: String) throws -> String
+  func setSecureString(key: String, value: String) throws -> Void
+  func removeSecureString(key: String) throws -> Void
 }
 
 public extension HybridNativeStorageSpec_protocol {

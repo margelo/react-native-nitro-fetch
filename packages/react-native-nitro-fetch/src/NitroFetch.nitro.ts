@@ -86,4 +86,8 @@ export interface NativeStorage extends HybridObject<{
   getString(key: string): string;
   setString(key: string, value: string): void;
   removeString(key: string): void;
+  /** AES-GCM at rest in the same prefs/suite as getString; key material in Keystore / Keychain. */
+  getSecureString(key: string): string;
+  setSecureString(key: string, value: string): void;
+  removeSecureString(key: string): void;
 }

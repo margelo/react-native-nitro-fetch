@@ -51,6 +51,9 @@ namespace margelo::nitro::nitrofetch {
       virtual std::string getString(const std::string& key) = 0;
       virtual void setString(const std::string& key, const std::string& value) = 0;
       virtual void removeString(const std::string& key) = 0;
+      virtual std::string getSecureString(const std::string& key) = 0;
+      virtual void setSecureString(const std::string& key, const std::string& value) = 0;
+      virtual void removeSecureString(const std::string& key) = 0;
 
     protected:
       // Hybrid Setup

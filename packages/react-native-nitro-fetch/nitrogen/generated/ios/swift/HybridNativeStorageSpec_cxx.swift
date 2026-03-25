@@ -157,4 +157,38 @@ open class HybridNativeStorageSpec_cxx {
       return bridge.create_Result_void_(__exceptionPtr)
     }
   }
+  
+  @inline(__always)
+  public final func getSecureString(key: std.string) -> bridge.Result_std__string_ {
+    do {
+      let __result = try self.__implementation.getSecureString(key: String(key))
+      let __resultCpp = std.string(__result)
+      return bridge.create_Result_std__string_(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__string_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func setSecureString(key: std.string, value: std.string) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.setSecureString(key: String(key), value: String(value))
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func removeSecureString(key: std.string) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.removeSecureString(key: String(key))
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
 }
