@@ -1,4 +1,5 @@
 import 'web-streams-polyfill/polyfill';
+/* global ReadableStream */
 import {
   boxedNitroFetch,
   NitroFetch as NitroFetchSingleton,
