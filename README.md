@@ -34,7 +34,7 @@ npm i react-native-nitro-fetch react-native-nitro-modules
 npm i react-native-nitro-websockets react-native-nitro-text-decoder
 ```
 
-Full setup, native hooks, prewarm, and API details: **[docs/websockets.md](docs/websockets.md)**.
+Full setup, native hooks, prewarm, and API details: **[docs/websockets.md](docs/websockets.md)** · UI: [`example/src/screens/WebSocketScreen.tsx`](example/src/screens/WebSocketScreen.tsx) · auth + prewarm: [Token refresh](#token-refresh-cold-start) (example block).
 
 ## Usage
 
@@ -130,6 +130,31 @@ registerTokenRefresh({
 - For a plain-text body, set `responseType: 'text'` and use **`textHeader`** / optional **`textTemplate`** (with `{{value}}`).
 
 
+
+**Example: token refresh + WebSocket prewarm**
+
+```ts
+import { registerTokenRefresh } from 'react-native-nitro-fetch'
+import { prewarmOnAppStart, NitroWebSocket } from 'react-native-nitro-websockets'
+
+const WSS = 'wss://api.example.com/live'
+
+registerTokenRefresh({
+  target: 'websocket', // use 'all' if you also use prefetchOnAppStart with the same token flow
+  url: 'https://api.example.com/oauth/token',
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    grant_type: 'client_credentials',
+    client_id: '…',
+    client_secret: '…',
+  }),
+  mappings: [
+    { jsonPath: 'access_token', header: 'Authorization', valueTemplate: 'Bearer {{value}}' },
+  ],
+})
+
+```
 
 **3. Optional JS helpers**
 
@@ -293,7 +318,7 @@ removeFromPrewarmQueue('wss://echo.websocket.org')
 
 On **Android**, call `NitroWebSocketAutoPrewarmer.prewarmOnStart(this)` in `Application.onCreate` (see [example `MainApplication.kt`](example/android/app/src/main/java/nitrofetch/example/MainApplication.kt)). **iOS** picks up the queue via the linked pod.
 
-Authenticated prewarms can use **`registerTokenRefresh`** with `target: 'websocket'` or `'all'` (see [Token refresh (cold start)](#token-refresh-cold-start)).
+Authenticated prewarms: use **`registerTokenRefresh`** with `target: 'websocket'` or `'all'` — see [Token refresh (cold start)](#token-refresh-cold-start) for a **small `registerTokenRefresh` + `prewarmOnAppStart` + `NitroWebSocket` example**.
 
 More detail: **[docs/websockets.md](docs/websockets.md)** · UI sample: **[example/src/screens/WebSocketScreen.tsx](example/src/screens/WebSocketScreen.tsx)**.
 

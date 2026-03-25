@@ -123,6 +123,33 @@ If prewarmed sockets need fresh headers, register token refresh with `target: 'w
 
 
 
+```ts
+import { registerTokenRefresh } from 'react-native-nitro-fetch'
+import { prewarmOnAppStart, NitroWebSocket } from 'react-native-nitro-websockets'
+
+const WSS = 'wss://api.example.com/live'
+
+registerTokenRefresh({
+  target: 'websocket',
+  url: 'https://api.example.com/oauth/token',
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ grant_type: 'client_credentials' }),
+  mappings: [
+    { jsonPath: 'access_token', header: 'Authorization', valueTemplate: 'Bearer {{value}}' },
+  ],
+})
+
+prewarmOnAppStart(WSS)
+
+// Runtime connection (add your own token if you have it in JS)
+const ws = new NitroWebSocket(WSS, undefined, { Authorization: 'Bearer …' })
+```
+
+Use `target: 'all'` if you share the same OAuth response for **both** `prefetchOnAppStart` queues and WebSocket prewarm.
+
+
+
 ## See also
 
 - [Prefetch & auto-prefetch](prefetch.md) — HTTP prefetch; pairs conceptually with WS prewarm.
