@@ -3,9 +3,9 @@
 #import <UIKit/UIKit.h>
 #endif
 
-// No need to import the Swift header if you don’t want to.
-// Just declare the C entry point:
-extern "C" void NitroStartSwift(void);
+@interface NitroAutoPrefetcher : NSObject
++ (void)prefetchOnStart;
+@end
 
 @interface NitroFetchBootstrapper : NSObject @end
 @implementation NitroFetchBootstrapper
@@ -16,10 +16,10 @@ extern "C" void NitroStartSwift(void);
     [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidFinishLaunchingNotification
                                                       object:nil queue:nil
                                                   usingBlock:^(__unused NSNotification *note) {
-      NitroStartSwift(); // <-- call the C symbol
+      [NitroAutoPrefetcher prefetchOnStart];
     }];
     dispatch_async(dispatch_get_main_queue(), ^{
-      NitroStartSwift();
+      [NitroAutoPrefetcher prefetchOnStart];
     });
   }
 #endif
