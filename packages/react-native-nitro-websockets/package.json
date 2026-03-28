@@ -19,6 +19,7 @@
     "android/src",
     "cpp",
     "ios/**/*.h",
+    "ios/**/*.hpp",
     "ios/**/*.m",
     "ios/**/*.mm",
     "ios/**/*.cpp",
