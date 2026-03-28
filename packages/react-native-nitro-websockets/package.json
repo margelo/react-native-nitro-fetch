@@ -1,6 +1,6 @@
 {
   "name": "react-native-nitro-websockets",
-  "version": "0.1.0-beta.2",
+  "version": "0.1.0-beta.3",
   "description": "react-native-nitro-websockets",
   "main": "lib/index",
   "module": "lib/index",
@@ -52,6 +52,7 @@
     "thirdparty/mbedtls/3rdparty/**",
     "thirdparty/mbedtls/configs/**",
     "thirdparty/mbedtls/pkgconfig/**",
+    "thirdparty/mbedtls/scripts/config.py",
     "thirdparty/mbedtls/framework/CMakeLists.txt",
     "thirdparty/mbedtls/CMakeLists.txt",
     "thirdparty/mbedtls/LICENSE"
