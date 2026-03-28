@@ -28,7 +28,8 @@
     "*.podspec",
     "README.md",
     "thirdparty/xcframeworks/**",
-    "thirdparty/lws_config.h"
+    "thirdparty/lws_config.h",
+    "thirdparty/**"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
