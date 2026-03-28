@@ -110,6 +110,15 @@
     "react-native-nitro-modules": "*",
     "react-native-nitro-text-decoder": ">=0.1.0"
   },
+  "release-it": {
+    "git": false,
+    "npm": {
+      "publish": true
+    },
+    "github": {
+      "release": true
+    }
+  },
   "eslintConfig": {
     "root": true,
     "extends": [
