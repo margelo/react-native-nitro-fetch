@@ -1,6 +1,6 @@
 {
   "name": "react-native-nitro-websockets",
-  "version": "0.0.1",
+  "version": "0.1.0-beta.4",
   "description": "react-native-nitro-websockets",
   "main": "lib/index",
   "module": "lib/index",
@@ -19,6 +19,7 @@
     "android/src",
     "cpp",
     "ios/**/*.h",
+    "ios/**/*.hpp",
     "ios/**/*.m",
     "ios/**/*.mm",
     "ios/**/*.cpp",
@@ -28,7 +29,34 @@
     "*.podspec",
     "README.md",
     "thirdparty/xcframeworks/**",
-    "thirdparty/lws_config.h"
+    "thirdparty/lws_config.h",
+    "thirdparty/libwebsockets/lib/core/**",
+    "thirdparty/libwebsockets/lib/misc/**",
+    "thirdparty/libwebsockets/lib/system/**",
+    "thirdparty/libwebsockets/lib/tls/**",
+    "thirdparty/libwebsockets/lib/core-net/**",
+    "thirdparty/libwebsockets/lib/roles/**",
+    "thirdparty/libwebsockets/lib/event-libs/**",
+    "thirdparty/libwebsockets/lib/plat/unix/**",
+    "thirdparty/libwebsockets/lib/secure-streams/**",
+    "thirdparty/libwebsockets/lib/CMakeLists.txt",
+    "thirdparty/libwebsockets/include/**",
+    "thirdparty/libwebsockets/cmake/**",
+    "thirdparty/libwebsockets/plugins/**",
+    "thirdparty/libwebsockets/lwsws/**",
+    "thirdparty/libwebsockets/CMakeLists.txt",
+    "thirdparty/libwebsockets/CMakeLists-implied-options.txt",
+    "thirdparty/libwebsockets/LICENSE",
+    "thirdparty/mbedtls/library/**",
+    "thirdparty/mbedtls/include/**",
+    "thirdparty/mbedtls/cmake/**",
+    "thirdparty/mbedtls/3rdparty/**",
+    "thirdparty/mbedtls/configs/**",
+    "thirdparty/mbedtls/pkgconfig/**",
+    "thirdparty/mbedtls/scripts/config.py",
+    "thirdparty/mbedtls/framework/CMakeLists.txt",
+    "thirdparty/mbedtls/CMakeLists.txt",
+    "thirdparty/mbedtls/LICENSE"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -72,7 +100,7 @@
     "react": "19.2.3",
     "react-native": "0.85.0-rc.0",
     "react-native-nitro-modules": "^0.35.2",
-    "react-native-nitro-text-decoder": "workspace:*",
+    "react-native-nitro-text-decoder": "0.1.0",
     "release-it": "^17.10.0",
     "typescript": "^5.8.3"
   },
@@ -81,6 +109,15 @@
     "react-native": "*",
     "react-native-nitro-modules": "*",
     "react-native-nitro-text-decoder": ">=0.1.0"
+  },
+  "release-it": {
+    "git": false,
+    "npm": {
+      "publish": true
+    },
+    "github": {
+      "release": true
+    }
   },
   "eslintConfig": {
     "root": true,
