@@ -8,7 +8,11 @@
 //
 
 #import <Foundation/Foundation.h>
+#if __has_include(<NitroFetchWebsockets/NitroFetchWebsockets-Swift.h>)
+#import <NitroFetchWebsockets/NitroFetchWebsockets-Swift.h>
+#else
 #import "NitroFetchWebsockets-Swift.h"
+#endif
 #if __has_include(<UIKit/UIKit.h>)
 #import <UIKit/UIKit.h>
 #endif
