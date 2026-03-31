@@ -3,7 +3,7 @@ PODS:
   - hermes-engine (250829098.0.10):
     - hermes-engine/Pre-built (= 250829098.0.10)
   - hermes-engine/Pre-built (250829098.0.10)
-  - NitroFetch (0.2.1):
+  - NitroFetch (0.3.0-beta.1):
     - hermes-engine
     - NitroModules
     - RCTRequired
@@ -27,7 +27,7 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
-  - NitroFetchWebsockets (0.0.1):
+  - NitroFetchWebsockets (0.1.0-beta.4):
     - hermes-engine
     - NitroModules
     - RCTRequired
@@ -2279,8 +2279,8 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   FBLazyVector: 4ee5f665093abe339f4b579fc3d59f65c8af196c
   hermes-engine: 6e73b6dc6e9f908925b064fcfed5d7ae87f93a6e
-  NitroFetch: fbbbc61ad92977bd6620ad52e2d1b094cf7408d8
-  NitroFetchWebsockets: 350cc00474d40716f7aef656aeeb5db50e3fcfda
+  NitroFetch: a4b88e567d5e06282b8b83f34447942c588f52dd
+  NitroFetchWebsockets: 1157de90095aed8e35a98d74e3f0f735356240ed
   NitroModules: 2d92eeea80a5afdebe7b4fd2443b5bd4d7ba1a44
   NitroTextDecoder: f01469b8de6606c311227f0ccc070283f6d0a5ca
   RCTDeprecation: b73940ea69ab57c2c59f845b37b09e1d8b0d0588
@@ -2358,6 +2358,6 @@ SPEC CHECKSUMS:
   RNWorklets: 996ccc52b3280acc4798ded64d3b4771358ddce2
   Yoga: 1c38e066a91a4397f2979abcaf62ac497625a929
 
-PODFILE CHECKSUM: f6b2f5ca4d68c74f4081d0eba4760bc3e276a477
+PODFILE CHECKSUM: bbc52a1acf2d8893ec306ba64335ecd7e90487bb
 
 COCOAPODS: 1.15.2
