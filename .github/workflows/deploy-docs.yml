@@ -30,11 +30,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: docs-website
-        run: bun ci
+        run: npm ci
 
       - name: Build
         working-directory: docs-website
-        run: bun run build
+        run: npm run build
 
       - uses: actions/upload-pages-artifact@v3
         with:
