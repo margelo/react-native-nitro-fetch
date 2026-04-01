@@ -66,7 +66,7 @@ int nitroWsCallback(lws* wsi, enum lws_callback_reasons reason,
       break;
 
     case LWS_CALLBACK_CLIENT_RECEIVE:
-      if (conn) conn->handleReceive(in, len, lws_frame_is_binary(wsi) != 0);
+      if (conn) conn->handleReceiveFragment(wsi, in, len);
       break;
 
     case LWS_CALLBACK_CLIENT_WRITEABLE:
@@ -288,6 +288,41 @@ void WebSocketConnection::handleReceive(const void* in, size_t len, bool isBinar
                                static_cast<const uint8_t*>(in) + len);
     std::lock_guard<std::mutex> lock(_msgMu);
     _msgBuffer.push_back({ std::move(copy), isBinary });
+  }
+}
+
+void WebSocketConnection::handleReceiveFragment(lws* wsi, const void* in, size_t len) {
+  bool isBinary = lws_frame_is_binary(wsi) != 0;
+  bool isFirst  = lws_is_first_fragment(wsi) != 0;
+  bool isFinal  = lws_is_final_fragment(wsi) != 0;
+
+  // Fast path: single-frame message (most common case)
+  if (isFirst && isFinal) {
+    handleReceive(in, len, isBinary);
+    return;
+  }
+
+  // Multi-frame: accumulate fragments
+  if (isFirst) {
+    _rxBuf.clear();
+    _rxBinary = isBinary;
+  }
+
+  // Max message size guard — close with 1009 (Message Too Big)
+  if (_rxBuf.size() + len > kMaxMessageSize) {
+    _rxBuf.clear();
+    _rxBuf.shrink_to_fit();
+    close(1009, "message too large");
+    return;
+  }
+
+  const uint8_t* data = static_cast<const uint8_t*>(in);
+  _rxBuf.insert(_rxBuf.end(), data, data + len);
+
+  if (isFinal) {
+    handleReceive(_rxBuf.data(), _rxBuf.size(), _rxBinary);
+    _rxBuf.clear();
+    _rxBuf.shrink_to_fit();
   }
 }
 
