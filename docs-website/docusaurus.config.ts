@@ -11,10 +11,10 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'https://margelo.github.io',
+  url: 'https://riteshshukla04.github.io',
   baseUrl: '/react-native-nitro-fetch/',
 
-  organizationName: 'margelo',
+  organizationName: 'riteshshukla04',
   projectName: 'react-native-nitro-fetch',
 
   onBrokenLinks: 'throw',
