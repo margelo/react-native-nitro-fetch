@@ -1,5 +1,5 @@
-import {themes as prismThemes} from 'prism-react-renderer';
-import type {Config} from '@docusaurus/types';
+import { themes as prismThemes } from 'prism-react-renderer';
+import type { Config } from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
@@ -63,9 +63,9 @@ const config: Config = {
           label: 'Docs',
         },
         {
-          href: 'https://github.com/margelo/react-native-nitro-fetch',
-          position: 'right',
-          className: 'header-github-link',
+          'href': 'https://github.com/margelo/react-native-nitro-fetch',
+          'position': 'right',
+          'className': 'header-github-link',
           'aria-label': 'GitHub repository',
         },
       ],
@@ -76,9 +76,9 @@ const config: Config = {
         {
           title: 'Docs',
           items: [
-            {label: 'Getting Started', to: '/docs/getting-started'},
-            {label: 'API Reference', to: '/docs/api'},
-            {label: 'WebSockets', to: '/docs/websockets'},
+            { label: 'Getting Started', to: '/docs/getting-started' },
+            { label: 'API Reference', to: '/docs/api' },
+            { label: 'WebSockets', to: '/docs/websockets' },
           ],
         },
         {

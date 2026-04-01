@@ -18,7 +18,9 @@ export default function HomepageHero(): React.JSX.Element {
             mapping.
           </p>
           <div className={styles.install}>
-            <code>npm i react-native-nitro-fetch react-native-nitro-modules</code>
+            <code>
+              npm i react-native-nitro-fetch react-native-nitro-modules
+            </code>
           </div>
           <div className={styles.buttons}>
             <Link

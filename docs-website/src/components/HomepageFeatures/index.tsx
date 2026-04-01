@@ -46,7 +46,7 @@ const features: Feature[] = [
   },
 ];
 
-function FeatureCard({title, description, icon}: Feature): React.JSX.Element {
+function FeatureCard({ title, description, icon }: Feature): React.JSX.Element {
   return (
     <div className={styles.card}>
       <div className={styles.icon}>{icon}</div>
