@@ -119,6 +119,28 @@ p {
     no-repeat;
 }
 
+/* ── Hire Us (navbar) ── */
+
+.navbar-hire-link {
+  border: 1px solid var(--ifm-color-primary);
+  color: var(--ifm-color-primary) !important;
+  font-weight: 600;
+  font-size: 0.8rem;
+  padding: 0.3rem 0.9rem;
+  border-radius: 6px;
+  transition: background-color 150ms ease, color 150ms ease;
+  margin-right: 0.5rem;
+}
+
+.navbar-hire-link:hover {
+  background-color: var(--ifm-color-primary);
+  color: #18181b !important;
+}
+
+[data-theme='light'] .navbar-hire-link:hover {
+  color: #ffffff !important;
+}
+
 /* ── Sidebar ── */
 
 .menu {
@@ -163,6 +185,40 @@ p {
 
 .theme-doc-sidebar-container {
   border-right: 1px solid var(--ifm-toc-border-color) !important;
+}
+
+/* ── Margelo promo (right sidebar) ── */
+
+.margelo-promo {
+  position: sticky;
+  top: calc(100vh - 8rem);
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--ifm-toc-border-color);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: #a1a1aa;
+}
+
+[data-theme='light'] .margelo-promo {
+  color: #71717a;
+}
+
+.margelo-promo a {
+  color: var(--ifm-color-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.margelo-promo a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 996px) {
+  .margelo-promo {
+    display: none;
+  }
 }
 
 /* ── Content area ── */

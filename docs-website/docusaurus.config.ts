@@ -25,6 +25,47 @@ const config: Config = {
     },
   },
 
+  headTags: [
+    {
+      tagName: 'meta',
+      attributes: {
+        property: 'og:description',
+        content:
+          'Drop-in fetch() replacement powered by Cronet & URLSession. HTTP/3, QUIC, prefetching, WebSockets, and worklet mapping.',
+      },
+    },
+    {
+      tagName: 'meta',
+      attributes: {
+        name: 'twitter:card',
+        content: 'summary_large_image',
+      },
+    },
+    {
+      tagName: 'meta',
+      attributes: {
+        name: 'twitter:title',
+        content: 'Nitro Fetch — Blazing-fast networking for React Native',
+      },
+    },
+    {
+      tagName: 'meta',
+      attributes: {
+        name: 'twitter:description',
+        content:
+          'Drop-in fetch() replacement powered by Cronet & URLSession. HTTP/3, QUIC, prefetching, WebSockets, and worklet mapping.',
+      },
+    },
+    {
+      tagName: 'meta',
+      attributes: {
+        name: 'twitter:image',
+        content:
+          'https://riteshshukla04.github.io/react-native-nitro-fetch/img/og-image.png',
+      },
+    },
+  ],
+
   i18n: {
     defaultLocale: 'en',
     locales: ['en'],
@@ -48,7 +89,7 @@ const config: Config = {
   ],
 
   themeConfig: {
-    image: 'img/banner-dark.png',
+    image: 'img/og-image.png',
     navbar: {
       title: 'NITRO FETCH',
       logo: {
@@ -61,6 +102,12 @@ const config: Config = {
           sidebarId: 'docsSidebar',
           position: 'left',
           label: 'Docs',
+        },
+        {
+          href: 'https://margelo.com',
+          label: 'Hire Us',
+          position: 'right',
+          className: 'navbar-hire-link',
         },
         {
           'href': 'https://github.com/margelo/react-native-nitro-fetch',
