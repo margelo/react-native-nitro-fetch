@@ -47,6 +47,7 @@ public:
   // lws callback handlers (internal, not part of the base interface)
   void handleEstablished(lws* wsi);
   void handleReceive(const void* in, size_t len, bool isBinary);
+  void handleReceiveFragment(lws* wsi, const void* in, size_t len);
   int  handleWriteable(lws* wsi);
   void handleClose(int code, const char* reason, size_t len);
   void handleError(const char* msg);
@@ -72,6 +73,7 @@ private:
   std::atomic<bool> _isRedirecting{false};
   std::atomic<int>  _redirectCount{0};
   static constexpr int kMaxRedirects = 5;
+  static constexpr size_t kMaxMessageSize = 16 * 1024 * 1024; // 16 MB
 
   struct BufferedMessage { std::vector<uint8_t> data; bool isBinary; };
   std::deque<BufferedMessage> _msgBuffer;
@@ -93,6 +95,9 @@ private:
   };
   std::optional<PendingConnect> _pendingConnect;
   std::mutex _pendingConnectMu;
+
+  std::vector<uint8_t> _rxBuf;
+  bool _rxBinary = false;
 };
 
 } // namespace margelo::nitro::nitrofetchwebsockets
