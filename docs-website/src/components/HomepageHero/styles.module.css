@@ -1,0 +1,119 @@
+.hero {
+  padding: 8rem 2rem 6rem;
+  background: #18181b;
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme='light'] .hero {
+  background: #fafafa;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4rem;
+}
+
+.content {
+  flex: 1;
+}
+
+.title {
+  font-size: 3.25rem;
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  color: #fafafa;
+  margin-bottom: 1.25rem;
+}
+
+[data-theme='light'] .title {
+  color: #18181b;
+}
+
+.tagline {
+  font-size: 1.1rem;
+  line-height: 1.7;
+  color: #a1a1aa;
+  margin-bottom: 2rem;
+  max-width: 480px;
+}
+
+[data-theme='light'] .tagline {
+  color: #52525b;
+}
+
+.install {
+  background: #09090b;
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  padding: 0.65rem 1.25rem;
+  margin-bottom: 2rem;
+  display: inline-block;
+}
+
+.install code {
+  color: #a1a1aa;
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  padding: 0;
+}
+
+[data-theme='light'] .install {
+  background: #f4f4f5;
+  border-color: #e4e4e7;
+}
+
+[data-theme='light'] .install code {
+  color: #52525b;
+}
+
+.buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.logoContainer {
+  flex-shrink: 0;
+}
+
+.logo {
+  width: 240px;
+  height: 240px;
+  object-fit: contain;
+  opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+  .hero {
+    padding: 4rem 1.5rem 3rem;
+  }
+
+  .container {
+    flex-direction: column-reverse;
+    gap: 2rem;
+    text-align: center;
+  }
+
+  .title {
+    font-size: 2.25rem;
+  }
+
+  .tagline {
+    max-width: 100%;
+  }
+
+  .buttons {
+    justify-content: center;
+  }
+
+  .logo {
+    width: 140px;
+    height: 140px;
+  }
+}

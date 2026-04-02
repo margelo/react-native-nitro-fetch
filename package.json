@@ -27,7 +27,10 @@
     "release": "release-it --only-version",
     "release:fetch": "bun --cwd packages/react-native-nitro-fetch release-it --only-version",
     "release:textdecoder": "bun --cwd packages/react-native-nitro-text-decoder release-it --only-version",
-    "release:websockets": "bun --cwd packages/react-native-nitro-websockets release-it --only-version"
+    "release:websockets": "bun --cwd packages/react-native-nitro-websockets release-it --only-version",
+    "docs": "cd docs-website && npm start",
+    "docs:build": "cd docs-website && npm run build",
+    "docs:deploy": "cd docs-website && npm run deploy"
   },
   "devDependencies": {
     "@commitlint/config-conventional": "^19.6.0",
