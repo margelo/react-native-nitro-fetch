@@ -71,12 +71,37 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       onFail: (Throwable) -> Unit
     ): UrlRequest {
       val url = req.url
+      val shouldFollowRedirects = req.followRedirects ?: true
       val callback = object : UrlRequest.Callback() {
         private val buffer = ByteBuffer.allocateDirect(16 * 1024)
         private val out = java.io.ByteArrayOutputStream()
+        private var redirectStopped = false
 
         override fun onRedirectReceived(request: UrlRequest, info: UrlResponseInfo, newLocationUrl: String) {
-          request.followRedirect()
+          if (shouldFollowRedirects) {
+            request.followRedirect()
+          } else {
+            // Return the redirect response as-is without following
+            redirectStopped = true
+            request.cancel()
+            try {
+              val headersArr = info.allHeadersAsList.map { NitroHeader(it.key, it.value) }.toTypedArray()
+              val status = info.httpStatusCode
+              val res = NitroResponse(
+                url = info.url,
+                status = status.toDouble(),
+                statusText = info.httpStatusText ?: "",
+                ok = false,
+                redirected = false,
+                headers = headersArr,
+                bodyString = "",
+                bodyBytes = null
+              )
+              onSuccess(res)
+            } catch (t: Throwable) {
+              onFail(t)
+            }
+          }
         }
 
         override fun onResponseStarted(request: UrlRequest, info: UrlResponseInfo) {
@@ -131,7 +156,9 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         }
 
         override fun onCanceled(request: UrlRequest, info: UrlResponseInfo?) {
-          onFail(RuntimeException("Cronet canceled"))
+          if (!redirectStopped) {
+            onFail(RuntimeException("Cronet canceled"))
+          }
         }
       }
 

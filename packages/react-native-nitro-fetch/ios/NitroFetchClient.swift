@@ -154,7 +154,9 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     }
 
     let (urlRequest, finalURL) = try await buildURLRequest(req)
-    let (data, response) = try await session.data(for: urlRequest)
+    let shouldFollowRedirects = req.followRedirects ?? true
+    let delegate: URLSessionTaskDelegate? = shouldFollowRedirects ? nil : NoRedirectDelegate()
+    let (data, response) = try await session.data(for: urlRequest, delegate: delegate)
     guard let http = response as? HTTPURLResponse else {
       throw NSError(domain: "NitroFetch", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
     }
@@ -308,5 +310,19 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       }
     }
     return nil
+  }
+}
+
+/// Delegate that prevents URLSession from following HTTP redirects.
+/// When the completion handler receives `nil`, the 3xx response is returned as-is.
+final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate {
+  func urlSession(
+    _ session: URLSession,
+    task: URLSessionTask,
+    willPerformHTTPRedirection response: HTTPURLResponse,
+    newRequest request: URLRequest,
+    completionHandler: @escaping @Sendable (URLRequest?) -> Void
+  ) {
+    completionHandler(nil)
   }
 }

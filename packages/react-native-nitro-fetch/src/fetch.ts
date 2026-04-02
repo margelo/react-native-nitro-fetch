@@ -3,8 +3,8 @@ import type {
   NitroFetch as NitroFetchModule,
   NitroFormDataPart,
   NitroHeader,
-  NitroRequest,
-  NitroResponse,
+  NitroRequest as NitroRequestNative,
+  NitroResponse as NitroResponseNative,
 } from './NitroFetch.nitro';
 import {
   boxedNitroFetch,
@@ -12,6 +12,10 @@ import {
   NitroCronetSingleton,
 } from './NitroInstances';
 import { NativeStorage as NativeStorageSingleton } from './NitroInstances';
+import { NitroHeaders } from './Headers';
+import { NitroResponse } from './Response';
+import { NitroRequest as NitroRequestClass } from './Request';
+import type { RequestRedirect, RequestCache } from './Request';
 
 // No base64: pass strings/ArrayBuffers directly
 
@@ -163,39 +167,63 @@ function ensureClient() {
 
 function buildNitroRequest(
   input: RequestInfo | URL,
-  init?: RequestInit
-): NitroRequest {
+  init?: RequestInit & { redirect?: RequestRedirect; cache?: RequestCache }
+): NitroRequestNative {
   'worklet';
   let url: string;
   let method: string | undefined;
   let headersInit: HeadersInit | undefined;
   let body: BodyInit | null | undefined;
+  let redirectOption: RequestRedirect =
+    (init?.redirect as RequestRedirect) ?? 'follow';
+  let cacheOption: RequestCache | undefined = init?.cache as
+    | RequestCache
+    | undefined;
 
-  if (typeof input === 'string' || input instanceof URL) {
+  if (input instanceof NitroRequestClass) {
+    url = input.url;
+    method = init?.method ?? input.method;
+    headersInit = init?.headers ?? (input.headers as any);
+    body = init?.body ?? input.body ?? null;
+    if (!init?.redirect) redirectOption = input.redirect;
+    if (!init?.cache) cacheOption = input.cache;
+  } else if (typeof input === 'string' || input instanceof URL) {
     url = String(input);
     method = init?.method;
     headersInit = init?.headers;
     body = init?.body ?? null;
   } else {
-    // Request object
+    // Standard Request object
     url = input.url;
     method = input.method;
     headersInit = input.headers as any;
-    // Clone body if needed – Request objects in RN typically allow direct access
     body = init?.body ?? null;
   }
 
-  const headers = headersToPairs(headersInit);
+  const headers = headersToPairs(headersInit) ?? [];
   const normalized = normalizeBody(body);
+
+  // Inject cache-control headers based on cache option
+  if (cacheOption === 'no-store') {
+    headers.push({ key: 'Cache-Control', value: 'no-store' });
+  } else if (cacheOption === 'no-cache') {
+    headers.push({ key: 'Cache-Control', value: 'no-cache' });
+  } else if (cacheOption === 'reload') {
+    headers.push({ key: 'Cache-Control', value: 'no-cache' });
+    headers.push({ key: 'Pragma', value: 'no-cache' });
+  }
+
+  // Determine followRedirects based on redirect option
+  const followRedirects = redirectOption === 'follow';
 
   return {
     url,
     method: (method?.toUpperCase() as any) ?? 'GET',
-    headers,
+    headers: headers.length > 0 ? headers : undefined,
     bodyString: normalized?.bodyString,
     bodyBytes: undefined as any,
     bodyFormData: normalized?.bodyFormData,
-    followRedirects: true,
+    followRedirects,
   };
 }
 
@@ -297,7 +325,7 @@ function normalizeBodyPure(
 export function buildNitroRequestPure(
   input: RequestInfo | URL,
   init?: RequestInit
-): NitroRequest {
+): NitroRequestNative {
   'worklet';
   let url: string;
   let method: string | undefined;
@@ -345,16 +373,48 @@ function createAbortError(): Error {
   return err;
 }
 
+async function resolveBlobBody(
+  init: RequestInit | undefined
+): Promise<RequestInit | undefined> {
+  if (!init?.body) return init;
+  if (typeof Blob !== 'undefined' && init.body instanceof Blob) {
+    const blob = init.body as Blob;
+    const text = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsText(blob);
+    });
+    // Auto-set Content-Type from Blob.type if not already provided
+    let headers = init.headers;
+    if (blob.type) {
+      const pairs = headersToPairs(headers) ?? [];
+      const hasContentType = pairs.some(
+        (h) => h.key.toLowerCase() === 'content-type'
+      );
+      if (!hasContentType) {
+        pairs.push({ key: 'Content-Type', value: blob.type });
+        headers = pairs.map((h) => [h.key, h.value] as [string, string]);
+      }
+    }
+    return { ...init, body: text, headers };
+  }
+  return init;
+}
+
 async function nitroFetchRaw(
   input: RequestInfo | URL,
   init?: RequestInit
-): Promise<NitroResponse> {
+): Promise<NitroResponseNative> {
   const signal = init?.signal as AbortSignal | undefined | null;
 
   // Fast-abort: reject synchronously before any bridge work.
   if (signal?.aborted) {
     throw createAbortError();
   }
+
+  // Resolve Blob body to string before passing to sync buildNitroRequest
+  init = await resolveBlobBody(init);
 
   const hasNative =
     typeof (NitroFetchHybrid as any)?.createClient === 'function';
@@ -375,7 +435,7 @@ async function nitroFetchRaw(
       headers,
       bodyBytes: bytes,
       bodyString: undefined,
-    } as any as NitroResponse; // bleee
+    } as any as NitroResponseNative; // bleee
   }
 
   const req = buildNitroRequest(input, init);
@@ -403,7 +463,7 @@ async function nitroFetchRaw(
   }
 
   try {
-    const res: NitroResponse = await client.request(req);
+    const res: NitroResponseNative = await client.request(req);
     return res;
   } catch (e) {
     // If the signal was aborted (either before or during the request),
@@ -421,42 +481,7 @@ async function nitroFetchRaw(
   }
 }
 
-// Simple Headers-like class that supports get() method
-class NitroHeaders {
-  private _headers: Map<string, string>;
-
-  constructor(headers: NitroHeader[]) {
-    this._headers = new Map();
-    for (const { key, value } of headers) {
-      // Headers are case-insensitive, normalize to lowercase
-      this._headers.set(key.toLowerCase(), value);
-    }
-  }
-
-  get(name: string): string | null {
-    return this._headers.get(name.toLowerCase()) ?? null;
-  }
-
-  has(name: string): boolean {
-    return this._headers.has(name.toLowerCase());
-  }
-
-  forEach(callback: (value: string, key: string) => void): void {
-    this._headers.forEach(callback);
-  }
-
-  entries(): IterableIterator<[string, string]> {
-    return this._headers.entries();
-  }
-
-  keys(): IterableIterator<string> {
-    return this._headers.keys();
-  }
-
-  values(): IterableIterator<string> {
-    return this._headers.values();
-  }
-}
+// NitroHeaders is now imported from './Headers'
 
 async function nitroStreamFetch(
   input: RequestInfo | URL,
@@ -494,9 +519,7 @@ async function nitroStreamFetch(
       const responseHeaders = new NitroHeaders(
         Object.entries(info.allHeaders).map(([key, value]) => ({ key, value }))
       );
-      // Use a plain object — React Native's Response constructor does not
-      // propagate a ReadableStream to .body, so we set it explicitly.
-      const response: any = {
+      const response = new NitroResponse({
         url: info.url,
         ok: status >= 200 && status < 300,
         status,
@@ -504,9 +527,8 @@ async function nitroStreamFetch(
         headers: responseHeaders,
         redirected: false,
         body: stream,
-        bodyUsed: false,
-      };
-      resolveResponse(response as Response);
+      });
+      resolveResponse(response as unknown as Response);
       // Android/Cronet: kick off the first buffer read.
       // iOS/URLSession handles reading automatically so this is a no-op there.
       request.read();
@@ -549,33 +571,48 @@ async function nitroStreamFetch(
 
 export async function nitroFetch(
   input: RequestInfo | URL,
-  init?: RequestInit & { stream?: boolean }
+  init?: RequestInit & {
+    stream?: boolean;
+    redirect?: RequestRedirect;
+    cache?: RequestCache;
+  }
 ): Promise<Response> {
+  // Merge defaults from NitroRequestClass if input is one
+  if (input instanceof NitroRequestClass) {
+    init = {
+      ...init,
+      signal: init?.signal ?? input.signal,
+      redirect: (init?.redirect as RequestRedirect) ?? input.redirect,
+      cache: (init?.cache as RequestCache) ?? input.cache,
+    } as any;
+  }
+
   if ((init as any)?.stream === true) {
     return nitroStreamFetch(input, init);
   }
+
+  const redirectOption: RequestRedirect =
+    (init?.redirect as RequestRedirect) ?? 'follow';
   const res = await nitroFetchRaw(input, init);
 
-  const headersObj = new NitroHeaders(res.headers);
+  // Handle redirect: "error" — if we got a 3xx back (followRedirects was false), throw
+  if (redirectOption === 'error' && res.status >= 300 && res.status < 400) {
+    throw new TypeError(
+      `redirect mode is "error": redirected request to "${res.url}"`
+    );
+  }
 
-  const bodyBytes = res.bodyBytes;
-  const bodyString = res.bodyString;
-
-  const makeLight = (): any => ({
+  const response = new NitroResponse({
     url: res.url,
-    ok: res.ok,
     status: res.status,
     statusText: res.statusText,
+    ok: res.ok,
     redirected: res.redirected,
-    headers: headersObj,
-    arrayBuffer: async () => bodyBytes,
-    text: async () => bodyString,
-    json: async () => JSON.parse(bodyString ?? '{}'),
-    clone: () => makeLight(),
+    headers: res.headers,
+    bodyBytes: res.bodyBytes as unknown as ArrayBuffer | undefined,
+    bodyString: res.bodyString,
   });
-
-  const light: any = makeLight();
-  return light as Response;
+  return response as unknown as Response;
 }
 
 // Start a native prefetch. Requires a `prefetchKey` header on the request.
@@ -778,8 +815,12 @@ export async function nitroFetchOnWorklet<T>(
   });
 }
 
+export type { NitroFormDataPart } from './NitroFetch.nitro';
 export type {
-  NitroFormDataPart,
-  NitroRequest,
-  NitroResponse,
+  NitroRequest as NitroRequestNativeType,
+  NitroResponse as NitroResponseNativeType,
 } from './NitroFetch.nitro';
+export { NitroHeaders } from './Headers';
+export { NitroResponse } from './Response';
+export { NitroRequest as NitroRequestClass } from './Request';
+export type { RequestRedirect, RequestCache } from './Request';
