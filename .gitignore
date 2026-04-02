@@ -92,11 +92,3 @@ packages/react-native-nitro-websockets/thirdparty/build_arm64
 packages/react-native-nitro-websockets/thirdparty/build_arm64_sim/
 packages/react-native-nitro-websockets/thirdparty/build_x86_64/
 packages/react-native-nitro-websockets/thirdparty/build_sim_fat/
-
-
-.claude
-
-# Docusaurus
-docs-website/node_modules
-docs-website/build
-docs-website/.docusaurus
