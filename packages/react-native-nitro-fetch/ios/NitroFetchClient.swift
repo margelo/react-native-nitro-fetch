@@ -1,5 +1,10 @@
 import Foundation
 import NitroModules
+import os
+
+#if NITROFETCH_TRACING
+private let fetchLog = OSLog(subsystem: "com.margelo.nitrofetch", category: "network")
+#endif
 
 final class NitroFetchClient: HybridNitroFetchClientSpec {
 
@@ -156,6 +161,15 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     let (urlRequest, finalURL) = try await buildURLRequest(req)
     let shouldFollowRedirects = req.followRedirects ?? true
     let delegate: URLSessionTaskDelegate? = shouldFollowRedirects ? nil : NoRedirectDelegate()
+
+    #if NITROFETCH_TRACING
+    let signpostID = OSSignpostID(log: fetchLog)
+    let traceMethod = req.method?.stringValue ?? "GET"
+    let tracePath = URL(string: req.url)?.path ?? req.url
+    os_signpost(.begin, log: fetchLog, name: "NitroFetch", signpostID: signpostID,
+                "%{public}s %{public}s", traceMethod, tracePath)
+    #endif
+
     let (data, response) = try await session.data(for: urlRequest, delegate: delegate)
     guard let http = response as? HTTPURLResponse else {
       throw NSError(domain: "NitroFetch", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
@@ -182,6 +196,11 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     )
 
     // Do not write to cache here; only prefetch should populate the cache
+
+    #if NITROFETCH_TRACING
+    os_signpost(.end, log: fetchLog, name: "NitroFetch", signpostID: signpostID,
+                "status=%d bytes=%d", http.statusCode, data.count)
+    #endif
 
     return res
   }

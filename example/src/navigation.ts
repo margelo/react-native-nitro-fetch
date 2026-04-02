@@ -8,6 +8,7 @@ export type RootStackParamList = {
   StreamingScreen: undefined;
   WebSocketScreen: undefined;
   WebSocketBenchmarkScreen: undefined;
+  NetworkInspectorScreen: undefined;
   TokenRefreshScreen: undefined;
 };
 

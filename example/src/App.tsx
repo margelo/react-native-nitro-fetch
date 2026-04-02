@@ -17,6 +17,7 @@ import { BasicFetchScreen } from './screens/BasicFetchScreen';
 import { StreamingScreen } from './screens/StreamingScreen';
 import { WebSocketScreen } from './screens/WebSocketScreen';
 import { WebSocketBenchmarkScreen } from './screens/WebSocketBenchmarkScreen';
+import { NetworkInspectorScreen } from './screens/NetworkInspectorScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -131,6 +132,11 @@ export default function App() {
           name="WebSocketBenchmarkScreen"
           component={WebSocketBenchmarkScreen}
           options={{ title: 'WS Benchmark' }}
+        />
+        <Stack.Screen
+          name="NetworkInspectorScreen"
+          component={NetworkInspectorScreen}
+          options={{ title: 'Network Inspector' }}
         />
       </Stack.Navigator>
     </NavigationContainer>

@@ -65,6 +65,13 @@ const EXAMPLES = [
     screen: 'WebSocketBenchmarkScreen' as const,
     icon: '📡',
   },
+  {
+    id: 'network-inspector',
+    title: 'Network Inspector',
+    description: 'Track request speed, headers, body, and generate curl commands.',
+    screen: 'NetworkInspectorScreen' as const,
+    icon: '🔍',
+  },
 ];
 
 export function HomeScreen() {
