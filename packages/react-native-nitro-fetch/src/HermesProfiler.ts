@@ -21,8 +21,7 @@ export async function profileFetch<T>(
     return { result };
   }
 
-  const path =
-    outputPath ?? `/tmp/nitrofetch-profile-${Date.now()}.cpuprofile`;
+  const path = outputPath ?? `/tmp/nitrofetch-profile-${Date.now()}.cpuprofile`;
   hermes.enableSamplingProfiler();
   try {
     const result = await fn();

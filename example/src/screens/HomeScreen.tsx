@@ -68,7 +68,8 @@ const EXAMPLES = [
   {
     id: 'network-inspector',
     title: 'Network Inspector',
-    description: 'Track request speed, headers, body, and generate curl commands.',
+    description:
+      'Track request speed, headers, body, and generate curl commands.',
     screen: 'NetworkInspectorScreen' as const,
     icon: '🔍',
   },

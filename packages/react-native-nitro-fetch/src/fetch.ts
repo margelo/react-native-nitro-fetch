@@ -444,8 +444,7 @@ async function nitroFetchRaw(
   // Inspector: record start (zero cost when disabled — single boolean check)
   let inspectorId: string | undefined;
   if (NetworkInspector.isEnabled()) {
-    inspectorId =
-      String(Date.now()) + '-' + String(Math.random()).slice(2, 8);
+    inspectorId = String(Date.now()) + '-' + String(Math.random()).slice(2, 8);
     NetworkInspector._recordStart(
       inspectorId,
       req.url,
@@ -485,7 +484,9 @@ async function nitroFetchRaw(
         res.status,
         res.statusText,
         res.headers ?? [],
-        res.bodyString?.length ?? 0
+        res.bodyString?.length ?? 0,
+        undefined,
+        res.bodyString ?? undefined
       );
     }
     return res;
@@ -521,8 +522,7 @@ async function nitroStreamFetch(
   // Inspector: record start
   let inspectorId: string | undefined;
   if (NetworkInspector.isEnabled()) {
-    inspectorId =
-      String(Date.now()) + '-' + String(Math.random()).slice(2, 8);
+    inspectorId = String(Date.now()) + '-' + String(Math.random()).slice(2, 8);
     NetworkInspector._recordStart(
       inspectorId,
       url,
@@ -604,14 +604,7 @@ async function nitroStreamFetch(
     builder.onFailed((_info, error) => {
       const err = new Error(error.message);
       if (inspectorId) {
-        NetworkInspector._recordEnd(
-          inspectorId,
-          0,
-          '',
-          [],
-          0,
-          error.message
-        );
+        NetworkInspector._recordEnd(inspectorId, 0, '', [], 0, error.message);
       }
       if (!responseResolved) {
         responseResolved = true;

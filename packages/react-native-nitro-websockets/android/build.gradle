@@ -31,6 +31,8 @@ def getExtOrDefault(name) {
   return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties["NitroFetchWebsockets_" + name]
 }
 
+def enableTracing = (getExtOrDefault("enableTracing") ?: "false").toString().toBoolean()
+
 def getExtOrIntegerDefault(name) {
   return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["NitroFetchWebsockets_" + name]).toInteger()
 }
@@ -45,11 +47,16 @@ android {
     minSdkVersion getExtOrIntegerDefault("minSdkVersion")
     targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
     buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
+    buildConfigField "boolean", "NITRO_WS_TRACING", enableTracing.toString()
 
     externalNativeBuild {
       cmake {
         cppFlags "-frtti -fexceptions -Wall -Wextra -fstack-protector-all"
-        arguments "-DANDROID_STL=c++_shared", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"
+        def cmakeArgs = ["-DANDROID_STL=c++_shared", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON"]
+        if (enableTracing) {
+          cmakeArgs.add("-DNITRO_WS_TRACING=ON")
+        }
+        arguments(*cmakeArgs)
         abiFilters (*reactNativeArchitectures())
 
         buildTypes {

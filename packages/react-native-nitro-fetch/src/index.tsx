@@ -27,7 +27,13 @@ export {
 } from './tokenRefresh';
 export type { TokenRefreshConfig } from './tokenRefresh';
 export { NetworkInspector } from './NetworkInspector';
-export type { NetworkEntry, NetworkEntryCallback } from './NetworkInspector';
+export type {
+  NetworkEntry,
+  NetworkEntryCallback,
+  WebSocketEntry,
+  WebSocketMessage,
+  InspectorEntry,
+} from './NetworkInspector';
 export { generateCurl } from './CurlGenerator';
 export type { CurlOptions } from './CurlGenerator';
 export { profileFetch } from './HermesProfiler';

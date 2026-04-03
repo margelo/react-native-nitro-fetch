@@ -13,6 +13,10 @@
 #include <stdexcept>
 #include <algorithm>
 
+#if defined(NITRO_WS_TRACING)
+#include <android/trace.h>
+#endif
+
 namespace margelo::nitro::nitrofetchwebsockets {
 
 
@@ -132,6 +136,10 @@ void WebSocketConnection::connect(
   _url   = url;
   _state = State::CONNECTING;
 
+#if defined(NITRO_WS_TRACING)
+  ATrace_beginSection(("NitroWS connect " + url).c_str());
+#endif
+
   ParsedUrl parsed;
   try {
     parsed = parseUrl(url);
@@ -181,6 +189,9 @@ void WebSocketConnection::connect(
       self->_wsi = wsi;
     }
   });
+#if defined(NITRO_WS_TRACING)
+  ATrace_endSection();
+#endif
 }
 
 
@@ -203,6 +214,9 @@ void WebSocketConnection::close(int code, const std::string& reason) {
 
 
 void WebSocketConnection::send(const std::string& data) {
+#if defined(NITRO_WS_TRACING)
+  ATrace_beginSection("NitroWS send text");
+#endif
   std::vector<uint8_t> buf(LWS_PRE + data.size());
   std::memcpy(buf.data() + LWS_PRE, data.c_str(), data.size());
   {
@@ -211,9 +225,15 @@ void WebSocketConnection::send(const std::string& data) {
     _bufferedAmount += data.size();
   }
   requestWrite();
+#if defined(NITRO_WS_TRACING)
+  ATrace_endSection();
+#endif
 }
 
 void WebSocketConnection::sendBinary(const uint8_t* data, size_t len) {
+#if defined(NITRO_WS_TRACING)
+  ATrace_beginSection("NitroWS send binary");
+#endif
   std::vector<uint8_t> buf(LWS_PRE + len);
   std::memcpy(buf.data() + LWS_PRE, data, len);
   {
@@ -222,6 +242,9 @@ void WebSocketConnection::sendBinary(const uint8_t* data, size_t len) {
     _bufferedAmount += len;
   }
   requestWrite();
+#if defined(NITRO_WS_TRACING)
+  ATrace_endSection();
+#endif
 }
 
 void WebSocketConnection::requestWrite() {
@@ -266,6 +289,9 @@ void WebSocketConnection::setOnError(OnError cb) {
 
 
 void WebSocketConnection::handleEstablished(lws* wsi) {
+#if defined(NITRO_WS_TRACING)
+  ATrace_beginSection("NitroWS established");
+#endif
   _wsi   = wsi;
   _state = State::OPEN;
   _redirectCount = 0;
@@ -278,6 +304,9 @@ void WebSocketConnection::handleEstablished(lws* wsi) {
   } else {
     _openFired = true;
   }
+#if defined(NITRO_WS_TRACING)
+  ATrace_endSection();
+#endif
 }
 
 void WebSocketConnection::handleReceive(const void* in, size_t len, bool isBinary) {
@@ -292,6 +321,9 @@ void WebSocketConnection::handleReceive(const void* in, size_t len, bool isBinar
 }
 
 void WebSocketConnection::handleReceiveFragment(lws* wsi, const void* in, size_t len) {
+#if defined(NITRO_WS_TRACING)
+  ATrace_beginSection("NitroWS receive");
+#endif
   bool isBinary = lws_frame_is_binary(wsi) != 0;
   bool isFirst  = lws_is_first_fragment(wsi) != 0;
   bool isFinal  = lws_is_final_fragment(wsi) != 0;
@@ -299,6 +331,9 @@ void WebSocketConnection::handleReceiveFragment(lws* wsi, const void* in, size_t
   // Fast path: single-frame message (most common case)
   if (isFirst && isFinal) {
     handleReceive(in, len, isBinary);
+#if defined(NITRO_WS_TRACING)
+    ATrace_endSection();
+#endif
     return;
   }
 
@@ -324,6 +359,9 @@ void WebSocketConnection::handleReceiveFragment(lws* wsi, const void* in, size_t
     _rxBuf.clear();
     _rxBuf.shrink_to_fit();
   }
+#if defined(NITRO_WS_TRACING)
+  ATrace_endSection();
+#endif
 }
 
 int WebSocketConnection::handleWriteable(lws* wsi) {
@@ -354,18 +392,30 @@ int WebSocketConnection::handleWriteable(lws* wsi) {
 }
 
 void WebSocketConnection::handleClose(int code, const char* reason, size_t len) {
+#if defined(NITRO_WS_TRACING)
+  ATrace_beginSection("NitroWS close");
+#endif
   _state = State::CLOSED;
   _wsi   = nullptr;
   if (_onClose) {
     std::string r = (reason && len > 0) ? std::string(reason, len) : "";
     _onClose(code > 0 ? code : 1000, r, true);
   }
+#if defined(NITRO_WS_TRACING)
+  ATrace_endSection();
+#endif
 }
 
 void WebSocketConnection::handleError(const char* msg) {
+#if defined(NITRO_WS_TRACING)
+  ATrace_beginSection("NitroWS error");
+#endif
   _state = State::CLOSED;
   _wsi   = nullptr;
   if (_onError) _onError(msg ? std::string(msg) : "WebSocket error");
+#if defined(NITRO_WS_TRACING)
+  ATrace_endSection();
+#endif
 }
 
 void WebSocketConnection::handleRedirect(const std::string& location) {

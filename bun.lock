@@ -158,9 +158,13 @@
       "peerDependencies": {
         "react": "*",
         "react-native": "*",
+        "react-native-nitro-fetch": "*",
         "react-native-nitro-modules": "*",
         "react-native-nitro-text-decoder": ">=0.1.0",
       },
+      "optionalPeers": [
+        "react-native-nitro-fetch",
+      ],
     },
   },
   "patchedDependencies": {

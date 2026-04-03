@@ -67,6 +67,10 @@ private:
   void scheduleReceive();
   void fireClose(int code, const std::string& reason, bool wasClean);
   void fireError(const std::string& msg);
+
+#if defined(NITRO_WS_TRACING)
+  uint64_t _signpostId = 0;
+#endif
 };
 
 std::shared_ptr<WebSocketConnectionBase> createNWConnection();

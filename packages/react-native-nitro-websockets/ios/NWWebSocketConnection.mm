@@ -10,6 +10,16 @@
 
 #include <cstring>
 
+#if defined(NITRO_WS_TRACING)
+#include <os/log.h>
+#include <os/signpost.h>
+
+static os_log_t nitroWsLog() {
+  static os_log_t log = os_log_create("com.margelo.nitro.websockets", "NitroWS");
+  return log;
+}
+#endif
+
 // ── ObjC delegate bridging NSURLSession events to C++ via blocks ────────
 
 @interface NWWSDelegate : NSObject <NSURLSessionWebSocketDelegate, NSURLSessionTaskDelegate>
@@ -93,6 +103,13 @@ void NWWebSocketConnection::connect(
     _negotiatedProtocol.clear();
   }
   _state.store(State::CONNECTING, std::memory_order_release);
+
+#if defined(NITRO_WS_TRACING)
+  os_signpost_id_t spid = os_signpost_id_generate(nitroWsLog());
+  _signpostId = spid;
+  os_signpost_interval_begin(nitroWsLog(), spid, "NitroWS",
+                              "%{public}s", url.c_str());
+#endif
   _closeFired = false;
   _openFired = false;
   _receivedCloseCode = 1005;
@@ -154,6 +171,12 @@ void NWWebSocketConnection::connect(
     auto* conn = static_cast<NWWebSocketConnection*>(strong.get());
 
     conn->_state.store(State::OPEN, std::memory_order_release);
+
+#if defined(NITRO_WS_TRACING)
+    os_signpost_interval_end(nitroWsLog(),
+      static_cast<os_signpost_id_t>(conn->_signpostId),
+      "NitroWS", "connected");
+#endif
 
     if (protocol.length > 0) {
       std::lock_guard<std::mutex> lock(conn->_strMu);
@@ -255,6 +278,12 @@ void NWWebSocketConnection::send(const std::string& data) {
   if (_state.load(std::memory_order_acquire) != State::OPEN) return;
   if (!_impl->task) return;
 
+#if defined(NITRO_WS_TRACING)
+  os_signpost_event_emit(nitroWsLog(),
+    static_cast<os_signpost_id_t>(_signpostId),
+    "NitroWS", "send text %zu bytes", data.size());
+#endif
+
   size_t len = data.size();
   _bufferedAmount.fetch_add(len, std::memory_order_relaxed);
 
@@ -283,6 +312,12 @@ void NWWebSocketConnection::send(const std::string& data) {
 void NWWebSocketConnection::sendBinary(const uint8_t* data, size_t len) {
   if (_state.load(std::memory_order_acquire) != State::OPEN) return;
   if (!_impl->task) return;
+
+#if defined(NITRO_WS_TRACING)
+  os_signpost_event_emit(nitroWsLog(),
+    static_cast<os_signpost_id_t>(_signpostId),
+    "NitroWS", "send binary %zu bytes", len);
+#endif
 
   _bufferedAmount.fetch_add(len, std::memory_order_relaxed);
 
@@ -335,6 +370,13 @@ void NWWebSocketConnection::scheduleReceive() {
         std::lock_guard<std::mutex> lock(conn->_cbMu);
         onMsg = conn->_onMessage;
       }
+
+#if defined(NITRO_WS_TRACING)
+      os_signpost_event_emit(nitroWsLog(),
+        static_cast<os_signpost_id_t>(conn->_signpostId),
+        "NitroWS", "receive %s",
+        message.type == NSURLSessionWebSocketMessageTypeString ? "text" : "binary");
+#endif
 
       switch (message.type) {
         case NSURLSessionWebSocketMessageTypeString: {
@@ -446,6 +488,12 @@ void NWWebSocketConnection::fireClose(
   if (_closeFired.exchange(true, std::memory_order_acq_rel)) return;
   _state.store(State::CLOSED, std::memory_order_release);
 
+#if defined(NITRO_WS_TRACING)
+  os_signpost_event_emit(nitroWsLog(),
+    static_cast<os_signpost_id_t>(_signpostId),
+    "NitroWS", "close code=%d clean=%d", code, wasClean ? 1 : 0);
+#endif
+
   OnClose cb;
   {
     std::lock_guard<std::mutex> lock(_cbMu);
@@ -456,6 +504,12 @@ void NWWebSocketConnection::fireClose(
 
 void NWWebSocketConnection::fireError(const std::string& msg) {
   _state.store(State::CLOSED, std::memory_order_release);
+
+#if defined(NITRO_WS_TRACING)
+  os_signpost_event_emit(nitroWsLog(),
+    static_cast<os_signpost_id_t>(_signpostId),
+    "NitroWS", "error %{public}s", msg.c_str());
+#endif
 
   OnError cb;
   {

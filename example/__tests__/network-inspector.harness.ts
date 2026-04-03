@@ -136,3 +136,164 @@ describe('CurlGenerator', () => {
     expect(cmd).toContain("'");
   });
 });
+
+// ---------------------------------------------------------------------------
+// NetworkInspector - HTTP entry type discriminator
+// ---------------------------------------------------------------------------
+describe('NetworkInspector - HTTP type', () => {
+  it('HTTP entries have type "http"', async () => {
+    NetworkInspector.enable();
+    NetworkInspector.clear();
+    await nitroFetch(`${BASE}/get`);
+    const entries = NetworkInspector.getEntries();
+    expect(entries[0]!.type).toBe('http');
+    NetworkInspector.disable();
+    NetworkInspector.clear();
+  });
+
+  it('getHttpEntries() filters HTTP only', async () => {
+    NetworkInspector.enable();
+    NetworkInspector.clear();
+    await nitroFetch(`${BASE}/get`);
+    const httpEntries = NetworkInspector.getHttpEntries();
+    expect(httpEntries.length).toBe(1);
+    expect(httpEntries[0]!.type).toBe('http');
+    const wsEntries = NetworkInspector.getWebSocketEntries();
+    expect(wsEntries.length).toBe(0);
+    NetworkInspector.disable();
+    NetworkInspector.clear();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NetworkInspector - WebSocket recording
+// ---------------------------------------------------------------------------
+describe('NetworkInspector - WebSocket', () => {
+  it('_recordWsOpen creates websocket entry', () => {
+    NetworkInspector.enable();
+    NetworkInspector.clear();
+    (NetworkInspector as any)._recordWsOpen(
+      'ws-test-1',
+      'wss://example.com',
+      ['proto1'],
+      [{ key: 'Authorization', value: 'Bearer tok' }]
+    );
+    const entries = NetworkInspector.getWebSocketEntries();
+    expect(entries.length).toBe(1);
+    expect(entries[0]!.type).toBe('websocket');
+    expect(entries[0]!.url).toBe('wss://example.com');
+    expect(entries[0]!.protocols.length).toBe(1);
+    expect(entries[0]!.readyState).toBe('CONNECTING');
+    NetworkInspector.disable();
+    NetworkInspector.clear();
+  });
+
+  it('_recordWsMessage records sent messages', () => {
+    NetworkInspector.enable();
+    NetworkInspector.clear();
+    (NetworkInspector as any)._recordWsOpen(
+      'ws-test-2',
+      'wss://example.com',
+      [],
+      []
+    );
+    (NetworkInspector as any)._recordWsMessage(
+      'ws-test-2',
+      'sent',
+      'hello',
+      5,
+      false
+    );
+    const entry = NetworkInspector.getWebSocketEntries()[0]!;
+    expect(entry.messagesSent).toBe(1);
+    expect(entry.messagesReceived).toBe(0);
+    expect(entry.bytesSent).toBe(5);
+    expect(entry.messages.length).toBe(1);
+    expect(entry.messages[0]!.direction).toBe('sent');
+    expect(entry.messages[0]!.data).toBe('hello');
+    NetworkInspector.disable();
+    NetworkInspector.clear();
+  });
+
+  it('_recordWsMessage records received messages', () => {
+    NetworkInspector.enable();
+    NetworkInspector.clear();
+    (NetworkInspector as any)._recordWsOpen(
+      'ws-test-3',
+      'wss://example.com',
+      [],
+      []
+    );
+    (NetworkInspector as any)._recordWsMessage(
+      'ws-test-3',
+      'received',
+      'world',
+      5,
+      false
+    );
+    const entry = NetworkInspector.getWebSocketEntries()[0]!;
+    expect(entry.messagesReceived).toBe(1);
+    expect(entry.messagesSent).toBe(0);
+    expect(entry.bytesReceived).toBe(5);
+    expect(entry.messages[0]!.direction).toBe('received');
+    NetworkInspector.disable();
+    NetworkInspector.clear();
+  });
+
+  it('_recordWsClose sets closeCode/closeReason and endTime', () => {
+    NetworkInspector.enable();
+    NetworkInspector.clear();
+    (NetworkInspector as any)._recordWsOpen(
+      'ws-test-4',
+      'wss://example.com',
+      [],
+      []
+    );
+    (NetworkInspector as any)._recordWsClose(
+      'ws-test-4',
+      1000,
+      'Normal closure'
+    );
+    const entry = NetworkInspector.getWebSocketEntries()[0]!;
+    expect(entry.closeCode).toBe(1000);
+    expect(entry.closeReason).toBe('Normal closure');
+    expect(entry.readyState).toBe('CLOSED');
+    expect(entry.endTime).toBeGreaterThan(0);
+    expect(entry.duration).toBeGreaterThan(0);
+    NetworkInspector.disable();
+    NetworkInspector.clear();
+  });
+
+  it('_recordWsError sets error field', () => {
+    NetworkInspector.enable();
+    NetworkInspector.clear();
+    (NetworkInspector as any)._recordWsOpen(
+      'ws-test-5',
+      'wss://example.com',
+      [],
+      []
+    );
+    (NetworkInspector as any)._recordWsError('ws-test-5', 'Connection refused');
+    const entry = NetworkInspector.getWebSocketEntries()[0]!;
+    expect(entry.error).toBe('Connection refused');
+    NetworkInspector.disable();
+    NetworkInspector.clear();
+  });
+
+  it('getWebSocketEntries() filters correctly alongside HTTP entries', async () => {
+    NetworkInspector.enable();
+    NetworkInspector.clear();
+    await nitroFetch(`${BASE}/get`);
+    (NetworkInspector as any)._recordWsOpen(
+      'ws-test-6',
+      'wss://example.com',
+      [],
+      []
+    );
+    expect(NetworkInspector.getEntries().length).toBe(2);
+    expect(NetworkInspector.getHttpEntries().length).toBe(1);
+    expect(NetworkInspector.getWebSocketEntries().length).toBe(1);
+    NetworkInspector.disable();
+    NetworkInspector.clear();
+  });
+});
