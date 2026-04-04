@@ -296,24 +296,14 @@ void WebSocketConnection::handleReceiveFragment(lws* wsi, const void* in, size_t
   bool isFirst  = lws_is_first_fragment(wsi) != 0;
   bool isFinal  = lws_is_final_fragment(wsi) != 0;
 
-  // Fast path: single-frame message (most common case)
   if (isFirst && isFinal) {
     handleReceive(in, len, isBinary);
     return;
   }
 
-  // Multi-frame: accumulate fragments
   if (isFirst) {
     _rxBuf.clear();
     _rxBinary = isBinary;
-  }
-
-  // Max message size guard — close with 1009 (Message Too Big)
-  if (_rxBuf.size() + len > kMaxMessageSize) {
-    _rxBuf.clear();
-    _rxBuf.shrink_to_fit();
-    close(1009, "message too large");
-    return;
   }
 
   const uint8_t* data = static_cast<const uint8_t*>(in);
@@ -322,7 +312,6 @@ void WebSocketConnection::handleReceiveFragment(lws* wsi, const void* in, size_t
   if (isFinal) {
     handleReceive(_rxBuf.data(), _rxBuf.size(), _rxBinary);
     _rxBuf.clear();
-    _rxBuf.shrink_to_fit();
   }
 }
 
