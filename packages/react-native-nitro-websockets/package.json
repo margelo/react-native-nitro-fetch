@@ -108,7 +108,13 @@
     "react": "*",
     "react-native": "*",
     "react-native-nitro-modules": "*",
-    "react-native-nitro-text-decoder": ">=0.1.0"
+    "react-native-nitro-text-decoder": ">=0.1.0",
+    "react-native-nitro-fetch": "*"
+  },
+  "peerDependenciesMeta": {
+    "react-native-nitro-fetch": {
+      "optional": true
+    }
   },
   "release-it": {
     "git": false,

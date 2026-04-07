@@ -39,6 +39,9 @@ android {
     minSdkVersion getExtOrIntegerDefault("minSdkVersion")
     targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
 
+    def enableTracing = (getExtOrDefault("enableTracing") ?: "false").toString().toBoolean()
+    buildConfigField "boolean", "NITRO_FETCH_TRACING", enableTracing.toString()
+
     externalNativeBuild {
       cmake {
         cppFlags "-frtti -fexceptions -Wall -fstack-protector-all"

@@ -26,5 +26,13 @@ Pod::Spec.new do |s|
   load 'nitrogen/generated/ios/NitroFetch+autolinking.rb'
   add_nitrogen_files(s)
 
+  if ENV['NITROFETCH_TRACING'] == '1'
+    current_xcconfig = s.attributes_hash['pod_target_xcconfig'] || {}
+    existing = current_xcconfig['SWIFT_ACTIVE_COMPILATION_CONDITIONS'] || '$(inherited)'
+    s.pod_target_xcconfig = current_xcconfig.merge({
+      'SWIFT_ACTIVE_COMPILATION_CONDITIONS' => "#{existing} NITROFETCH_TRACING"
+    })
+  end
+
   install_modules_dependencies(s)
 end

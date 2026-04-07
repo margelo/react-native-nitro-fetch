@@ -26,6 +26,18 @@ export {
   applyTemplate,
 } from './tokenRefresh';
 export type { TokenRefreshConfig } from './tokenRefresh';
+export { NetworkInspector } from './NetworkInspector';
+export type {
+  NetworkEntry,
+  NetworkEntryCallback,
+  WebSocketEntry,
+  WebSocketMessage,
+  InspectorEntry,
+} from './NetworkInspector';
+export { generateCurl } from './CurlGenerator';
+export type { CurlOptions } from './CurlGenerator';
+export { profileFetch } from './HermesProfiler';
+export type { ProfileResult } from './HermesProfiler';
 import './fetch';
 
 // Keep legacy export to avoid breaking any local tests/usages during scaffolding.

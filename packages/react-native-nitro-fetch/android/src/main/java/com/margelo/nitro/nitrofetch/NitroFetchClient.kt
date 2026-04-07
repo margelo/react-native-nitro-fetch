@@ -1,6 +1,7 @@
 package com.margelo.nitro.nitrofetch
 
 import android.net.Uri
+import android.os.Trace
 import android.util.Log
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.NitroModules
@@ -72,6 +73,13 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
     ): UrlRequest {
       val url = req.url
       val shouldFollowRedirects = req.followRedirects ?: true
+      val traceLabel = if (BuildConfig.NITRO_FETCH_TRACING) {
+        "NitroFetch ${req.method?.name ?: "GET"} ${Uri.parse(url).path ?: url}"
+      } else ""
+      val traceCookie = if (BuildConfig.NITRO_FETCH_TRACING) url.hashCode() else 0
+      if (BuildConfig.NITRO_FETCH_TRACING) {
+        Trace.beginAsyncSection(traceLabel, traceCookie)
+      }
       val callback = object : UrlRequest.Callback() {
         private val buffer = ByteBuffer.allocateDirect(16 * 1024)
         private val out = java.io.ByteArrayOutputStream()
@@ -119,6 +127,9 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         }
 
         override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) {
+          if (BuildConfig.NITRO_FETCH_TRACING) {
+            Trace.endAsyncSection(traceLabel, traceCookie)
+          }
           try {
             val headersArr: Array<NitroHeader> =
               info.allHeadersAsList.map { NitroHeader(it.key, it.value) }.toTypedArray()
@@ -152,10 +163,16 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         }
 
         override fun onFailed(request: UrlRequest, info: UrlResponseInfo?, error: CronetException) {
+          if (BuildConfig.NITRO_FETCH_TRACING) {
+            Trace.endAsyncSection(traceLabel, traceCookie)
+          }
           onFail(RuntimeException("Cronet failed: ${error.message}", error))
         }
 
         override fun onCanceled(request: UrlRequest, info: UrlResponseInfo?) {
+          if (BuildConfig.NITRO_FETCH_TRACING) {
+            Trace.endAsyncSection(traceLabel, traceCookie)
+          }
           if (!redirectStopped) {
             onFail(RuntimeException("Cronet canceled"))
           }

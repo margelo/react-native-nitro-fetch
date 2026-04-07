@@ -16,6 +16,7 @@ import { NitroHeaders } from './Headers';
 import { NitroResponse } from './Response';
 import { NitroRequest as NitroRequestClass } from './Request';
 import type { RequestRedirect, RequestCache } from './Request';
+import { NetworkInspector } from './NetworkInspector';
 
 // No base64: pass strings/ArrayBuffers directly
 
@@ -440,6 +441,19 @@ async function nitroFetchRaw(
 
   const req = buildNitroRequest(input, init);
 
+  // Inspector: record start (zero cost when disabled — single boolean check)
+  let inspectorId: string | undefined;
+  if (NetworkInspector.isEnabled()) {
+    inspectorId = String(Date.now()) + '-' + String(Math.random()).slice(2, 8);
+    NetworkInspector._recordStart(
+      inspectorId,
+      req.url,
+      req.method ?? 'GET',
+      req.headers ?? [],
+      req.bodyString
+    );
+  }
+
   // Only allocate a requestId when a signal is present — zero overhead otherwise.
   const requestId = signal ? String(Math.random()) : undefined;
   if (requestId) req.requestId = requestId;
@@ -464,8 +478,22 @@ async function nitroFetchRaw(
 
   try {
     const res: NitroResponseNative = await client.request(req);
+    if (inspectorId) {
+      NetworkInspector._recordEnd(
+        inspectorId,
+        res.status,
+        res.statusText,
+        res.headers ?? [],
+        res.bodyString?.length ?? 0,
+        undefined,
+        res.bodyString ?? undefined
+      );
+    }
     return res;
   } catch (e) {
+    if (inspectorId) {
+      NetworkInspector._recordEnd(inspectorId, 0, '', [], 0, String(e));
+    }
     // If the signal was aborted (either before or during the request),
     // surface a spec-compliant AbortError regardless of what native threw.
     if (signal?.aborted) {
@@ -491,6 +519,19 @@ async function nitroStreamFetch(
   const method = init?.method?.toUpperCase() ?? 'GET';
   const headers = headersToPairs(init?.headers);
 
+  // Inspector: record start
+  let inspectorId: string | undefined;
+  if (NetworkInspector.isEnabled()) {
+    inspectorId = String(Date.now()) + '-' + String(Math.random()).slice(2, 8);
+    NetworkInspector._recordStart(
+      inspectorId,
+      url,
+      method,
+      headers ?? [],
+      typeof init?.body === 'string' ? init.body : undefined
+    );
+  }
+
   const builder = NitroCronetSingleton.newUrlRequestBuilder(url);
   builder.setHttpMethod(method);
   headers?.forEach((h) => builder.addHeader(h.key, h.value));
@@ -511,6 +552,7 @@ async function nitroStreamFetch(
     });
 
     let responseResolved = false;
+    let streamBytesReceived = 0;
 
     builder.onResponseStarted((info) => {
       if (responseResolved) return;
@@ -536,16 +578,34 @@ async function nitroStreamFetch(
 
     builder.onReadCompleted((_info, byteBuffer, bytesRead) => {
       const chunk = new Uint8Array(byteBuffer, 0, bytesRead).slice();
+      streamBytesReceived += bytesRead;
       streamController.enqueue(chunk);
       if (!request.isDone()) {
         request.read();
       }
     });
 
-    builder.onSucceeded(() => streamController.close());
+    builder.onSucceeded((_info) => {
+      streamController.close();
+      if (inspectorId) {
+        const info = _info as any;
+        const status = info?.httpStatusCode ?? 0;
+        const hdrs = info?.allHeadersAsList ?? [];
+        NetworkInspector._recordEnd(
+          inspectorId,
+          status,
+          info?.httpStatusText ?? '',
+          hdrs,
+          streamBytesReceived
+        );
+      }
+    });
 
     builder.onFailed((_info, error) => {
       const err = new Error(error.message);
+      if (inspectorId) {
+        NetworkInspector._recordEnd(inspectorId, 0, '', [], 0, error.message);
+      }
       if (!responseResolved) {
         responseResolved = true;
         rejectResponse(err);
@@ -556,6 +616,16 @@ async function nitroStreamFetch(
 
     builder.onCanceled(() => {
       const err = createAbortError();
+      if (inspectorId) {
+        NetworkInspector._recordEnd(
+          inspectorId,
+          0,
+          '',
+          [],
+          0,
+          'Request canceled'
+        );
+      }
       if (!responseResolved) {
         responseResolved = true;
         rejectResponse(err);

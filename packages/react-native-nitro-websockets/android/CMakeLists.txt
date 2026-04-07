@@ -77,6 +77,11 @@ add_library(${PACKAGE_NAME} SHARED
 # Add Nitrogen specs
 include(${CMAKE_SOURCE_DIR}/../nitrogen/generated/android/NitroFetchWebsockets+autolinking.cmake)
 
+# ── Tracing (Perfetto / systrace) ─────────────────────────────────────────────
+if(NITRO_WS_TRACING)
+  target_compile_definitions(${PACKAGE_NAME} PRIVATE NITRO_WS_TRACING=1)
+endif()
+
 # Include directories
 include_directories(
   "src/main/cpp"

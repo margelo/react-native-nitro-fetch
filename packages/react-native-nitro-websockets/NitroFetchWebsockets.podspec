@@ -34,7 +34,7 @@ Pod::Spec.new do |s|
   ]
 
   current_xcconfig = s.attributes_hash['pod_target_xcconfig'] || {}
-  s.pod_target_xcconfig = current_xcconfig.merge({
+  merged_xcconfig = {
     'HEADER_SEARCH_PATHS' => [
       '$(inherited)',
       '"${PODS_TARGET_SRCROOT}/cpp"',
@@ -43,7 +43,12 @@ Pod::Spec.new do |s|
       '"$(PODS_CONFIGURATION_BUILD_DIR)/NitroFetchWebsockets"',
     ].join(' '),
     'OTHER_LDFLAGS' => '-lc++',
-  })
+  }
+  if ENV['NITRO_WS_TRACING'] == '1'
+    existing_cxx_flags = current_xcconfig['OTHER_CPLUSPLUSFLAGS'] || '$(inherited)'
+    merged_xcconfig['OTHER_CPLUSPLUSFLAGS'] = "#{existing_cxx_flags} -DNITRO_WS_TRACING=1"
+  end
+  s.pod_target_xcconfig = current_xcconfig.merge(merged_xcconfig)
 
   s.dependency 'React-jsi'
   s.dependency 'React-callinvoker'
