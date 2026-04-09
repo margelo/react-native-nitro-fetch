@@ -22,6 +22,7 @@ const sidebars: SidebarsConfig = {
       label: 'Advanced',
       items: ['worklets', 'inspection'],
     },
+    'skills',
     'troubleshooting',
   ],
 };
