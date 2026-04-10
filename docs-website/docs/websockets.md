@@ -132,6 +132,18 @@ override fun onCreate() {
 }
 ```
 
+### Expo Plugin (Android)
+
+If you use **Expo**, the plugin automatically injects `NitroWebSocketAutoPrewarmer.prewarmOnStart()` into `MainApplication.kt` during `expo prebuild` — no manual native code changes needed.
+
+Add to your `app.json`:
+
+```json
+{
+  "plugins": ["react-native-nitro-websockets"]
+}
+```
+
 ### Auth on cold start
 
 If prewarmed sockets need fresh headers, register token refresh with `target: 'websocket'` or `'all'` using `registerTokenRefresh` from `react-native-nitro-fetch`. See the [Token Refresh guide](./token-refresh.md) for details.

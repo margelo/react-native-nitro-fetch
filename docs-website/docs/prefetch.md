@@ -118,3 +118,15 @@ export function UserDetails() {
 }
 ```
 
+## Expo Plugin (Android)
+
+If you use **Expo**, the plugin automatically injects `AutoPrefetcher.prefetchOnStart()` into `MainApplication.kt` during `expo prebuild` — no manual native code changes needed.
+
+Add to your `app.json`:
+
+```json
+{
+  "plugins": ["react-native-nitro-fetch"]
+}
+```
+
