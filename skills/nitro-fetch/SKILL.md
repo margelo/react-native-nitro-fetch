@@ -1,0 +1,73 @@
+---
+name: nitro-fetch
+description: Use this skill whenever an agent is working in a project that uses react-native-nitro-fetch, react-native-nitro-websockets, or react-native-nitro-text-decoder. Covers the fetch API, prefetching and cold-start cache warming, the NitroWebSocket class and pre-warming, migrating from React Native's built-in WebSocket (by touching call sites, never by swapping globals), the in-process NetworkInspector, native Perfetto / Instruments tracing, the native TextDecoder, and plugging nitro-fetch into axios via a custom adapter.
+license: MIT
+metadata:
+  author: Margelo
+  scope: react-native-nitro-fetch, react-native-nitro-websockets, react-native-nitro-text-decoder
+  tags: react-native, networking, fetch, websocket, prefetch, performance, cold-start, axios, inspector, perfetto
+---
+
+# react-native-nitro-fetch
+
+A focused reference for AI coding assistants working in a project that uses the `react-native-nitro-fetch` family of packages. Answer using the real APIs from this repo — not invented ones — by routing to the matching `references/*.md` file below.
+
+## Mental model
+
+`react-native-nitro-fetch` is a drop-in, native-backed replacement for the browser networking stack on React Native:
+
+- `fetch` — WHATWG-compatible, backed by `URLSession` (iOS) and `OkHttp`/`HttpURLConnection` (Android) via [Nitro Modules](https://github.com/mrousavy/nitro).
+- `NitroWebSocket` — native WebSocket (libwebsockets + mbedTLS) with the same shape as the browser `WebSocket`.
+- `NitroTextDecoder` — native UTF-8 decoder that beats the Hermes JS polyfill.
+
+The performance story has three moving parts, and most questions end up being about one of them:
+
+1. **Prefetching.** Native code can run *before* React Native loads. `prefetchOnAppStart(...)` and `prewarmOnAppStart(...)` replay stored requests / socket opens on every cold start, so by the time JS runs the response is already cached or the socket is already `OPEN`.
+2. **Explicit call sites.** Every place that wants the native client imports it directly — `import { fetch } from 'react-native-nitro-fetch'`, `import { NitroWebSocket } from 'react-native-nitro-websockets'`, or plugs it into axios via a custom adapter. **Do not** monkey-patch `globalThis.fetch` or `globalThis.WebSocket` — it breaks devtools, hot reload, and any library that does `instanceof` checks or re-enters the polyfill, and it hides which code paths actually use nitro.
+3. **Seeing what's happening.** `NetworkInspector` records HTTP + WS activity at the JS boundary; native Perfetto / Instruments traces cover everything below that (DNS, TLS, TTFB, body). One is for correctness, the other is for latency.
+
+## Routing table — problem to reference
+
+Load the matching file from `references/` before writing code. Each reference cites real file paths in this repo.
+
+| User is asking about… | Read |
+|---|---|
+| Warming the cache before a screen mounts, making cold-start GETs feel instant, `prefetch`, `prefetchOnAppStart`, `prefetchKey` | [`references/prefetching.md`](./references/prefetching.md) |
+| Routing axios through nitro-fetch (the full custom adapter — `baseURL`, `params`, `timeout`, `signal`, `responseType`, `validateStatus`) | [`references/axios-adapter.md`](./references/axios-adapter.md) |
+| UTF-8 decoding, slow `TextDecoder`, Hermes polyfill, streaming decode, `NitroTextDecoder` | [`references/text-decoder.md`](./references/text-decoder.md) |
+| Opening a `wss://` connection before React Native boots, `prewarmOnAppStart`, Android `Application.onCreate` wiring | [`references/websocket-prewarm.md`](./references/websocket-prewarm.md) |
+| The `NitroWebSocket` class, headers, sub-protocols, `wss://`, binary frames, runtime usage | [`references/using-websockets.md`](./references/using-websockets.md) |
+| Migrating an existing app from React Native's built-in `WebSocket` to `NitroWebSocket` | [`references/migrate-from-rn-ws.md`](./references/migrate-from-rn-ws.md) |
+| Seeing requests and responses at the JS level, debugging which library made a call, `NetworkInspector` | [`references/network-inspector.md`](./references/network-inspector.md) |
+| Finding the slow API, DNS / TLS / TTFB breakdowns, native traces, Perfetto, Instruments, Hermes profiler | [`references/perfetto-profiling.md`](./references/perfetto-profiling.md) |
+
+If the question doesn't match any row, read [`references/prefetching.md`](./references/prefetching.md) first — most cold-start questions start there, and it links out to the rest.
+
+**Do not** offer or produce code that swaps `globalThis.fetch` or `globalThis.WebSocket` with the nitro implementations, regardless of how the question is phrased. Migrate at the call site, or plug into axios via `references/axios-adapter.md`.
+
+## Installation (one-line, for reference)
+
+```bash
+npm install react-native-nitro-fetch react-native-nitro-modules
+# optional, for WebSockets and TextDecoder:
+npm install react-native-nitro-websockets react-native-nitro-text-decoder
+```
+
+After install, rebuild the app (`pod install` for iOS, a fresh `./gradlew` build for Android). Nothing else is wired automatically — turning any of this on is opt-in through the reference files above.
+
+## Verifying the skill is loaded
+
+A correct answer for any of these will cite the API and file path. A wrong / hallucinated answer will invent an `install()`, `setup()`, or `init()` helper that doesn't exist in this repo.
+
+Good test questions:
+
+- *"How do I prewarm a wss connection in this repo?"* → should mention `prewarmOnAppStart` **and** the Android `Application.onCreate` wiring via `NitroWebSocketAutoPrewarmer.prewarmOnStart(this)`.
+- *"How do I make axios go through nitro-fetch?"* → should produce an `AxiosAdapter` that respects `baseURL`, `params`, `timeout`, `signal`, and `responseType` — not a 20-line sketch that `JSON.parse`s everything.
+- *"Why is my cold-start GET still slow after adding `prefetch`?"* → should mention `prefetchKey` and point at `references/prefetching.md`.
+
+## Pointers
+
+- Source: `packages/react-native-nitro-fetch/`, `packages/react-native-nitro-websockets/`, `packages/react-native-nitro-text-decoder/`
+- Public API: `packages/react-native-nitro-fetch/src/index.tsx`
+- Example wiring: `example/index.js`, `example/src/App.tsx`
+- Docs website: https://margelo.github.io/react-native-nitro-fetch/

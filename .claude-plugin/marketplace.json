@@ -1,0 +1,19 @@
+{
+  "name": "react-native-nitro-fetch",
+  "owner": {
+    "name": "Margelo",
+    "url": "https://github.com/margelo"
+  },
+  "metadata": {
+    "description": "Agent skill for react-native-nitro-fetch: native fetch, WebSockets, prefetch, cold-start warming, NetworkInspector, Perfetto tracing, TextDecoder, and axios integration.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "nitro-fetch",
+      "description": "Use whenever an agent is working in a project that uses react-native-nitro-fetch, react-native-nitro-websockets, or react-native-nitro-text-decoder. Covers fetch, prefetching, NitroWebSocket and pre-warming, migrating from RN's built-in WebSocket at the call sites (never by swapping globals), NetworkInspector, native Perfetto / Instruments tracing, NitroTextDecoder, and plugging nitro-fetch into axios via a custom adapter.",
+      "source": "./",
+      "skills": ["./skills/nitro-fetch"]
+    }
+  ]
+}
