@@ -100,3 +100,5 @@ packages/react-native-nitro-websockets/thirdparty/build_sim_fat/
 docs-website/node_modules
 docs-website/build
 docs-website/.docusaurus
+
+**/expo/plugins/dist
