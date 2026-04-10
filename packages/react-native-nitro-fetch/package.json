@@ -13,7 +13,8 @@
       "types": "./lib/typescript/src/index.d.ts",
       "default": "./lib/module/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./app.plugin.js": "./app.plugin.js"
   },
   "files": [
     "src",
@@ -34,16 +35,19 @@
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/__mocks__",
-    "!**/.*"
+    "!**/.*",
+    "expo/plugins/dist",
+    "app.plugin.js"
   ],
   "scripts": {
     "test": "jest",
     "typecheck": "tsc",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
-    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib",
+    "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib expo/plugins/dist",
     "prepare": "bob build",
+    "build:plugin": "cd expo/plugins && npx tsc",
     "nitrogen": "nitrogen",
-    "release": "release-it --only-version"
+    "release": "npm run build:plugin && release-it --only-version"
   },
   "keywords": [
     "react-native",
@@ -75,7 +79,9 @@
     "@types/jest": "^29.5.5",
     "@types/react": "^19.2.0",
     "commitlint": "^19.6.1",
+    "@expo/config-plugins": "^9.0.0",
     "del-cli": "^5.1.0",
+    "expo-module-scripts": "^5.0.8",
     "eslint": "^9.22.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.3",
