@@ -33,7 +33,7 @@ This is for the *next* launch, not the current one. Pre-warming and immediately 
 
 ### iOS — automatic
 
-iOS auto-bootstraps via `+load` in [`packages/react-native-nitro-websockets/ios/NitroWSAutoBootstrap.mm`](../../packages/react-native-nitro-websockets/ios/NitroWSAutoBootstrap.mm). Nothing to wire.
+iOS auto-bootstraps via `+load` in [`packages/react-native-nitro-websockets/ios/NitroWSAutoBootstrap.mm`](../../../packages/react-native-nitro-websockets/ios/NitroWSAutoBootstrap.mm). Nothing to wire.
 
 ### Android — one line in `Application.onCreate`
 
@@ -49,7 +49,7 @@ class MainApplication : Application(), ReactApplication {
 }
 ```
 
-Reference: [`example/android/app/src/main/java/nitrofetch/example/MainApplication.kt`](../../example/android/app/src/main/java/nitrofetch/example/MainApplication.kt).
+Reference: [`example/android/app/src/main/java/nitrofetch/example/MainApplication.kt`](../../../example/android/app/src/main/java/nitrofetch/example/MainApplication.kt).
 
 If you skip this on Android, the JS API silently writes to disk and nothing on the native side ever reads it back.
 
@@ -69,7 +69,7 @@ import {
 | `removeFromPrewarmQueue(url)` | Drop one entry. No-op if it isn't there. |
 | `clearPrewarmQueue()` | Wipe the queue. |
 
-Source: [`packages/react-native-nitro-websockets/src/prewarm.ts`](../../packages/react-native-nitro-websockets/src/prewarm.ts).
+Source: [`packages/react-native-nitro-websockets/src/prewarm.ts`](../../../packages/react-native-nitro-websockets/src/prewarm.ts).
 
 ## Recipes
 
@@ -114,23 +114,18 @@ ws.onmessage = (e) => {
 };
 ```
 
-### Adoption via the global swap
+### Adoption via explicit `NitroWebSocket` call sites
 
-If you've followed [`nitro-fetch-replace-global`](./replace-global.md) and pointed `globalThis.WebSocket` at `NitroWebSocket`, pre-warmed connections are adopted by **anything** that calls `new WebSocket(url)` on the global — your code and the libraries (Phoenix, socket.io-client, Firebase RTDB, Ably, ...) you don't own. The libraries don't need to know the pre-warmer exists.
-
-```ts
-// index.js
-import './src/setupNitroGlobals'; // swaps globalThis.WebSocket → NitroWebSocket
-// ...
-```
+Pre-warmed connections are adopted the moment your code calls `new NitroWebSocket(url, ...)` with a matching URL. The adoption happens on the native service thread — you don't have to wait for "open" yourself.
 
 ```ts
-// somewhere else in your app — could be inside a third-party library
-const ws = new WebSocket('wss://stream.example.com/feed', ['v1.feed.proto']);
+import { NitroWebSocket } from 'react-native-nitro-websockets';
+
+const ws = new NitroWebSocket('wss://stream.example.com/feed', ['v1.feed.proto']);
 // ↑ adopts the warm connection if the URL matches the prewarm queue
 ```
 
-This is the recommended setup. It's the only way to make pre-warming benefit libraries that construct their own WebSockets internally.
+Libraries that accept an injectable constructor (`socket.io-client`, `centrifuge-js`, and similar) can be pointed at `NitroWebSocket` the same way — pass it as the library's `WebSocket` option so its internal `new WebSocket(...)` becomes `new NitroWebSocket(...)`. Don't swap `globalThis.WebSocket`; it breaks devtools and hot reload and hides which code paths actually use the native socket.
 
 ### Tear down on logout
 
@@ -162,9 +157,9 @@ If your stored auth header expires, register a token-refresh config (see `docs-w
 
 ## Pointers
 
-- JS: [`packages/react-native-nitro-websockets/src/prewarm.ts`](../../packages/react-native-nitro-websockets/src/prewarm.ts)
-- Android bootstrap: [`packages/react-native-nitro-websockets/android/src/main/java/com/margelo/nitro/nitrofetchwebsockets/NitroWebSocketAutoPrewarmer.kt`](../../packages/react-native-nitro-websockets/android/src/main/java/com/margelo/nitro/nitrofetchwebsockets/NitroWebSocketAutoPrewarmer.kt)
-- iOS bootstrap: [`packages/react-native-nitro-websockets/ios/NitroWSAutoBootstrap.mm`](../../packages/react-native-nitro-websockets/ios/NitroWSAutoBootstrap.mm)
-- C++ singleton: [`packages/react-native-nitro-websockets/cpp/WebSocketPrewarmer.hpp`](../../packages/react-native-nitro-websockets/cpp/WebSocketPrewarmer.hpp)
-- Working example: [`example/src/screens/WebSocketScreen.tsx`](../../example/src/screens/WebSocketScreen.tsx)
-- Related: [`nitro-fetch-using-websockets`](./using-websockets.md), [`nitro-fetch-migrate-from-rn-ws`](./migrate-from-rn-ws.md)
+- JS: [`packages/react-native-nitro-websockets/src/prewarm.ts`](../../../packages/react-native-nitro-websockets/src/prewarm.ts)
+- Android bootstrap: [`packages/react-native-nitro-websockets/android/src/main/java/com/margelo/nitro/nitrofetchwebsockets/NitroWebSocketAutoPrewarmer.kt`](../../../packages/react-native-nitro-websockets/android/src/main/java/com/margelo/nitro/nitrofetchwebsockets/NitroWebSocketAutoPrewarmer.kt)
+- iOS bootstrap: [`packages/react-native-nitro-websockets/ios/NitroWSAutoBootstrap.mm`](../../../packages/react-native-nitro-websockets/ios/NitroWSAutoBootstrap.mm)
+- C++ singleton: [`packages/react-native-nitro-websockets/cpp/WebSocketPrewarmer.hpp`](../../../packages/react-native-nitro-websockets/cpp/WebSocketPrewarmer.hpp)
+- Working example: [`example/src/screens/WebSocketScreen.tsx`](../../../example/src/screens/WebSocketScreen.tsx)
+- Related: [`using-websockets.md`](./using-websockets.md), [`migrate-from-rn-ws.md`](./migrate-from-rn-ws.md)

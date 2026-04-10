@@ -68,7 +68,7 @@ What's actually supported:
 | `ignoreBOM: true` | A leading byte-order mark is dropped instead of being included. |
 | `decode(buf, { stream: true })` | Holds incomplete code points until the next call so you can chunk binary input. |
 
-Source: [`packages/react-native-nitro-text-decoder/src/TextDecoder.ts`](../../packages/react-native-nitro-text-decoder/src/TextDecoder.ts).
+Source: [`packages/react-native-nitro-text-decoder/src/TextDecoder.ts`](../../../packages/react-native-nitro-text-decoder/src/TextDecoder.ts).
 
 ## Recipes
 
@@ -120,24 +120,15 @@ for await (const chunk of someAsyncByteIterator) {
 acc += decoder.decode(); // flush
 ```
 
-### Polyfill `globalThis.TextDecoder`
+### Libraries that use `globalThis.TextDecoder`
 
-Some libraries (`protobufjs`, `msgpack-lite`, certain WASM glue) reach for `globalThis.TextDecoder`. If you know everything in your app uses UTF-8, you can wire the global once:
+Some libraries (`protobufjs`, `msgpack-lite`, certain WASM glue) reach for `globalThis.TextDecoder`. **Don't** swap it with the nitro implementation — `nitro-text-decoder` is UTF-8 only, so a library that constructs `new TextDecoder('utf-16le')` will throw under the polyfill, and monkey-patching a web-standard global hides the failure until production.
 
-```ts
-// src/setupTextDecoder.ts
-import { TextDecoder } from 'react-native-nitro-text-decoder';
-;(globalThis as any).TextDecoder = TextDecoder;
-```
+Prefer one of:
 
-```js
-// index.js
-import './src/setupTextDecoder';
-import './src/setupNitroFetch';
-// ...
-```
-
-A library that constructs `new TextDecoder('utf-16le')` will throw under this polyfill — check the libraries you ship before turning it on.
+- Use the library's native output and decode the bytes yourself with the explicit nitro decoder import.
+- Pass a decoder to the library if it accepts one as an option.
+- Leave the library on Hermes' built-in `TextDecoder` — it's slower, but only for that one library.
 
 ## Gotchas
 
@@ -149,6 +140,6 @@ A library that constructs `new TextDecoder('utf-16le')` will throw under this po
 
 ## Pointers
 
-- Source: [`packages/react-native-nitro-text-decoder/src`](../../packages/react-native-nitro-text-decoder/src)
-- Used internally by: [`packages/react-native-nitro-websockets/src/index.ts`](../../packages/react-native-nitro-websockets/src/index.ts) (look for `utf8Decoder`)
-- Pairs with: [`nitro-fetch-using-websockets`](./using-websockets.md)
+- Source: [`packages/react-native-nitro-text-decoder/src`](../../../packages/react-native-nitro-text-decoder/src)
+- Used internally by: [`packages/react-native-nitro-websockets/src/index.ts`](../../../packages/react-native-nitro-websockets/src/index.ts) (look for `utf8Decoder`)
+- Pairs with: [`using-websockets.md`](./using-websockets.md)

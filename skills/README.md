@@ -11,7 +11,6 @@ The agent routes the user's question to one of these `references/*.md` files:
 | Topic | Reference |
 |---|---|
 | Warming the native cache (`prefetch`, `prefetchOnAppStart`) | [`prefetching.md`](./nitro-fetch/references/prefetching.md) |
-| Pointing `globalThis.fetch` / `globalThis.WebSocket` at nitro | [`replace-global.md`](./nitro-fetch/references/replace-global.md) |
 | Native UTF-8 `TextDecoder` | [`text-decoder.md`](./nitro-fetch/references/text-decoder.md) |
 | Opening WebSockets before React Native boots | [`websocket-prewarm.md`](./nitro-fetch/references/websocket-prewarm.md) |
 | The `NitroWebSocket` class, including `wss://` | [`using-websockets.md`](./nitro-fetch/references/using-websockets.md) |
@@ -86,7 +85,7 @@ Ask the agent something the skill covers, e.g.:
 
 > *How do I prewarm a wss connection in this repo?*
 
-Correct answer cites `prewarmOnAppStart` and the Android `Application.onCreate` wiring via `NitroWebSocketPrewarmer`. Wrong answer invents an `install()` or `setup()` helper that doesn't exist.
+Correct answer cites `prewarmOnAppStart` and the Android `Application.onCreate` wiring via `NitroWebSocketAutoPrewarmer.prewarmOnStart(this)`. Wrong answer invents an `install()` or `setup()` helper that doesn't exist.
 
 ## Contributing a new topic
 

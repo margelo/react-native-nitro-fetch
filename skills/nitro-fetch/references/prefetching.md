@@ -21,7 +21,7 @@ The key idea is the **`prefetchKey`**. It's how the native cache identifies a st
 - Cross-launch prefetches start *before React Native loads*, so the response is usually sitting in cache by the time the first screen mounts. Cold-start time-to-first-render drops by hundreds of milliseconds on real networks.
 - In-session prefetches let a list screen warm the next detail screen — taps feel instant.
 - It's free for callers: the consuming `fetch()` is the same call you were already making, just with a `prefetchKey` header.
-- The native cache is shared across consumers, so any library that goes through nitro-fetch (see [`nitro-fetch-replace-global`](./replace-global.md)) automatically benefits.
+- The native cache is shared across any code path that imports `fetch` from `react-native-nitro-fetch`, so wrappers around that import (e.g. the [axios adapter](./axios-adapter.md)) automatically benefit.
 
 ## Setup
 
@@ -200,7 +200,7 @@ If neither option works for you (the URL itself must contain a fresh value, e.g.
 
 ### Without token refresh
 
-If you don't register a refresh config, the bootstrap reuses whatever headers were stored at `prefetchOnAppStart` time. That works fine for tokens that outlive the app's typical kill/restart cycle. See [`docs-website/docs/token-refresh.md`](../../docs-website/docs/token-refresh.md) for the full reference (composite headers, plain-text response bodies, `onFailure` modes).
+If you don't register a refresh config, the bootstrap reuses whatever headers were stored at `prefetchOnAppStart` time. That works fine for tokens that outlive the app's typical kill/restart cycle. See [`docs-website/docs/token-refresh.md`](../../../docs-website/docs/token-refresh.md) for the full reference (composite headers, plain-text response bodies, `onFailure` modes).
 
 ## Gotchas
 
@@ -213,9 +213,9 @@ If you don't register a refresh config, the bootstrap reuses whatever headers we
 
 ## Pointers
 
-- Source: [`packages/react-native-nitro-fetch/src/fetch.ts`](../../packages/react-native-nitro-fetch/src/fetch.ts), search for `prefetch`
-- Android bootstrap: [`packages/react-native-nitro-fetch/android/src/main/java/com/margelo/nitro/nitrofetch/AutoPrefetcher.kt`](../../packages/react-native-nitro-fetch/android/src/main/java/com/margelo/nitro/nitrofetch/AutoPrefetcher.kt)
-- iOS bootstrap: [`packages/react-native-nitro-fetch/ios/NitroBootstrap.mm`](../../packages/react-native-nitro-fetch/ios/NitroBootstrap.mm)
-- End-to-end example: [`example/src/screens/PrefetchScreen.tsx`](../../example/src/screens/PrefetchScreen.tsx)
-- Long-form docs: [`docs-website/docs/prefetch.md`](../../docs-website/docs/prefetch.md)
-- Related: [`nitro-fetch-replace-global`](./replace-global.md), [`nitro-fetch-network-inspector`](./network-inspector.md)
+- Source: [`packages/react-native-nitro-fetch/src/fetch.ts`](../../../packages/react-native-nitro-fetch/src/fetch.ts), search for `prefetch`
+- Android bootstrap: [`packages/react-native-nitro-fetch/android/src/main/java/com/margelo/nitro/nitrofetch/AutoPrefetcher.kt`](../../../packages/react-native-nitro-fetch/android/src/main/java/com/margelo/nitro/nitrofetch/AutoPrefetcher.kt)
+- iOS bootstrap: [`packages/react-native-nitro-fetch/ios/NitroBootstrap.mm`](../../../packages/react-native-nitro-fetch/ios/NitroBootstrap.mm)
+- End-to-end example: [`example/src/screens/PrefetchScreen.tsx`](../../../example/src/screens/PrefetchScreen.tsx)
+- Long-form docs: [`docs-website/docs/prefetch.md`](../../../docs-website/docs/prefetch.md)
+- Related: [`axios-adapter.md`](./axios-adapter.md), [`network-inspector.md`](./network-inspector.md)

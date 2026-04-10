@@ -89,43 +89,11 @@ type WebSocketMessageEvent = {
 };
 ```
 
-Source: [`packages/react-native-nitro-websockets/src/index.ts`](../../packages/react-native-nitro-websockets/src/index.ts).
+Source: [`packages/react-native-nitro-websockets/src/index.ts`](../../../packages/react-native-nitro-websockets/src/index.ts).
 
 ## Recipes
 
-### Recommended: swap `globalThis.WebSocket` once
-
-The cleanest way to use `NitroWebSocket` everywhere — your code *and* libraries you don't own (Phoenix, socket.io-client, Firebase RTDB, Ably, centrifuge-js, ...) — is to point `globalThis.WebSocket` at it from a setup file imported as the very first line of `index.js`. After that, every `new WebSocket(...)` call site uses the nitro implementation:
-
-```ts
-// src/setupNitroGlobals.ts
-import { NitroWebSocket } from 'react-native-nitro-websockets';
-
-;(globalThis as any).__rnWebSocket = (globalThis as any).WebSocket;
-;(globalThis as any).WebSocket     = NitroWebSocket;
-```
-
-```js
-// index.js — must be the very first import
-import './src/setupNitroGlobals';
-import { AppRegistry } from 'react-native';
-import App from './src/App';
-import { name as appName } from './app.json';
-
-AppRegistry.registerComponent(appName, () => App);
-```
-
-Now every existing call site just works — including the third constructor argument for headers:
-
-```ts
-const ws = new WebSocket('wss://stream.example.com/feed', ['v1.proto'], {
-  Authorization: `Bearer ${token}`, // ← previously impossible on iOS
-});
-```
-
-For the combined fetch + WebSocket setup file (and the matching escape hatch via `__rnWebSocket`), see [`nitro-fetch-replace-global`](./replace-global.md).
-
-The remaining recipes use `NitroWebSocket` directly — both styles work side by side.
+> **Do not swap `globalThis.WebSocket`.** Monkey-patching globals breaks devtools, hot reload, and third-party libraries that reach into the runtime assuming the spec shape. Always import `NitroWebSocket` explicitly at the call sites where you want the native implementation — this also keeps your grep history honest about where the nitro socket is used.
 
 ### `ws://` echo client
 
@@ -205,7 +173,7 @@ For long-lived sockets that should outlive a single screen, hoist the instance t
 | TLS roots | OS trust store | bundled Mozilla CA via mbedTLS |
 | Pre-warming | n/a | yes ([prewarm skill](./websocket-prewarm.md)) |
 
-For migrating an existing app, see [`nitro-fetch-migrate-from-rn-ws`](./migrate-from-rn-ws.md).
+For migrating an existing app, see [`migrate-from-rn-ws.md`](./migrate-from-rn-ws.md).
 
 ## Gotchas
 
@@ -218,9 +186,9 @@ For migrating an existing app, see [`nitro-fetch-migrate-from-rn-ws`](./migrate-
 
 ## Pointers
 
-- Source: [`packages/react-native-nitro-websockets/src/index.ts`](../../packages/react-native-nitro-websockets/src/index.ts)
-- C++ side: [`packages/react-native-nitro-websockets/cpp/HybridWebSocket.cpp`](../../packages/react-native-nitro-websockets/cpp/HybridWebSocket.cpp)
-- Bundled CA: [`packages/react-native-nitro-websockets/cpp/cacert.pem`](../../packages/react-native-nitro-websockets/cpp/cacert.pem)
-- Working example: [`example/src/screens/WebSocketScreen.tsx`](../../example/src/screens/WebSocketScreen.tsx)
-- Long-form docs: [`docs-website/docs/websockets.md`](../../docs-website/docs/websockets.md)
-- Related: [`nitro-fetch-websocket-prewarm`](./websocket-prewarm.md), [`nitro-fetch-migrate-from-rn-ws`](./migrate-from-rn-ws.md), [`nitro-fetch-network-inspector`](./network-inspector.md)
+- Source: [`packages/react-native-nitro-websockets/src/index.ts`](../../../packages/react-native-nitro-websockets/src/index.ts)
+- C++ side: [`packages/react-native-nitro-websockets/cpp/HybridWebSocket.cpp`](../../../packages/react-native-nitro-websockets/cpp/HybridWebSocket.cpp)
+- Bundled CA: [`packages/react-native-nitro-websockets/android/src/main/cpp/cacert.pem`](../../../packages/react-native-nitro-websockets/android/src/main/cpp/cacert.pem)
+- Working example: [`example/src/screens/WebSocketScreen.tsx`](../../../example/src/screens/WebSocketScreen.tsx)
+- Long-form docs: [`docs-website/docs/websockets.md`](../../../docs-website/docs/websockets.md)
+- Related: [`websocket-prewarm.md`](./websocket-prewarm.md), [`migrate-from-rn-ws.md`](./migrate-from-rn-ws.md), [`network-inspector.md`](./network-inspector.md)

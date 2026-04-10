@@ -11,7 +11,7 @@ keywords: axios, adapter, baseURL, interceptors, cancelToken, responseType, vali
 
 Axios supports custom **adapters**: the last-mile function that actually makes the HTTP call. If you replace it with one backed by `react-native-nitro-fetch`, every axios feature you already use — interceptors, `create()` instances, `transformRequest`, `cancelToken` — keeps working, and every request now goes through the native client.
 
-If the app already points `globalThis.fetch` at nitro-fetch (see [`replace-global.md`](./replace-global.md)), you might not need this: axios picks up `globalThis.fetch` via its `fetchAdapter` in modern versions. Use a custom adapter when you want to pin the adapter explicitly, or when the app uses axios ≤ 1.6 where `fetchAdapter` isn't the default.
+Pin the adapter explicitly — **do not** try to route axios through nitro-fetch by swapping `globalThis.fetch`. Monkey-patching globals is fragile and hides which code is actually using nitro; an explicit adapter at the axios instance boundary is the right integration point.
 
 ## Common wrong answer
 
@@ -201,10 +201,10 @@ export const api = axios.create({
 - **`response.headers` is a `NitroHeaders` instance**, not a plain object — iterate with `.forEach()` / `.entries()`.
 - **`responseType: 'stream'`** returns nitro-fetch's web-standard `ReadableStream`, not Node's `Readable`. Axios stream examples from Node won't work unchanged.
 - **`onUploadProgress` / `onDownloadProgress`** are not implemented by this adapter. If you need progress, see [`references/perfetto-profiling.md`](./perfetto-profiling.md) or pipe the response body manually.
-- **If you already replaced `globalThis.fetch`**, confirm axios isn't still using its XHR adapter on RN. Pin the adapter explicitly (`axios.create({ adapter: nitroAxiosAdapter })`) if you want the guarantee.
+- **Always pin the adapter explicitly.** `axios.create({ adapter: nitroAxiosAdapter })` makes the boundary obvious. Don't rely on swapping `globalThis.fetch` to route axios through nitro — it's fragile and hides which code is using nitro.
 
 ## Pointers
 
 - Public `fetch` export: `packages/react-native-nitro-fetch/src/fetch.ts`
 - Spec-compliant `Headers` / `Response` / `Request`: `packages/react-native-nitro-fetch/src/Headers.ts`, `Response.ts`, `Request.ts`
-- Related: [`replace-global.md`](./replace-global.md), [`network-inspector.md`](./network-inspector.md)
+- Related: [`network-inspector.md`](./network-inspector.md)

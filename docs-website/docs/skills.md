@@ -6,7 +6,7 @@ sidebar_position: 10
 
 # Agent Skill
 
-`react-native-nitro-fetch` ships a single agent skill — **`nitro-fetch`** — that teaches any AI coding assistant how to use this library correctly: `fetch`, prefetching, replacing the global `fetch` / `WebSocket`, `NitroWebSocket`, pre-warming, `NetworkInspector`, native tracing, `NitroTextDecoder`, and plugging nitro-fetch into axios.
+`react-native-nitro-fetch` ships a single agent skill — **`nitro-fetch`** — that teaches any AI coding assistant how to use this library correctly: `fetch`, prefetching, `NitroWebSocket`, pre-warming, migrating from React Native's built-in `WebSocket`, `NetworkInspector`, native tracing, `NitroTextDecoder`, and plugging nitro-fetch into axios via a custom adapter.
 
 It loads on demand — the agent keeps a small router in context and only reads the relevant reference file when a matching question comes up.
 

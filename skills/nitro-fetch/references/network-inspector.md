@@ -27,12 +27,12 @@ It *is*:
 
 Two important things this inspector deliberately *doesn't* do. They confuse people, so spell them out before you start:
 
-1. **HTTP calls made by anything other than nitro-fetch are not visible here, and they are not in your Perfetto / Instruments traces either.** RN's built-in `fetch`, raw `XMLHttpRequest`, OkHttp/`URLSession` calls inside third-party SDKs, native Cronet calls outside this package — none of them go through nitro's recording path. They live in the OS network stack and are entirely invisible to both the inspector and the native trace points. If you want everything to show up in one place, route everything through nitro-fetch (see [`nitro-fetch-replace-global`](./replace-global.md)).
+1. **HTTP calls made by anything other than nitro-fetch are not visible here, and they are not in your Perfetto / Instruments traces either.** RN's built-in `fetch`, raw `XMLHttpRequest`, OkHttp/`URLSession` calls inside third-party SDKs, native Cronet calls outside this package — none of them go through nitro's recording path. They live in the OS network stack and are entirely invisible to both the inspector and the native trace points. If you want a specific caller visible, migrate that caller to import `fetch` from `react-native-nitro-fetch` — or plug axios in via the [axios adapter](./axios-adapter.md). Don't monkey-patch `globalThis.fetch`.
 2. **nitro-fetch's own HTTP calls are not pushed to React Native DevTools / Chrome DevTools network panel.** RN's DevTools network panel hooks `XMLHttpRequest`. nitro-fetch bypasses XHR entirely and goes through Nitro / JSI to native code, so its requests will never appear in DevTools. The `NetworkInspector` is the replacement view — and the curl export and `onEntry` listener are how you reach traffic that DevTools can't see.
 
 **Symmetric summary:** DevTools sees the libraries that use XHR. The `NetworkInspector` (and Perfetto) see the libraries that use nitro-fetch. Neither sees both unless you explicitly bridge them.
 
-If you need request-stage breakdowns (DNS / TLS / TTFB / body), this inspector is the wrong tool — you want native traces. See [`nitro-fetch-perfetto-profiling`](./perfetto-profiling.md).
+If you need request-stage breakdowns (DNS / TLS / TTFB / body), this inspector is the wrong tool — you want native traces. See [`perfetto-profiling.md`](./perfetto-profiling.md).
 
 ## API
 
@@ -62,7 +62,7 @@ const unsubscribe = NetworkInspector.onEntry((entry) => {
 
 Defaults: `maxEntries: 500`, `maxBodyCapture: 4096` (bytes per body, per side).
 
-Source: [`packages/react-native-nitro-fetch/src/NetworkInspector.ts`](../../packages/react-native-nitro-fetch/src/NetworkInspector.ts).
+Source: [`packages/react-native-nitro-fetch/src/NetworkInspector.ts`](../../../packages/react-native-nitro-fetch/src/NetworkInspector.ts).
 
 ## Setup
 
@@ -175,7 +175,7 @@ export function NetworkLogScreen() {
 }
 ```
 
-A full reference implementation (filter tabs, detail view, curl export, live console) lives in [`example/src/screens/NetworkInspectorScreen.tsx`](../../example/src/screens/NetworkInspectorScreen.tsx).
+A full reference implementation (filter tabs, detail view, curl export, live console) lives in [`example/src/screens/NetworkInspectorScreen.tsx`](../../../example/src/screens/NetworkInspectorScreen.tsx).
 
 ## Entry shapes
 
@@ -219,14 +219,14 @@ A full reference implementation (filter tabs, detail view, curl export, live con
 - **Bodies are truncated.** Default 4096 bytes. Bump `maxBodyCapture` for larger payloads, but be aware it allocates more per request.
 - **Binary WS frames don't capture payload.** Only the size is recorded. The placeholder is the literal `[binary N bytes]` — don't try to JSON-parse it.
 - **Entry mutation.** `getEntries()` returns the live array. Treat it as read-only and clone before storing or rendering snapshots.
-- **Libraries that bypass nitro-fetch.** Anything using raw `XMLHttpRequest` (older Sentry, react-native-blob-util, the default axios adapter) won't appear. See [`nitro-fetch-replace-global`](./replace-global.md) for the swap and its limits.
+- **Libraries that bypass nitro-fetch.** Anything using raw `XMLHttpRequest` (older Sentry, react-native-blob-util, the default axios adapter) won't appear. Fix this by migrating the specific call sites — use the [axios adapter](./axios-adapter.md) for axios, and construct `NitroWebSocket` directly at your call sites. Don't monkey-patch `globalThis.fetch` to paper over it.
 - **Production buffer growth.** The ring buffer caps entry count, but each entry holds bodies. Either disable in production or set a small `maxEntries`/`maxBodyCapture`.
 
 ## Pointers
 
-- Source: [`packages/react-native-nitro-fetch/src/NetworkInspector.ts`](../../packages/react-native-nitro-fetch/src/NetworkInspector.ts)
-- curl generator: [`packages/react-native-nitro-fetch/src/CurlGenerator.ts`](../../packages/react-native-nitro-fetch/src/CurlGenerator.ts)
-- Reference UI: [`example/src/screens/NetworkInspectorScreen.tsx`](../../example/src/screens/NetworkInspectorScreen.tsx)
-- Long-form docs: [`docs-website/docs/inspection.md`](../../docs-website/docs/inspection.md)
-- When this isn't enough: [`nitro-fetch-perfetto-profiling`](./perfetto-profiling.md)
-- Make every library visible: [`nitro-fetch-replace-global`](./replace-global.md)
+- Source: [`packages/react-native-nitro-fetch/src/NetworkInspector.ts`](../../../packages/react-native-nitro-fetch/src/NetworkInspector.ts)
+- curl generator: [`packages/react-native-nitro-fetch/src/CurlGenerator.ts`](../../../packages/react-native-nitro-fetch/src/CurlGenerator.ts)
+- Reference UI: [`example/src/screens/NetworkInspectorScreen.tsx`](../../../example/src/screens/NetworkInspectorScreen.tsx)
+- Long-form docs: [`docs-website/docs/inspection.md`](../../../docs-website/docs/inspection.md)
+- When this isn't enough: [`perfetto-profiling.md`](./perfetto-profiling.md)
+- Plugging axios into nitro-fetch: [`axios-adapter.md`](./axios-adapter.md)

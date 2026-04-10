@@ -19,7 +19,7 @@ You have three tools at progressively higher levels of detail. Start with the ch
 
 The usual flow is: triage with the inspector → if the slowness looks JS-side, wrap the call in `profileFetch` → if it's native or you need stage-level attribution, capture a Perfetto/Instruments trace.
 
-> **Visibility boundary.** Both `NetworkInspector` and the native trace points only see traffic that goes through nitro-fetch. RN's built-in `fetch`, raw `XMLHttpRequest`, third-party SDKs that use OkHttp / `URLSession` directly — none of those show up in the inspector or in your Perfetto / Instruments traces. Route them through the global polyfill (see [`nitro-fetch-replace-global`](./replace-global.md)) if you want unified visibility. Conversely, nitro-fetch's calls do **not** appear in React Native DevTools' network panel either, since DevTools hooks XHR.
+> **Visibility boundary.** Both `NetworkInspector` and the native trace points only see traffic that goes through nitro-fetch. RN's built-in `fetch`, raw `XMLHttpRequest`, third-party SDKs that use OkHttp / `URLSession` directly — none of those show up in the inspector or in your Perfetto / Instruments traces. Migrate those specific call sites to import `fetch` from `react-native-nitro-fetch` (or use the [axios adapter](./axios-adapter.md) for axios) if you want unified visibility. **Don't** try to patch this with `globalThis.fetch = nitroFetch` — it's fragile and hides which callers actually benefit. Conversely, nitro-fetch's calls do **not** appear in React Native DevTools' network panel either, since DevTools hooks XHR.
 
 ---
 
@@ -59,7 +59,7 @@ Reading the output:
 
 What this layer **can't** tell you: DNS vs TLS vs TTFB vs body breakdown, JS-thread time after the response arrives, time spent on the JS thread vs the native networking thread. For those, escalate.
 
-Full inspector docs: [`nitro-fetch-network-inspector`](./network-inspector.md).
+Full inspector docs: [`network-inspector.md`](./network-inspector.md).
 
 ---
 
@@ -91,7 +91,7 @@ Caveats:
 - **Captures all JS, not just your wrapped code.** Keep the wrapper tight.
 - **Sampling.** Sub-10ms bursts may not show up.
 
-Source: [`packages/react-native-nitro-fetch/src/HermesProfiler.ts`](../../packages/react-native-nitro-fetch/src/HermesProfiler.ts).
+Source: [`packages/react-native-nitro-fetch/src/HermesProfiler.ts`](../../../packages/react-native-nitro-fetch/src/HermesProfiler.ts).
 
 ---
 
@@ -131,7 +131,7 @@ Rebuild from Xcode (or `yarn ios`). The env vars inject `-DNITRO_WS_TRACING=1` a
 6. **Start recording**, exercise the app, **Stop**.
 7. In the timeline, find your app's process. HTTP requests appear as async slices labelled `NitroFetch GET /path`, etc. WebSocket events appear as sync slices labelled `NitroWS connect <url>`, `NitroWS send text`, `NitroWS receive`, `NitroWS close`, etc.
 
-A protobuf config alternative for `adb shell perfetto` is in [`docs-website/docs/inspection.md`](../../docs-website/docs/inspection.md).
+A protobuf config alternative for `adb shell perfetto` is in [`docs-website/docs/inspection.md`](../../../docs-website/docs/inspection.md).
 
 ### Capture an iOS Instruments trace
 
@@ -157,7 +157,7 @@ A protobuf config alternative for `adb shell perfetto` is in [`docs-website/docs
 | `NitroWS connect <url>` interval much longer than expected | TLS handshake is slow — pre-warm the socket |
 | `NitroWS receive` events bursting at launch with no JS handler attached yet | Connection is open before JS is ready; events buffer and replay correctly |
 
-Trace point definitions: [`packages/react-native-nitro-websockets/cpp/WsTrace.hpp`](../../packages/react-native-nitro-websockets/cpp/WsTrace.hpp).
+Trace point definitions: [`packages/react-native-nitro-websockets/cpp/WsTrace.hpp`](../../../packages/react-native-nitro-websockets/cpp/WsTrace.hpp).
 
 ---
 
@@ -180,8 +180,8 @@ Trace point definitions: [`packages/react-native-nitro-websockets/cpp/WsTrace.hp
 
 ## Pointers
 
-- Inspector skill: [`nitro-fetch-network-inspector`](./network-inspector.md)
-- Hermes profiler: [`packages/react-native-nitro-fetch/src/HermesProfiler.ts`](../../packages/react-native-nitro-fetch/src/HermesProfiler.ts)
-- Trace macros: [`packages/react-native-nitro-websockets/cpp/WsTrace.hpp`](../../packages/react-native-nitro-websockets/cpp/WsTrace.hpp)
-- Long-form docs (with screenshots): [`docs-website/docs/inspection.md`](../../docs-website/docs/inspection.md)
-- Once slow APIs are identified — usual fixes: [`nitro-fetch-prefetching`](./prefetching.md), [`nitro-fetch-websocket-prewarm`](./websocket-prewarm.md)
+- Inspector skill: [`network-inspector.md`](./network-inspector.md)
+- Hermes profiler: [`packages/react-native-nitro-fetch/src/HermesProfiler.ts`](../../../packages/react-native-nitro-fetch/src/HermesProfiler.ts)
+- Trace macros: [`packages/react-native-nitro-websockets/cpp/WsTrace.hpp`](../../../packages/react-native-nitro-websockets/cpp/WsTrace.hpp)
+- Long-form docs (with screenshots): [`docs-website/docs/inspection.md`](../../../docs-website/docs/inspection.md)
+- Once slow APIs are identified — usual fixes: [`prefetching.md`](./prefetching.md), [`websocket-prewarm.md`](./websocket-prewarm.md)

@@ -25,7 +25,7 @@ Once those five are out of the way, the rest of the API maps one-to-one. There's
 - **Reliable `wss://` across devices.** The package ships its own Mozilla CA bundle and validates via mbedTLS, so TLS behaves identically on physical iOS devices, simulators, emulators, and old Android builds.
 - **First-class binary frames.** No `Blob` round-trip, no `binaryType` toggle. Binary and text are explicitly distinguished by `e.isBinary`.
 - **Native UTF-8 decoding** for text frames via `react-native-nitro-text-decoder` (~50× faster than the JS shim).
-- **Pre-warmable.** Once you're on `NitroWebSocket`, you can have the connection already `OPEN` before React Native finishes booting — see [`nitro-fetch-websocket-prewarm`](./websocket-prewarm.md).
+- **Pre-warmable.** Once you're on `NitroWebSocket`, you can have the connection already `OPEN` before React Native finishes booting — see [`websocket-prewarm.md`](./websocket-prewarm.md).
 - **Inspector-aware.** Every `NitroWebSocket` automatically records open / messages / close into `NetworkInspector` — you get an in-app WS log for free.
 
 ## Setup
@@ -42,52 +42,44 @@ npm install \
 cd ios && pod install
 ```
 
-For more on the new API surface, see [`nitro-fetch-using-websockets`](./using-websockets.md).
+For more on the new API surface, see [`using-websockets.md`](./using-websockets.md).
 
 ## The five rewrites
 
-### 1. Swap `globalThis.WebSocket` once
+### 1. Replace `new WebSocket(...)` with `new NitroWebSocket(...)` at the call sites
 
-The recommended migration is the same shape as the [`nitro-fetch-replace-global`](./replace-global.md) skill: a tiny setup file imported as the very first line of `index.js`, which reassigns `globalThis.WebSocket` to `NitroWebSocket`. After that, every `new WebSocket(...)` call site in your app — and inside libraries you don't own — uses the nitro implementation. You don't have to find-and-replace anything.
+> **Don't swap `globalThis.WebSocket`.** Monkey-patching the global breaks devtools, hot reload, and libraries that do `instanceof WebSocket` or re-enter the polyfill from native. It also hides which code paths are actually using the nitro implementation. Migrate by touching the real call sites — grep is your friend.
 
 ```ts
-// src/setupNitroWebSocket.ts
+// before
+const ws = new WebSocket('wss://stream.example.com/feed', ['v1.proto']);
+```
+
+```ts
+// after
 import { NitroWebSocket } from 'react-native-nitro-websockets';
 
-;(globalThis as any).__rnWebSocket = (globalThis as any).WebSocket; // stash original
-;(globalThis as any).WebSocket     = NitroWebSocket;
+const ws = new NitroWebSocket('wss://stream.example.com/feed', ['v1.proto']);
 ```
 
-```js
-// index.js — must be the very first import
-import './src/setupNitroWebSocket';
-import './src/setupNitroFetch'; // if you also swap fetch
-import { AppRegistry } from 'react-native';
-import App from './src/App';
-import { name as appName } from './app.json';
-
-AppRegistry.registerComponent(appName, () => App);
-```
-
-Now your existing call sites just work:
+If you have many call sites, a local alias per module is cleanest:
 
 ```ts
+import { NitroWebSocket as WebSocket } from 'react-native-nitro-websockets';
+
+// …unchanged call sites below
 const ws = new WebSocket('wss://stream.example.com/feed', ['v1.proto']);
-// ↑ resolves to NitroWebSocket — gets headers, native TLS, inspector, the lot
 ```
 
-For new call sites where you want the third constructor argument (custom upgrade headers), pass it the same way you would to a standard `WebSocket`:
+New call sites gain the third constructor argument (custom upgrade headers) — previously impossible on iOS:
 
 ```ts
-const ws = new WebSocket(
+const ws = new NitroWebSocket(
   'wss://stream.example.com/feed',
   ['v1.proto'],
-  { Authorization: `Bearer ${token}` }, // ← previously impossible on iOS
+  { Authorization: `Bearer ${token}` },
 );
 ```
-
-`NitroWebSocket`'s constructor accepts the third arg even when called via the global alias, since it's just a class.
-
 
 ### 2. Fix `readyState` comparisons
 
@@ -196,26 +188,28 @@ prewarmOnAppStart('wss://stream.example.com/feed', ['v1.proto'], {
 });
 ```
 
-Don't forget the Android `Application.onCreate` wiring — see [`nitro-fetch-websocket-prewarm`](./websocket-prewarm.md).
+Don't forget the Android `Application.onCreate` wiring — see [`websocket-prewarm.md`](./websocket-prewarm.md).
 
 ## Library compatibility
 
-Once `globalThis.WebSocket` points at `NitroWebSocket`, libraries that read from the global (`phoenix`, `socket.io-client`, `centrifuge-js`, Firebase RTDB, Ably, ...) automatically use the nitro implementation. That's the entire point of the swap.
-
-If a library imports `WebSocket` from a typed namespace and does `instanceof WebSocket` checks against the *original*, it'll fail under the swap — uncommon, but real. The escape hatch is the original you stashed at setup time:
+Libraries that accept an injectable `WebSocket` constructor (socket.io-client, centrifuge-js, phoenix in some configurations) can be pointed at `NitroWebSocket` directly:
 
 ```ts
-const OriginalWebSocket = (globalThis as any).__rnWebSocket;
+import { NitroWebSocket } from 'react-native-nitro-websockets';
+import { io } from 'socket.io-client';
 
-const flakyClient = createSomeLibrary({
-  WebSocket: OriginalWebSocket, // bypass nitro just for this client
+const socket = io('wss://example.com', {
+  transports: ['websocket'],
+  WebSocket: NitroWebSocket, // or whatever field the library uses
 });
 ```
+
+Libraries that *don't* accept an injection and hard-code `new WebSocket(...)` internally will keep using React Native's built-in WebSocket. That's acceptable — the apps you own still get native TLS, headers, pre-warming, and the inspector on the call sites you migrated. Don't be tempted to monkey-patch the global just to reach the last 5%.
 
 ## Checklist
 
 - [ ] `react-native-nitro-websockets`, `react-native-nitro-fetch`, `react-native-nitro-text-decoder`, and `react-native-nitro-modules` installed; `pod install` run.
-- [ ] `setupNitroWebSocket.ts` (and `setupNitroFetch.ts` if you also swap fetch) imported as the very first lines of `index.js`.
+- [ ] Every `new WebSocket(...)` you own replaced with `new NitroWebSocket(...)` (or `import { NitroWebSocket as WebSocket }` aliasing).
 - [ ] All `.readyState` comparisons converted to string form.
 - [ ] All `addEventListener` calls converted to property assignment.
 - [ ] All `binaryType` setters removed; binary handling uses `e.isBinary` / `e.binaryData`.
@@ -225,15 +219,15 @@ const flakyClient = createSomeLibrary({
 
 ## Gotchas
 
-- **Setup file imported too late.** The `globalThis.WebSocket = NitroWebSocket` line must run before any library that captures `WebSocket` into a module-local. Make `setupNitroWebSocket` the very first import in `index.js`.
+- **Don't swap `globalThis.WebSocket`.** Breaks devtools, hot reload, and any library that does `instanceof WebSocket` checks or re-enters the polyfill from native bridges. Always migrate at the call site.
 - **Forgetting that `e.binaryData` is `undefined` for text frames.** Always check `e.isBinary` first.
 - **Sending a `Blob`.** TypeScript may not catch it; runtime will. Convert first.
 - **`NitroWebSocket.OPEN`.** Doesn't exist. Use the string `'OPEN'`.
-- **`instanceof WebSocket` against the original.** Uncommon but real — keep `__rnWebSocket` around as an escape hatch for libraries that do this.
+- **Missed call sites.** `grep -rn 'new WebSocket('` before you ship — anything you didn't migrate keeps using the RN polyfill and silently won't appear in the inspector.
 
 ## Pointers
 
-- API reference: [`nitro-fetch-using-websockets`](./using-websockets.md)
-- Pre-warming: [`nitro-fetch-websocket-prewarm`](./websocket-prewarm.md)
-- Inspector: [`nitro-fetch-network-inspector`](./network-inspector.md)
-- Source: [`packages/react-native-nitro-websockets/src/index.ts`](../../packages/react-native-nitro-websockets/src/index.ts)
+- API reference: [`using-websockets.md`](./using-websockets.md)
+- Pre-warming: [`websocket-prewarm.md`](./websocket-prewarm.md)
+- Inspector: [`network-inspector.md`](./network-inspector.md)
+- Source: [`packages/react-native-nitro-websockets/src/index.ts`](../../../packages/react-native-nitro-websockets/src/index.ts)
