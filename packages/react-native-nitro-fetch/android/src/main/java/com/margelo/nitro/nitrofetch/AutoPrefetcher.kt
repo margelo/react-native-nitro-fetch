@@ -2,6 +2,7 @@ package com.margelo.nitro.nitrofetch
 
 import android.app.Application
 import android.content.Context
+import android.webkit.CookieManager
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -151,8 +152,22 @@ object AutoPrefetcher {
       conn.doInput = true
       if (body != null) conn.doOutput = true
 
+      var hasCookieHeader = false
       reqHeaders?.keys()?.forEachRemaining { k ->
+        if (k.equals("Cookie", ignoreCase = true)) hasCookieHeader = true
         conn.setRequestProperty(k, reqHeaders.optString(k, ""))
+      }
+
+      if (!hasCookieHeader) {
+        try {
+          val jar = CookieManager.getInstance()
+          val cookieHeader = jar.getCookie(urlStr)
+          if (!cookieHeader.isNullOrEmpty()) {
+            conn.setRequestProperty("Cookie", cookieHeader)
+          }
+        } catch (_: Throwable) {
+          // Best-effort — CookieManager may not be initialized yet
+        }
       }
 
       if (body != null) {
@@ -160,7 +175,24 @@ object AutoPrefetcher {
       }
 
       val status = conn.responseCode
-      if (status !in 200..299) return null
+      if (status !in 200..299) {
+        android.util.Log.d("NitroFetch", "[TokenRefresh] Refresh endpoint returned HTTP $status")
+        return null
+      }
+
+      try {
+        val cookieManager = CookieManager.getInstance()
+        conn.headerFields?.forEach { (key, values) ->
+          if (key?.equals("Set-Cookie", ignoreCase = true) == true) {
+            values.forEach { cookieValue ->
+              cookieManager.setCookie(urlStr, cookieValue)
+            }
+          }
+        }
+        cookieManager.flush()
+      } catch (_: Throwable) {
+        // Best-effort — CookieManager may not be initialized yet
+      }
 
       val responseBody = conn.inputStream.use { it.bufferedReader(Charsets.UTF_8).readText() }
 
