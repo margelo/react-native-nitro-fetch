@@ -7,6 +7,13 @@ public final class NitroAutoPrefetcher: NSObject {
   private static let suiteName = "nitro_fetch_storage"
   private static let tokenRefreshKey = "nitro_token_refresh_fetch"
   private static let tokenCacheKey = "nitro_token_refresh_fetch_cache"
+  /// Plaintext outcome for debug / JS (`NativeStorage.getString`). Same key as `tokenRefresh.ts`.
+  private static let lastFetchTokenRefreshOutcomeKey = "nitro_token_refresh_fetch_last_outcome"
+
+  private static func setFetchTokenRefreshOutcome(_ value: String, defaults: UserDefaults) {
+    defaults.set(value, forKey: lastFetchTokenRefreshOutcomeKey)
+    defaults.synchronize()
+  }
 
   @objc
   public static func prefetchOnStart() {
@@ -14,7 +21,10 @@ public final class NitroAutoPrefetcher: NSObject {
     initialized = true
 
     let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
-    guard let raw = userDefaults.string(forKey: queueKey), !raw.isEmpty else { return }
+    guard let raw = userDefaults.string(forKey: queueKey), !raw.isEmpty else {
+      setFetchTokenRefreshOutcome("not_run", defaults: userDefaults)
+      return
+    }
     guard let data = raw.data(using: .utf8) else { return }
     guard let arr = try? JSONSerialization.jsonObject(with: data, options: []) as? [Any] else { return }
 
@@ -33,6 +43,7 @@ public final class NitroAutoPrefetcher: NSObject {
         let refreshed = try? await callTokenRefresh(config: refreshObj)
         if let refreshed = refreshed {
           print("[NitroFetch][TokenRefresh] ✅ Success — got \(refreshed.count) header(s)")
+          setFetchTokenRefreshOutcome("success", defaults: userDefaults)
           for (k, v) in refreshed { print("[NitroFetch][TokenRefresh]   \(k): \(v)") }
           // Cache fresh token headers for useStoredHeaders fallback on next cold start
           if let cacheData = try? JSONSerialization.data(withJSONObject: refreshed),
@@ -44,6 +55,7 @@ public final class NitroAutoPrefetcher: NSObject {
           print("[NitroFetch][TokenRefresh] ❌ Refresh failed — onFailure: \(onFailure)")
           if onFailure == "skip" {
             print("[NitroFetch][TokenRefresh] Skipping all prefetches")
+            setFetchTokenRefreshOutcome("failed_skip", defaults: userDefaults)
             return
           }
           var cached: [String: String] = [:]
@@ -54,9 +66,11 @@ public final class NitroAutoPrefetcher: NSObject {
             cached = cacheObj
           }
           print("[NitroFetch][TokenRefresh] Using cached headers (\(cached.count) header(s))")
+          setFetchTokenRefreshOutcome("failed_cache", defaults: userDefaults)
           tokenHeaders = cached
         }
       } else {
+        setFetchTokenRefreshOutcome("none", defaults: userDefaults)
         tokenHeaders = [:]
       }
 

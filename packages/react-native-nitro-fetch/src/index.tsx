@@ -22,6 +22,7 @@ export {
   clearTokenRefresh,
   callRefreshEndpoint,
   getStoredTokenRefreshConfig,
+  getFetchTokenRefreshLastOutcome,
   getNestedField,
   applyTemplate,
 } from './tokenRefresh';

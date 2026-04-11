@@ -5,6 +5,8 @@ const KEY_WS = 'nitro_token_refresh_websocket';
 const KEY_FETCH = 'nitro_token_refresh_fetch';
 const KEY_WS_CACHE = 'nitro_token_refresh_ws_cache';
 const KEY_FETCH_CACHE = 'nitro_token_refresh_fetch_cache';
+/** Plaintext; written by native cold-start autoprefetch (`NitroAutoPrefetcher` / `AutoPrefetcher`). */
+const KEY_FETCH_LAST_OUTCOME = 'nitro_token_refresh_fetch_last_outcome';
 
 type TokenRefreshTarget = 'websocket' | 'fetch' | 'all';
 
@@ -143,6 +145,11 @@ export function clearTokenRefresh(target?: TokenRefreshTarget): void {
   if (t === 'fetch' || t === 'all') {
     NativeStorageSingleton.removeSecureString(KEY_FETCH);
     NativeStorageSingleton.removeSecureString(KEY_FETCH_CACHE);
+    try {
+      NativeStorageSingleton.removeString(KEY_FETCH_LAST_OUTCOME);
+    } catch (_error) {
+      /* ignore */
+    }
   }
 }
 
@@ -156,5 +163,17 @@ export function getStoredTokenRefreshConfig(
     return JSON.parse(raw) as TokenRefreshConfig;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Outcome of the last native cold-start fetch token refresh (before JS runs).
+ * Values: `success` | `failed_skip` | `failed_cache` | `none` | `not_run` | `error` | `''` if unset.
+ */
+export function getFetchTokenRefreshLastOutcome(): string {
+  try {
+    return NativeStorageSingleton.getString(KEY_FETCH_LAST_OUTCOME).trim();
+  } catch (_error) {
+    return '';
   }
 }
