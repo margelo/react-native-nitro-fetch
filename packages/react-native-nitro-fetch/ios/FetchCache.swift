@@ -25,17 +25,13 @@ final class FetchCache {
   }
 
   static func complete(_ key: String, with result: Result<NitroResponse, Error>) {
-    var callbacks: [(Result<NitroResponse, Error>) -> Void] = []
-    queue.sync {
-      callbacks = pending[key] ?? []
-    }
     queue.async(flags: .barrier) {
-      pending.removeValue(forKey: key)
+      let callbacks = pending.removeValue(forKey: key) ?? []
       if case let .success(resp) = result {
         results[key] = CachedEntry(response: resp, timestampMs: Int64(Date().timeIntervalSince1970 * 1000))
       }
+      callbacks.forEach { $0(result) }
     }
-    callbacks.forEach { $0(result) }
   }
 
   static func getResultIfFresh(_ key: String, maxAgeMs: Int64) -> NitroResponse? {
