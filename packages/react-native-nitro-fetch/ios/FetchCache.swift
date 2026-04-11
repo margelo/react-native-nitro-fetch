@@ -40,13 +40,24 @@ final class FetchCache {
 
   static func getResultIfFresh(_ key: String, maxAgeMs: Int64) -> NitroResponse? {
     var out: NitroResponse?
+    var shouldEvict = false
     queue.sync {
       if let entry = results[key] {
         let age = Int64(Date().timeIntervalSince1970 * 1000) - entry.timestampMs
         if age <= maxAgeMs {
           out = entry.response
         } else {
-          results.removeValue(forKey: key)
+          shouldEvict = true
+        }
+      }
+    }
+    if shouldEvict {
+      queue.async(flags: .barrier) {
+        if let entry = results[key] {
+          let age = Int64(Date().timeIntervalSince1970 * 1000) - entry.timestampMs
+          if age > maxAgeMs {
+            results.removeValue(forKey: key)
+          }
         }
       }
     }
