@@ -170,7 +170,7 @@ object AutoPrefetcher {
         return null
       }
 
-      NitroCookieSync.storeSetCookieFromHttpURLConnection(urlStr, conn, flush = true)
+      NitroCookieSync.storeSetCookieFromHttpURLConnection(conn.url.toString(), conn, flush = true)
 
       val responseBody = conn.inputStream.use { it.bufferedReader(Charsets.UTF_8).readText() }
 
