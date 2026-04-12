@@ -3,7 +3,6 @@ package com.margelo.nitro.nitrofetch
 import android.net.Uri
 import android.os.Trace
 import android.util.Log
-import android.webkit.CookieManager
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.ArrayBuffer
@@ -49,25 +48,6 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
   }
 
   companion object {
-    private fun hasCookieHeader(request: NitroRequest): Boolean {
-      return request.headers?.any { it.key.equals("Cookie", ignoreCase = true) } == true
-    }
-
-    private fun storeResponseCookies(responseUrl: String, info: UrlResponseInfo) {
-      try {
-        val cookieManager = CookieManager.getInstance()
-        val setCookieHeaders = info.allHeadersAsList.filter {
-          it.key.equals("Set-Cookie", ignoreCase = true)
-        }
-        for (header in setCookieHeaders) {
-          cookieManager.setCookie(responseUrl, header.value)
-        }
-        cookieManager.flush()
-      } catch (exception: Exception) {
-        Log.w("NitroFetchClient", "Failed to store response cookies", exception)
-      }
-    }
-
     @JvmStatic
     fun fetch(
       req: NitroRequest,
@@ -104,10 +84,15 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         private val buffer = ByteBuffer.allocateDirect(16 * 1024)
         private val out = java.io.ByteArrayOutputStream()
         private var redirectStopped = false
+        /** True if a redirect response applied at least one `Set-Cookie` (in memory, not yet flushed). */
+        private var setCookieAppliedOnRedirect = false
 
         override fun onRedirectReceived(request: UrlRequest, info: UrlResponseInfo, newLocationUrl: String) {
           if (shouldFollowRedirects) {
-            storeResponseCookies(info.url, info)
+            // Apply Set-Cookie in-memory; flush once in onSucceeded (avoid flush per hop).
+            if (NitroCookieSync.storeSetCookieFromUrlResponseInfo(info.url, info, flush = false)) {
+              setCookieAppliedOnRedirect = true
+            }
             request.followRedirect()
           } else {
             // Return the redirect response as-is without following
@@ -152,7 +137,11 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
             Trace.endAsyncSection(traceLabel, traceCookie)
           }
           try {
-            storeResponseCookies(info.url, info)
+            val storedOnFinal =
+              NitroCookieSync.storeSetCookieFromUrlResponseInfo(info.url, info, flush = false)
+            if (storedOnFinal || setCookieAppliedOnRedirect) {
+              NitroCookieSync.flushCookieManager()
+            }
             val headersArr: Array<NitroHeader> =
               info.allHeadersAsList.map { NitroHeader(it.key, it.value) }.toTypedArray()
             val status = info.httpStatusCode
@@ -206,17 +195,10 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       builder.setHttpMethod(method)
       req.headers?.forEach { (k, v) -> builder.addHeader(k, v) }
 
-      if (!hasCookieHeader(req)) {
-        try {
-          val cookieManager = CookieManager.getInstance()
-          val cookie = cookieManager.getCookie(url)
-          if (!cookie.isNullOrEmpty()) {
-            builder.addHeader("Cookie", cookie)
-          }
-        } catch (exception: Exception) {
-          Log.w("NitroFetchClient", "Failed to attach cookie header", exception)
-        }
-      }
+      NitroCookieSync.attachCookieFromManagerIfMissing(
+        url,
+        NitroCookieSync.hasCookieHeaderInNitroRequest(req.headers)
+      ) { key, value -> builder.addHeader(key, value) }
 
       val formParts = req.bodyFormData
       if (formParts != null && formParts.isNotEmpty()) {
