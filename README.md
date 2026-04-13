@@ -276,7 +276,7 @@ export function StreamingExample() {
 
   const runStream = async () => {
     // `stream: true` enables the streaming transport
-    const res = await nitrofetch('https://httpbin.org/stream/20', {
+    const res = await nitroFetch('https://httpbin.org/stream/20', {
       stream: true,
     })
 
@@ -327,10 +327,6 @@ On **Android**, call `NitroWebSocketAutoPrewarmer.prewarmOnStart(this)` in `Appl
 Authenticated prewarms: use **`registerTokenRefresh`** with `target: 'websocket'` or `'all'` — see [Token refresh (cold start)](#token-refresh-cold-start) for a **small `registerTokenRefresh` + `prewarmOnAppStart` + `NitroWebSocket` example**.
 
 More detail: **[docs/websockets.md](docs/websockets.md)** · UI sample: **[example/src/screens/WebSocketScreen.tsx](example/src/screens/WebSocketScreen.tsx)**.
-
-## Project Status
-
-Nitro Fetch is currently in an alpha stage. You can adopt it in production, but keep in mind that the library and it's API is subject to change.
 
 ## Limitations & Alternatives
 
