@@ -362,6 +362,7 @@ We build fast and beautiful apps. Contact us at [margelo.com](https://margelo.co
 - [Alex Shumihin](https://github.com/pioner92)
 - [Ronald Goedeke](https://github.com/ronickg)
 - [Marc Rousavy](https://github.com/mrousavy)
+- [Ritesh Shukla](https://github.com/riteshshukla04)
 
 ## License
 
