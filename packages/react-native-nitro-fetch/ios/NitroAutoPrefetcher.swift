@@ -7,6 +7,13 @@ public final class NitroAutoPrefetcher: NSObject {
   private static let suiteName = "nitro_fetch_storage"
   private static let tokenRefreshKey = "nitro_token_refresh_fetch"
   private static let tokenCacheKey = "nitro_token_refresh_fetch_cache"
+  /// Plaintext outcome for debug / JS (`NativeStorage.getString`). Same key as `tokenRefresh.ts`.
+  private static let lastFetchTokenRefreshOutcomeKey = "nitro_token_refresh_fetch_last_outcome"
+
+  private static func setFetchTokenRefreshOutcome(_ value: String, defaults: UserDefaults) {
+    defaults.set(value, forKey: lastFetchTokenRefreshOutcomeKey)
+    defaults.synchronize()
+  }
 
   @objc
   public static func prefetchOnStart() {
@@ -14,7 +21,10 @@ public final class NitroAutoPrefetcher: NSObject {
     initialized = true
 
     let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
-    guard let raw = userDefaults.string(forKey: queueKey), !raw.isEmpty else { return }
+    guard let raw = userDefaults.string(forKey: queueKey), !raw.isEmpty else {
+      setFetchTokenRefreshOutcome("not_run", defaults: userDefaults)
+      return
+    }
     guard let data = raw.data(using: .utf8) else { return }
     guard let arr = try? JSONSerialization.jsonObject(with: data, options: []) as? [Any] else { return }
 
@@ -28,12 +38,9 @@ public final class NitroAutoPrefetcher: NSObject {
          let refreshData = refreshRaw.data(using: .utf8),
          let refreshObj = try? JSONSerialization.jsonObject(with: refreshData) as? [String: Any] {
         let onFailure = refreshObj["onFailure"] as? String ?? "useStoredHeaders"
-        let refreshURL = refreshObj["url"] as? String ?? "(unknown)"
-        print("[NitroFetch][TokenRefresh] Calling refresh endpoint: \(refreshURL)")
         let refreshed = try? await callTokenRefresh(config: refreshObj)
         if let refreshed = refreshed {
-          print("[NitroFetch][TokenRefresh] ✅ Success — got \(refreshed.count) header(s)")
-          for (k, v) in refreshed { print("[NitroFetch][TokenRefresh]   \(k): \(v)") }
+          setFetchTokenRefreshOutcome("success", defaults: userDefaults)
           // Cache fresh token headers for useStoredHeaders fallback on next cold start
           if let cacheData = try? JSONSerialization.data(withJSONObject: refreshed),
              let cacheStr = String(data: cacheData, encoding: .utf8) {
@@ -41,9 +48,8 @@ public final class NitroAutoPrefetcher: NSObject {
           }
           tokenHeaders = refreshed
         } else {
-          print("[NitroFetch][TokenRefresh] ❌ Refresh failed — onFailure: \(onFailure)")
           if onFailure == "skip" {
-            print("[NitroFetch][TokenRefresh] Skipping all prefetches")
+            setFetchTokenRefreshOutcome("failed_skip", defaults: userDefaults)
             return
           }
           var cached: [String: String] = [:]
@@ -53,18 +59,18 @@ public final class NitroAutoPrefetcher: NSObject {
              let cacheObj = try? JSONSerialization.jsonObject(with: cacheData) as? [String: String] {
             cached = cacheObj
           }
-          print("[NitroFetch][TokenRefresh] Using cached headers (\(cached.count) header(s))")
+          setFetchTokenRefreshOutcome("failed_cache", defaults: userDefaults)
           tokenHeaders = cached
         }
       } else {
+        setFetchTokenRefreshOutcome("none", defaults: userDefaults)
         tokenHeaders = [:]
       }
 
       // Launch a prefetch task per entry with merged headers
-      print("[NitroFetch][TokenRefresh] Injecting token headers into \(arr.count) prefetch URL(s)")
       for item in arr {
         guard let obj = item as? [String: Any] else { continue }
-        guard let url = obj["url"] as? String, !url.isEmpty else { continue }
+        guard let url = obj["url"] as? String, !url.isEmpty, URL(string: url) != nil else { continue }
         guard let prefetchKey = obj["prefetchKey"] as? String, !prefetchKey.isEmpty else { continue }
         let headersDict = (obj["headers"] as? [String: Any]) ?? [:]
 
@@ -76,9 +82,6 @@ public final class NitroAutoPrefetcher: NSObject {
         var headers: [NitroHeader] = merged.map { NitroHeader(key: $0.key, value: $0.value) }
         headers.append(NitroHeader(key: "prefetchKey", value: prefetchKey))
 
-        print("[NitroFetch][TokenRefresh] Prefetching \(url) with \(merged.count) header(s)")
-        for (k, v) in merged { print("[NitroFetch][TokenRefresh]   \(k): \(v)") }
-
         let req = NitroRequest(
           url: url,
           method: nil,
@@ -86,7 +89,7 @@ public final class NitroAutoPrefetcher: NSObject {
           bodyString: nil,
           bodyBytes: nil,
           bodyFormData: nil,
-          timeoutMs: nil,
+          timeoutMs: 15_000,
           followRedirects: true,
           requestId: nil
         )

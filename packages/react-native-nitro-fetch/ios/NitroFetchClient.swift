@@ -93,13 +93,25 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     return promise
   }
   
-  // Shared URLSession for static operations
+  // Main URLSession for JS-initiated requests — must never be blocked by prefetch traffic.
   private static let session: URLSession = {
     let config = URLSessionConfiguration.default
     config.requestCachePolicy = .useProtocolCachePolicy
     config.urlCache = URLCache(memoryCapacity: 32 * 1024 * 1024,
                                diskCapacity: 100 * 1024 * 1024,
                                diskPath: "nitrofetch_urlcache")
+    return URLSession(configuration: config)
+  }()
+
+  // Isolated session for native autoprefetch so slow/stale prefetch requests never saturate
+  // the connection pool of the main session and block JS-initiated fetch() calls.
+  private static let prefetchSession: URLSession = {
+    let config = URLSessionConfiguration.default
+    config.requestCachePolicy = .useProtocolCachePolicy
+    config.timeoutIntervalForRequest = 15
+    config.urlCache = URLCache(memoryCapacity: 8 * 1024 * 1024,
+                               diskCapacity: 32 * 1024 * 1024,
+                               diskPath: "nitrofetch_prefetch_urlcache")
     return URLSession(configuration: config)
   }()
 
@@ -132,30 +144,9 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
                              bodyBytes: cached.bodyBytes)
       }
 
-      // If a prefetch is already pending, await and reuse its result
-      if FetchCache.getPending(key) {
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<NitroResponse, Error>) in
-          FetchCache.addPending(key) { result in
-            switch result {
-            case .success(let res):
-              // Mirror Android: mark response as coming from prefetch
-              var headers = res.headers ?? []
-              headers.append(NitroHeader(key: "nitroPrefetched", value: "true"))
-              let wrapped = NitroResponse(url: res.url,
-                                          status: res.status,
-                                          statusText: res.statusText,
-                                          ok: res.ok,
-                                          redirected: res.redirected,
-                                          headers: headers,
-                                          bodyString: res.bodyString,
-                                          bodyBytes: res.bodyBytes)
-              continuation.resume(returning: wrapped)
-            case .failure(let err):
-              continuation.resume(throwing: err)
-            }
-          }
-        }
-      }
+      // A prefetch may still be in-flight on the isolated prefetchSession.
+      // Do NOT block — fall through and make a fresh request on the main session.
+      // If the prefetch completes later its result is cached for future callers.
     }
 
     let (urlRequest, finalURL) = try await buildURLRequest(req)
@@ -205,6 +196,8 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     return res
   }
 
+  private static let prefetchTimeoutSeconds: TimeInterval = 15
+
   public class func prefetchStatic(_ req: NitroRequest) async throws {
     guard let key = findPrefetchKey(req) else {
       throw NSError(domain: "NitroFetch", code: -2, userInfo: [NSLocalizedDescriptionKey: "prefetch: missing 'prefetchKey' header"])
@@ -218,12 +211,12 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       return // already pending
     }
 
-    // Mark pending and start the request
+    // Mark pending and start the request on the isolated prefetch session.
     FetchCache.addPending(key) { _ in /* ignored here */ }
     Task.detached {
       do {
         let (urlRequest, finalURL) = try await buildURLRequest(req)
-        let (data, response) = try await session.data(for: urlRequest)
+        let (data, response) = try await prefetchSession.data(for: urlRequest)
         guard let http = response as? HTTPURLResponse else {
           throw NSError(domain: "NitroFetch", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
         }
@@ -254,6 +247,8 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     return req.method?.stringValue
   }
 
+  private static let defaultRequestTimeoutSeconds: TimeInterval = 30
+
   private static func buildURLRequest(_ req: NitroRequest) async throws -> (URLRequest, URL?) {
     guard let url = URL(string: req.url) else {
       throw NSError(domain: "NitroFetch", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid URL: \(req.url)"])
@@ -270,7 +265,11 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     } else if let s = req.bodyString {
       r.httpBody = s.data(using: .utf8)
     }
-    if let t = req.timeoutMs, t > 0 { r.timeoutInterval = TimeInterval(t) / 1000.0 }
+    if let t = req.timeoutMs, t > 0 {
+      r.timeoutInterval = TimeInterval(t) / 1000.0
+    } else {
+      r.timeoutInterval = defaultRequestTimeoutSeconds
+    }
     return (r, nil)
   }
 
