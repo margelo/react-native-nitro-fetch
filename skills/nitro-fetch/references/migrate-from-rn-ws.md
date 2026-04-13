@@ -48,7 +48,7 @@ For more on the new API surface, see [`using-websockets.md`](./using-websockets.
 
 ### 1. Replace `new WebSocket(...)` with `new NitroWebSocket(...)` at the call sites
 
-> **Don't swap `globalThis.WebSocket`.** Monkey-patching the global breaks devtools, hot reload, and libraries that do `instanceof WebSocket` or re-enter the polyfill from native. It also hides which code paths are actually using the nitro implementation. Migrate by touching the real call sites — grep is your friend.
+> **Prefer explicit imports** at the call site — it's safer and easier to debug. If you want a global swap instead (`globalThis.WebSocket = NitroWebSocket`), see the [Global Replace docs](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace) for setup and trade-offs.
 
 ```ts
 // before
@@ -204,7 +204,7 @@ const socket = io('wss://example.com', {
 });
 ```
 
-Libraries that *don't* accept an injection and hard-code `new WebSocket(...)` internally will keep using React Native's built-in WebSocket. That's acceptable — the apps you own still get native TLS, headers, pre-warming, and the inspector on the call sites you migrated. Don't be tempted to monkey-patch the global just to reach the last 5%.
+Libraries that *don't* accept an injection and hard-code `new WebSocket(...)` internally will keep using React Native's built-in WebSocket. You can either accept that, or do a [global replace](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace) to route everything through NitroWebSocket — just be aware of the trade-offs documented there.
 
 ## Checklist
 
@@ -219,7 +219,7 @@ Libraries that *don't* accept an injection and hard-code `new WebSocket(...)` in
 
 ## Gotchas
 
-- **Don't swap `globalThis.WebSocket`.** Breaks devtools, hot reload, and any library that does `instanceof WebSocket` checks or re-enters the polyfill from native bridges. Always migrate at the call site.
+- **Global swap is an option, but has trade-offs.** See the [Global Replace docs](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace) — DevTools, `instanceof`, and hot-reload caveats apply. Prefer explicit imports when possible.
 - **Forgetting that `e.binaryData` is `undefined` for text frames.** Always check `e.isBinary` first.
 - **Sending a `Blob`.** TypeScript may not catch it; runtime will. Convert first.
 - **`NitroWebSocket.OPEN`.** Doesn't exist. Use the string `'OPEN'`.
