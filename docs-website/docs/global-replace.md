@@ -24,16 +24,6 @@ globalThis.Response = Response;
 
 That's it — every `fetch()` call in the process now uses the Nitro implementation.
 
-:::caution Trade-offs
-Swapping globals is convenient but comes with caveats:
-
-- **DevTools / Flipper** network inspectors hook into the built-in `fetch` — they won't see requests after the swap. Use the [Network Inspector](./inspection.md) instead.
-- **`instanceof` checks** in third-party code (e.g. `response instanceof Response`) may fail if the library captured the original `Response` before your shim ran.
-- **Hot-reload** can re-run your entry file and double-patch the global — generally harmless but worth knowing.
-
-If any of these are a problem, prefer the explicit import approach instead.
-:::
-
 ## WebSocket
 
 The same pattern works for the WebSocket package:
@@ -57,3 +47,44 @@ const socket = io('https://example.com', {
 });
 ```
 :::
+
+## Axios
+
+If you use [axios](https://axios-http.com), you can route all requests through Nitro via a custom adapter:
+
+```ts
+import axios, { AxiosAdapter, AxiosHeaders } from 'axios';
+import { fetch } from 'react-native-nitro-fetch';
+
+const nitroAxiosAdapter: AxiosAdapter = async (config) => {
+  const url = buildURL(config);
+  const res = await fetch(url, {
+    method: (config.method ?? 'get').toUpperCase(),
+    headers: AxiosHeaders.from(config.headers as any).toJSON() as Record<string, string>,
+    body: config.data,
+    signal: config.signal,
+  });
+
+  const headers = new AxiosHeaders();
+  res.headers.forEach((v, k) => headers.set(k, v));
+  const data = config.responseType === 'arraybuffer' ? await res.arrayBuffer()
+    : config.responseType === 'blob' ? await res.blob()
+    : config.responseType === 'text' ? await res.text()
+    : await res.json().catch(() => null);
+
+  return { data, status: res.status, statusText: res.statusText, headers, config, request: null };
+};
+
+function buildURL(config: any): string {
+  let url = config.url ?? '';
+  if (config.baseURL && !/^https?:\/\//i.test(url))
+    url = config.baseURL.replace(/\/+$/, '') + '/' + url.replace(/^\/+/, '');
+  if (config.params) {
+    const qs = new URLSearchParams(config.params).toString();
+    if (qs) url += (url.includes('?') ? '&' : '?') + qs;
+  }
+  return url;
+}
+
+export const api = axios.create({ adapter: nitroAxiosAdapter });
+```

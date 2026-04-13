@@ -48,7 +48,7 @@ For more on the new API surface, see [`using-websockets.md`](./using-websockets.
 
 ### 1. Replace `new WebSocket(...)` with `new NitroWebSocket(...)` at the call sites
 
-> **Prefer explicit imports** at the call site — it's safer and easier to debug. If you want a global swap instead (`globalThis.WebSocket = NitroWebSocket`), see the [Global Replace docs](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace) for setup and trade-offs.
+> You can also do a global swap (`globalThis.WebSocket = NitroWebSocket`) — see the [Global Replace docs](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace).
 
 ```ts
 // before
@@ -204,7 +204,7 @@ const socket = io('wss://example.com', {
 });
 ```
 
-Libraries that *don't* accept an injection and hard-code `new WebSocket(...)` internally will keep using React Native's built-in WebSocket. You can either accept that, or do a [global replace](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace) to route everything through NitroWebSocket — just be aware of the trade-offs documented there.
+Libraries that *don't* accept an injection and hard-code `new WebSocket(...)` internally will keep using React Native's built-in WebSocket. You can do a [global replace](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace) to route everything through NitroWebSocket.
 
 ## Checklist
 
@@ -219,7 +219,7 @@ Libraries that *don't* accept an injection and hard-code `new WebSocket(...)` in
 
 ## Gotchas
 
-- **Global swap is an option, but has trade-offs.** See the [Global Replace docs](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace) — DevTools, `instanceof`, and hot-reload caveats apply. Prefer explicit imports when possible.
+- **Global swap** is also supported — see the [Global Replace docs](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace).
 - **Forgetting that `e.binaryData` is `undefined` for text frames.** Always check `e.isBinary` first.
 - **Sending a `Blob`.** TypeScript may not catch it; runtime will. Convert first.
 - **`NitroWebSocket.OPEN`.** Doesn't exist. Use the string `'OPEN'`.

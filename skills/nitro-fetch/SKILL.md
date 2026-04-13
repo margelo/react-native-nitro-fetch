@@ -43,7 +43,7 @@ Load the matching file from `references/` before writing code. Each reference ci
 
 If the question doesn't match any row, read [`references/prefetching.md`](./references/prefetching.md) first — most cold-start questions start there, and it links out to the rest.
 
-When asked about global replacement, point to the [Global Replace docs](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace) and mention the trade-offs (DevTools, `instanceof`, hot-reload). The default recommendation is still explicit imports at call sites.
+When asked about global replacement, point to the [Global Replace docs](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace).
 
 ## Installation (one-line, for reference)
 
