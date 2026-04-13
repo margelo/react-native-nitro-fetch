@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "react-native-nitro-fetch-monorepo",
@@ -71,7 +72,7 @@
     },
     "packages/react-native-nitro-fetch": {
       "name": "react-native-nitro-fetch",
-      "version": "0.3.0",
+      "version": "1.0.1",
       "dependencies": {
         "web-streams-polyfill": "^4.2.0",
       },
@@ -110,6 +111,9 @@
         "react-native-nitro-modules": "^0.35.2",
         "react-native-worklets": "^0.8.0",
       },
+      "optionalPeers": [
+        "react-native-worklets",
+      ],
     },
     "packages/react-native-nitro-text-decoder": {
       "name": "react-native-nitro-text-decoder",
@@ -140,7 +144,7 @@
     },
     "packages/react-native-nitro-websockets": {
       "name": "react-native-nitro-websockets",
-      "version": "0.1.0",
+      "version": "1.0.2",
       "devDependencies": {
         "@expo/config-plugins": "^9.0.0",
         "@react-native/eslint-config": "^0.85.0-rc.0",

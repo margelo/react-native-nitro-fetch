@@ -103,7 +103,7 @@
     "react-native-worklets": "^0.8.0"
   },
   "peerDependenciesMeta": {
-    "react-native-worklets-core": {
+    "react-native-worklets": {
       "optional": true
     }
   },
