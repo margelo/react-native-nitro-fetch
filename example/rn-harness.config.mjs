@@ -14,7 +14,7 @@ const config = {
   runners: [
     androidPlatform({
       name: 'android',
-      device: androidEmulator('Pixel_8_API_35'), // Your Android emulator name
+      device: androidEmulator('Pixel_6_Pro'), // Your Android emulator name
       bundleId: 'nitrofetch.example', // Your Android bundle ID
     }),
     applePlatform({
