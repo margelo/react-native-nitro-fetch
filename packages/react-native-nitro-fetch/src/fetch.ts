@@ -808,7 +808,8 @@ export async function removeAllFromAutoprefetch(): Promise<void> {
   NativeStorageSingleton.setString(KEY, JSON.stringify([]));
 }
 
-// Optional off-thread processing using react-native-worklets-core
+// Optional off-thread processing using react-native-worklets
+
 export type NitroWorkletMapper<T> = (payload: {
   url: string;
   status: number;
@@ -827,7 +828,7 @@ function ensureWorkletRuntime(name = 'nitro-fetch'): any | undefined {
     nitroRuntime = nitroRuntime ?? createWorkletRuntime(name);
     return nitroRuntime;
   } catch {
-    console.warn('react-native-worklets-core not available');
+    console.warn('react-native-worklets not available');
     return undefined;
   }
 }
