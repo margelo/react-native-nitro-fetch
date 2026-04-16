@@ -47,7 +47,9 @@
     "prepare": "bob build",
     "build:plugin": "cd expo/plugins && npx tsc",
     "nitrogen": "nitrogen",
-    "release": "npm run build:plugin && release-it --only-version"
+    "release": "npm run build:plugin && release-it --only-version",
+    "prepack": "cp ../../README.md ./README.md",
+    "postpack": "rm -f ./README.md"
   },
   "keywords": [
     "react-native",

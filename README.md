@@ -1,8 +1,8 @@
 <a href="https://margelo.com">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./assets/banner-dark.png" />
-    <source media="(prefers-color-scheme: light)" srcset="./assets/banner-light.png" />
-    <img alt="Nitro Modules" src="./assets/banner-light.png" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/margelo/react-native-nitro-fetch/main/assets/banner-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/margelo/react-native-nitro-fetch/main/assets/banner-light.png" />
+    <img alt="Nitro Modules" src="https://raw.githubusercontent.com/margelo/react-native-nitro-fetch/main/assets/banner-light.png" />
   </picture>
 </a>
 

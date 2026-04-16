@@ -35,7 +35,9 @@
     "lint-ci": "eslint \"**/*.{js,ts,tsx}\" -f @jamesacarr/github-actions",
     "typescript": "tsc",
     "specs": "tsc --noEmit false && nitrogen --logLevel=\"debug\"",
-    "release": "release-it --only-version"
+    "release": "release-it --only-version",
+    "prepack": "cp ../../README.md ./README.md",
+    "postpack": "rm -f ./README.md"
   },
   "keywords": [
     "react-native",
