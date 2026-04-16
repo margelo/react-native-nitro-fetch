@@ -38,7 +38,7 @@ export class NitroRequest {
   readonly referrerPolicy: ReferrerPolicy;
   readonly integrity: string;
   readonly keepalive: boolean;
-  readonly destination: string;
+  readonly destination: RequestDestination;
 
   private _body: BodyInit | null;
   private _bodyUsed: boolean = false;
@@ -128,11 +128,11 @@ export class NitroRequest {
     return this._bodyUsed;
   }
 
-  get body(): ReadableStream<Uint8Array> | null {
+  get body(): ReadableStream<Uint8Array<ArrayBuffer>> | null {
     if (this._body == null) return null;
     const bodyBytes = this._getBodyBytes();
     if (!bodyBytes) return null;
-    return new ReadableStream<Uint8Array>({
+    return new ReadableStream<Uint8Array<ArrayBuffer>>({
       start(controller) {
         controller.enqueue(new Uint8Array(bodyBytes));
         controller.close();
@@ -201,7 +201,7 @@ export class NitroRequest {
     return new Blob([buffer], { type: contentType });
   }
 
-  async bytes(): Promise<Uint8Array> {
+  async bytes(): Promise<Uint8Array<ArrayBuffer>> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
     const buffer = this._getBodyBytes() ?? new ArrayBuffer(0);

@@ -374,6 +374,26 @@ function createAbortError(): Error {
   return err;
 }
 
+async function resolveRequestBody(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined
+): Promise<RequestInit | undefined> {
+  if (typeof input === 'string' || input instanceof URL) return init;
+  if (input instanceof NitroRequestClass) return init;
+  if (init?.body != null) return init;
+  const req = input as Request;
+  if (typeof req.clone !== 'function') return init;
+  const method = (init?.method ?? req.method ?? 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD') return init;
+  try {
+    const text = await req.clone().text();
+    if (text.length === 0) return init;
+    return { ...(init ?? {}), body: text };
+  } catch {
+    return init;
+  }
+}
+
 async function resolveBlobBody(
   init: RequestInit | undefined
 ): Promise<RequestInit | undefined> {
@@ -414,6 +434,8 @@ async function nitroFetchRaw(
     throw createAbortError();
   }
 
+  // Extract body from standard Request when init.body is absent (ky/undici pattern)
+  init = await resolveRequestBody(input, init);
   // Resolve Blob body to string before passing to sync buildNitroRequest
   init = await resolveBlobBody(init);
 
@@ -543,9 +565,11 @@ async function nitroStreamFetch(
   }
 
   return new Promise((resolveResponse, rejectResponse) => {
-    let streamController: ReadableStreamDefaultController<Uint8Array>;
+    let streamController: ReadableStreamDefaultController<
+      Uint8Array<ArrayBuffer>
+    >;
 
-    const stream = new ReadableStream<Uint8Array>({
+    const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
       start(controller) {
         streamController = controller;
       },
