@@ -18,8 +18,8 @@ const _origResponse = globalThis.Response;
 
 globalThis.fetch = nitroFetch;
 globalThis.Headers = NitroHeaders;
-globalThis.Request = NitroRequest as unknown as typeof Request;
-globalThis.Response = NitroResponse as unknown as typeof Response;
+globalThis.Request = NitroRequest;
+globalThis.Response = NitroResponse;
 
 // ---------------------------------------------------------------------------
 // Headers - forEach thisArg support

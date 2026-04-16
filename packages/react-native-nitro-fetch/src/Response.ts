@@ -19,23 +19,8 @@ export interface NitroResponseInit {
   headers: NitroHeader[] | NitroHeaders;
   bodyBytes?: ArrayBuffer;
   bodyString?: string;
-  body?: ReadableStream<Uint8Array>;
+  body?: ReadableStream<Uint8Array<ArrayBuffer>>;
   type?: ResponseType;
-}
-
-export type BodyInit =
-  | string
-  | Blob
-  | ArrayBuffer
-  | ArrayBufferView
-  | ReadableStream<Uint8Array>
-  | URLSearchParams
-  | null;
-
-export interface ResponseInit {
-  status?: number;
-  statusText?: string;
-  headers?: HeadersInit;
 }
 
 function isNitroResponseInit(arg: any): arg is NitroResponseInit {
@@ -59,7 +44,7 @@ export class NitroResponse {
 
   private _bodyBytes: ArrayBuffer | undefined;
   private _bodyString: string | undefined;
-  private _bodyStream: ReadableStream<Uint8Array> | undefined;
+  private _bodyStream: ReadableStream<Uint8Array<ArrayBuffer>> | undefined;
   private _bodyUsed: boolean = false;
 
   constructor(body?: BodyInit | null, init?: ResponseInit);
@@ -130,7 +115,7 @@ export class NitroResponse {
         // Store as string — RN Blobs are string-backed
         this._bodyString = '';
         this._bodyStream = body.stream?.() as
-          | ReadableStream<Uint8Array>
+          | ReadableStream<Uint8Array<ArrayBuffer>>
           | undefined;
       }
     }
@@ -140,11 +125,11 @@ export class NitroResponse {
     return this._bodyUsed;
   }
 
-  get body(): ReadableStream<Uint8Array> | null {
+  get body(): ReadableStream<Uint8Array<ArrayBuffer>> | null {
     if (this._bodyStream) return this._bodyStream;
     const bytes = this._getBodyBytes();
     if (!bytes) return null;
-    return new ReadableStream<Uint8Array>({
+    return new ReadableStream<Uint8Array<ArrayBuffer>>({
       start(controller) {
         controller.enqueue(new Uint8Array(bytes));
         controller.close();
@@ -248,7 +233,7 @@ export class NitroResponse {
     return new Blob([bodyStr], { type: contentType });
   }
 
-  async bytes(): Promise<Uint8Array> {
+  async bytes(): Promise<Uint8Array<ArrayBuffer>> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
     const buffer = this._getBodyBytes() ?? new ArrayBuffer(0);
