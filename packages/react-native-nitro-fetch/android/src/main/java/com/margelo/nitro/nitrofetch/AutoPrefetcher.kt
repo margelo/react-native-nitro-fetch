@@ -14,7 +14,13 @@ object AutoPrefetcher {
   private const val KEY_QUEUE = "nitrofetch_autoprefetch_queue"
   private const val KEY_TOKEN_REFRESH = "nitro_token_refresh_fetch"
   private const val KEY_TOKEN_CACHE = "nitro_token_refresh_fetch_cache"
+  /** Plaintext outcome for debug / JS — same key as `tokenRefresh.ts` */
+  private const val KEY_LAST_FETCH_TOKEN_REFRESH_OUTCOME = "nitro_token_refresh_fetch_last_outcome"
   private const val PREFS_NAME = NitroFetchSecureAtRest.PREFS_NAME
+
+  private fun setFetchTokenRefreshOutcome(prefs: android.content.SharedPreferences, value: String) {
+    prefs.edit().putString(KEY_LAST_FETCH_TOKEN_REFRESH_OUTCOME, value).apply()
+  }
 
   fun prefetchOnStart(app: Application) {
     if (initialized) return
@@ -22,7 +28,10 @@ object AutoPrefetcher {
     try {
       val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
       val raw = prefs.getString(KEY_QUEUE, null) ?: ""
-      if (raw.isEmpty()) return
+      if (raw.isEmpty()) {
+        setFetchTokenRefreshOutcome(prefs, "not_run")
+        return
+      }
       val arr = JSONArray(raw)
 
       val refreshRaw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_REFRESH)
@@ -40,7 +49,7 @@ object AutoPrefetcher {
 
             val tokenHeaders: Map<String, String> = if (refreshed != null) {
               android.util.Log.d("NitroFetch", "[TokenRefresh] ✅ Success — got ${refreshed.size} header(s)")
-              refreshed.forEach { (k, v) -> android.util.Log.d("NitroFetch", "[TokenRefresh]   $k: $v") }
+              setFetchTokenRefreshOutcome(prefs, "success")
               // Cache fresh token headers for useStoredHeaders fallback on next cold start
               val cacheJson = JSONObject()
               refreshed.forEach { (k, v) -> cacheJson.put(k, v) }
@@ -50,6 +59,7 @@ object AutoPrefetcher {
               android.util.Log.d("NitroFetch", "[TokenRefresh] ❌ Refresh failed — onFailure: $onFailure")
               if (onFailure == "skip") {
                 android.util.Log.d("NitroFetch", "[TokenRefresh] Skipping all prefetches")
+                setFetchTokenRefreshOutcome(prefs, "failed_skip")
                 return@Thread
               }
               // Use last cached token headers (or empty map if none cached yet)
@@ -63,16 +73,19 @@ object AutoPrefetcher {
                 emptyMap()
               }
               android.util.Log.d("NitroFetch", "[TokenRefresh] Using cached headers (${cached.size} header(s))")
+              setFetchTokenRefreshOutcome(prefs, "failed_cache")
               cached
             }
 
             android.util.Log.d("NitroFetch", "[TokenRefresh] Injecting token headers into ${arr.length()} prefetch URL(s)")
             startPrefetches(arr, tokenHeaders)
           } catch (_: Throwable) {
+            setFetchTokenRefreshOutcome(prefs, "error")
             // Best-effort — never crash the app
           }
         }.start()
       } else {
+        setFetchTokenRefreshOutcome(prefs, "none")
         // No token refresh config — proceed on current thread (Cronet is async)
         startPrefetches(arr, emptyMap())
       }
@@ -155,12 +168,22 @@ object AutoPrefetcher {
         conn.setRequestProperty(k, reqHeaders.optString(k, ""))
       }
 
+      NitroCookieSync.attachCookieFromManagerIfMissing(
+        urlStr,
+        NitroCookieSync.hasCookieHeaderInJson(reqHeaders)
+      ) { key, value -> conn.setRequestProperty(key, value) }
+
       if (body != null) {
         conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
       }
 
       val status = conn.responseCode
-      if (status !in 200..299) return null
+      if (status !in 200..299) {
+        android.util.Log.d("NitroFetch", "[TokenRefresh] Refresh endpoint returned HTTP $status")
+        return null
+      }
+
+      NitroCookieSync.storeSetCookieFromHttpURLConnection(urlStr, conn, flush = true)
 
       val responseBody = conn.inputStream.use { it.bufferedReader(Charsets.UTF_8).readText() }
 
