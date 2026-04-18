@@ -1,6 +1,5 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "react-native-nitro-fetch-monorepo",
@@ -72,7 +71,7 @@
     },
     "packages/react-native-nitro-fetch": {
       "name": "react-native-nitro-fetch",
-      "version": "1.0.1",
+      "version": "1.0.3",
       "dependencies": {
         "web-streams-polyfill": "^4.2.0",
       },
@@ -144,7 +143,7 @@
     },
     "packages/react-native-nitro-websockets": {
       "name": "react-native-nitro-websockets",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "devDependencies": {
         "@expo/config-plugins": "^9.0.0",
         "@react-native/eslint-config": "^0.85.0-rc.0",
