@@ -38,6 +38,8 @@
  public:
    // Methods - typed version (required by base class)
    std::string decode(const std::optional<std::shared_ptr<ArrayBuffer>> &input,
+                      std::optional<double> byteOffset,
+                      std::optional<double> byteLength,
                       const std::optional<TextDecodeOptions> &options) override;
  
  private:
