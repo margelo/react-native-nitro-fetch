@@ -84,9 +84,15 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         private val buffer = ByteBuffer.allocateDirect(16 * 1024)
         private val out = java.io.ByteArrayOutputStream()
         private var redirectStopped = false
+        /** True if a redirect response applied at least one `Set-Cookie` (in memory, not yet flushed). */
+        private var setCookieAppliedOnRedirect = false
 
         override fun onRedirectReceived(request: UrlRequest, info: UrlResponseInfo, newLocationUrl: String) {
           if (shouldFollowRedirects) {
+            // Apply Set-Cookie in-memory; flush once in onSucceeded (avoid flush per hop).
+            if (NitroCookieSync.storeSetCookieFromUrlResponseInfo(info.url, info, flush = false)) {
+              setCookieAppliedOnRedirect = true
+            }
             request.followRedirect()
           } else {
             // Return the redirect response as-is without following
@@ -131,6 +137,11 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
             Trace.endAsyncSection(traceLabel, traceCookie)
           }
           try {
+            val storedOnFinal =
+              NitroCookieSync.storeSetCookieFromUrlResponseInfo(info.url, info, flush = false)
+            if (storedOnFinal || setCookieAppliedOnRedirect) {
+              NitroCookieSync.flushCookieManager()
+            }
             val headersArr: Array<NitroHeader> =
               info.allHeadersAsList.map { NitroHeader(it.key, it.value) }.toTypedArray()
             val status = info.httpStatusCode
@@ -183,6 +194,11 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       val method = req.method?.name ?: "GET"
       builder.setHttpMethod(method)
       req.headers?.forEach { (k, v) -> builder.addHeader(k, v) }
+
+      NitroCookieSync.attachCookieFromManagerIfMissing(
+        url,
+        NitroCookieSync.hasCookieHeaderInNitroRequest(req.headers)
+      ) { key, value -> builder.addHeader(key, value) }
 
       val formParts = req.bodyFormData
       if (formParts != null && formParts.isNotEmpty()) {

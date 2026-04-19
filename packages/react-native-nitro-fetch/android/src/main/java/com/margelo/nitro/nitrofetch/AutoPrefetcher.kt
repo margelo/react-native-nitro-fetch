@@ -155,12 +155,22 @@ object AutoPrefetcher {
         conn.setRequestProperty(k, reqHeaders.optString(k, ""))
       }
 
+      NitroCookieSync.attachCookieFromManagerIfMissing(
+        urlStr,
+        NitroCookieSync.hasCookieHeaderInJson(reqHeaders)
+      ) { key, value -> conn.setRequestProperty(key, value) }
+
       if (body != null) {
         conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
       }
 
       val status = conn.responseCode
-      if (status !in 200..299) return null
+      if (status !in 200..299) {
+        android.util.Log.d("NitroFetch", "[TokenRefresh] Refresh endpoint returned HTTP $status")
+        return null
+      }
+
+      NitroCookieSync.storeSetCookieFromHttpURLConnection(conn.url.toString(), conn, flush = true)
 
       val responseBody = conn.inputStream.use { it.bufferedReader(Charsets.UTF_8).readText() }
 
