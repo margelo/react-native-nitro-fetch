@@ -42,20 +42,9 @@ export class TextDecoder {
       throw new TypeError('Options must be an object')
     }
     try {
-      // Zero-copy: pass the underlying buffer + view offsets, let native slice.
-      let buffer: ArrayBuffer | undefined
-      let byteOffset: number | undefined
-      let byteLength: number | undefined
-      if (input) {
-        if (input instanceof ArrayBuffer) {
-          buffer = input
-        } else if (ArrayBuffer.isView(input)) {
-          buffer = input.buffer as ArrayBuffer
-          byteOffset = input.byteOffset
-          byteLength = input.byteLength
-        }
-      }
-      return this.decoder.decode(buffer, byteOffset, byteLength, options)
+      // Native reads byteOffset/byteLength off TypedArray/DataView directly —
+      // no JS-side slicing or unpacking.
+      return (this.decoder as any).decode(input, options)
     } catch (e: any) {
       throw new TypeError(e.message)
     }

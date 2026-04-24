@@ -22,6 +22,10 @@ Pod::Spec.new do |s|
 
   s.dependency 'React-jsi'
   s.dependency 'React-callinvoker'
+  s.dependency 'React-RCTNetwork'
+
+  # Expose the DevTools reporter Obj-C facade to Swift via the pod's umbrella module.
+  s.public_header_files = ["ios/NitroDevToolsReporter.h"]
 
   load 'nitrogen/generated/ios/NitroFetch+autolinking.rb'
   add_nitrogen_files(s)

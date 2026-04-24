@@ -73,6 +73,14 @@ const EXAMPLES = [
     screen: 'NetworkInspectorScreen' as const,
     icon: '🔍',
   },
+  {
+    id: 'devtools-demo',
+    title: 'DevTools Demo',
+    description:
+      '200 / 404 / 500, redirects, abort, streaming, big body — visible in RN DevTools Network tab.',
+    screen: 'DevToolsDemoScreen' as const,
+    icon: '🧪',
+  },
 ];
 
 export function HomeScreen() {

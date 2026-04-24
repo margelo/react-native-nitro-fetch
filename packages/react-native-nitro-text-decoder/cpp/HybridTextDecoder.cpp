@@ -9,12 +9,13 @@
 
  #include "HybridTextDecoder.hpp"
  #include "TextDecoderUtils.hpp"
- 
+
  #include <NitroModules/HybridObject.hpp>
- 
+ #include <NitroModules/Prototype.hpp>
+
  #include <algorithm>
  #include <stdexcept>
- 
+
  namespace margelo::nitro::nitrotextdecoder {
  using namespace margelo::nitro;
  
@@ -39,46 +40,124 @@
  
  bool HybridTextDecoder::getIgnoreBOM() { return _ignoreBOM; }
  
- // Main decode method - typed version (required by base class)
+ // Typed decode — retained for interface compliance but not actually
+ // registered on the prototype. loadHybridMethods below binds "decode" to the
+ // raw JSI variant for zero-overhead calls.
  std::string HybridTextDecoder::decode(
      const std::optional<std::shared_ptr<ArrayBuffer>> &input,
      std::optional<double> byteOffset,
      std::optional<double> byteLength,
      const std::optional<TextDecodeOptions> &options) {
-   // Parse stream option
    bool stream = options.has_value() && options->stream.has_value() &&
                  options->stream.value();
-
-   // Get input bytes
    const uint8_t *inputBytes = nullptr;
    size_t inputLength = 0;
-
    if (input.has_value() && input.value() && input.value()->data() &&
        input.value()->size() > 0) {
      auto buffer = input.value();
      size_t bufferSize = buffer->size();
-
-     // Apply byteOffset and byteLength for zero-copy ArrayBufferView support.
      size_t offset = byteOffset.has_value()
                          ? static_cast<size_t>(byteOffset.value())
                          : 0;
      size_t length = byteLength.has_value()
                          ? static_cast<size_t>(byteLength.value())
                          : (bufferSize - offset);
-
      if (offset + length > bufferSize) [[unlikely]] {
        throw std::invalid_argument("byteOffset + byteLength exceeds buffer size");
      }
-
      if (length > 2147483648UL) [[unlikely]] {
        throw std::invalid_argument("Input buffer size is too large");
      }
-
      inputBytes = buffer->data() + offset;
      inputLength = length;
    }
-
    return decodeImpl(inputBytes, inputLength, stream);
+ }
+
+ // Override loadHybridMethods to bind "decode" to a raw JSI entry point —
+ // bypasses std::optional unpacking and shared_ptr<ArrayBuffer> allocation.
+ // Skips the spec's auto-registration of the typed decode.
+ void HybridTextDecoder::loadHybridMethods() {
+   HybridObject::loadHybridMethods();
+   registerHybrids(this, [](Prototype &proto) {
+     proto.registerHybridGetter("encoding", &HybridTextDecoder::getEncoding);
+     proto.registerHybridGetter("fatal", &HybridTextDecoder::getFatal);
+     proto.registerHybridGetter("ignoreBOM", &HybridTextDecoder::getIgnoreBOM);
+     proto.registerRawHybridMethod("decode", 2, &HybridTextDecoder::decodeRaw);
+   });
+ }
+
+ // Raw JSI decode. Signature: decode(input?, options?).
+ // `input` may be undefined/null, an ArrayBuffer, or a TypedArray/DataView —
+ // we read byteOffset/byteLength off the view directly.
+ jsi::Value HybridTextDecoder::decodeRaw(jsi::Runtime &runtime,
+                                         const jsi::Value & /*thisVal*/,
+                                         const jsi::Value *args, size_t count) {
+   const uint8_t *inputBytes = nullptr;
+   size_t inputLength = 0;
+
+   if (count > 0 && !args[0].isUndefined() && !args[0].isNull()) {
+     if (!args[0].isObject()) [[unlikely]] {
+       throw jsi::JSError(runtime,
+                          "TextDecoder.decode() input must be an ArrayBuffer or TypedArray");
+     }
+     jsi::Object obj = args[0].asObject(runtime);
+
+     if (obj.isArrayBuffer(runtime)) {
+       // Direct ArrayBuffer.
+       jsi::ArrayBuffer ab = obj.getArrayBuffer(runtime);
+       inputBytes = ab.data(runtime);
+       inputLength = ab.size(runtime);
+     } else {
+       // TypedArray or DataView: read underlying buffer + view offsets.
+       jsi::Value bufferVal = obj.getProperty(runtime, "buffer");
+       if (!bufferVal.isObject()) [[unlikely]] {
+         throw jsi::JSError(runtime,
+                            "TextDecoder.decode() input must be an ArrayBuffer or TypedArray");
+       }
+       jsi::Object bufferObj = bufferVal.asObject(runtime);
+       if (!bufferObj.isArrayBuffer(runtime)) [[unlikely]] {
+         throw jsi::JSError(runtime,
+                            "TextDecoder.decode() input must be an ArrayBuffer or TypedArray");
+       }
+       jsi::ArrayBuffer ab = bufferObj.getArrayBuffer(runtime);
+       uint8_t *fullData = ab.data(runtime);
+       size_t fullSize = ab.size(runtime);
+
+       jsi::Value offsetVal = obj.getProperty(runtime, "byteOffset");
+       jsi::Value lengthVal = obj.getProperty(runtime, "byteLength");
+       size_t offset = offsetVal.isNumber()
+                           ? static_cast<size_t>(offsetVal.asNumber())
+                           : 0;
+       size_t length = lengthVal.isNumber()
+                           ? static_cast<size_t>(lengthVal.asNumber())
+                           : fullSize;
+       if (offset + length > fullSize) [[unlikely]] {
+         throw jsi::JSError(runtime,
+                            "byteOffset + byteLength exceeds buffer size");
+       }
+       inputBytes = fullData + offset;
+       inputLength = length;
+     }
+   }
+
+   // Parse { stream } option from args[1].
+   bool stream = false;
+   if (count > 1 && !args[1].isUndefined() && !args[1].isNull() &&
+       args[1].isObject()) {
+     jsi::Object options = args[1].asObject(runtime);
+     jsi::Value streamVal = options.getProperty(runtime, "stream");
+     if (streamVal.isBool()) {
+       stream = streamVal.getBool();
+     }
+   }
+
+   try {
+     std::string result = decodeImpl(inputBytes, inputLength, stream);
+     return jsi::String::createFromUtf8(runtime, result);
+   } catch (const std::exception &e) {
+     throw jsi::JSError(runtime, e.what());
+   }
  }
  
  // Helper: normalize encoding name
