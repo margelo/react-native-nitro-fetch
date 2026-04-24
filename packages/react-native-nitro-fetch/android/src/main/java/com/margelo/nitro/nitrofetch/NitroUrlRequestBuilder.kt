@@ -7,6 +7,7 @@ import org.chromium.net.UrlRequest as CronetUrlRequest
 import org.chromium.net.UrlResponseInfo as CronetUrlResponseInfo
 import org.chromium.net.CronetException as CronetNativeException
 import java.nio.ByteBuffer
+import java.util.UUID
 import java.util.concurrent.Executor as JavaExecutor
 
 @DoNotStrip
@@ -26,6 +27,14 @@ class NitroUrlRequestBuilder(
 
   private val builder: CronetUrlRequest.Builder
   private val byteBuffer: ByteBuffer
+  private val devToolsRequestId: String = UUID.randomUUID().toString()
+  private val devToolsEnabled: Boolean = DevToolsReporter.isDebuggingEnabled()
+  private var devToolsBytes: Int = 0
+  private var devToolsTextual: Boolean = false
+  private var httpMethod: String = "GET"
+  private val requestHeaders: LinkedHashMap<String, String> = LinkedHashMap()
+  private var uploadBodyString: String = ""
+  private var uploadBodyLength: Long = 0L
 
   init {
     // Allocate ONE reusable owning buffer for all reads (64KB)
@@ -49,6 +58,19 @@ class NitroUrlRequestBuilder(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo
       ) {
+        if (devToolsEnabled) {
+          val headersMap = LinkedHashMap<String, String>()
+          info.allHeadersAsList.forEach { headersMap[it.key] = it.value }
+          val ct = headersMap["Content-Type"] ?: headersMap["content-type"]
+          devToolsTextual = DevToolsReporter.isTextualContentType(ct)
+          DevToolsReporter.reportResponseStart(
+            devToolsRequestId,
+            info.url,
+            info.httpStatusCode,
+            headersMap,
+            -1L
+          )
+        }
         onResponseStartedCallback?.let { callback ->
           val nitroInfo = info.toNitro()
           callback(nitroInfo)
@@ -60,8 +82,19 @@ class NitroUrlRequestBuilder(
         info: CronetUrlResponseInfo,
         receivedBuffer: ByteBuffer
       ) {
+        val bytesRead = receivedBuffer.position()
+        if (devToolsEnabled && bytesRead > 0) {
+          devToolsBytes += bytesRead
+          DevToolsReporter.reportDataReceived(devToolsRequestId, bytesRead)
+          if (devToolsTextual) {
+            val dup = receivedBuffer.duplicate()
+            dup.flip()
+            val arr = ByteArray(dup.remaining())
+            dup.get(arr)
+            DevToolsReporter.storeResponseBodyIncremental(devToolsRequestId, String(arr, Charsets.UTF_8))
+          }
+        }
         onReadCompletedCallback?.let { callback ->
-          val bytesRead = receivedBuffer.position()
           val nitroInfo = info.toNitro()
           callback(nitroInfo, reusableBuffer, bytesRead.toDouble())
         }
@@ -71,6 +104,9 @@ class NitroUrlRequestBuilder(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo
       ) {
+        if (devToolsEnabled) {
+          DevToolsReporter.reportResponseEnd(devToolsRequestId, devToolsBytes.toLong())
+        }
         onSucceededCallback?.let { callback ->
           val nitroInfo = info.toNitro()
           callback(nitroInfo)
@@ -82,6 +118,9 @@ class NitroUrlRequestBuilder(
         info: CronetUrlResponseInfo?,
         error: CronetNativeException
       ) {
+        if (devToolsEnabled) {
+          DevToolsReporter.reportRequestFailed(devToolsRequestId, false)
+        }
         onFailedCallback?.let { callback ->
           val nitroInfo = info?.toNitro()
           val nitroError = error.toNitro()
@@ -93,6 +132,9 @@ class NitroUrlRequestBuilder(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo?
       ) {
+        if (devToolsEnabled) {
+          DevToolsReporter.reportRequestFailed(devToolsRequestId, true)
+        }
         onCanceledCallback?.let { callback ->
           val nitroInfo = info?.toNitro()
           callback(nitroInfo)
@@ -104,11 +146,13 @@ class NitroUrlRequestBuilder(
   }
 
   override fun setHttpMethod(httpMethod: String) {
+    this.httpMethod = httpMethod
     builder.setHttpMethod(httpMethod)
   }
 
   override fun addHeader(name: String, value: String) {
-    builder.addHeader(name, value)  
+    requestHeaders[name] = value
+    builder.addHeader(name, value)
   }
 
   override fun setUploadBody(body: Variant_ArrayBuffer_String) {
@@ -119,8 +163,12 @@ class NitroUrlRequestBuilder(
         buffer.get(bytes)
         bytes
       }
-      is Variant_ArrayBuffer_String.Second -> body.value.toByteArray(Charsets.UTF_8)
+      is Variant_ArrayBuffer_String.Second -> {
+        uploadBodyString = body.value
+        body.value.toByteArray(Charsets.UTF_8)
+      }
     }
+    uploadBodyLength = bodyBytes.size.toLong()
 
     val provider = object : org.chromium.net.UploadDataProvider() {
       private var position = 0
@@ -176,6 +224,16 @@ class NitroUrlRequestBuilder(
 
   override fun build(): HybridUrlRequestSpec {
     val cronetRequest = builder.build()
+    if (devToolsEnabled) {
+      DevToolsReporter.reportRequestStart(
+        devToolsRequestId,
+        url,
+        httpMethod,
+        requestHeaders,
+        uploadBodyString,
+        uploadBodyLength
+      )
+    }
     return NitroUrlRequest(cronetRequest, byteBuffer)
   }
 }

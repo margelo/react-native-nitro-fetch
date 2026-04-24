@@ -80,10 +80,14 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       if (BuildConfig.NITRO_FETCH_TRACING) {
         Trace.beginAsyncSection(traceLabel, traceCookie)
       }
+      val devToolsRequestId = req.requestId ?: UUID.randomUUID().toString()
+      val devToolsEnabled = DevToolsReporter.isDebuggingEnabled()
       val callback = object : UrlRequest.Callback() {
         private val buffer = ByteBuffer.allocateDirect(16 * 1024)
         private val out = java.io.ByteArrayOutputStream()
         private var redirectStopped = false
+        private var devToolsBytes = 0
+        private var devToolsTextual = false
 
         override fun onRedirectReceived(request: UrlRequest, info: UrlResponseInfo, newLocationUrl: String) {
           if (shouldFollowRedirects) {
@@ -113,6 +117,19 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         }
 
         override fun onResponseStarted(request: UrlRequest, info: UrlResponseInfo) {
+          if (devToolsEnabled) {
+            val headersMap = LinkedHashMap<String, String>()
+            info.allHeadersAsList.forEach { headersMap[it.key] = it.value }
+            val contentType = headersMap["Content-Type"] ?: headersMap["content-type"]
+            devToolsTextual = DevToolsReporter.isTextualContentType(contentType)
+            DevToolsReporter.reportResponseStart(
+              devToolsRequestId,
+              info.url,
+              info.httpStatusCode,
+              headersMap,
+              -1L
+            )
+          }
           buffer.clear()
           request.read(buffer)
         }
@@ -122,6 +139,13 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
           val bytes = ByteArray(byteBuffer.remaining())
           byteBuffer.get(bytes)
           out.write(bytes)
+          if (devToolsEnabled) {
+            devToolsBytes += bytes.size
+            DevToolsReporter.reportDataReceived(devToolsRequestId, bytes.size)
+            if (devToolsTextual) {
+              DevToolsReporter.storeResponseBodyIncremental(devToolsRequestId, String(bytes, Charsets.UTF_8))
+            }
+          }
           byteBuffer.clear()
           request.read(byteBuffer)
         }
@@ -129,6 +153,9 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) {
           if (BuildConfig.NITRO_FETCH_TRACING) {
             Trace.endAsyncSection(traceLabel, traceCookie)
+          }
+          if (devToolsEnabled) {
+            DevToolsReporter.reportResponseEnd(devToolsRequestId, devToolsBytes.toLong())
           }
           try {
             val headersArr: Array<NitroHeader> =
@@ -166,12 +193,18 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
           if (BuildConfig.NITRO_FETCH_TRACING) {
             Trace.endAsyncSection(traceLabel, traceCookie)
           }
+          if (devToolsEnabled) {
+            DevToolsReporter.reportRequestFailed(devToolsRequestId, false)
+          }
           onFail(RuntimeException("Cronet failed: ${error.message}", error))
         }
 
         override fun onCanceled(request: UrlRequest, info: UrlResponseInfo?) {
           if (BuildConfig.NITRO_FETCH_TRACING) {
             Trace.endAsyncSection(traceLabel, traceCookie)
+          }
+          if (devToolsEnabled) {
+            DevToolsReporter.reportRequestFailed(devToolsRequestId, true)
           }
           if (!redirectStopped) {
             onFail(RuntimeException("Cronet canceled"))
@@ -205,6 +238,19 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       }
 
       val request = builder.build()
+      if (devToolsEnabled) {
+        val headersMap = DevToolsReporter.headersArrayToMap(req.headers)
+        val body = req.bodyString ?: ""
+        val encoded = body.toByteArray(Charsets.UTF_8).size.toLong()
+        DevToolsReporter.reportRequestStart(
+          devToolsRequestId,
+          url,
+          method,
+          headersMap,
+          body,
+          encoded
+        )
+      }
       request.start()
       return request
     }

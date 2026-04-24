@@ -18,6 +18,7 @@ import { StreamingScreen } from './screens/StreamingScreen';
 import { WebSocketScreen } from './screens/WebSocketScreen';
 import { WebSocketBenchmarkScreen } from './screens/WebSocketBenchmarkScreen';
 import { NetworkInspectorScreen } from './screens/NetworkInspectorScreen';
+import { DevToolsDemoScreen } from './screens/DevToolsDemoScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -137,6 +138,11 @@ export default function App() {
           name="NetworkInspectorScreen"
           component={NetworkInspectorScreen}
           options={{ title: 'Network Inspector' }}
+        />
+        <Stack.Screen
+          name="DevToolsDemoScreen"
+          component={DevToolsDemoScreen}
+          options={{ title: 'DevTools Demo' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
