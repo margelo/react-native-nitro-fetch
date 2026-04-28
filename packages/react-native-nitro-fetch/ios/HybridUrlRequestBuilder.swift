@@ -109,9 +109,11 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     task.priority = priority
     delegate.task = task
 
+    #if DEBUG
     if NitroDevToolsReporter.isDebuggingEnabled() {
       NitroDevToolsReporter.reportRequestStart(withRequest: devToolsRequestId, request: urlRequest)
     }
+    #endif
 
     let request = HybridUrlRequest(task: task, delegate: delegate)
     delegate.hybridRequest = request
@@ -192,17 +194,21 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
       if let error = error {
         let nsError = error as NSError
         if nsError.code == NSURLErrorCancelled {
+          #if DEBUG
           if NitroDevToolsReporter.isDebuggingEnabled() {
             NitroDevToolsReporter.reportRequestFailed(self.devToolsRequestId, cancelled: true)
           }
+          #endif
           if let callback = self.onCanceled {
             let nitroInfo = self.response?.toNitro()
             callback(nitroInfo)
           }
         } else {
+          #if DEBUG
           if NitroDevToolsReporter.isDebuggingEnabled() {
             NitroDevToolsReporter.reportRequestFailed(self.devToolsRequestId, cancelled: false)
           }
+          #endif
           if let callback = self.onFailed {
             let nitroError = error.toNitro()
             let nitroInfo = self.response?.toNitro()
@@ -210,9 +216,11 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
           }
         }
       } else if let response = self.response {
+        #if DEBUG
         if NitroDevToolsReporter.isDebuggingEnabled() {
           NitroDevToolsReporter.reportResponseEnd(self.devToolsRequestId, encodedDataLength: self.devToolsBytes)
         }
+        #endif
         if let callback = self.onSucceeded {
           let info = response.toNitro()
           callback(info)
@@ -236,6 +244,7 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
 
     executor.sync { [weak self] in
       guard let self = self else { return }
+      #if DEBUG
       if NitroDevToolsReporter.isDebuggingEnabled() {
         var headerDict: [String: String] = [:]
         httpResponse.allHeaderFields.forEach { k, v in
@@ -250,6 +259,7 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
         let ct = headerDict["Content-Type"] ?? headerDict["content-type"]
         self.devToolsTextual = NitroDevToolsReporter.isTextualContentType(ct)
       }
+      #endif
       if let callback = self.onResponseStarted {
         let info = httpResponse.toNitro()
         callback(info)
@@ -268,6 +278,7 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
       executor.sync { [weak self] in
         guard let self = self, let response = self.response else { return }
 
+        #if DEBUG
         if NitroDevToolsReporter.isDebuggingEnabled() {
           self.devToolsBytes += data.count
           NitroDevToolsReporter.reportDataReceived(self.devToolsRequestId, length: data.count)
@@ -275,6 +286,7 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
             NitroDevToolsReporter.storeResponseBodyIncremental(self.devToolsRequestId, text: text)
           }
         }
+        #endif
 
         let arrayBuffer: ArrayBuffer
         do {

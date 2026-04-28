@@ -1,110 +1,98 @@
 package com.margelo.nitro.nitrofetch
 
 /**
- * Thin facade over React Native's [com.facebook.react.modules.network.InspectorNetworkReporter].
- * All methods are no-ops when the modern CDP debugger is not attached (guarded by
- * `isDebuggingEnabled()` inside RN), so they are safe to call in release builds.
+ * Thin facade over React Native's `com.facebook.react.modules.network.InspectorNetworkReporter`.
  *
- * The underlying reporter is marked `internal` in RN but is the officially documented
- * Kotlin entry point for third-party networking libraries to surface requests in the
- * Fusebox / RN DevTools Network tab. We intentionally bypass the visibility modifier
- * rather than duplicating the JNI bindings, matching the pattern used by other
- * community HTTP clients. If the class isn't present (RN < 0.76 or a trimmed
- * distribution), every call becomes a no-op.
+ * The reporter is `internal` in RN and may be missing entirely on older versions or stripped
+ * distributions. To stay both safe (no [NoClassDefFoundError]) and fast (no per-call reflection
+ * once the class is known to exist), we use the **isolation-class pattern**:
+ *
+ *  - This facade has *no* compile-time reference to `InspectorNetworkReporter`. It can always
+ *    be loaded and verified by ART, even when the reporter is absent.
+ *  - All direct calls live in [DevToolsReporterImpl], which is loaded reflectively *once* via
+ *    `Class.forName`. If verification fails (missing class), we catch and stay in no-op mode.
+ *  - On success, we hold an [Impl] interface reference and dispatch through it on every call —
+ *    a single null check + a virtual call (likely devirtualized by the JIT). No reflection,
+ *    no boxing, no method-handle lookups on the hot path.
  */
-@Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
 internal object DevToolsReporter {
-  private val available: Boolean = try {
-    Class.forName("com.facebook.react.modules.network.InspectorNetworkReporter")
-    true
-  } catch (_: Throwable) {
-    false
+
+  /** Stable interface in *our* package — Impl implements it; no foreign types here. */
+  internal interface Impl {
+    fun isDebuggingEnabled(): Boolean
+    fun reportRequestStart(
+      requestId: String, url: String, method: String,
+      headers: Map<String, String>, body: String, encodedDataLength: Long
+    )
+    fun reportResponseStart(
+      requestId: String, url: String, statusCode: Int,
+      headers: Map<String, String>, expectedDataLength: Long
+    )
+    fun reportDataReceived(requestId: String, length: Int)
+    fun reportResponseEnd(requestId: String, encodedDataLength: Long)
+    fun reportRequestFailed(requestId: String, cancelled: Boolean)
+    fun storeResponseBody(requestId: String, body: String, base64Encoded: Boolean)
+    fun storeResponseBodyIncremental(requestId: String, data: String)
   }
 
-  fun isDebuggingEnabled(): Boolean {
-    if (!available) return false
+  @Volatile private var impl: Impl? = null
+  // We deliberately do NOT latch failure: cold-start prefetch can run before
+  // RN classes are realized, and we want a later request to recover. The
+  // probe is cheap (Class.forName has its own internal cache).
+  private fun resolve(): Impl? {
+    val cached = impl
+    if (cached != null) return cached
     return try {
-      com.facebook.react.modules.network.InspectorNetworkReporter.isDebuggingEnabled()
+      val cls = Class.forName("com.margelo.nitro.nitrofetch.DevToolsReporterImpl")
+      val created = cls.getDeclaredConstructor().newInstance() as Impl
+      // Force a real call so any missing transitive symbol surfaces here, not later.
+      created.isDebuggingEnabled()
+      impl = created
+      created
     } catch (_: Throwable) {
-      false
+      null
     }
   }
+
+  // --- Hot path: one null check + interface call. JIT will devirtualize. ---
+
+  fun isDebuggingEnabled(): Boolean = resolve()?.isDebuggingEnabled() ?: false
 
   fun reportRequestStart(
-    requestId: String,
-    url: String,
-    method: String,
-    headers: Map<String, String>,
-    body: String,
-    encodedDataLength: Long
+    requestId: String, url: String, method: String,
+    headers: Map<String, String>, body: String, encodedDataLength: Long
   ) {
-    if (!available) return
-    try {
-      com.facebook.react.modules.network.InspectorNetworkReporter.reportRequestStart(
-        requestId, url, method, headers, body, encodedDataLength
-      )
-      com.facebook.react.modules.network.InspectorNetworkReporter.reportConnectionTiming(requestId, headers)
-    } catch (_: Throwable) {
-    }
+    impl?.reportRequestStart(requestId, url, method, headers, body, encodedDataLength)
   }
 
   fun reportResponseStart(
-    requestId: String,
-    url: String,
-    statusCode: Int,
-    headers: Map<String, String>,
-    expectedDataLength: Long
+    requestId: String, url: String, statusCode: Int,
+    headers: Map<String, String>, expectedDataLength: Long
   ) {
-    if (!available) return
-    try {
-      com.facebook.react.modules.network.InspectorNetworkReporter.reportResponseStart(
-        requestId, url, statusCode, headers, expectedDataLength
-      )
-    } catch (_: Throwable) {
-    }
+    impl?.reportResponseStart(requestId, url, statusCode, headers, expectedDataLength)
   }
 
   fun reportDataReceived(requestId: String, length: Int) {
-    if (!available) return
-    try {
-      com.facebook.react.modules.network.InspectorNetworkReporter.reportDataReceivedImpl(requestId, length)
-    } catch (_: Throwable) {
-    }
+    impl?.reportDataReceived(requestId, length)
   }
 
   fun reportResponseEnd(requestId: String, encodedDataLength: Long) {
-    if (!available) return
-    try {
-      com.facebook.react.modules.network.InspectorNetworkReporter.reportResponseEnd(requestId, encodedDataLength)
-    } catch (_: Throwable) {
-    }
+    impl?.reportResponseEnd(requestId, encodedDataLength)
   }
 
   fun reportRequestFailed(requestId: String, cancelled: Boolean) {
-    if (!available) return
-    try {
-      com.facebook.react.modules.network.InspectorNetworkReporter.reportRequestFailed(requestId, cancelled)
-    } catch (_: Throwable) {
-    }
+    impl?.reportRequestFailed(requestId, cancelled)
   }
 
   fun storeResponseBody(requestId: String, body: String, base64Encoded: Boolean) {
-    if (!available) return
-    try {
-      com.facebook.react.modules.network.InspectorNetworkReporter.maybeStoreResponseBody(
-        requestId, body, base64Encoded
-      )
-    } catch (_: Throwable) {
-    }
+    impl?.storeResponseBody(requestId, body, base64Encoded)
   }
 
   fun storeResponseBodyIncremental(requestId: String, data: String) {
-    if (!available) return
-    try {
-      com.facebook.react.modules.network.InspectorNetworkReporter.maybeStoreResponseBodyIncremental(requestId, data)
-    } catch (_: Throwable) {
-    }
+    impl?.storeResponseBodyIncremental(requestId, data)
   }
+
+  // --- Pure helpers, no reporter dependency. ---
 
   fun isTextualContentType(contentType: String?): Boolean {
     if (contentType == null) return false

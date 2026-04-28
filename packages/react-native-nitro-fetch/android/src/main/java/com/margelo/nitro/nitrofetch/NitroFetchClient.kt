@@ -81,7 +81,10 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         Trace.beginAsyncSection(traceLabel, traceCookie)
       }
       val devToolsRequestId = req.requestId ?: UUID.randomUUID().toString()
-      val devToolsEnabled = DevToolsReporter.isDebuggingEnabled()
+      // BuildConfig.DEBUG short-circuits in release: R8 constant-folds the
+      // && so every `if (devToolsEnabled)` block below becomes dead code and
+      // the DevToolsReporter classes drop out of the release APK entirely.
+      val devToolsEnabled = BuildConfig.DEBUG && DevToolsReporter.isDebuggingEnabled()
       val callback = object : UrlRequest.Callback() {
         private val buffer = ByteBuffer.allocateDirect(16 * 1024)
         private val out = java.io.ByteArrayOutputStream()
