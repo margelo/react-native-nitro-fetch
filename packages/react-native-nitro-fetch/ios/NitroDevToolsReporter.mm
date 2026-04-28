@@ -10,29 +10,39 @@
 #define NITRO_HAS_NETWORK_REPORTER 0
 #endif
 
-// The Objective-C wrapper does not expose -isDebuggingEnabled publicly,
-// but the underlying C++ NetworkReporter does. We avoid depending on the
-// C++ header and instead rely on RN guarding every report call internally.
-// For our own body-capture short-circuit we assume enabled when the class
-// exists; the underlying calls are still no-ops when no debugger attached.
+// During cold-start prefetch, RN's RCTInspectorNetworkReporter class may not
+// be realized yet (its underlying C++ NetworkReporter singleton is brought up
+// when the bridge initializes). Every entry point goes through +reporterClass,
+// which uses NSClassFromString so a missing class becomes a clean no-op
+// instead of crashing on a not-yet-initialized C++ singleton.
 
 @implementation NitroDevToolsReporter
 
-+ (BOOL)isDebuggingEnabled {
++ (Class _Nullable)reporterClass {
 #if NITRO_HAS_NETWORK_REPORTER
-  return YES;
+  static Class cached = Nil;
+  if (cached == Nil) {
+    cached = NSClassFromString(@"RCTInspectorNetworkReporter");
+  }
+  return cached;
 #else
-  return NO;
+  return Nil;
 #endif
+}
+
++ (BOOL)isDebuggingEnabled {
+  return [self reporterClass] != Nil;
 }
 
 + (void)reportRequestStartWithRequest:(NSString *)requestId
                               request:(NSURLRequest *)request {
 #if NITRO_HAS_NETWORK_REPORTER
   if (request == nil) return;
+  Class cls = [self reporterClass];
+  if (cls == Nil) return;
   int encoded = (int)(request.HTTPBody.length);
-  [RCTInspectorNetworkReporter reportRequestStart:requestId request:request encodedDataLength:encoded];
-  [RCTInspectorNetworkReporter reportConnectionTiming:requestId request:request];
+  [cls reportRequestStart:requestId request:request encodedDataLength:encoded];
+  [cls reportConnectionTiming:requestId request:request];
 #endif
 }
 
@@ -42,6 +52,8 @@
                    headers:(NSDictionary<NSString *, NSString *> *)headers
                 bodyString:(NSString *)bodyString {
 #if NITRO_HAS_NETWORK_REPORTER
+  Class cls = [self reporterClass];
+  if (cls == Nil) return;
   NSURL *u = [NSURL URLWithString:url];
   if (u == nil) return;
   NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:u];
@@ -53,8 +65,8 @@
     req.HTTPBody = [bodyString dataUsingEncoding:NSUTF8StringEncoding];
   }
   NSInteger encoded = bodyString ? (NSInteger)[bodyString lengthOfBytesUsingEncoding:NSUTF8StringEncoding] : 0;
-  [RCTInspectorNetworkReporter reportRequestStart:requestId request:req encodedDataLength:(int)encoded];
-  [RCTInspectorNetworkReporter reportConnectionTiming:requestId request:req];
+  [cls reportRequestStart:requestId request:req encodedDataLength:(int)encoded];
+  [cls reportConnectionTiming:requestId request:req];
 #endif
 }
 
@@ -63,40 +75,48 @@
                  statusCode:(NSInteger)statusCode
                     headers:(NSDictionary<NSString *, NSString *> *)headers {
 #if NITRO_HAS_NETWORK_REPORTER
+  Class cls = [self reporterClass];
+  if (cls == Nil) return;
   NSURL *u = [NSURL URLWithString:url];
   if (u == nil) return;
   NSHTTPURLResponse *resp = [[NSHTTPURLResponse alloc] initWithURL:u
                                                          statusCode:statusCode
                                                         HTTPVersion:@"HTTP/1.1"
                                                        headerFields:headers];
-  [RCTInspectorNetworkReporter reportResponseStart:requestId
-                                           response:resp
-                                         statusCode:(int)statusCode
-                                            headers:headers];
+  [cls reportResponseStart:requestId
+                  response:resp
+                statusCode:(int)statusCode
+                   headers:headers];
 #endif
 }
 
 + (void)reportDataReceived:(NSString *)requestId length:(NSInteger)length {
 #if NITRO_HAS_NETWORK_REPORTER
   if (length <= 0) return;
+  Class cls = [self reporterClass];
+  if (cls == Nil) return;
   // Only data.length is read by the underlying reporter. Avoid allocating a
   // zero-filled buffer by handing NSData a non-owned byte pointer and the
   // intended length.
   static uint8_t sentinel;
   NSData *sized = [NSData dataWithBytesNoCopy:&sentinel length:(NSUInteger)length freeWhenDone:NO];
-  [RCTInspectorNetworkReporter reportDataReceived:requestId data:sized];
+  [cls reportDataReceived:requestId data:sized];
 #endif
 }
 
 + (void)reportResponseEnd:(NSString *)requestId encodedDataLength:(NSInteger)length {
 #if NITRO_HAS_NETWORK_REPORTER
-  [RCTInspectorNetworkReporter reportResponseEnd:requestId encodedDataLength:(int)length];
+  Class cls = [self reporterClass];
+  if (cls == Nil) return;
+  [cls reportResponseEnd:requestId encodedDataLength:(int)length];
 #endif
 }
 
 + (void)reportRequestFailed:(NSString *)requestId cancelled:(BOOL)cancelled {
 #if NITRO_HAS_NETWORK_REPORTER
-  [RCTInspectorNetworkReporter reportRequestFailed:requestId cancelled:cancelled];
+  Class cls = [self reporterClass];
+  if (cls == Nil) return;
+  [cls reportRequestFailed:requestId cancelled:cancelled];
 #endif
 }
 
@@ -104,13 +124,17 @@
                      data:(NSData *)data
             base64Encoded:(BOOL)base64Encoded {
 #if NITRO_HAS_NETWORK_REPORTER
-  [RCTInspectorNetworkReporter maybeStoreResponseBody:requestId data:data base64Encoded:base64Encoded];
+  Class cls = [self reporterClass];
+  if (cls == Nil) return;
+  [cls maybeStoreResponseBody:requestId data:data base64Encoded:base64Encoded];
 #endif
 }
 
 + (void)storeResponseBodyIncremental:(NSString *)requestId text:(NSString *)text {
 #if NITRO_HAS_NETWORK_REPORTER
-  [RCTInspectorNetworkReporter maybeStoreResponseBodyIncremental:requestId data:text];
+  Class cls = [self reporterClass];
+  if (cls == Nil) return;
+  [cls maybeStoreResponseBodyIncremental:requestId data:text];
 #endif
 }
 

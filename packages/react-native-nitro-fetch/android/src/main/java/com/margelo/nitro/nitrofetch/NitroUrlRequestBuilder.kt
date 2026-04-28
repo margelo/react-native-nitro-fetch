@@ -27,8 +27,10 @@ class NitroUrlRequestBuilder(
 
   private val builder: CronetUrlRequest.Builder
   private val byteBuffer: ByteBuffer
-  private val devToolsRequestId: String = UUID.randomUUID().toString()
-  private val devToolsEnabled: Boolean = DevToolsReporter.isDebuggingEnabled()
+  // BuildConfig.DEBUG short-circuits in release so R8 strips DevTools paths.
+  // UUID generation is gated too so SecureRandom isn't touched in release.
+  private val devToolsEnabled: Boolean = BuildConfig.DEBUG && DevToolsReporter.isDebuggingEnabled()
+  private val devToolsRequestId: String = if (devToolsEnabled) UUID.randomUUID().toString() else ""
   private var devToolsBytes: Int = 0
   private var devToolsTextual: Boolean = false
   private var httpMethod: String = "GET"
