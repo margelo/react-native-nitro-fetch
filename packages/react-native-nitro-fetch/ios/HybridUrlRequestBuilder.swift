@@ -16,7 +16,13 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
 
   private var urlRequest: URLRequest
   private var priority: Float = 0.5
-  private let devToolsRequestId: String = UUID().uuidString
+  private let devToolsRequestId: String = {
+    #if DEBUG
+    return UUID().uuidString
+    #else
+    return ""
+    #endif
+  }()
 
   init(
     url: String,

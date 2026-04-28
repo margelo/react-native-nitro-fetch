@@ -42,16 +42,23 @@ internal object DevToolsReporter {
   private fun resolve(): Impl? {
     val cached = impl
     if (cached != null) return cached
+
+    if (!isSoLoaderInitialized()) return null
     return try {
       val cls = Class.forName("com.margelo.nitro.nitrofetch.DevToolsReporterImpl")
+  
       val created = cls.getDeclaredConstructor().newInstance() as Impl
-      // Force a real call so any missing transitive symbol surfaces here, not later.
-      created.isDebuggingEnabled()
       impl = created
       created
     } catch (_: Throwable) {
       null
     }
+  }
+
+  private fun isSoLoaderInitialized(): Boolean = try {
+    com.facebook.soloader.SoLoader.isInitialized()
+  } catch (_: Throwable) {
+    false
   }
 
   // --- Hot path: one null check + interface call. JIT will devirtualize. ---
