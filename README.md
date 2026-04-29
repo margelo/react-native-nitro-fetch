@@ -13,7 +13,7 @@
 **react-native-nitro-fetch** is a general purpose network fetching library for React Native. It can be used as a drop-in replacement for the built-in `fetch(...)` method, as well as provide additional features like prefetching and workletized mappers.
 
 <p align="center">
-  <a href="https://margelo.github.io/react-native-nitro-fetch/"><b>Documentation</b></a>
+  <a href="https://fetch.margelo.com"><b>Documentation</b></a>
 </p>
 
 ## Features
