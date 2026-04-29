@@ -11,7 +11,6 @@
  #include "TextDecoderUtils.hpp"
 
  #include <NitroModules/HybridObject.hpp>
- #include <NitroModules/Prototype.hpp>
 
  #include <algorithm>
  #include <stdexcept>
