@@ -16,7 +16,7 @@ Pod::Spec.new do |s|
 
   s.source_files = [
     "ios/**/*.{swift}",
-    "ios/**/*.{m,mm}",
+    "ios/**/*.{h,m,mm}",
     "cpp/**/*.{hpp,cpp}",
   ]
 

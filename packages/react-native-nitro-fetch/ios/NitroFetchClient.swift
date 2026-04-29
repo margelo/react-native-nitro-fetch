@@ -218,8 +218,11 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       )
       NitroDevToolsReporter.reportDataReceived(devToolsId, length: data.count)
       if NitroDevToolsReporter.isTextualContentType(headerDict["Content-Type"] ?? headerDict["content-type"]) {
+        // Use the incremental/text API for textual bodies — the byte-based
+        // `storeResponseBody` path goes through CDP as base64 regardless of
+        // the flag, which makes the DevTools Response panel show base64.
         if let text = String(data: data, encoding: .utf8) {
-          NitroDevToolsReporter.storeResponseBody(devToolsId, data: Data(text.utf8), base64Encoded: false)
+          NitroDevToolsReporter.storeResponseBodyIncremental(devToolsId, text: text)
         }
       } else if data.count > 0 && data.count <= 5 * 1024 * 1024 {
         NitroDevToolsReporter.storeResponseBody(devToolsId, data: data, base64Encoded: true)
