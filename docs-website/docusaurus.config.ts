@@ -61,7 +61,7 @@ const config: Config = {
       attributes: {
         name: 'twitter:image',
         content:
-          'https://margelo.github.io/react-native-nitro-fetch/img/og-image.png',
+          'https://fetch.margelo.com/img/og-image.png',
       },
     },
   ],
