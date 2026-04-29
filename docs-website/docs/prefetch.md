@@ -118,7 +118,35 @@ export function UserDetails() {
 }
 ```
 
-## Expo Plugin (Android)
+## Android Setup
+
+To enable auto-prefetch on Android, you need to call `AutoPrefetcher.prefetchOnStart()` from your `MainApplication.kt`. This kicks off queued requests as early as possible — before React Native and JS have finished loading.
+
+### Manual Setup (bare React Native)
+
+Edit `android/app/src/main/java/.../MainApplication.kt`:
+
+```kotlin
+import com.margelo.nitro.nitrofetch.AutoPrefetcher
+
+class MainApplication : Application(), ReactApplication {
+  // ...
+
+  override fun onCreate() {
+    super.onCreate()
+     // Start any queued auto-prefetch requests as early as possible
+    try { AutoPrefetcher.prefetchOnStart(this) } catch (_: Throwable) {}
+    
+    loadReactNative(this)
+  }
+}
+```
+
+:::tip
+Place the `AutoPrefetcher.prefetchOnStart(this)` call as early as possible in `onCreate()` — the earlier it runs, the more network time you save before JS is ready.
+:::
+
+### Expo Plugin (Android)
 
 If you use **Expo**, the plugin automatically injects `AutoPrefetcher.prefetchOnStart()` into `MainApplication.kt` during `expo prebuild` — no manual native code changes needed.
 
