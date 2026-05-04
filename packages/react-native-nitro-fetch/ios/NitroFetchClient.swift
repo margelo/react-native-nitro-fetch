@@ -170,8 +170,34 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
                 "%{public}s %{public}s", traceMethod, tracePath)
     #endif
 
-    let (data, response) = try await session.data(for: urlRequest, delegate: delegate)
+    // DevTools/CDP reporting is gated on `#if DEBUG` so the entire block is
+    // compiled out of release builds — no runtime cost, no symbol references.
+    #if DEBUG
+    let devToolsId = req.requestId ?? UUID().uuidString
+    if NitroDevToolsReporter.isDebuggingEnabled() {
+      NitroDevToolsReporter.reportRequestStart(withRequest: devToolsId, request: urlRequest)
+    }
+    #endif
+
+    let data: Data
+    let response: URLResponse
+    do {
+      (data, response) = try await session.data(for: urlRequest, delegate: delegate)
+    } catch {
+      #if DEBUG
+      if NitroDevToolsReporter.isDebuggingEnabled() {
+        let cancelled = (error as NSError).code == NSURLErrorCancelled
+        NitroDevToolsReporter.reportRequestFailed(devToolsId, cancelled: cancelled)
+      }
+      #endif
+      throw error
+    }
     guard let http = response as? HTTPURLResponse else {
+      #if DEBUG
+      if NitroDevToolsReporter.isDebuggingEnabled() {
+        NitroDevToolsReporter.reportRequestFailed(devToolsId, cancelled: false)
+      }
+      #endif
       throw NSError(domain: "NitroFetch", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
     }
 
@@ -179,6 +205,31 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       guard let key = k as? String else { return nil }
       return NitroHeader(key: key, value: String(describing: v))
     }
+
+    #if DEBUG
+    if NitroDevToolsReporter.isDebuggingEnabled() {
+      var headerDict: [String: String] = [:]
+      for h in headersPairs { headerDict[h.key] = h.value }
+      NitroDevToolsReporter.reportResponseStart(
+        devToolsId,
+        url: finalURL?.absoluteString ?? http.url?.absoluteString ?? req.url,
+        statusCode: http.statusCode,
+        headers: headerDict
+      )
+      NitroDevToolsReporter.reportDataReceived(devToolsId, length: data.count)
+      if NitroDevToolsReporter.isTextualContentType(headerDict["Content-Type"] ?? headerDict["content-type"]) {
+        // Use the incremental/text API for textual bodies — the byte-based
+        // `storeResponseBody` path goes through CDP as base64 regardless of
+        // the flag, which makes the DevTools Response panel show base64.
+        if let text = String(data: data, encoding: .utf8) {
+          NitroDevToolsReporter.storeResponseBodyIncremental(devToolsId, text: text)
+        }
+      } else if data.count > 0 && data.count <= 5 * 1024 * 1024 {
+        NitroDevToolsReporter.storeResponseBody(devToolsId, data: data, base64Encoded: true)
+      }
+      NitroDevToolsReporter.reportResponseEnd(devToolsId, encodedDataLength: data.count)
+    }
+    #endif
 
     // Choose bodyString by default (matching Android’s first pass)
     let charset = NitroFetchClient.detectCharset(from: http) ?? String.Encoding.utf8

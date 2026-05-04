@@ -1,8 +1,8 @@
 <a href="https://margelo.com">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="./assets/banner-dark.png" />
-    <source media="(prefers-color-scheme: light)" srcset="./assets/banner-light.png" />
-    <img alt="Nitro Modules" src="./assets/banner-light.png" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/margelo/react-native-nitro-fetch/main/assets/banner-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/margelo/react-native-nitro-fetch/main/assets/banner-light.png" />
+    <img alt="Nitro Modules" src="https://raw.githubusercontent.com/margelo/react-native-nitro-fetch/main/assets/banner-light.png" />
   </picture>
 </a>
 
@@ -13,7 +13,7 @@
 **react-native-nitro-fetch** is a general purpose network fetching library for React Native. It can be used as a drop-in replacement for the built-in `fetch(...)` method, as well as provide additional features like prefetching and workletized mappers.
 
 <p align="center">
-  <a href="https://margelo.github.io/react-native-nitro-fetch/"><b>Documentation</b></a>
+  <a href="https://fetch.margelo.com"><b>Documentation</b></a>
 </p>
 
 ## Features
@@ -276,7 +276,7 @@ export function StreamingExample() {
 
   const runStream = async () => {
     // `stream: true` enables the streaming transport
-    const res = await nitrofetch('https://httpbin.org/stream/20', {
+    const res = await nitroFetch('https://httpbin.org/stream/20', {
       stream: true,
     })
 
@@ -328,10 +328,6 @@ Authenticated prewarms: use **`registerTokenRefresh`** with `target: 'websocket'
 
 More detail: **[docs/websockets.md](docs/websockets.md)** · UI sample: **[example/src/screens/WebSocketScreen.tsx](example/src/screens/WebSocketScreen.tsx)**.
 
-## Project Status
-
-Nitro Fetch is currently in an alpha stage. You can adopt it in production, but keep in mind that the library and it's API is subject to change.
-
 ## Limitations & Alternatives
 
 - **WebSockets** are not part of `react-native-nitro-fetch` itself; use the companion package **[react-native-nitro-websockets](docs/websockets.md)** (with **react-native-nitro-text-decoder**). For other stacks, [react-native-fast-io](https://github.com/callstackincubator/react-native-fast-io) is another option.
@@ -366,6 +362,7 @@ We build fast and beautiful apps. Contact us at [margelo.com](https://margelo.co
 - [Alex Shumihin](https://github.com/pioner92)
 - [Ronald Goedeke](https://github.com/ronickg)
 - [Marc Rousavy](https://github.com/mrousavy)
+- [Ritesh Shukla](https://github.com/riteshshukla04)
 
 ## License
 

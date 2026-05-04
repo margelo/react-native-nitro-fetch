@@ -54,7 +54,7 @@ namespace margelo::nitro::nitrotextdecoder {
 
     public:
       // Methods
-      virtual std::string decode(const std::optional<std::shared_ptr<ArrayBuffer>>& input, const std::optional<TextDecodeOptions>& options) = 0;
+      virtual std::string decode(const std::optional<std::shared_ptr<ArrayBuffer>>& input, std::optional<double> byteOffset, std::optional<double> byteLength, const std::optional<TextDecodeOptions>& options) = 0;
 
     protected:
       // Hybrid Setup

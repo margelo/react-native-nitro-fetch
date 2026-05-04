@@ -12,7 +12,6 @@ export type {
   NitroResponseNativeType as NitroResponse,
 } from './fetch';
 export type { RequestRedirect, RequestCache } from './fetch';
-export type { BodyInit, ResponseInit } from './Response';
 export { NitroHeaders as Headers } from './Headers';
 export { NitroResponse as Response } from './Response';
 export { NitroRequest as Request } from './Request';
@@ -39,9 +38,3 @@ export type { CurlOptions } from './CurlGenerator';
 export { profileFetch } from './HermesProfiler';
 export type { ProfileResult } from './HermesProfiler';
 import './fetch';
-
-// Keep legacy export to avoid breaking any local tests/usages during scaffolding.
-// Will be removed once native Cronet path is ready.
-export function multiply(a: number, b: number): number {
-  return a * b;
-}

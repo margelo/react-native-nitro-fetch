@@ -38,15 +38,18 @@ export class NitroRequest {
   readonly referrerPolicy: ReferrerPolicy;
   readonly integrity: string;
   readonly keepalive: boolean;
-  readonly destination: string;
+  readonly destination: RequestDestination;
 
   private _body: BodyInit | null;
   private _bodyUsed: boolean = false;
 
-  constructor(input: string | URL | NitroRequest, init?: NitroRequestInit) {
+  constructor(
+    input: string | URL | NitroRequest | Request,
+    init?: NitroRequestInit
+  ) {
     if (input instanceof NitroRequest) {
       // Clone from another NitroRequest
-      this.url = init?.method ? input.url : input.url; // URL always from input
+      this.url = input.url;
       this.method = (init?.method ?? input.method).toUpperCase();
       this.headers = new NitroHeaders(
         init?.headers
@@ -65,6 +68,37 @@ export class NitroRequest {
       this.integrity = init?.integrity ?? input.integrity;
       this.keepalive = init?.keepalive ?? input.keepalive;
       this._body = init?.body !== undefined ? (init.body ?? null) : input._body;
+    } else if (
+      typeof input === 'object' &&
+      input !== null &&
+      'url' in input &&
+      'method' in input &&
+      'headers' in input &&
+      !(input instanceof URL)
+    ) {
+      // Construct from a Request-like object (standard Request or duck-typed)
+      this.url = input.url;
+      this.method = (init?.method ?? input.method).toUpperCase();
+      this.headers = new NitroHeaders(
+        init?.headers
+          ? init.headers instanceof NitroHeaders
+            ? init.headers
+            : (init.headers as any)
+          : (input.headers as any)
+      );
+      this.redirect =
+        init?.redirect ?? (input.redirect as RequestRedirect) ?? 'follow';
+      this.signal = init?.signal ?? input.signal;
+      this.cache = init?.cache ?? (input.cache as RequestCache) ?? 'default';
+      this.credentials =
+        init?.credentials ?? input.credentials ?? 'same-origin';
+      this.mode = init?.mode ?? input.mode ?? 'cors';
+      this.referrer = init?.referrer ?? input.referrer ?? 'about:client';
+      this.referrerPolicy =
+        init?.referrerPolicy ?? (input.referrerPolicy as ReferrerPolicy) ?? '';
+      this.integrity = init?.integrity ?? input.integrity ?? '';
+      this.keepalive = init?.keepalive ?? input.keepalive ?? false;
+      this._body = init?.body ?? null;
     } else {
       this.url = String(input);
       this.method = (init?.method ?? 'GET').toUpperCase();
@@ -94,11 +128,11 @@ export class NitroRequest {
     return this._bodyUsed;
   }
 
-  get body(): ReadableStream<Uint8Array> | null {
+  get body(): ReadableStream<Uint8Array<ArrayBuffer>> | null {
     if (this._body == null) return null;
     const bodyBytes = this._getBodyBytes();
     if (!bodyBytes) return null;
-    return new ReadableStream<Uint8Array>({
+    return new ReadableStream<Uint8Array<ArrayBuffer>>({
       start(controller) {
         controller.enqueue(new Uint8Array(bodyBytes));
         controller.close();
@@ -167,7 +201,7 @@ export class NitroRequest {
     return new Blob([buffer], { type: contentType });
   }
 
-  async bytes(): Promise<Uint8Array> {
+  async bytes(): Promise<Uint8Array<ArrayBuffer>> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
     const buffer = this._getBodyBytes() ?? new ArrayBuffer(0);

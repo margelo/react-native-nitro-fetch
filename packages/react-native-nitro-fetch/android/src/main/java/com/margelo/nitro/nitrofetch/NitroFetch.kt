@@ -50,7 +50,7 @@ class NitroFetch : HybridNitroFetchSpec() {
           .enableBrotli(true)
           .setStoragePath(cacheDir.absolutePath)
           .enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISK, 50 * 1024 * 1024)
-          .setUserAgent("NitroFetch/0.1")
+          .setUserAgent("NitroFetch/1.0")
 
 
         // --- Optional debugging knobs (uncomment temporarily) ---

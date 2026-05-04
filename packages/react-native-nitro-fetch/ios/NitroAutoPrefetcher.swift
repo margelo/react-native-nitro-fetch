@@ -8,6 +8,70 @@ public final class NitroAutoPrefetcher: NSObject {
   private static let tokenRefreshKey = "nitro_token_refresh_fetch"
   private static let tokenCacheKey = "nitro_token_refresh_fetch_cache"
 
+  /// Register a URL to prefetch on app start. Call from
+  /// `application(_:didFinishLaunchingWithOptions:)`. Writes to the same
+  /// persistent queue used by the JS `prefetchOnAppStart` API; entries are
+  /// deduped by `prefetchKey`.
+  ///
+  /// If called after `prefetchOnStart` already ran (late registration), the
+  /// entry is also kicked immediately via `NitroFetchClient.prefetchStatic`.
+  @objc
+  public static func registerPrefetch(
+    url: String,
+    prefetchKey: String,
+    headers: [String: String]
+  ) {
+    if url.isEmpty || prefetchKey.isEmpty { return }
+    let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
+
+    var arr: [[String: Any]] = []
+    if let raw = userDefaults.string(forKey: queueKey),
+       !raw.isEmpty,
+       let data = raw.data(using: .utf8),
+       let parsed = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+      arr = parsed
+    }
+    arr.removeAll { ($0["prefetchKey"] as? String) == prefetchKey }
+    arr.append([
+      "url": url,
+      "prefetchKey": prefetchKey,
+      "headers": headers,
+    ])
+    if let data = try? JSONSerialization.data(withJSONObject: arr),
+       let str = String(data: data, encoding: .utf8) {
+      userDefaults.set(str, forKey: queueKey)
+    }
+
+    if initialized {
+      // Late path — apply cached token headers + kick immediate prefetch
+      var tokenHeaders: [String: String] = [:]
+      if let cacheRaw = NitroFetchSecureAtRest.decryptedString(forKey: tokenCacheKey, defaults: userDefaults),
+         !cacheRaw.isEmpty,
+         let cacheData = cacheRaw.data(using: .utf8),
+         let cacheObj = try? JSONSerialization.jsonObject(with: cacheData) as? [String: String] {
+        tokenHeaders = cacheObj
+      }
+      var merged: [String: String] = headers
+      for (k, v) in tokenHeaders { merged[k] = v }
+      var hdrs: [NitroHeader] = merged.map { NitroHeader(key: $0.key, value: $0.value) }
+      hdrs.append(NitroHeader(key: "prefetchKey", value: prefetchKey))
+      let req = NitroRequest(
+        url: url,
+        method: nil,
+        headers: hdrs,
+        bodyString: nil,
+        bodyBytes: nil,
+        bodyFormData: nil,
+        timeoutMs: nil,
+        followRedirects: true,
+        requestId: nil
+      )
+      Task {
+        do { try await NitroFetchClient.prefetchStatic(req) } catch { /* best-effort */ }
+      }
+    }
+  }
+
   @objc
   public static func prefetchOnStart() {
     if initialized { return }

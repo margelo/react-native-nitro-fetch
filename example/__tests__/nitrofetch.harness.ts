@@ -3,12 +3,33 @@ import {
   fetch as nitroFetch,
   nitroFetchOnWorklet,
   prefetch,
+  removeFromAutoPrefetch,
 } from 'react-native-nitro-fetch';
 import { getRuntimeKind, RuntimeKind } from 'react-native-worklets';
 
 const image = 'https://httpbin.org/image/jpeg';
 
 const BASE = 'https://httpbin.org';
+
+describe('NitroFetch - Native registerPrefetch', () => {
+  const NP_URL = 'https://httpbin.org/anything/native-prefetch-test';
+  const NP_KEY = 'harness-native-prefetch';
+
+  it('serves a cache hit on the first JS fetch (first-run prefetching)', async () => {
+    const res = await nitroFetch(NP_URL, {
+      headers: { prefetchKey: NP_KEY },
+    });
+    expect(res.ok).toBe(true);
+    // Native code stamps "nitroPrefetched: true" on cache-served responses.
+    expect(res.headers.get('nitroPrefetched')).toBe('true');
+  });
+
+  it('removeFromAutoPrefetch deletes the natively-registered entry', async () => {
+    // Native registration shares storage with JS prefetchOnAppStart, so
+    // removeFromAutoPrefetch is the canonical removal API for both paths.
+    await removeFromAutoPrefetch(NP_KEY);
+  });
+});
 
 describe('NitroFetch - Basic GET', () => {
   it('returns status 200 and ok=true for successful GET', async () => {

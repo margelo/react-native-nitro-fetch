@@ -31,7 +31,7 @@ describe('NetworkInspector - capture', () => {
     NetworkInspector.enable();
     NetworkInspector.clear();
     await nitroFetch(`${BASE}/get`);
-    const entries = NetworkInspector.getEntries();
+    const entries = NetworkInspector.getHttpEntries();
     expect(entries.length).toBe(1);
     expect(entries[0]!.url).toContain('/get');
     expect(entries[0]!.method).toBe('GET');
@@ -45,7 +45,7 @@ describe('NetworkInspector - capture', () => {
     NetworkInspector.enable();
     NetworkInspector.clear();
     await nitroFetch(`${BASE}/get`);
-    const entries = NetworkInspector.getEntries();
+    const entries = NetworkInspector.getHttpEntries();
     expect(entries[0]!.curl).toContain('curl');
     expect(entries[0]!.curl).toContain('/get');
     NetworkInspector.disable();
@@ -60,7 +60,7 @@ describe('NetworkInspector - capture', () => {
       body: '{"test":true}',
       headers: { 'Content-Type': 'application/json' },
     });
-    const entries = NetworkInspector.getEntries();
+    const entries = NetworkInspector.getHttpEntries();
     expect(entries.length).toBe(1);
     expect(entries[0]!.method).toBe('POST');
     expect(entries[0]!.requestBody).toContain('test');

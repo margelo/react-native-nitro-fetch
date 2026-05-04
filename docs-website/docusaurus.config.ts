@@ -11,8 +11,8 @@ const config: Config = {
     v4: true,
   },
 
-  url: 'https://margelo.github.io',
-  baseUrl: '/react-native-nitro-fetch/',
+  url: 'https://fetch.margelo.com',
+  baseUrl: '/',
 
   organizationName: 'margelo',
   projectName: 'react-native-nitro-fetch',
@@ -61,7 +61,7 @@ const config: Config = {
       attributes: {
         name: 'twitter:image',
         content:
-          'https://margelo.github.io/react-native-nitro-fetch/img/og-image.png',
+          'https://fetch.margelo.com/img/og-image.png',
       },
     },
   ],

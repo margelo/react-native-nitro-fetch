@@ -23,8 +23,14 @@ export class NitroHeaders {
       init._map.forEach((values, key) => {
         this._map.set(key, [...values]);
       });
-    } else if (typeof Headers !== 'undefined' && init instanceof Headers) {
-      init.forEach((value, key) => {
+    } else if (
+      typeof init === 'object' &&
+      !Array.isArray(init) &&
+      typeof (init as any).forEach === 'function' &&
+      typeof (init as any).get === 'function'
+    ) {
+      // Headers-like object (standard Headers or duck-typed)
+      (init as any).forEach((value: string, key: string) => {
         this._map.set(normalizeName(key), [value]);
       });
     } else if (Array.isArray(init)) {
@@ -92,11 +98,12 @@ export class NitroHeaders {
   }
 
   forEach(
-    callback: (value: string, key: string, headers: NitroHeaders) => void
+    callback: (value: string, key: string, headers: NitroHeaders) => void,
+    thisArg?: any
   ): void {
     const sortedKeys = Array.from(this._map.keys()).sort();
     for (const key of sortedKeys) {
-      callback(this._map.get(key)!.join(', '), key, this);
+      callback.call(thisArg, this._map.get(key)!.join(', '), key, this);
     }
   }
 

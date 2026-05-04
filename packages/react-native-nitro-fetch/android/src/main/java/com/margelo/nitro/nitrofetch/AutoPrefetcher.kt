@@ -16,6 +16,77 @@ object AutoPrefetcher {
   private const val KEY_TOKEN_CACHE = "nitro_token_refresh_fetch_cache"
   private const val PREFS_NAME = NitroFetchSecureAtRest.PREFS_NAME
 
+  /**
+   * Register a URL to prefetch on app start. Call from `Application.onCreate()`
+   * BEFORE `prefetchOnStart(this)`. Writes to the same persistent queue used by
+   * the JS `prefetchOnAppStart` API; entries are deduped by `prefetchKey`.
+   *
+   * If called after `prefetchOnStart` already ran (late registration), the
+   * entry is also kicked immediately via `NitroFetchClient.fetch` so the
+   * current session benefits without waiting for the next cold launch.
+   */
+  @JvmStatic
+  @JvmOverloads
+  fun registerPrefetch(
+    context: Context,
+    url: String,
+    prefetchKey: String,
+    headers: Map<String, String> = emptyMap()
+  ) {
+    if (url.isEmpty() || prefetchKey.isEmpty()) return
+    try {
+      val prefs = context.applicationContext
+        .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+      val raw = prefs.getString(KEY_QUEUE, null) ?: ""
+      val arr = if (raw.isEmpty()) JSONArray() else try { JSONArray(raw) } catch (_: Throwable) { JSONArray() }
+
+      val next = JSONArray()
+      for (i in 0 until arr.length()) {
+        val o = arr.optJSONObject(i) ?: continue
+        if (o.optString("prefetchKey", "") == prefetchKey) continue
+        next.put(o)
+      }
+
+      val headersObj = JSONObject()
+      headers.forEach { (k, v) -> headersObj.put(k, v) }
+      val entry = JSONObject().apply {
+        put("url", url)
+        put("prefetchKey", prefetchKey)
+        put("headers", headersObj)
+      }
+      next.put(entry)
+      prefs.edit().putString(KEY_QUEUE, next.toString()).apply()
+    } catch (_: Throwable) {
+      // best-effort
+    }
+
+    if (initialized) {
+      // late path — kick a single immediate prefetch with cached token headers
+      try {
+        val prefs = context.applicationContext
+          .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val cacheRaw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE)
+        val tokenHeaders: Map<String, String> = if (!cacheRaw.isNullOrEmpty()) {
+          try {
+            val co = JSONObject(cacheRaw)
+            co.keys().asSequence().associateWith { k -> co.optString(k, "") }
+          } catch (_: Throwable) { emptyMap() }
+        } else emptyMap()
+
+        val single = JSONArray().apply {
+          val headersObj = JSONObject()
+          headers.forEach { (k, v) -> headersObj.put(k, v) }
+          put(JSONObject().apply {
+            put("url", url)
+            put("prefetchKey", prefetchKey)
+            put("headers", headersObj)
+          })
+        }
+        startPrefetches(single, tokenHeaders)
+      } catch (_: Throwable) {}
+    }
+  }
+
   fun prefetchOnStart(app: Application) {
     if (initialized) return
     initialized = true

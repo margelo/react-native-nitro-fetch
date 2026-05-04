@@ -20,7 +20,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Advanced',
-      items: ['worklets', 'inspection'],
+      items: ['worklets', 'inspection', 'global-replace'],
     },
     'skills',
     'troubleshooting',

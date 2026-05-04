@@ -25,6 +25,15 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     NitroWebSocketAutoPrewarmer.prewarmOnStart(this)
+    // Native-side prefetch registration — fires on the very first cold launch.
+    try {
+      AutoPrefetcher.registerPrefetch(
+        this,
+        "https://httpbin.org/anything/native-prefetch-test",
+        "harness-native-prefetch",
+        mapOf("Accept" to "application/json")
+      )
+    } catch (_: Throwable) {}
     // Best-effort auto prefetch when engine initializes (app start)
     try { AutoPrefetcher.prefetchOnStart(this) } catch (_: Throwable) {}
     loadReactNative(this)

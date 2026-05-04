@@ -1,6 +1,6 @@
 ---
 name: nitro-fetch
-description: Use this skill whenever an agent is working in a project that uses react-native-nitro-fetch, react-native-nitro-websockets, or react-native-nitro-text-decoder. Covers the fetch API, prefetching and cold-start cache warming, the NitroWebSocket class and pre-warming, migrating from React Native's built-in WebSocket (by touching call sites, never by swapping globals), the in-process NetworkInspector, native Perfetto / Instruments tracing, the native TextDecoder, and plugging nitro-fetch into axios via a custom adapter.
+description: Use this skill whenever an agent is working in a project that uses react-native-nitro-fetch, react-native-nitro-websockets, or react-native-nitro-text-decoder. Covers the fetch API, global replacement, prefetching and cold-start cache warming, the NitroWebSocket class and pre-warming, migrating from React Native's built-in WebSocket, the in-process NetworkInspector, native Perfetto / Instruments tracing, the native TextDecoder, and plugging nitro-fetch into axios via a custom adapter.
 license: MIT
 metadata:
   author: Margelo
@@ -23,7 +23,7 @@ A focused reference for AI coding assistants working in a project that uses the 
 The performance story has three moving parts, and most questions end up being about one of them:
 
 1. **Prefetching.** Native code can run *before* React Native loads. `prefetchOnAppStart(...)` and `prewarmOnAppStart(...)` replay stored requests / socket opens on every cold start, so by the time JS runs the response is already cached or the socket is already `OPEN`.
-2. **Explicit call sites.** Every place that wants the native client imports it directly — `import { fetch } from 'react-native-nitro-fetch'`, `import { NitroWebSocket } from 'react-native-nitro-websockets'`, or plugs it into axios via a custom adapter. **Do not** monkey-patch `globalThis.fetch` or `globalThis.WebSocket` — it breaks devtools, hot reload, and any library that does `instanceof` checks or re-enters the polyfill, and it hides which code paths actually use nitro.
+2. **Importing the native client.** The default approach is explicit imports — `import { fetch } from 'react-native-nitro-fetch'`, `import { NitroWebSocket } from 'react-native-nitro-websockets'`, or plugging into axios via a custom adapter. Alternatively, users can do a **global replace** (`globalThis.fetch = fetch`, etc.) at the top of their entry file — see the [Global Replace docs](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace) for setup and trade-offs.
 3. **Seeing what's happening.** `NetworkInspector` records HTTP + WS activity at the JS boundary; native Perfetto / Instruments traces cover everything below that (DNS, TLS, TTFB, body). One is for correctness, the other is for latency.
 
 ## Routing table — problem to reference
@@ -43,7 +43,7 @@ Load the matching file from `references/` before writing code. Each reference ci
 
 If the question doesn't match any row, read [`references/prefetching.md`](./references/prefetching.md) first — most cold-start questions start there, and it links out to the rest.
 
-**Do not** offer or produce code that swaps `globalThis.fetch` or `globalThis.WebSocket` with the nitro implementations, regardless of how the question is phrased. Migrate at the call site, or plug into axios via `references/axios-adapter.md`.
+When asked about global replacement, point to the [Global Replace docs](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace).
 
 ## Installation (one-line, for reference)
 

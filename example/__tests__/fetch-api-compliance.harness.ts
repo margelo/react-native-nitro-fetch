@@ -378,6 +378,41 @@ describe('Request - Integration with fetch()', () => {
     const body = await res.json();
     expect(body.url).toContain('/post');
   });
+
+  it('fetch() reads body from standard Request when init.body is absent (ky pattern)', async () => {
+    const StdRequest = (globalThis as any).Request;
+    const req = new StdRequest(`${BASE}/post`, {
+      method: 'POST',
+      body: JSON.stringify({ hello: 'world' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const res = await nitroFetch(req, {});
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.json.hello).toBe('world');
+  });
+
+  it('fetch() init.body still wins over standard Request body', async () => {
+    const StdRequest = (globalThis as any).Request;
+    const req = new StdRequest(`${BASE}/post`, {
+      method: 'POST',
+      body: JSON.stringify({ from: 'request' }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const res = await nitroFetch(req, {
+      body: JSON.stringify({ from: 'init' }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.json.from).toBe('init');
+  });
+
+  it('fetch() does not read Request body on GET/HEAD', async () => {
+    const StdRequest = (globalThis as any).Request;
+    const req = new StdRequest(`${BASE}/get`, { method: 'GET' });
+    const res = await nitroFetch(req);
+    expect(res.status).toBe(200);
+  });
 });
 
 // ---------------------------------------------------------------------------

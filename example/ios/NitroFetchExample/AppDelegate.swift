@@ -15,6 +15,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
 
+    NitroAutoPrefetcher.registerPrefetch(
+      withUrl: "https://httpbin.org/anything/native-prefetch-test",
+      prefetchKey: "harness-native-prefetch",
+      headers: ["Accept": "application/json"]
+    )
+
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()

@@ -102,3 +102,6 @@ docs-website/build
 docs-website/.docusaurus
 
 **/expo/plugins/dist
+
+# README.md copied from repo root by each package's `prepack` script
+packages/*/README.md

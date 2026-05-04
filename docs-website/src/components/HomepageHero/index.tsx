@@ -39,7 +39,7 @@ export default function HomepageHero(): React.JSX.Element {
         </div>
         <div className={styles.logoContainer}>
           <img
-            src="/react-native-nitro-fetch/img/logo.png"
+            src="/img/logo.png"
             alt="Nitro Fetch"
             className={styles.logo}
           />

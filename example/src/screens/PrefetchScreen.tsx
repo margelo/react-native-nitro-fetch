@@ -13,6 +13,12 @@ declare const performance: any;
 const PREFETCH_URL = 'https://httpbin.org/uuid';
 const PREFETCH_KEY = 'uuid';
 
+// Registered natively from MainApplication.onCreate() (Android) and
+// application(_:didFinishLaunchingWithOptions:) (iOS). Fires on the
+// very first cold launch — no JS-side scheduling required.
+const NATIVE_PREFETCH_URL = 'https://httpbin.org/anything/native-prefetch-test';
+const NATIVE_PREFETCH_KEY = 'harness-native-prefetch';
+
 export function PrefetchScreen() {
   const [logs, setLogs] = React.useState<string[]>([]);
 
@@ -63,6 +69,26 @@ export function PrefetchScreen() {
     }
   };
 
+  const handleConsumeNativePrefetch = async () => {
+    try {
+      addLog('Consuming native-registered prefetch...');
+      const t0 = performance.now();
+      const res = await nitroFetch(NATIVE_PREFETCH_URL, {
+        headers: { prefetchKey: NATIVE_PREFETCH_KEY },
+      });
+      const text = await res.text();
+      const prefHeader = res.headers.get('nitroPrefetched');
+      const time = (performance.now() - t0).toFixed(0);
+      addLog(
+        `✅ Fetched in ${time}ms\nnitroPrefetched: ${prefHeader ?? 'null'}\n` +
+          `(registered natively in MainApplication / AppDelegate, fires on first cold launch)\n` +
+          `Response: ${text.substring(0, 60)}...`
+      );
+    } catch (e: any) {
+      addLog(`❌ Native prefetch consume error: ${e?.message ?? String(e)}`);
+    }
+  };
+
   const handleClearPrefetch = async () => {
     try {
       addLog('Clearing auto-prefetch queue...');
@@ -105,6 +131,20 @@ export function PrefetchScreen() {
           >
             <Text style={styles.buttonText}>Clear Schedule</Text>
             <Text style={styles.buttonSub}>Removes all saved tasks</Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.row}>
+          <Pressable
+            style={[styles.button, styles.primaryBtn]}
+            onPress={handleConsumeNativePrefetch}
+          >
+            <Text style={[styles.buttonText, styles.primaryBtnText]}>
+              Consume Native Prefetch
+            </Text>
+            <Text style={[styles.buttonSub, styles.primaryBtnSub]}>
+              Registered in MainApplication / AppDelegate
+            </Text>
           </Pressable>
         </View>
       </View>
