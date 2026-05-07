@@ -11,6 +11,7 @@
     ".": {
       "source": "./src/index.tsx",
       "types": "./lib/typescript/src/index.d.ts",
+      "browser": "./lib/module/index.web.js",
       "default": "./lib/module/index.js"
     },
     "./package.json": "./package.json",
