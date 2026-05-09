@@ -107,28 +107,40 @@ export class NitroHeaders {
     }
   }
 
-  *entries(): IterableIterator<[string, string]> {
-    const sortedKeys = Array.from(this._map.keys()).sort();
-    for (const key of sortedKeys) {
-      yield [key, this._map.get(key)!.join(', ')];
+  entries(): HeadersIterator<[string, string]> {
+    const map = this._map;
+    const sortedKeys = Array.from(map.keys()).sort();
+    function* gen(): Generator<[string, string]> {
+      for (const key of sortedKeys) {
+        yield [key, map.get(key)!.join(', ')];
+      }
     }
+    return gen() as unknown as HeadersIterator<[string, string]>;
   }
 
-  *keys(): IterableIterator<string> {
-    const sortedKeys = Array.from(this._map.keys()).sort();
-    for (const key of sortedKeys) {
-      yield key;
+  keys(): HeadersIterator<string> {
+    const map = this._map;
+    const sortedKeys = Array.from(map.keys()).sort();
+    function* gen(): Generator<string> {
+      for (const key of sortedKeys) {
+        yield key;
+      }
     }
+    return gen() as unknown as HeadersIterator<string>;
   }
 
-  *values(): IterableIterator<string> {
-    const sortedKeys = Array.from(this._map.keys()).sort();
-    for (const key of sortedKeys) {
-      yield this._map.get(key)!.join(', ');
+  values(): HeadersIterator<string> {
+    const map = this._map;
+    const sortedKeys = Array.from(map.keys()).sort();
+    function* gen(): Generator<string> {
+      for (const key of sortedKeys) {
+        yield map.get(key)!.join(', ');
+      }
     }
+    return gen() as unknown as HeadersIterator<string>;
   }
 
-  [Symbol.iterator](): IterableIterator<[string, string]> {
+  [Symbol.iterator](): HeadersIterator<[string, string]> {
     return this.entries();
   }
 }
