@@ -1,22 +1,33 @@
 let _TextEncoder: typeof TextEncoder | undefined;
 let _TextDecoder: typeof TextDecoder | undefined;
 
-try {
-  _TextEncoder =
-    typeof TextEncoder !== 'undefined'
-      ? TextEncoder
-      : require('react-native-nitro-text-decoder').TextEncoder;
-} catch {
-  /* resolved at first use */
+// The module name is held in a variable so bundlers (webpack, rspack) treat
+// this as an "expression require" rather than a static literal — they won't
+// try to resolve the optional peer at build time. Metro keeps working as
+// before because it evaluates require() lazily.
+const NITRO_TEXT_DECODER_PKG = 'react-native-nitro-text-decoder';
+
+function loadOptionalTextCodec(): {
+  TextEncoder?: typeof TextEncoder;
+  TextDecoder?: typeof TextDecoder;
+} {
+  try {
+    return require(NITRO_TEXT_DECODER_PKG);
+  } catch {
+    return {};
+  }
 }
 
-try {
-  _TextDecoder =
-    typeof TextDecoder !== 'undefined'
-      ? TextDecoder
-      : require('react-native-nitro-text-decoder').TextDecoder;
-} catch {
-  /* resolved at first use */
+if (typeof TextEncoder !== 'undefined') {
+  _TextEncoder = TextEncoder;
+} else {
+  _TextEncoder = loadOptionalTextCodec().TextEncoder;
+}
+
+if (typeof TextDecoder !== 'undefined') {
+  _TextDecoder = TextDecoder;
+} else {
+  _TextDecoder = loadOptionalTextCodec().TextDecoder;
 }
 
 export function stringToUTF8(str: string): Uint8Array {
