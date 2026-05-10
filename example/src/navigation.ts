@@ -11,6 +11,7 @@ export type RootStackParamList = {
   NetworkInspectorScreen: undefined;
   DevToolsDemoScreen: undefined;
   TokenRefreshScreen: undefined;
+  TextDecoderBenchmarkScreen: undefined;
 };
 
 export type MainTabParamList = {

@@ -81,6 +81,14 @@ const EXAMPLES = [
     screen: 'DevToolsDemoScreen' as const,
     icon: '🧪',
   },
+  {
+    id: 'textdecoder-benchmark',
+    title: 'TextDecoder Benchmark',
+    description:
+      'Nitro TextDecoder vs global.TextDecoder across ASCII / mixed / CJK / emoji payloads.',
+    screen: 'TextDecoderBenchmarkScreen' as const,
+    icon: '🔡',
+  },
 ];
 
 export function HomeScreen() {

@@ -19,6 +19,7 @@ import { WebSocketScreen } from './screens/WebSocketScreen';
 import { WebSocketBenchmarkScreen } from './screens/WebSocketBenchmarkScreen';
 import { NetworkInspectorScreen } from './screens/NetworkInspectorScreen';
 import { DevToolsDemoScreen } from './screens/DevToolsDemoScreen';
+import { TextDecoderBenchmarkScreen } from './screens/TextDecoderBenchmarkScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
@@ -143,6 +144,11 @@ export default function App() {
           name="DevToolsDemoScreen"
           component={DevToolsDemoScreen}
           options={{ title: 'DevTools Demo' }}
+        />
+        <Stack.Screen
+          name="TextDecoderBenchmarkScreen"
+          component={TextDecoderBenchmarkScreen}
+          options={{ title: 'TextDecoder Benchmark' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
