@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = package["author"]
 
-  s.platforms    = { :ios => min_ios_version_supported }
+  s.platforms    = { :ios => min_ios_version_supported, :tvos => min_ios_version_supported }
   s.source       = { :git => "http://google.com.git", :tag => "#{s.version}" }
 
 
