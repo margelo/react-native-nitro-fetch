@@ -1,10 +1,6 @@
 let _TextEncoder: typeof TextEncoder | undefined;
 let _TextDecoder: typeof TextDecoder | undefined;
 
-// The module name is held in a variable so bundlers (webpack, rspack) treat
-// this as an "expression require" rather than a static literal — they won't
-// try to resolve the optional peer at build time. Metro keeps working as
-// before because it evaluates require() lazily.
 const NITRO_TEXT_DECODER_PKG = 'react-native-nitro-text-decoder';
 
 function loadOptionalTextCodec(): {
@@ -12,7 +8,15 @@ function loadOptionalTextCodec(): {
   TextDecoder?: typeof TextDecoder;
 } {
   try {
-    return require(NITRO_TEXT_DECODER_PKG);
+    // Hide require from the bundler so the package stays truly optional.
+    // eslint-disable-next-line no-new-func
+    const dynamicRequire = new Function('mod', 'return require(mod);') as (
+      m: string
+    ) => unknown;
+    return dynamicRequire(NITRO_TEXT_DECODER_PKG) as {
+      TextEncoder?: typeof TextEncoder;
+      TextDecoder?: typeof TextDecoder;
+    };
   } catch {
     return {};
   }
