@@ -7,7 +7,6 @@ import type {
   NitroResponse as NitroResponseNative,
 } from './NitroFetch.nitro';
 import {
-  boxedNitroFetch,
   NitroFetch as NitroFetchSingleton,
   NitroCronetSingleton,
 } from './NitroInstances';
@@ -891,10 +890,9 @@ export async function nitroFetchOnWorklet<T>(
   }
   return await runOnRuntimeAsync(rt, () => {
     'worklet';
-    const unboxedNitroFetch = boxedNitroFetch.unbox();
-    const unboxedClient = unboxedNitroFetch.createClient();
+    const nitroFetchClient = NitroFetchHybrid.createClient();
     const request = buildNitroRequestPure(input, init);
-    const res = unboxedClient.requestSync(request);
+    const res = nitroFetchClient.requestSync(request);
     const payload = {
       url: res.url,
       status: res.status,
