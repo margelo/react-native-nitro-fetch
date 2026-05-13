@@ -227,6 +227,10 @@
    return len;
  }
 
+ size_t findASCIIPrefixLength(const uint8_t *ptr, size_t maxLen) {
+   return findASCIIRunLengthScalar(ptr, maxLen);
+ }
+
  // Go-style UTF-8 validator (port of `unicode/utf8.ValidString`).
  // Lead byte → (size:4 | acceptRange:4), one table lookup. Continuation
  // byte(s) validated directly via range compare — no per-byte DFA walk.

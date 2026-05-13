@@ -14,6 +14,9 @@
 
  #include <algorithm>
  #include <stdexcept>
+ #include <vector>
+
+ #include "simdutf.h"
 
  namespace margelo::nitro::nitrotextdecoder {
  using namespace margelo::nitro;
@@ -152,8 +155,52 @@
    }
 
    try {
+     if (_pendingCount == 0 && inputBytes && inputLength > 0) [[likely]] {
+       const uint8_t *dataStart = inputBytes;
+       size_t dataLen = inputLength;
+       if (!_ignoreBOM && !_bomSeen && dataLen >= 3 &&
+           dataStart[0] == 0xEF && dataStart[1] == 0xBB &&
+           dataStart[2] == 0xBF) {
+         dataStart += 3;
+         dataLen -= 3;
+       }
+
+       size_t asciiLen = findASCIIPrefixLength(dataStart, dataLen);
+       if (asciiLen == dataLen) [[likely]] {
+         _bomSeen = stream;
+         return jsi::String::createFromAscii(
+             runtime,
+             reinterpret_cast<const char *>(dataStart),
+             dataLen);
+       }
+
+       auto validation = simdutf::validate_utf8_with_errors(
+           reinterpret_cast<const char *>(dataStart + asciiLen),
+           dataLen - asciiLen);
+       size_t validLen = asciiLen + validation.count;
+       if (validLen == dataLen) [[likely]] {
+         _bomSeen = stream;
+         // Below this size simdutf setup costs more than Hermes' scalar
+         // transcode amortizes — hand raw bytes to Hermes instead.
+         constexpr size_t kSimdMinBytes = 256;
+         if (dataLen >= kSimdMinBytes) {
+           static thread_local std::vector<char16_t> u16Buf;
+           if (u16Buf.size() < dataLen) u16Buf.resize(dataLen);
+           size_t written = simdutf::convert_valid_utf8_to_utf16le(
+               reinterpret_cast<const char *>(dataStart), dataLen,
+               u16Buf.data());
+           return jsi::String::createFromUtf16(
+               runtime, u16Buf.data(), written);
+         }
+         return jsi::String::createFromUtf8(runtime, dataStart, dataLen);
+       }
+     }
+
      std::string result = decodeImpl(inputBytes, inputLength, stream);
-     return jsi::String::createFromUtf8(runtime, result);
+     return jsi::String::createFromUtf8(
+         runtime,
+         reinterpret_cast<const uint8_t *>(result.data()),
+         result.size());
    } catch (const std::exception &e) {
      throw jsi::JSError(runtime, e.what());
    }

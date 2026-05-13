@@ -22,6 +22,8 @@ Pod::Spec.new do |s|
     "cpp/**/*.{hpp,cpp}",
   ]
 
+  s.compiler_flags = '-DSIMDUTF_FEATURE_BASE64=0'
+
   load 'nitrogen/generated/ios/NitroTextDecoder+autolinking.rb'
   add_nitrogen_files(s)
 

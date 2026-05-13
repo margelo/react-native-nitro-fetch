@@ -11,6 +11,13 @@ add_library(${PACKAGE_NAME} SHARED
         ../cpp/HybridTextEncoding.cpp
         ../cpp/HybridTextDecoder.cpp
         ../cpp/TextDecoderUtils.cpp
+        ../cpp/simdutf.cpp
+)
+
+# Drop simdutf's base64 support — the decoder only uses UTF transcoding
+# (~20-30 KB saved on stripped binary).
+target_compile_definitions(${PACKAGE_NAME} PRIVATE
+        SIMDUTF_FEATURE_BASE64=0
 )
 
 # Add Nitrogen specs :)
