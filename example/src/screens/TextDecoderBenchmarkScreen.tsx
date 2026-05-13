@@ -20,7 +20,7 @@ type Row = {
 
 const ITERATIONS = 2000;
 const WARMUP = 200;
-const PASSES = 3;
+const PASSES = 10;
 const BLOCK = 50;
 const SHAPES: Shape[] = [
   'ascii',

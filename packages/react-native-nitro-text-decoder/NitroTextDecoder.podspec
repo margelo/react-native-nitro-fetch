@@ -24,6 +24,14 @@ Pod::Spec.new do |s|
 
   s.compiler_flags = '-DSIMDUTF_FEATURE_BASE64=0'
 
+  # simdutf is tuned for -O3; ThinLTO lets the JSI binding inline into
+  # the simdutf entry points. CocoaPods inherits Xcode's -Os Release
+  # default otherwise, which leaves perf on the table.
+  s.pod_target_xcconfig = {
+    'GCC_OPTIMIZATION_LEVEL' => '3',
+    'LLVM_LTO' => 'YES_THIN',
+  }
+
   load 'nitrogen/generated/ios/NitroTextDecoder+autolinking.rb'
   add_nitrogen_files(s)
 
