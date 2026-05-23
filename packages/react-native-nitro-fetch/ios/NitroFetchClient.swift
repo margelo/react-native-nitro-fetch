@@ -310,7 +310,8 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       }
     }
   }
-  
+
+
   private static func reqToHttpMethod(_ req: NitroRequest) -> String? {
     return req.method?.stringValue
   }

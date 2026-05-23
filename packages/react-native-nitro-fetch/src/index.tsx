@@ -5,6 +5,7 @@ export {
   prefetchOnAppStart,
   removeFromAutoPrefetch,
   removeAllFromAutoprefetch,
+  __readAutoPrefetchQueue,
 } from './fetch';
 export type { NitroFormDataPart } from './fetch';
 export type {

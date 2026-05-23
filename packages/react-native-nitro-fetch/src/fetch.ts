@@ -769,11 +769,19 @@ export async function prefetchOnAppStart(
     {} as Record<string, string>
   );
 
-  const entry = {
+  const entry: Record<string, any> = {
     url: req.url,
     prefetchKey,
     headers: headersObj,
-  } as const;
+  };
+  if (req.method && req.method !== 'GET') entry.method = req.method;
+  if (req.bodyString !== undefined) entry.bodyString = req.bodyString;
+  if (typeof req.bodyBytes === 'string' && req.bodyBytes.length > 0)
+    entry.bodyBytes = req.bodyBytes;
+  if (req.bodyFormData && req.bodyFormData.length > 0)
+    entry.bodyFormData = req.bodyFormData;
+  if (typeof req.timeoutMs === 'number') entry.timeoutMs = req.timeoutMs;
+  if (req.followRedirects === false) entry.followRedirects = false;
 
   // Write or append to storage queue
   try {
@@ -829,6 +837,19 @@ export async function removeFromAutoPrefetch(
 export async function removeAllFromAutoprefetch(): Promise<void> {
   const KEY = 'nitrofetch_autoprefetch_queue';
   NativeStorageSingleton.setString(KEY, JSON.stringify([]));
+}
+
+export function __readAutoPrefetchQueue(): Array<Record<string, any>> {
+  try {
+    const raw = NativeStorageSingleton.getString(
+      'nitrofetch_autoprefetch_queue'
+    );
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 // Optional off-thread processing using react-native-worklets

@@ -19,6 +19,16 @@ const PREFETCH_KEY = 'uuid';
 const NATIVE_PREFETCH_URL = 'https://httpbin.org/anything/native-prefetch-test';
 const NATIVE_PREFETCH_KEY = 'harness-native-prefetch';
 
+const POST_PREFETCH_URL = 'https://httpbin.org/post';
+const POST_PREFETCH_KEY = 'post-prefetch';
+
+const NATIVE_POST_PREFETCH_URL = 'https://httpbin.org/post';
+const NATIVE_POST_PREFETCH_KEY = 'harness-native-post-prefetch';
+
+const JSON_PREFETCH_URL = 'https://httpbin.org/post';
+const JSON_PREFETCH_KEY = 'json-post-prefetch';
+const JSON_PAYLOAD = { user: 'alice', tags: ['a', 'b'], count: 42 };
+
 export function PrefetchScreen() {
   const [logs, setLogs] = React.useState<string[]>([]);
 
@@ -99,6 +109,116 @@ export function PrefetchScreen() {
     }
   };
 
+  const buildPostFormData = () => {
+    const fd = new FormData();
+    fd.append('user', 'alice');
+    fd.append('msg', 'hello from prefetch');
+    return fd;
+  };
+
+  const handleSchedulePost = async () => {
+    try {
+      addLog('Scheduling POST+FormData prefetch on app start...');
+      await prefetchOnAppStart(POST_PREFETCH_URL, {
+        method: 'POST',
+        body: buildPostFormData(),
+        prefetchKey: POST_PREFETCH_KEY,
+      });
+      addLog(
+        '✅ Scheduled POST in queue.\nKill + relaunch app, then tap "Consume POST".'
+      );
+    } catch (e: any) {
+      addLog(`❌ Schedule POST error: ${e?.message ?? String(e)}`);
+    }
+  };
+
+  const handleConsumePost = async () => {
+    try {
+      addLog('Consuming JS-scheduled POST prefetch...');
+      const t0 = performance.now();
+      const res = await nitroFetch(POST_PREFETCH_URL, {
+        method: 'POST',
+        body: buildPostFormData(),
+        headers: { prefetchKey: POST_PREFETCH_KEY },
+      });
+      const body = await res.json();
+      const prefHeader = res.headers.get('nitroPrefetched');
+      const time = (performance.now() - t0).toFixed(0);
+      addLog(
+        `✅ Fetched in ${time}ms\nnitroPrefetched: ${prefHeader ?? 'null'}\n` +
+          `Echo form.user: ${body?.form?.user ?? '(missing)'}`
+      );
+    } catch (e: any) {
+      addLog(`❌ Consume POST error: ${e?.message ?? String(e)}`);
+    }
+  };
+
+  const handleScheduleJsonPost = async () => {
+    try {
+      addLog('Scheduling POST+JSON prefetch on app start...');
+      await prefetchOnAppStart(JSON_PREFETCH_URL, {
+        method: 'POST',
+        body: JSON.stringify(JSON_PAYLOAD),
+        headers: { 'Content-Type': 'application/json' },
+        prefetchKey: JSON_PREFETCH_KEY,
+      });
+      addLog(
+        '✅ Scheduled JSON POST in queue.\nKill + relaunch app, then tap "Consume JSON POST".'
+      );
+    } catch (e: any) {
+      addLog(`❌ Schedule JSON error: ${e?.message ?? String(e)}`);
+    }
+  };
+
+  const handleConsumeJsonPost = async () => {
+    try {
+      addLog('Consuming JS-scheduled JSON POST prefetch...');
+      const t0 = performance.now();
+      const res = await nitroFetch(JSON_PREFETCH_URL, {
+        method: 'POST',
+        body: JSON.stringify(JSON_PAYLOAD),
+        headers: {
+          'Content-Type': 'application/json',
+          'prefetchKey': JSON_PREFETCH_KEY,
+        },
+      });
+      const body = await res.json();
+      const prefHeader = res.headers.get('nitroPrefetched');
+      const time = (performance.now() - t0).toFixed(0);
+      addLog(
+        `✅ Fetched in ${time}ms\nnitroPrefetched: ${prefHeader ?? 'null'}\n` +
+          `Echo json.user: ${body?.json?.user ?? '(missing)'}, count: ${body?.json?.count ?? '(missing)'}`
+      );
+    } catch (e: any) {
+      addLog(`❌ Consume JSON error: ${e?.message ?? String(e)}`);
+    }
+  };
+
+  const handleConsumeNativePost = async () => {
+    try {
+      addLog('Consuming native-registered POST prefetch...');
+      const t0 = performance.now();
+      const fd = new FormData();
+      fd.append('user', 'alice');
+      fd.append('msg', 'hello from native');
+      const res = await nitroFetch(NATIVE_POST_PREFETCH_URL, {
+        method: 'POST',
+        body: fd,
+        headers: { prefetchKey: NATIVE_POST_PREFETCH_KEY },
+      });
+      const body = await res.json();
+      const prefHeader = res.headers.get('nitroPrefetched');
+      const time = (performance.now() - t0).toFixed(0);
+      addLog(
+        `✅ Fetched in ${time}ms\nnitroPrefetched: ${prefHeader ?? 'null'}\n` +
+          `(registered in MainApplication / AppDelegate)\n` +
+          `Echo form.user: ${body?.form?.user ?? '(missing)'}`
+      );
+    } catch (e: any) {
+      addLog(`❌ Consume native POST error: ${e?.message ?? String(e)}`);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.actions}>
@@ -144,6 +264,60 @@ export function PrefetchScreen() {
             </Text>
             <Text style={[styles.buttonSub, styles.primaryBtnSub]}>
               Registered in MainApplication / AppDelegate
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.row}>
+          <Pressable style={styles.button} onPress={handleSchedulePost}>
+            <Text style={styles.buttonText}>Schedule POST</Text>
+            <Text style={styles.buttonSub}>
+              POST + FormData to queue; needs kill + relaunch
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.button, styles.primaryBtn]}
+            onPress={handleConsumePost}
+          >
+            <Text style={[styles.buttonText, styles.primaryBtnText]}>
+              Consume POST
+            </Text>
+            <Text style={[styles.buttonSub, styles.primaryBtnSub]}>
+              Verifies nitroPrefetched + echoed form
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.row}>
+          <Pressable style={styles.button} onPress={handleScheduleJsonPost}>
+            <Text style={styles.buttonText}>Schedule JSON POST</Text>
+            <Text style={styles.buttonSub}>
+              POST + application/json; kill + relaunch
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.button, styles.primaryBtn]}
+            onPress={handleConsumeJsonPost}
+          >
+            <Text style={[styles.buttonText, styles.primaryBtnText]}>
+              Consume JSON POST
+            </Text>
+            <Text style={[styles.buttonSub, styles.primaryBtnSub]}>
+              Verifies echoed json.user / json.count
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={styles.row}>
+          <Pressable
+            style={[styles.button, styles.primaryBtn]}
+            onPress={handleConsumeNativePost}
+          >
+            <Text style={[styles.buttonText, styles.primaryBtnText]}>
+              Consume Native POST
+            </Text>
+            <Text style={[styles.buttonSub, styles.primaryBtnSub]}>
+              POST registered in MainApplication / AppDelegate
             </Text>
           </Pressable>
         </View>

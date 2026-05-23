@@ -31,9 +31,19 @@ object AutoPrefetcher {
     context: Context,
     url: String,
     prefetchKey: String,
-    headers: Map<String, String> = emptyMap()
+    headers: Map<String, String> = emptyMap(),
+    method: String? = null,
+    bodyString: String? = null,
+    bodyBytes: String? = null,
+    bodyFormData: List<Map<String, String?>>? = null,
+    timeoutMs: Double? = null,
+    followRedirects: Boolean? = null,
   ) {
     if (url.isEmpty() || prefetchKey.isEmpty()) return
+    val entry = buildEntryJson(
+      url, prefetchKey, headers,
+      method, bodyString, bodyBytes, bodyFormData, timeoutMs, followRedirects
+    )
     try {
       val prefs = context.applicationContext
         .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -45,14 +55,6 @@ object AutoPrefetcher {
         val o = arr.optJSONObject(i) ?: continue
         if (o.optString("prefetchKey", "") == prefetchKey) continue
         next.put(o)
-      }
-
-      val headersObj = JSONObject()
-      headers.forEach { (k, v) -> headersObj.put(k, v) }
-      val entry = JSONObject().apply {
-        put("url", url)
-        put("prefetchKey", prefetchKey)
-        put("headers", headersObj)
       }
       next.put(entry)
       prefs.edit().putString(KEY_QUEUE, next.toString()).apply()
@@ -73,15 +75,7 @@ object AutoPrefetcher {
           } catch (_: Throwable) { emptyMap() }
         } else emptyMap()
 
-        val single = JSONArray().apply {
-          val headersObj = JSONObject()
-          headers.forEach { (k, v) -> headersObj.put(k, v) }
-          put(JSONObject().apply {
-            put("url", url)
-            put("prefetchKey", prefetchKey)
-            put("headers", headersObj)
-          })
-        }
+        val single = JSONArray().apply { put(entry) }
         startPrefetches(single, tokenHeaders)
       } catch (_: Throwable) {}
     }
@@ -169,18 +163,7 @@ object AutoPrefetcher {
 
       android.util.Log.d("NitroFetch", "[TokenRefresh] Prefetching $url with ${merged.size} header(s)")
       merged.forEach { (k, v) -> android.util.Log.d("NitroFetch", "[TokenRefresh]   $k: $v") }
-      val headerObjs = merged.map { (k, v) -> NitroHeader(k, v) }.toTypedArray()
-      val req = NitroRequest(
-        url = url,
-        method = null,
-        headers = headerObjs,
-        bodyString = null,
-        bodyBytes = null,
-        bodyFormData = null,
-        timeoutMs = null,
-        followRedirects = null,
-        requestId = null
-      )
+      val req = buildNitroRequestFromEntry(url, merged, o)
 
       if (FetchCache.getPending(prefetchKey) != null) continue
       if (FetchCache.hasFreshResult(prefetchKey, 5_000L)) continue
@@ -203,6 +186,95 @@ object AutoPrefetcher {
         }
       )
     }
+  }
+
+  private fun buildEntryJson(
+    url: String,
+    prefetchKey: String,
+    headers: Map<String, String>,
+    method: String?,
+    bodyString: String?,
+    bodyBytes: String?,
+    bodyFormData: List<Map<String, String?>>?,
+    timeoutMs: Double?,
+    followRedirects: Boolean?,
+  ): JSONObject {
+    val headersObj = JSONObject()
+    headers.forEach { (k, v) -> headersObj.put(k, v) }
+    return JSONObject().apply {
+      put("url", url)
+      put("prefetchKey", prefetchKey)
+      put("headers", headersObj)
+      if (method != null && method.isNotEmpty() && method != "GET") put("method", method)
+      if (bodyString != null) put("bodyString", bodyString)
+      if (bodyBytes != null) put("bodyBytes", bodyBytes)
+      if (!bodyFormData.isNullOrEmpty()) {
+        val arr = JSONArray()
+        bodyFormData.forEach { part ->
+          val obj = JSONObject()
+          part["name"]?.let { obj.put("name", it) }
+          part["value"]?.let { obj.put("value", it) }
+          part["fileUri"]?.let { obj.put("fileUri", it) }
+          part["fileName"]?.let { obj.put("fileName", it) }
+          part["mimeType"]?.let { obj.put("mimeType", it) }
+          arr.put(obj)
+        }
+        put("bodyFormData", arr)
+      }
+      if (timeoutMs != null) put("timeoutMs", timeoutMs)
+      if (followRedirects == false) put("followRedirects", false)
+    }
+  }
+
+  private fun buildNitroRequestFromEntry(
+    url: String,
+    mergedHeaders: Map<String, String>,
+    entry: JSONObject?,
+  ): NitroRequest {
+    val headerObjs = mergedHeaders.map { (k, v) -> NitroHeader(k, v) }.toTypedArray()
+
+    val methodStr = entry?.optString("method", "")?.takeIf { it.isNotEmpty() }
+    val method: NitroRequestMethod? = methodStr?.let {
+      runCatching { NitroRequestMethod.valueOf(it) }.getOrNull()
+    }
+    val bodyString = entry
+      ?.takeIf { it.has("bodyString") && !it.isNull("bodyString") }
+      ?.optString("bodyString")
+    val bodyBytes = entry
+      ?.takeIf { it.has("bodyBytes") && !it.isNull("bodyBytes") }
+      ?.optString("bodyBytes")
+    val timeoutMs = entry
+      ?.takeIf { it.has("timeoutMs") && !it.isNull("timeoutMs") }
+      ?.optDouble("timeoutMs")
+    val followRedirects = entry
+      ?.takeIf { it.has("followRedirects") && !it.isNull("followRedirects") }
+      ?.optBoolean("followRedirects")
+
+    val formArr = entry?.optJSONArray("bodyFormData")
+    val bodyFormData: Array<NitroFormDataPart>? = formArr?.let { ja ->
+      Array(ja.length()) { i ->
+        val p = ja.optJSONObject(i) ?: JSONObject()
+        NitroFormDataPart(
+          name = p.optString("name", ""),
+          value = if (p.has("value") && !p.isNull("value")) p.optString("value") else null,
+          fileUri = if (p.has("fileUri") && !p.isNull("fileUri")) p.optString("fileUri") else null,
+          fileName = if (p.has("fileName") && !p.isNull("fileName")) p.optString("fileName") else null,
+          mimeType = if (p.has("mimeType") && !p.isNull("mimeType")) p.optString("mimeType") else null
+        )
+      }
+    }
+
+    return NitroRequest(
+      url = url,
+      method = method,
+      headers = headerObjs,
+      bodyString = bodyString,
+      bodyBytes = bodyBytes,
+      bodyFormData = bodyFormData,
+      timeoutMs = timeoutMs,
+      followRedirects = followRedirects,
+      requestId = null
+    )
   }
 
   // MARK: - Token refresh (synchronous, runs on background thread)
