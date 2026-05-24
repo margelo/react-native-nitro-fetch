@@ -19,7 +19,7 @@ const config = {
     }),
     applePlatform({
       name: 'ios',
-      device: appleSimulator('iPhone 17 Pro', '26.5'), // Your iOS simulator name and version
+      device: appleSimulator('iPhone 17 Pro', '26.2'), // Your iOS simulator name and version
       bundleId: 'nitrofetch.example', // Your iOS bundle ID
     }),
   ],
