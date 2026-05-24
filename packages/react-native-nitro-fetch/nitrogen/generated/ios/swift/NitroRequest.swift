@@ -18,7 +18,7 @@ public extension NitroRequest {
   /**
    * Create a new instance of `NitroRequest`.
    */
-  init(url: String, method: NitroRequestMethod?, headers: [NitroHeader]?, bodyString: String?, bodyBytes: String?, bodyFormData: [NitroFormDataPart]?, timeoutMs: Double?, followRedirects: Bool?, requestId: String?) {
+  init(url: String, method: NitroRequestMethod?, headers: [NitroHeader]?, bodyString: String?, bodyBytes: String?, bodyFormData: [NitroFormDataPart]?, timeoutMs: Double?, followRedirects: Bool?, prefetchCacheTtlMs: Double?, requestId: String?) {
     self.init(std.string(url), { () -> bridge.std__optional_NitroRequestMethod_ in
       if let __unwrappedValue = method {
         return bridge.create_std__optional_NitroRequestMethod_(__unwrappedValue)
@@ -70,6 +70,12 @@ public extension NitroRequest {
     }(), { () -> bridge.std__optional_bool_ in
       if let __unwrappedValue = followRedirects {
         return bridge.create_std__optional_bool_(__unwrappedValue)
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_double_ in
+      if let __unwrappedValue = prefetchCacheTtlMs {
+        return bridge.create_std__optional_double_(__unwrappedValue)
       } else {
         return .init()
       }
@@ -175,6 +181,18 @@ public extension NitroRequest {
     return { () -> Bool? in
       if bridge.has_value_std__optional_bool_(self.__followRedirects) {
         let __unwrapped = bridge.get_std__optional_bool_(self.__followRedirects)
+        return __unwrapped
+      } else {
+        return nil
+      }
+    }()
+  }
+  
+  @inline(__always)
+  var prefetchCacheTtlMs: Double? {
+    return { () -> Double? in
+      if bridge.has_value_std__optional_double_(self.__prefetchCacheTtlMs) {
+        let __unwrapped = bridge.get_std__optional_double_(self.__prefetchCacheTtlMs)
         return __unwrapped
       } else {
         return nil

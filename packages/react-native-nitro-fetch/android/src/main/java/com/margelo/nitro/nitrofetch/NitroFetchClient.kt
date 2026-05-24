@@ -403,7 +403,7 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
           throw e.cause ?: e
         }
       }
-      FetchCache.getResultIfFresh(key, 5_000L)?.let { cached ->
+      FetchCache.getResultIfFresh(key, req.prefetchCacheTtlMs?.toLong() ?: 5_000L)?.let { cached ->
         return withPrefetchedHeader(cached)
       }
     }
@@ -445,8 +445,8 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         }
         return promise
       }
-      // If a fresh prefetched result exists (<=5s old), return it immediately
-      FetchCache.getResultIfFresh(key, 5_000L)?.let { cached ->
+      // If a fresh prefetched result exists, return it immediately
+      FetchCache.getResultIfFresh(key, req.prefetchCacheTtlMs?.toLong() ?: 5_000L)?.let { cached ->
         promise.resolve(withPrefetchedHeader(cached))
         return promise
       }
@@ -479,7 +479,7 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       return promise
     }
     // If already have a fresh result, resolve immediately (NON-DESTRUCTIVE CHECK)
-    if (FetchCache.hasFreshResult(key, 5_000L)) {
+    if (FetchCache.hasFreshResult(key, req.prefetchCacheTtlMs?.toLong() ?: 5_000L)) {
       promise.resolve(Unit)
       return promise
     }

@@ -109,6 +109,64 @@ For FormData with file uploads, only reference stable URIs (bundled assets, pers
 
 The fields are JSON-serialized in `NativeStorage` under `nitrofetch_autoprefetch_queue`. Defaults are omitted to keep entries compact and backward-compatible: a body-less GET stays `{ url, prefetchKey, headers }`.
 
+## Cache TTL
+
+A cached prefetch is considered fresh for **5 seconds** by default. The check happens at *read time* — when `fetch()` looks up the entry, anything older than the TTL is evicted and the request goes to the network. Five seconds is fine for "prewarm the next screen the user is about to tap," but too short for cross-launch prefetches that have to survive the JS bundle boot, or for screens reached via a slow route.
+
+Pass `prefetchCacheTtlMs` on **both** the prefetch and the consuming `fetch()` to widen the window — each call brings its own TTL (there is no global default to set):
+
+```ts
+// In-session: keep the prefetched response fresh for up to 60s.
+await prefetch('https://api.example.com/items/42', {
+  headers: { prefetchKey: 'item-42' },
+  prefetchCacheTtlMs: 60_000,
+});
+
+// Consume — pass the same TTL so the cache hit isn't skipped.
+const res = await fetch('https://api.example.com/items/42', {
+  headers: { prefetchKey: 'item-42' },
+  prefetchCacheTtlMs: 60_000,
+});
+```
+
+For cross-launch prefetches, the TTL is persisted next to the request in the queue, so the next cold start honors it:
+
+```ts
+await prefetchOnAppStart('https://api.example.com/feed', {
+  prefetchKey: 'home-feed',
+  prefetchCacheTtlMs: 5 * 60_000, // 5 minutes
+});
+```
+
+For native-side registration, both platforms accept the TTL:
+
+```kotlin
+// Android
+AutoPrefetcher.registerPrefetch(
+  context = this,
+  url = "https://api.example.com/feed",
+  prefetchKey = "feed",
+  headers = mapOf("Accept" to "application/json"),
+  prefetchCacheTtlMs = 300_000.0, // Double, in ms
+)
+```
+
+```swift
+// iOS — extended @objc selector with trailing prefetchCacheTtlMs:
+NitroAutoPrefetcher.registerPrefetch(
+  withURL: "https://api.example.com/feed",
+  prefetchKey: "feed",
+  headers: ["Accept": "application/json"],
+  method: nil, bodyString: nil, bodyBytes: nil, bodyFormData: nil,
+  timeoutMs: nil, followRedirects: nil,
+  prefetchCacheTtlMs: NSNumber(value: 300_000)
+)
+```
+
+:::note
+Omitting `prefetchCacheTtlMs` preserves the historical 5-second behavior. A value `<= 0` disables cache hits for that key (any positive age fails the `age <= maxAgeMs` check). A long TTL widens the "stale-after-deploy" window — bump the `prefetchKey` on backend schema changes regardless of TTL.
+:::
+
 ## Why Prefetch Is Cool
 
 - **Earlier start at app launch**: Auto-prefetch can kick off network work immediately when the process starts, before React and JS are ready. On mid-range Android devices (e.g., Samsung A16), we observed the prefetch starting at least **~220 ms** earlier than triggering the same request from JS after the app warms up.

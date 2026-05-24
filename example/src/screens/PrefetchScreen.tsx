@@ -29,20 +29,60 @@ const JSON_PREFETCH_URL = 'https://httpbin.org/post';
 const JSON_PREFETCH_KEY = 'json-post-prefetch';
 const JSON_PAYLOAD = { user: 'alice', tags: ['a', 'b'], count: 42 };
 
+// 60-second TTL demo: prefetch a UUID, wait past the 5s default, then fetch
+// it and confirm the cache still serves the entry because we widened the TTL.
+const TTL_PREFETCH_URL = 'https://httpbin.org/uuid';
+const TTL_PREFETCH_KEY = 'uuid-60s';
+const TTL_MS = 60_000;
+
+// Tracks the wall-clock time (ms since epoch) at which each prefetch key was
+// last dispatched, so the consume handler can report elapsed time and a
+// verdict (would-HIT vs would-MISS at the default 5s TTL). This makes agent
+// device interactions auditable: even if the agent is slow to tap, the log
+// proves whether the cache was within the freshness window.
+const lastPrefetchAt: Record<string, number> = {};
+
+function fmtNow(): string {
+  const d = new Date();
+  const ms = String(d.getMilliseconds()).padStart(3, '0');
+  return `${d.toLocaleTimeString()}.${ms}`;
+}
+
 export function PrefetchScreen() {
   const [logs, setLogs] = React.useState<string[]>([]);
 
   const addLog = (msg: string) => {
-    setLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev]);
+    const line = `[${fmtNow()}] ${msg}`;
+    console.log('[PrefetchScreen]', line);
+    setLogs((prev) => [line, ...prev]);
+  };
+
+  const markPrefetch = (key: string) => {
+    const at = Date.now();
+    lastPrefetchAt[key] = at;
+    return at;
+  };
+
+  const elapsedSincePrefetch = (key: string, ttlMs: number) => {
+    const at = lastPrefetchAt[key];
+    if (!at) return null;
+    const elapsed = Date.now() - at;
+    const withinDefault = elapsed <= 5_000;
+    const withinTtl = elapsed <= ttlMs;
+    return { at, elapsed, withinDefault, withinTtl };
   };
 
   const handlePrefetch = async () => {
     try {
-      addLog('Starting prefetch...');
+      const dispatchedAt = markPrefetch(PREFETCH_KEY);
+      addLog(
+        `Prefetch(default-5s) dispatched at T0=${dispatchedAt} ` +
+          `(key=${PREFETCH_KEY})`
+      );
       await prefetch(PREFETCH_URL, {
         headers: { prefetchKey: PREFETCH_KEY },
       });
-      addLog('✅ Prefetch request dispatched natively');
+      addLog('✅ Prefetch(default) dispatched OK');
     } catch (e: any) {
       addLog(`❌ Prefetch error: ${e?.message ?? String(e)}`);
     }
@@ -50,7 +90,12 @@ export function PrefetchScreen() {
 
   const handleFetchPrefetched = async () => {
     try {
-      addLog('Fetching from prefetched cache...');
+      const consumeAt = Date.now();
+      const info = elapsedSincePrefetch(PREFETCH_KEY, 5_000);
+      const elapsedStr = info
+        ? `elapsed=${info.elapsed}ms (default5s would ${info.withinDefault ? 'HIT' : 'MISS'})`
+        : `(no prior prefetch tracked)`;
+      addLog(`Consume(default) at T1=${consumeAt} ${elapsedStr}`);
       const t0 = performance.now();
       const res = await nitroFetch(PREFETCH_URL, {
         headers: { prefetchKey: PREFETCH_KEY },
@@ -58,9 +103,11 @@ export function PrefetchScreen() {
       const text = await res.text();
       const prefHeader = res.headers.get('nitroPrefetched');
       const time = (performance.now() - t0).toFixed(0);
-
+      const verdict =
+        prefHeader === 'true' ? 'CACHE_HIT' : 'CACHE_MISS_(network)';
       addLog(
-        `✅ Fetched in ${time}ms\nnitroPrefetched: ${prefHeader ?? 'null'}\nResponse: ${text.substring(0, 50)}...`
+        `✅ ${verdict} in ${time}ms nitroPrefetched=${prefHeader ?? 'null'} ` +
+          `body=${text.substring(0, 40)}...`
       );
     } catch (e: any) {
       addLog(`❌ Fetch error: ${e?.message ?? String(e)}`);
@@ -81,18 +128,29 @@ export function PrefetchScreen() {
 
   const handleConsumeNativePrefetch = async () => {
     try {
-      addLog('Consuming native-registered prefetch...');
+      const consumeAt = Date.now();
+      // Match the TTL the native registration uses in MainApplication.kt /
+      // AppDelegate.swift (300_000ms). Without this, the consume side falls
+      // back to the 5s default and a cold-start cache hit only works when JS
+      // mounts within 5s of native prefetch completion — fragile in practice.
+      const NATIVE_TTL_MS = 300_000;
+      addLog(
+        `Consume(native-prefetch, TTL=${NATIVE_TTL_MS / 1000}s) at T1=${consumeAt} ` +
+          `(key=${NATIVE_PREFETCH_KEY})`
+      );
       const t0 = performance.now();
       const res = await nitroFetch(NATIVE_PREFETCH_URL, {
         headers: { prefetchKey: NATIVE_PREFETCH_KEY },
-      });
+        prefetchCacheTtlMs: NATIVE_TTL_MS,
+      } as any);
       const text = await res.text();
       const prefHeader = res.headers.get('nitroPrefetched');
       const time = (performance.now() - t0).toFixed(0);
+      const verdict =
+        prefHeader === 'true' ? 'CACHE_HIT' : 'CACHE_MISS_(network)';
       addLog(
-        `✅ Fetched in ${time}ms\nnitroPrefetched: ${prefHeader ?? 'null'}\n` +
-          `(registered natively in MainApplication / AppDelegate, fires on first cold launch)\n` +
-          `Response: ${text.substring(0, 60)}...`
+        `✅ ${verdict} in ${time}ms nitroPrefetched=${prefHeader ?? 'null'} ` +
+          `body=${text.substring(0, 40)}...`
       );
     } catch (e: any) {
       addLog(`❌ Native prefetch consume error: ${e?.message ?? String(e)}`);
@@ -194,6 +252,50 @@ export function PrefetchScreen() {
     }
   };
 
+  const handlePrefetchWithTtl = async () => {
+    try {
+      const dispatchedAt = markPrefetch(TTL_PREFETCH_KEY);
+      addLog(
+        `Prefetch(TTL=${TTL_MS / 1000}s) dispatched at T0=${dispatchedAt} ` +
+          `(key=${TTL_PREFETCH_KEY})`
+      );
+      await prefetch(TTL_PREFETCH_URL, {
+        headers: { prefetchKey: TTL_PREFETCH_KEY },
+        prefetchCacheTtlMs: TTL_MS,
+      } as any);
+      addLog(`✅ Prefetch(TTL) dispatched OK`);
+    } catch (e: any) {
+      addLog(`❌ Prefetch (TTL) error: ${e?.message ?? String(e)}`);
+    }
+  };
+
+  const handleConsumeTtl = async () => {
+    try {
+      const consumeAt = Date.now();
+      const info = elapsedSincePrefetch(TTL_PREFETCH_KEY, TTL_MS);
+      const elapsedStr = info
+        ? `elapsed=${info.elapsed}ms (default5s would ${info.withinDefault ? 'HIT' : 'MISS'}; 60sTTL would ${info.withinTtl ? 'HIT' : 'MISS'})`
+        : `(no prior prefetch tracked)`;
+      addLog(`Consume(TTL) at T1=${consumeAt} ${elapsedStr}`);
+      const t0 = performance.now();
+      const res = await nitroFetch(TTL_PREFETCH_URL, {
+        headers: { prefetchKey: TTL_PREFETCH_KEY },
+        prefetchCacheTtlMs: TTL_MS,
+      } as any);
+      const text = await res.text();
+      const prefHeader = res.headers.get('nitroPrefetched');
+      const time = (performance.now() - t0).toFixed(0);
+      const verdict =
+        prefHeader === 'true' ? 'CACHE_HIT' : 'CACHE_MISS_(network)';
+      addLog(
+        `✅ ${verdict} in ${time}ms nitroPrefetched=${prefHeader ?? 'null'} ` +
+          `body=${text.substring(0, 40)}...`
+      );
+    } catch (e: any) {
+      addLog(`❌ Consume (TTL) error: ${e?.message ?? String(e)}`);
+    }
+  };
+
   const handleConsumeNativePost = async () => {
     try {
       addLog('Consuming native-registered POST prefetch...');
@@ -221,7 +323,10 @@ export function PrefetchScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.actions}>
+      <ScrollView
+        style={styles.actionsScroll}
+        contentContainerStyle={styles.actions}
+      >
         <View style={styles.row}>
           <Pressable style={styles.button} onPress={handlePrefetch}>
             <Text style={styles.buttonText}>Prefetch Now</Text>
@@ -321,7 +426,27 @@ export function PrefetchScreen() {
             </Text>
           </Pressable>
         </View>
-      </View>
+
+        <View style={styles.row}>
+          <Pressable style={styles.button} onPress={handlePrefetchWithTtl}>
+            <Text style={styles.buttonText}>Prefetch (60s TTL)</Text>
+            <Text style={styles.buttonSub}>
+              prefetchCacheTtlMs: 60_000 — survives past the 5s default
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.button, styles.primaryBtn]}
+            onPress={handleConsumeTtl}
+          >
+            <Text style={[styles.buttonText, styles.primaryBtnText]}>
+              Consume 60s TTL
+            </Text>
+            <Text style={[styles.buttonSub, styles.primaryBtnSub]}>
+              Wait &gt; 5s after prefetch; cache still hits
+            </Text>
+          </Pressable>
+        </View>
+      </ScrollView>
 
       <View style={styles.logContainer}>
         <Text style={styles.logTitle}>Execution Logs</Text>
@@ -348,9 +473,13 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
     padding: theme.spacing.md,
   },
+  actionsScroll: {
+    flexGrow: 0,
+    maxHeight: '55%',
+    marginBottom: theme.spacing.lg,
+  },
   actions: {
     gap: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
   },
   row: {
     flexDirection: 'row',

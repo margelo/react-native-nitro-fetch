@@ -167,7 +167,11 @@ function ensureClient() {
 
 function buildNitroRequest(
   input: RequestInfo | URL,
-  init?: RequestInit & { redirect?: RequestRedirect; cache?: RequestCache }
+  init?: RequestInit & {
+    redirect?: RequestRedirect;
+    cache?: RequestCache;
+    prefetchCacheTtlMs?: number;
+  }
 ): NitroRequestNative {
   'worklet';
   let url: string;
@@ -216,6 +220,11 @@ function buildNitroRequest(
   // Determine followRedirects based on redirect option
   const followRedirects = redirectOption === 'follow';
 
+  const prefetchCacheTtlMs =
+    typeof init?.prefetchCacheTtlMs === 'number'
+      ? init.prefetchCacheTtlMs
+      : undefined;
+
   return {
     url,
     method: (method?.toUpperCase() as any) ?? 'GET',
@@ -224,6 +233,7 @@ function buildNitroRequest(
     bodyBytes: undefined as any,
     bodyFormData: normalized?.bodyFormData,
     followRedirects,
+    prefetchCacheTtlMs,
   };
 }
 
@@ -324,7 +334,7 @@ function normalizeBodyPure(
 // Pure JS version of buildNitroRequest that doesnt use anything that breaks worklets
 export function buildNitroRequestPure(
   input: RequestInfo | URL,
-  init?: RequestInit
+  init?: RequestInit & { prefetchCacheTtlMs?: number }
 ): NitroRequestNative {
   'worklet';
   let url: string;
@@ -356,6 +366,11 @@ export function buildNitroRequestPure(
   const headers = headersToPairsPure(headersInit);
   const normalized = normalizeBodyPure(body);
 
+  const prefetchCacheTtlMs =
+    typeof init?.prefetchCacheTtlMs === 'number'
+      ? init.prefetchCacheTtlMs
+      : undefined;
+
   return {
     url,
     method: (method?.toUpperCase() as any) ?? 'GET',
@@ -364,6 +379,7 @@ export function buildNitroRequestPure(
     // Only include bodyBytes when provided to avoid signaling upload data unintentionally
     bodyBytes: undefined as any,
     followRedirects: true,
+    prefetchCacheTtlMs,
   };
 }
 
@@ -782,6 +798,8 @@ export async function prefetchOnAppStart(
     entry.bodyFormData = req.bodyFormData;
   if (typeof req.timeoutMs === 'number') entry.timeoutMs = req.timeoutMs;
   if (req.followRedirects === false) entry.followRedirects = false;
+  if (typeof req.prefetchCacheTtlMs === 'number')
+    entry.prefetchCacheTtlMs = req.prefetchCacheTtlMs;
 
   // Write or append to storage queue
   try {

@@ -17,13 +17,14 @@ describe('NitroFetch - Native registerPrefetch', () => {
   const NP_URL = 'https://httpbin.org/anything/native-prefetch-test';
   const NP_KEY = 'harness-native-prefetch';
 
-  // Skipped: races against the 5s FetchCache TTL. On CI the harness reaches
-  // this test ~60s after app launch, well past the cached prefetch's freshness
-  // window, so the cache-hit assertion flakes.
-  it.skip('serves a cache hit on the first JS fetch (first-run prefetching)', async () => {
+  it('serves a cache hit on the first JS fetch (first-run prefetching)', async () => {
+    // The native registration in AppDelegate / MainApplication uses a long
+    // prefetchCacheTtlMs (300s) so the cache survives well past app launch;
+    // pass the same TTL here so the cache-hit lookup uses the matching window.
     const res = await nitroFetch(NP_URL, {
       headers: { prefetchKey: NP_KEY },
-    });
+      prefetchCacheTtlMs: 300_000,
+    } as any);
     expect(res.ok).toBe(true);
     expect(res.headers.get('nitroPrefetched')).toBe('true');
   });
@@ -32,6 +33,55 @@ describe('NitroFetch - Native registerPrefetch', () => {
     // Native registration shares storage with JS prefetchOnAppStart, so
     // removeFromAutoPrefetch is the canonical removal API for both paths.
     await removeFromAutoPrefetch(NP_KEY);
+  });
+});
+
+describe('NitroFetch - Prefetch cache TTL', () => {
+  it('custom TTL keeps the prefetch fresh past the 5s default', async () => {
+    // Unique per-run key + URL so we never collide with a previous app session.
+    const STAMP = String(Date.now());
+    const KEY = 'ttl-long-' + STAMP;
+    const URL = `${BASE}/anything/ttl-test-${STAMP}`;
+    await prefetch(URL, {
+      headers: { prefetchKey: KEY },
+      prefetchCacheTtlMs: 60_000,
+    } as any);
+    // Wait past the default 5s window (giving the prefetch ample time to land).
+    // 8s exceeds the 5s default; the 60s TTL keeps the entry fresh.
+    await new Promise((r) => setTimeout(r, 8_000));
+    const res = await nitroFetch(URL, {
+      headers: { prefetchKey: KEY },
+      prefetchCacheTtlMs: 60_000,
+    } as any);
+    expect(res.ok).toBe(true);
+    expect(res.headers.get('nitroPrefetched')).toBe('true');
+  });
+
+  it('prefetchOnAppStart persists prefetchCacheTtlMs into the queue', async () => {
+    const KEY = 'pf-ttl-persisted';
+    await prefetchOnAppStart('https://httpbin.org/get', {
+      prefetchKey: KEY,
+      prefetchCacheTtlMs: 12_345,
+    } as any);
+    const entry = __readAutoPrefetchQueue().find(
+      (e: any) => e?.prefetchKey === KEY
+    );
+    expect(entry).toBeDefined();
+    expect(entry!.prefetchCacheTtlMs).toBe(12_345);
+    await removeFromAutoPrefetch(KEY);
+  });
+
+  it('omitting prefetchCacheTtlMs leaves the queue entry without the field', async () => {
+    const KEY = 'pf-ttl-omitted';
+    await prefetchOnAppStart('https://httpbin.org/get', {
+      prefetchKey: KEY,
+    } as any);
+    const entry = __readAutoPrefetchQueue().find(
+      (e: any) => e?.prefetchKey === KEY
+    );
+    expect(entry).toBeDefined();
+    expect(entry!.prefetchCacheTtlMs).toBeUndefined();
+    await removeFromAutoPrefetch(KEY);
   });
 });
 

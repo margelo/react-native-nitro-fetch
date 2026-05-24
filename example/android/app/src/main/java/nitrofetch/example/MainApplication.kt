@@ -28,10 +28,12 @@ class MainApplication : Application(), ReactApplication {
     // Native-side prefetch registration — fires on the very first cold launch.
     try {
       AutoPrefetcher.registerPrefetch(
-        this,
-        "https://httpbin.org/anything/native-prefetch-test",
-        "harness-native-prefetch",
-        mapOf("Accept" to "application/json")
+        context = this,
+        url = "https://httpbin.org/anything/native-prefetch-test",
+        prefetchKey = "harness-native-prefetch",
+        headers = mapOf("Accept" to "application/json"),
+        // Long TTL so the harness can hit the cache long after launch.
+        prefetchCacheTtlMs = 300_000.0
       )
     } catch (_: Throwable) {}
     // Best-effort auto prefetch when engine initializes (app start)

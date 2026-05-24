@@ -36,6 +36,9 @@ export interface NitroRequest {
   // Controls
   timeoutMs?: number;
   followRedirects?: boolean; // default true
+  // Max age (ms) a prefetch cache entry is considered fresh at read time.
+  // Default 5000 when omitted. <= 0 disables cache hits.
+  prefetchCacheTtlMs?: number;
   // Optional ID used for cancellation via cancelRequest()
   requestId?: string;
 }
