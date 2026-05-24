@@ -38,11 +38,13 @@ object AutoPrefetcher {
     bodyFormData: List<Map<String, String?>>? = null,
     timeoutMs: Double? = null,
     followRedirects: Boolean? = null,
+    prefetchCacheTtlMs: Double? = null,
   ) {
     if (url.isEmpty() || prefetchKey.isEmpty()) return
     val entry = buildEntryJson(
       url, prefetchKey, headers,
-      method, bodyString, bodyBytes, bodyFormData, timeoutMs, followRedirects
+      method, bodyString, bodyBytes, bodyFormData, timeoutMs, followRedirects,
+      prefetchCacheTtlMs
     )
     try {
       val prefs = context.applicationContext
@@ -166,7 +168,10 @@ object AutoPrefetcher {
       val req = buildNitroRequestFromEntry(url, merged, o)
 
       if (FetchCache.getPending(prefetchKey) != null) continue
-      if (FetchCache.hasFreshResult(prefetchKey, 5_000L)) continue
+      val entryTtlMs = if (o.has("prefetchCacheTtlMs") && !o.isNull("prefetchCacheTtlMs")) {
+        o.optDouble("prefetchCacheTtlMs").toLong()
+      } else 5_000L
+      if (FetchCache.hasFreshResult(prefetchKey, entryTtlMs)) continue
 
       val future = CompletableFuture<NitroResponse>()
       FetchCache.setPending(prefetchKey, future)
@@ -198,6 +203,7 @@ object AutoPrefetcher {
     bodyFormData: List<Map<String, String?>>?,
     timeoutMs: Double?,
     followRedirects: Boolean?,
+    prefetchCacheTtlMs: Double? = null,
   ): JSONObject {
     val headersObj = JSONObject()
     headers.forEach { (k, v) -> headersObj.put(k, v) }
@@ -223,6 +229,7 @@ object AutoPrefetcher {
       }
       if (timeoutMs != null) put("timeoutMs", timeoutMs)
       if (followRedirects == false) put("followRedirects", false)
+      if (prefetchCacheTtlMs != null) put("prefetchCacheTtlMs", prefetchCacheTtlMs)
     }
   }
 
@@ -249,6 +256,9 @@ object AutoPrefetcher {
     val followRedirects = entry
       ?.takeIf { it.has("followRedirects") && !it.isNull("followRedirects") }
       ?.optBoolean("followRedirects")
+    val prefetchCacheTtlMs = entry
+      ?.takeIf { it.has("prefetchCacheTtlMs") && !it.isNull("prefetchCacheTtlMs") }
+      ?.optDouble("prefetchCacheTtlMs")
 
     val formArr = entry?.optJSONArray("bodyFormData")
     val bodyFormData: Array<NitroFormDataPart>? = formArr?.let { ja ->
@@ -273,6 +283,7 @@ object AutoPrefetcher {
       bodyFormData = bodyFormData,
       timeoutMs = timeoutMs,
       followRedirects = followRedirects,
+      prefetchCacheTtlMs = prefetchCacheTtlMs,
       requestId = null
     )
   }

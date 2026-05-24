@@ -119,7 +119,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
   public class func requestStatic(_ req: NitroRequest) async throws -> NitroResponse {
     if let key = findPrefetchKey(req) {
       // If a prefetched result is fresh, return immediately
-      if let cached = FetchCache.getResultIfFresh(key, maxAgeMs: 5_000) {
+      if let cached = FetchCache.getResultIfFresh(key, maxAgeMs: Int64(req.prefetchCacheTtlMs ?? 5_000)) {
         var headers = cached.headers ?? []
         headers.append(NitroHeader(key: "nitroPrefetched", value: "true"))
         return NitroResponse(url: cached.url,
@@ -267,7 +267,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       throw NSError(domain: "NitroFetch", code: -2, userInfo: [NSLocalizedDescriptionKey: "prefetch: missing 'prefetchKey' header"])
     }
 
-    if FetchCache.getResultIfFresh(key, maxAgeMs: 5_000) != nil {
+    if FetchCache.getResultIfFresh(key, maxAgeMs: Int64(req.prefetchCacheTtlMs ?? 5_000)) != nil {
       return // already have a fresh result
     }
 

@@ -57,11 +57,12 @@ namespace margelo::nitro::nitrofetch {
     std::optional<std::vector<NitroFormDataPart>> bodyFormData     SWIFT_PRIVATE;
     std::optional<double> timeoutMs     SWIFT_PRIVATE;
     std::optional<bool> followRedirects     SWIFT_PRIVATE;
+    std::optional<double> prefetchCacheTtlMs     SWIFT_PRIVATE;
     std::optional<std::string> requestId     SWIFT_PRIVATE;
 
   public:
     NitroRequest() = default;
-    explicit NitroRequest(std::string url, std::optional<NitroRequestMethod> method, std::optional<std::vector<NitroHeader>> headers, std::optional<std::string> bodyString, std::optional<std::string> bodyBytes, std::optional<std::vector<NitroFormDataPart>> bodyFormData, std::optional<double> timeoutMs, std::optional<bool> followRedirects, std::optional<std::string> requestId): url(url), method(method), headers(headers), bodyString(bodyString), bodyBytes(bodyBytes), bodyFormData(bodyFormData), timeoutMs(timeoutMs), followRedirects(followRedirects), requestId(requestId) {}
+    explicit NitroRequest(std::string url, std::optional<NitroRequestMethod> method, std::optional<std::vector<NitroHeader>> headers, std::optional<std::string> bodyString, std::optional<std::string> bodyBytes, std::optional<std::vector<NitroFormDataPart>> bodyFormData, std::optional<double> timeoutMs, std::optional<bool> followRedirects, std::optional<double> prefetchCacheTtlMs, std::optional<std::string> requestId): url(url), method(method), headers(headers), bodyString(bodyString), bodyBytes(bodyBytes), bodyFormData(bodyFormData), timeoutMs(timeoutMs), followRedirects(followRedirects), prefetchCacheTtlMs(prefetchCacheTtlMs), requestId(requestId) {}
 
   public:
     friend bool operator==(const NitroRequest& lhs, const NitroRequest& rhs) = default;
@@ -85,6 +86,7 @@ namespace margelo::nitro {
         JSIConverter<std::optional<std::vector<margelo::nitro::nitrofetch::NitroFormDataPart>>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bodyFormData"))),
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "timeoutMs"))),
         JSIConverter<std::optional<bool>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "followRedirects"))),
+        JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "prefetchCacheTtlMs"))),
         JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "requestId")))
       );
     }
@@ -98,6 +100,7 @@ namespace margelo::nitro {
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "bodyFormData"), JSIConverter<std::optional<std::vector<margelo::nitro::nitrofetch::NitroFormDataPart>>>::toJSI(runtime, arg.bodyFormData));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "timeoutMs"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.timeoutMs));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "followRedirects"), JSIConverter<std::optional<bool>>::toJSI(runtime, arg.followRedirects));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "prefetchCacheTtlMs"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.prefetchCacheTtlMs));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "requestId"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.requestId));
       return obj;
     }
@@ -117,6 +120,7 @@ namespace margelo::nitro {
       if (!JSIConverter<std::optional<std::vector<margelo::nitro::nitrofetch::NitroFormDataPart>>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bodyFormData")))) return false;
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "timeoutMs")))) return false;
       if (!JSIConverter<std::optional<bool>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "followRedirects")))) return false;
+      if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "prefetchCacheTtlMs")))) return false;
       if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "requestId")))) return false;
       return true;
     }

@@ -24,7 +24,8 @@ public final class NitroAutoPrefetcher: NSObject {
     registerPrefetchInternal(
       url: url, prefetchKey: prefetchKey, headers: headers,
       method: nil, bodyString: nil, bodyBytes: nil,
-      bodyFormData: nil, timeoutMs: nil, followRedirects: nil
+      bodyFormData: nil, timeoutMs: nil, followRedirects: nil,
+      prefetchCacheTtlMs: nil
     )
   }
 
@@ -45,7 +46,31 @@ public final class NitroAutoPrefetcher: NSObject {
       method: method, bodyString: bodyString, bodyBytes: bodyBytes,
       bodyFormData: bodyFormData,
       timeoutMs: timeoutMs?.doubleValue,
-      followRedirects: followRedirects?.boolValue
+      followRedirects: followRedirects?.boolValue,
+      prefetchCacheTtlMs: nil
+    )
+  }
+
+  @objc(registerPrefetchWithURL:prefetchKey:headers:method:bodyString:bodyBytes:bodyFormData:timeoutMs:followRedirects:prefetchCacheTtlMs:)
+  public static func registerPrefetch(
+    url: String,
+    prefetchKey: String,
+    headers: [String: String],
+    method: String?,
+    bodyString: String?,
+    bodyBytes: String?,
+    bodyFormData: [[String: String]]?,
+    timeoutMs: NSNumber?,
+    followRedirects: NSNumber?,
+    prefetchCacheTtlMs: NSNumber?
+  ) {
+    registerPrefetchInternal(
+      url: url, prefetchKey: prefetchKey, headers: headers,
+      method: method, bodyString: bodyString, bodyBytes: bodyBytes,
+      bodyFormData: bodyFormData,
+      timeoutMs: timeoutMs?.doubleValue,
+      followRedirects: followRedirects?.boolValue,
+      prefetchCacheTtlMs: prefetchCacheTtlMs?.doubleValue
     )
   }
 
@@ -58,14 +83,16 @@ public final class NitroAutoPrefetcher: NSObject {
     bodyBytes: String?,
     bodyFormData: [[String: String]]?,
     timeoutMs: Double?,
-    followRedirects: Bool?
+    followRedirects: Bool?,
+    prefetchCacheTtlMs: Double?
   ) {
     if url.isEmpty || prefetchKey.isEmpty { return }
     let entry = buildEntryDict(
       url: url, prefetchKey: prefetchKey, headers: headers,
       method: method, bodyString: bodyString, bodyBytes: bodyBytes,
       bodyFormData: bodyFormData, timeoutMs: timeoutMs,
-      followRedirects: followRedirects
+      followRedirects: followRedirects,
+      prefetchCacheTtlMs: prefetchCacheTtlMs
     )
     let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
 
@@ -191,7 +218,8 @@ public final class NitroAutoPrefetcher: NSObject {
     bodyBytes: String?,
     bodyFormData: [[String: String]]?,
     timeoutMs: Double?,
-    followRedirects: Bool?
+    followRedirects: Bool?,
+    prefetchCacheTtlMs: Double? = nil
   ) -> [String: Any] {
     var entry: [String: Any] = [
       "url": url,
@@ -214,6 +242,7 @@ public final class NitroAutoPrefetcher: NSObject {
     }
     if let timeoutMs = timeoutMs { entry["timeoutMs"] = timeoutMs }
     if followRedirects == false { entry["followRedirects"] = false }
+    if let prefetchCacheTtlMs = prefetchCacheTtlMs { entry["prefetchCacheTtlMs"] = prefetchCacheTtlMs }
     return entry
   }
 
@@ -228,6 +257,7 @@ public final class NitroAutoPrefetcher: NSObject {
     let bodyBytes = entry["bodyBytes"] as? String
     let timeoutMs = (entry["timeoutMs"] as? NSNumber)?.doubleValue
     let followRedirects = (entry["followRedirects"] as? Bool) ?? true
+    let prefetchCacheTtlMs = (entry["prefetchCacheTtlMs"] as? NSNumber)?.doubleValue
 
     let formData: [NitroFormDataPart]? = (entry["bodyFormData"] as? [[String: Any]])?.map { p in
       NitroFormDataPart(
@@ -248,6 +278,7 @@ public final class NitroAutoPrefetcher: NSObject {
       bodyFormData: formData,
       timeoutMs: timeoutMs,
       followRedirects: followRedirects,
+      prefetchCacheTtlMs: prefetchCacheTtlMs,
       requestId: nil
     )
   }
