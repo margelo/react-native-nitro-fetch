@@ -20,6 +20,16 @@ NS_ASSUME_NONNULL_BEGIN
                     prefetchKey:(NSString *)prefetchKey
                         headers:(NSDictionary<NSString *, NSString *> *)headers;
 
++ (void)registerPrefetchWithURL:(NSString *)url
+                    prefetchKey:(NSString *)prefetchKey
+                        headers:(NSDictionary<NSString *, NSString *> *)headers
+                         method:(nullable NSString *)method
+                     bodyString:(nullable NSString *)bodyString
+                      bodyBytes:(nullable NSString *)bodyBytes
+                   bodyFormData:(nullable NSArray<NSDictionary<NSString *, NSString *> *> *)bodyFormData
+                      timeoutMs:(nullable NSNumber *)timeoutMs
+                followRedirects:(nullable NSNumber *)followRedirects;
+
 @end
 
 NS_ASSUME_NONNULL_END

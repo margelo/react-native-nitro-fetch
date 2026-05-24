@@ -59,6 +59,56 @@ await removeAllFromAutoprefetch();
 Prefetch is best-effort; if native is unavailable, calls are ignored or fall back to JS fetch. Responses served from prefetch add header `nitroPrefetched: true`.
 :::
 
+## POST, JSON, and FormData prefetches
+
+`prefetchOnAppStart` persists the full request shape — `method`, `bodyString` / `bodyBytes` / `bodyFormData`, headers (including `Content-Type`), `timeoutMs`, and `followRedirects`. The native cold-start replay reconstructs the request exactly, so a JSON POST is replayed as a JSON POST, and a multipart form upload is replayed as a multipart form upload.
+
+```ts
+// Plain string body
+await prefetchOnAppStart('https://api.example.com/log', {
+  method: 'POST',
+  body: 'hello',
+  prefetchKey: 'log',
+});
+
+// JSON body — Content-Type is preserved verbatim
+await prefetchOnAppStart('https://api.example.com/feed', {
+  method: 'POST',
+  body: JSON.stringify({ userId: 42 }),
+  headers: { 'Content-Type': 'application/json' },
+  prefetchKey: 'feed',
+});
+
+// FormData (multipart) — string fields and `{ uri, type, name }` file parts
+const fd = new FormData();
+fd.append('user', 'alice');
+fd.append('avatar', { uri: avatarUri, type: 'image/jpeg', name: 'a.jpg' } as any);
+await prefetchOnAppStart('https://api.example.com/upload', {
+  method: 'POST',
+  body: fd,
+  prefetchKey: 'upload',
+});
+```
+
+The matching consume call uses the same `prefetchKey`:
+
+```ts
+const res = await fetch('https://api.example.com/feed', {
+  method: 'POST',
+  body: JSON.stringify({ userId: 42 }),
+  headers: {
+    'Content-Type': 'application/json',
+    prefetchKey: 'feed',
+  },
+});
+```
+
+:::tip
+For FormData with file uploads, only reference stable URIs (bundled assets, persistent app-data paths). Transient `content://` or `file://` URIs captured at scheduling time may be invalid by the next cold launch — the multipart builder will throw and the entry is skipped.
+:::
+
+The fields are JSON-serialized in `NativeStorage` under `nitrofetch_autoprefetch_queue`. Defaults are omitted to keep entries compact and backward-compatible: a body-less GET stays `{ url, prefetchKey, headers }`.
+
 ## Why Prefetch Is Cool
 
 - **Earlier start at app launch**: Auto-prefetch can kick off network work immediately when the process starts, before React and JS are ready. On mid-range Android devices (e.g., Samsung A16), we observed the prefetch starting at least **~220 ms** earlier than triggering the same request from JS after the app warms up.
@@ -156,6 +206,44 @@ NitroAutoPrefetcher.registerPrefetch(
 :::tip
 From Swift, expose `NitroAutoPrefetcher` via your bridging header with `#import <NitroFetch/NitroAutoPrefetcher.h>`.
 :::
+
+### Native POST + body registration
+
+Both platforms expose an extended `registerPrefetch` that also accepts `method`, `bodyString`, `bodyBytes`, `bodyFormData`, `timeoutMs`, and `followRedirects` — useful for pre-warming a POST endpoint on the very first launch.
+
+**Android** — `registerPrefetch` is annotated `@JvmOverloads`, so the existing 4-arg call keeps working and you can add the new args by name:
+
+```kotlin
+AutoPrefetcher.registerPrefetch(
+  context = this,
+  url = "https://api.example.com/feed",
+  prefetchKey = "feed",
+  headers = mapOf("X-App" to "demo"),
+  method = "POST",
+  bodyFormData = listOf(
+    mapOf("name" to "user", "value" to "alice"),
+  ),
+)
+```
+
+**iOS** — Swift `@objc` cannot expose default arguments, so the extended API is a separate selector:
+
+```swift
+NitroAutoPrefetcher.registerPrefetch(
+  withURL: "https://api.example.com/feed",
+  prefetchKey: "feed",
+  headers: ["X-App": "demo"],
+  method: "POST",
+  bodyString: nil,
+  bodyBytes: nil,
+  bodyFormData: [
+    ["name": "user", "value": "alice"],
+  ],
+  timeoutMs: nil,
+  followRedirects: nil
+)
+```
+
 
 JS consumes the result the same way as before:
 

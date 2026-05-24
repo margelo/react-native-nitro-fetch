@@ -21,7 +21,52 @@ public final class NitroAutoPrefetcher: NSObject {
     prefetchKey: String,
     headers: [String: String]
   ) {
+    registerPrefetchInternal(
+      url: url, prefetchKey: prefetchKey, headers: headers,
+      method: nil, bodyString: nil, bodyBytes: nil,
+      bodyFormData: nil, timeoutMs: nil, followRedirects: nil
+    )
+  }
+
+  @objc(registerPrefetchWithURL:prefetchKey:headers:method:bodyString:bodyBytes:bodyFormData:timeoutMs:followRedirects:)
+  public static func registerPrefetch(
+    url: String,
+    prefetchKey: String,
+    headers: [String: String],
+    method: String?,
+    bodyString: String?,
+    bodyBytes: String?,
+    bodyFormData: [[String: String]]?,
+    timeoutMs: NSNumber?,
+    followRedirects: NSNumber?
+  ) {
+    registerPrefetchInternal(
+      url: url, prefetchKey: prefetchKey, headers: headers,
+      method: method, bodyString: bodyString, bodyBytes: bodyBytes,
+      bodyFormData: bodyFormData,
+      timeoutMs: timeoutMs?.doubleValue,
+      followRedirects: followRedirects?.boolValue
+    )
+  }
+
+  private static func registerPrefetchInternal(
+    url: String,
+    prefetchKey: String,
+    headers: [String: String],
+    method: String?,
+    bodyString: String?,
+    bodyBytes: String?,
+    bodyFormData: [[String: String]]?,
+    timeoutMs: Double?,
+    followRedirects: Bool?
+  ) {
     if url.isEmpty || prefetchKey.isEmpty { return }
+    let entry = buildEntryDict(
+      url: url, prefetchKey: prefetchKey, headers: headers,
+      method: method, bodyString: bodyString, bodyBytes: bodyBytes,
+      bodyFormData: bodyFormData, timeoutMs: timeoutMs,
+      followRedirects: followRedirects
+    )
     let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
 
     var arr: [[String: Any]] = []
@@ -32,11 +77,7 @@ public final class NitroAutoPrefetcher: NSObject {
       arr = parsed
     }
     arr.removeAll { ($0["prefetchKey"] as? String) == prefetchKey }
-    arr.append([
-      "url": url,
-      "prefetchKey": prefetchKey,
-      "headers": headers,
-    ])
+    arr.append(entry)
     if let data = try? JSONSerialization.data(withJSONObject: arr),
        let str = String(data: data, encoding: .utf8) {
       userDefaults.set(str, forKey: queueKey)
@@ -55,17 +96,7 @@ public final class NitroAutoPrefetcher: NSObject {
       for (k, v) in tokenHeaders { merged[k] = v }
       var hdrs: [NitroHeader] = merged.map { NitroHeader(key: $0.key, value: $0.value) }
       hdrs.append(NitroHeader(key: "prefetchKey", value: prefetchKey))
-      let req = NitroRequest(
-        url: url,
-        method: nil,
-        headers: hdrs,
-        bodyString: nil,
-        bodyBytes: nil,
-        bodyFormData: nil,
-        timeoutMs: nil,
-        followRedirects: true,
-        requestId: nil
-      )
+      let req = buildNitroRequest(from: entry, mergedHeaders: hdrs)
       Task {
         do { try await NitroFetchClient.prefetchStatic(req) } catch { /* best-effort */ }
       }
@@ -143,22 +174,82 @@ public final class NitroAutoPrefetcher: NSObject {
         print("[NitroFetch][TokenRefresh] Prefetching \(url) with \(merged.count) header(s)")
         for (k, v) in merged { print("[NitroFetch][TokenRefresh]   \(k): \(v)") }
 
-        let req = NitroRequest(
-          url: url,
-          method: nil,
-          headers: headers,
-          bodyString: nil,
-          bodyBytes: nil,
-          bodyFormData: nil,
-          timeoutMs: nil,
-          followRedirects: true,
-          requestId: nil
-        )
+        let req = buildNitroRequest(from: obj, mergedHeaders: headers)
         Task {
           do { try await NitroFetchClient.prefetchStatic(req) } catch { /* ignore – best effort */ }
         }
       }
     }
+  }
+
+  private static func buildEntryDict(
+    url: String,
+    prefetchKey: String,
+    headers: [String: String],
+    method: String?,
+    bodyString: String?,
+    bodyBytes: String?,
+    bodyFormData: [[String: String]]?,
+    timeoutMs: Double?,
+    followRedirects: Bool?
+  ) -> [String: Any] {
+    var entry: [String: Any] = [
+      "url": url,
+      "prefetchKey": prefetchKey,
+      "headers": headers,
+    ]
+    if let method = method, !method.isEmpty, method != "GET" { entry["method"] = method }
+    if let bodyString = bodyString { entry["bodyString"] = bodyString }
+    if let bodyBytes = bodyBytes { entry["bodyBytes"] = bodyBytes }
+    if let parts = bodyFormData, !parts.isEmpty {
+      entry["bodyFormData"] = parts.map { part -> [String: String] in
+        var clean: [String: String] = [:]
+        if let v = part["name"] { clean["name"] = v }
+        if let v = part["value"] { clean["value"] = v }
+        if let v = part["fileUri"] { clean["fileUri"] = v }
+        if let v = part["fileName"] { clean["fileName"] = v }
+        if let v = part["mimeType"] { clean["mimeType"] = v }
+        return clean
+      }
+    }
+    if let timeoutMs = timeoutMs { entry["timeoutMs"] = timeoutMs }
+    if followRedirects == false { entry["followRedirects"] = false }
+    return entry
+  }
+
+  private static func buildNitroRequest(
+    from entry: [String: Any],
+    mergedHeaders: [NitroHeader]
+  ) -> NitroRequest {
+    let url = (entry["url"] as? String) ?? ""
+    let methodStr = entry["method"] as? String
+    let method: NitroRequestMethod? = methodStr.flatMap { NitroRequestMethod(fromString: $0) }
+    let bodyString = entry["bodyString"] as? String
+    let bodyBytes = entry["bodyBytes"] as? String
+    let timeoutMs = (entry["timeoutMs"] as? NSNumber)?.doubleValue
+    let followRedirects = (entry["followRedirects"] as? Bool) ?? true
+
+    let formData: [NitroFormDataPart]? = (entry["bodyFormData"] as? [[String: Any]])?.map { p in
+      NitroFormDataPart(
+        name: (p["name"] as? String) ?? "",
+        value: p["value"] as? String,
+        fileUri: p["fileUri"] as? String,
+        fileName: p["fileName"] as? String,
+        mimeType: p["mimeType"] as? String
+      )
+    }
+
+    return NitroRequest(
+      url: url,
+      method: method,
+      headers: mergedHeaders,
+      bodyString: bodyString,
+      bodyBytes: bodyBytes,
+      bodyFormData: formData,
+      timeoutMs: timeoutMs,
+      followRedirects: followRedirects,
+      requestId: nil
+    )
   }
 
   // MARK: - Token refresh
