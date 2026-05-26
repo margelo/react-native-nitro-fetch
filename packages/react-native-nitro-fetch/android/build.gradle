@@ -85,6 +85,16 @@ android {
     release {
       minifyEnabled false
     }
+    // The app's RN-managed `debugOptimized` build type (added by the React Native
+    // gradle plugin, app-only) falls back to this library's `release` variant, where
+    // BuildConfig.DEBUG is false — which constant-folds out the native DevTools/CDP
+    // network reporting in NitroFetchClient.kt. Define a matching debuggable variant
+    // so debugOptimized links a BuildConfig.DEBUG=true build and requests surface in
+    // the React Native DevTools Network panel.
+    debugOptimized {
+      initWith debug
+      matchingFallbacks += ["release"]
+    }
   }
 
   lintOptions {
