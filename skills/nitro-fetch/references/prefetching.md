@@ -162,12 +162,37 @@ On every subsequent cold start, the native bootstrap will:
 
 1. Read the refresh config from encrypted prefs (`NitroFetchSecureAtRest`).
 2. Call the refresh URL on a background thread.
-3. Map the JSON response into headers (`Authorization: Bearer ey...`).
-4. Merge those headers into every queued prefetch and fire them.
+3. Map the JSON response into headers (`Authorization: Bearer ey...`) and, if configured, into the request body / form-data.
+4. Merge those values into every queued prefetch and fire them.
+
+#### Inject the token into the JSON body or form-data
+
+Headers are the default destination, but the same refresh response can also be written into a prefetch's **JSON body** or a **multipart form-data field** via `bodyMappings` / `formDataMappings` (alongside `mappings`). Each is independent, so one refreshed value can land in a header, the body, and a form field at once. This is the **`fetch`** prefetch path only.
+
+```ts
+registerTokenRefresh({
+  target: 'fetch',
+  url:    'https://api.example.com/oauth/token',
+  responseType: 'json',
+  mappings: [
+    { jsonPath: 'access_token', header: 'Authorization', valueTemplate: 'Bearer {{value}}' },
+  ],
+  // JSON body: sets a (possibly nested) dot-path key in the prefetch's bodyString
+  bodyMappings: [
+    { jsonPath: 'access_token', bodyPath: 'auth.token' },
+  ],
+  // form-data: replaces (or appends) a part by name
+  formDataMappings: [
+    { jsonPath: 'access_token', field: 'token' },
+  ],
+});
+```
+
+Caveats: `bodyMappings` only rewrites a prefetch that already has a JSON-object body (it won't synthesize one on a GET/form request); `formDataMappings` only applies to prefetches that already send form-data; matching is per-prefetch by body shape, so a shared config won't cross-contaminate a JSON prefetch and a form prefetch; for `responseType: 'text'`, use `bodyTextPath` / `formDataTextField`.
 
 ### Putting the token in the URL
 
-The native auto-prefetcher merges refreshed values into **headers**, not into the URL. The stored URL is replayed verbatim. If your backend requires the token in the URL (e.g. a signed query string), you have two options:
+The native auto-prefetcher merges refreshed values into **headers** (and, via `bodyMappings` / `formDataMappings`, into the JSON body or form-data — see above), but never into the URL. The stored URL is replayed verbatim. If your backend requires the token in the URL (e.g. a signed query string), you have two options:
 
 **Option A — store the URL with the token already in it.** The token will be the one captured at scheduling time. Re-call `prefetchOnAppStart` whenever it rotates:
 

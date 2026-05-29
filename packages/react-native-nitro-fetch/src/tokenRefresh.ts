@@ -20,6 +20,18 @@ type TokenRefreshCompositeHeader = {
   paths: Record<string, string>;
 };
 
+type TokenRefreshBodyMapping = {
+  jsonPath: string;
+  bodyPath: string;
+  valueTemplate?: string;
+};
+
+type TokenRefreshFormDataMapping = {
+  jsonPath: string;
+  field: string;
+  valueTemplate?: string;
+};
+
 export type TokenRefreshConfig = {
   url: string;
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH';
@@ -30,6 +42,10 @@ export type TokenRefreshConfig = {
   compositeHeaders?: TokenRefreshCompositeHeader[];
   textHeader?: string;
   textTemplate?: string;
+  bodyMappings?: TokenRefreshBodyMapping[];
+  formDataMappings?: TokenRefreshFormDataMapping[];
+  bodyTextPath?: string;
+  formDataTextField?: string;
   onFailure?: 'skip' | 'useStoredHeaders';
 };
 

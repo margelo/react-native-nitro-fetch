@@ -65,20 +65,14 @@ object AutoPrefetcher {
     }
 
     if (initialized) {
-      // late path — kick a single immediate prefetch with cached token headers
+      // late path — kick a single immediate prefetch with cached tokens
       try {
         val prefs = context.applicationContext
           .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val cacheRaw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE)
-        val tokenHeaders: Map<String, String> = if (!cacheRaw.isNullOrEmpty()) {
-          try {
-            val co = JSONObject(cacheRaw)
-            co.keys().asSequence().associateWith { k -> co.optString(k, "") }
-          } catch (_: Throwable) { emptyMap() }
-        } else emptyMap()
+        val tokens = deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
 
         val single = JSONArray().apply { put(entry) }
-        startPrefetches(single, tokenHeaders)
+        startPrefetches(single, tokens)
       } catch (_: Throwable) {}
     }
   }
@@ -105,13 +99,11 @@ object AutoPrefetcher {
 
             val refreshed = callTokenRefreshSync(refreshConfig)
 
-            val tokenHeaders: Map<String, String> = if (refreshed != null) {
-              android.util.Log.d("NitroFetch", "[TokenRefresh] ✅ Success — got ${refreshed.size} header(s)")
-              refreshed.forEach { (k, v) -> android.util.Log.d("NitroFetch", "[TokenRefresh]   $k: $v") }
-              // Cache fresh token headers for useStoredHeaders fallback on next cold start
-              val cacheJson = JSONObject()
-              refreshed.forEach { (k, v) -> cacheJson.put(k, v) }
-              NitroFetchSecureAtRest.putEncrypted(prefs, KEY_TOKEN_CACHE, cacheJson.toString())
+            val tokens: TokenRefreshResult = if (refreshed != null) {
+              android.util.Log.d("NitroFetch", "[TokenRefresh] ✅ Success — got ${refreshed.headers.size} header(s)")
+              refreshed.headers.forEach { (k, v) -> android.util.Log.d("NitroFetch", "[TokenRefresh]   $k: $v") }
+              // Cache fresh tokens for useStoredHeaders fallback on next cold start
+              NitroFetchSecureAtRest.putEncrypted(prefs, KEY_TOKEN_CACHE, serializeCache(refreshed))
               refreshed
             } else {
               android.util.Log.d("NitroFetch", "[TokenRefresh] ❌ Refresh failed — onFailure: $onFailure")
@@ -119,36 +111,28 @@ object AutoPrefetcher {
                 android.util.Log.d("NitroFetch", "[TokenRefresh] Skipping all prefetches")
                 return@Thread
               }
-              // Use last cached token headers (or empty map if none cached yet)
-              val cacheRaw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE)
-              val cached = if (cacheRaw != null) {
-                try {
-                  val co = JSONObject(cacheRaw)
-                  co.keys().asSequence().associateWith { k -> co.optString(k, "") }
-                } catch (_: Throwable) { emptyMap() }
-              } else {
-                emptyMap()
-              }
-              android.util.Log.d("NitroFetch", "[TokenRefresh] Using cached headers (${cached.size} header(s))")
+              // Use last cached tokens (or empty if none cached yet)
+              val cached = deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
+              android.util.Log.d("NitroFetch", "[TokenRefresh] Using cached headers (${cached.headers.size} header(s))")
               cached
             }
 
             android.util.Log.d("NitroFetch", "[TokenRefresh] Injecting token headers into ${arr.length()} prefetch URL(s)")
-            startPrefetches(arr, tokenHeaders)
+            startPrefetches(arr, tokens)
           } catch (_: Throwable) {
             // Best-effort — never crash the app
           }
         }.start()
       } else {
         // No token refresh config — proceed on current thread (Cronet is async)
-        startPrefetches(arr, emptyMap())
+        startPrefetches(arr, TokenRefreshResult.EMPTY)
       }
     } catch (_: Throwable) {
       // ignore – prefetch-on-start is best-effort
     }
   }
 
-  private fun startPrefetches(arr: JSONArray, tokenHeaders: Map<String, String>) {
+  private fun startPrefetches(arr: JSONArray, tokens: TokenRefreshResult) {
     for (i in 0 until arr.length()) {
       val o = arr.optJSONObject(i) ?: continue
       val url = o.optString("url", null) ?: continue
@@ -160,12 +144,12 @@ object AutoPrefetcher {
       headersObj.keys().forEachRemaining { k ->
         merged[k] = headersObj.optString(k, "")
       }
-      tokenHeaders.forEach { (k, v) -> merged[k] = v }
+      tokens.headers.forEach { (k, v) -> merged[k] = v }
       merged["prefetchKey"] = prefetchKey
 
       android.util.Log.d("NitroFetch", "[TokenRefresh] Prefetching $url with ${merged.size} header(s)")
       merged.forEach { (k, v) -> android.util.Log.d("NitroFetch", "[TokenRefresh]   $k: $v") }
-      val req = buildNitroRequestFromEntry(url, merged, o)
+      val req = buildNitroRequestFromEntry(url, merged, o, tokens)
 
       if (FetchCache.getPending(prefetchKey) != null) continue
       val entryTtlMs = if (o.has("prefetchCacheTtlMs") && !o.isNull("prefetchCacheTtlMs")) {
@@ -237,6 +221,7 @@ object AutoPrefetcher {
     url: String,
     mergedHeaders: Map<String, String>,
     entry: JSONObject?,
+    tokens: TokenRefreshResult = TokenRefreshResult.EMPTY,
   ): NitroRequest {
     val headerObjs = mergedHeaders.map { (k, v) -> NitroHeader(k, v) }.toTypedArray()
 
@@ -244,9 +229,10 @@ object AutoPrefetcher {
     val method: NitroRequestMethod? = methodStr?.let {
       runCatching { NitroRequestMethod.valueOf(it) }.getOrNull()
     }
-    val bodyString = entry
+    val rawBodyString = entry
       ?.takeIf { it.has("bodyString") && !it.isNull("bodyString") }
       ?.optString("bodyString")
+    val bodyString = injectBodyFields(rawBodyString, tokens.bodyFields)
     val bodyBytes = entry
       ?.takeIf { it.has("bodyBytes") && !it.isNull("bodyBytes") }
       ?.optString("bodyBytes")
@@ -261,8 +247,8 @@ object AutoPrefetcher {
       ?.optDouble("prefetchCacheTtlMs")
 
     val formArr = entry?.optJSONArray("bodyFormData")
-    val bodyFormData: Array<NitroFormDataPart>? = formArr?.let { ja ->
-      Array(ja.length()) { i ->
+    val baseParts: List<NitroFormDataPart> = formArr?.let { ja ->
+      List(ja.length()) { i ->
         val p = ja.optJSONObject(i) ?: JSONObject()
         NitroFormDataPart(
           name = p.optString("name", ""),
@@ -272,7 +258,9 @@ object AutoPrefetcher {
           mimeType = if (p.has("mimeType") && !p.isNull("mimeType")) p.optString("mimeType") else null
         )
       }
-    }
+    } ?: emptyList()
+    val bodyFormData: Array<NitroFormDataPart>? =
+      injectFormFields(baseParts, tokens.formFields)?.toTypedArray()
 
     return NitroRequest(
       url = url,
@@ -290,7 +278,17 @@ object AutoPrefetcher {
 
   // MARK: - Token refresh (synchronous, runs on background thread)
 
-  private fun callTokenRefreshSync(config: JSONObject): Map<String, String>? {
+  private data class TokenRefreshResult(
+    val headers: Map<String, String>,
+    val bodyFields: Map<String, String>,
+    val formFields: Map<String, String>,
+  ) {
+    companion object {
+      val EMPTY = TokenRefreshResult(emptyMap(), emptyMap(), emptyMap())
+    }
+  }
+
+  private fun callTokenRefreshSync(config: JSONObject): TokenRefreshResult? {
     return try {
       val urlStr = config.optString("url", null) ?: return null
       val method = config.optString("method", "POST")
@@ -338,32 +336,30 @@ object AutoPrefetcher {
     body: String,
     responseType: String,
     config: JSONObject
-  ): Map<String, String> {
-    val result = mutableMapOf<String, String>()
+  ): TokenRefreshResult {
+    val headers = mutableMapOf<String, String>()
+    val bodyFields = mutableMapOf<String, String>()
+    val formFields = mutableMapOf<String, String>()
 
     if (responseType == "text") {
       val textHeader = config.optString("textHeader", null)
       if (textHeader != null) {
         val textTemplate = config.optString("textTemplate", null)
-        result[textHeader] = textTemplate?.replace("{{value}}", body) ?: body
+        headers[textHeader] = textTemplate?.replace("{{value}}", body) ?: body
       }
-      return result
+      config.optString("bodyTextPath", null)?.let { bodyFields[it] = body }
+      config.optString("formDataTextField", null)?.let { formFields[it] = body }
+      return TokenRefreshResult(headers, bodyFields, formFields)
     }
 
     // JSON
-    val json = try { JSONObject(body) } catch (_: Throwable) { return result }
-
-    val mappings = config.optJSONArray("mappings")
-    if (mappings != null) {
-      for (i in 0 until mappings.length()) {
-        val m = mappings.optJSONObject(i) ?: continue
-        val jsonPath = m.optString("jsonPath", null) ?: continue
-        val header = m.optString("header", null) ?: continue
-        val value = getNestedField(json, jsonPath) ?: continue
-        val tmpl = m.optString("valueTemplate", null)
-        result[header] = tmpl?.replace("{{value}}", value) ?: value
-      }
+    val json = try { JSONObject(body) } catch (_: Throwable) {
+      return TokenRefreshResult(headers, bodyFields, formFields)
     }
+
+    collectMappings(json, config.optJSONArray("mappings"), "header", headers)
+    collectMappings(json, config.optJSONArray("bodyMappings"), "bodyPath", bodyFields)
+    collectMappings(json, config.optJSONArray("formDataMappings"), "field", formFields)
 
     val compositeHeaders = config.optJSONArray("compositeHeaders")
     if (compositeHeaders != null) {
@@ -377,11 +373,29 @@ object AutoPrefetcher {
           val val2 = getNestedField(json, paths.optString(ph, ""))
           built = built.replace("{{$ph}}", val2 ?: "")
         }
-        result[header] = built
+        headers[header] = built
       }
     }
 
-    return result
+    return TokenRefreshResult(headers, bodyFields, formFields)
+  }
+
+  // jsonPath -> value (optionally templated), keyed by the mapping's `destKey` field.
+  private fun collectMappings(
+    json: JSONObject,
+    arr: JSONArray?,
+    destKey: String,
+    into: MutableMap<String, String>,
+  ) {
+    if (arr == null) return
+    for (i in 0 until arr.length()) {
+      val m = arr.optJSONObject(i) ?: continue
+      val jsonPath = m.optString("jsonPath", null) ?: continue
+      val dest = m.optString(destKey, null) ?: continue
+      val value = getNestedField(json, jsonPath) ?: continue
+      val tmpl = m.optString("valueTemplate", null)
+      into[dest] = tmpl?.replace("{{value}}", value) ?: value
+    }
   }
 
   private fun getNestedField(obj: JSONObject, dotPath: String): String? {
@@ -392,5 +406,84 @@ object AutoPrefetcher {
       current = current.opt(part) ?: return null
     }
     return current.toString()
+  }
+
+  private fun setNestedField(root: JSONObject, dotPath: String, value: String) {
+    val parts = dotPath.split(".")
+    var current = root
+    for (i in 0 until parts.size - 1) {
+      val key = parts[i]
+      val existing = current.optJSONObject(key)
+      current = existing ?: JSONObject().also { current.put(key, it) }
+    }
+    current.put(parts.last(), value)
+  }
+
+  private fun injectBodyFields(rawBody: String?, fields: Map<String, String>): String? {
+    if (fields.isEmpty()) return rawBody
+    // Don't synthesize a JSON body where there wasn't one (e.g. a GET or a
+    // form-data request) — only rewrite an existing JSON body.
+    if (rawBody.isNullOrEmpty()) return rawBody
+    val root = try {
+      JSONObject(rawBody)
+    } catch (_: Throwable) {
+      return rawBody
+    }
+    fields.forEach { (path, value) -> setNestedField(root, path, value) }
+    return root.toString()
+  }
+
+  private fun injectFormFields(
+    parts: List<NitroFormDataPart>,
+    fields: Map<String, String>,
+  ): List<NitroFormDataPart>? {
+    if (fields.isEmpty()) return parts.ifEmpty { null }
+    // Don't synthesize a multipart body where there wasn't one.
+    if (parts.isEmpty()) return null
+    val result = parts.toMutableList()
+    fields.forEach { (name, value) ->
+      val idx = result.indexOfFirst { it.name == name }
+      if (idx >= 0) {
+        val old = result[idx]
+        result[idx] = NitroFormDataPart(
+          name = old.name, value = value,
+          fileUri = null, fileName = old.fileName, mimeType = old.mimeType
+        )
+      } else {
+        result.add(NitroFormDataPart(name, value, null, null, null))
+      }
+    }
+    return result
+  }
+
+  private fun mapToJson(map: Map<String, String>): JSONObject {
+    val o = JSONObject()
+    map.forEach { (k, v) -> o.put(k, v) }
+    return o
+  }
+
+  private fun jsonToMap(obj: JSONObject?): Map<String, String> {
+    if (obj == null) return emptyMap()
+    return obj.keys().asSequence().associateWith { k -> obj.optString(k, "") }
+  }
+
+  private fun serializeCache(result: TokenRefreshResult): String =
+    JSONObject().apply {
+      put("headers", mapToJson(result.headers))
+      put("bodyFields", mapToJson(result.bodyFields))
+      put("formFields", mapToJson(result.formFields))
+    }.toString()
+
+  private fun deserializeCache(raw: String?): TokenRefreshResult {
+    if (raw.isNullOrEmpty()) return TokenRefreshResult.EMPTY
+    val o = try { JSONObject(raw) } catch (_: Throwable) { return TokenRefreshResult.EMPTY }
+    if (!o.has("headers") && !o.has("bodyFields") && !o.has("formFields")) {
+      return TokenRefreshResult(jsonToMap(o), emptyMap(), emptyMap())
+    }
+    return TokenRefreshResult(
+      headers = jsonToMap(o.optJSONObject("headers")),
+      bodyFields = jsonToMap(o.optJSONObject("bodyFields")),
+      formFields = jsonToMap(o.optJSONObject("formFields")),
+    )
   }
 }
