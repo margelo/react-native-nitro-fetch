@@ -111,19 +111,14 @@ public final class NitroAutoPrefetcher: NSObject {
     }
 
     if initialized {
-      // Late path — apply cached token headers + kick immediate prefetch
-      var tokenHeaders: [String: String] = [:]
-      if let cacheRaw = NitroFetchSecureAtRest.decryptedString(forKey: tokenCacheKey, defaults: userDefaults),
-         !cacheRaw.isEmpty,
-         let cacheData = cacheRaw.data(using: .utf8),
-         let cacheObj = try? JSONSerialization.jsonObject(with: cacheData) as? [String: String] {
-        tokenHeaders = cacheObj
-      }
+      // Late path — apply cached tokens + kick immediate prefetch
+      let tokens = deserializeCache(
+        NitroFetchSecureAtRest.decryptedString(forKey: tokenCacheKey, defaults: userDefaults))
       var merged: [String: String] = headers
-      for (k, v) in tokenHeaders { merged[k] = v }
+      for (k, v) in tokens.headers { merged[k] = v }
       var hdrs: [NitroHeader] = merged.map { NitroHeader(key: $0.key, value: $0.value) }
       hdrs.append(NitroHeader(key: "prefetchKey", value: prefetchKey))
-      let req = buildNitroRequest(from: entry, mergedHeaders: hdrs)
+      let req = buildNitroRequest(from: entry, mergedHeaders: hdrs, tokens: tokens)
       Task {
         do { try await NitroFetchClient.prefetchStatic(req) } catch { /* best-effort */ }
       }
@@ -143,8 +138,8 @@ public final class NitroAutoPrefetcher: NSObject {
     let refreshRaw = NitroFetchSecureAtRest.decryptedString(forKey: tokenRefreshKey, defaults: userDefaults)
 
     Task {
-      // Resolve token headers (may require a network call)
-      let tokenHeaders: [String: String]
+      // Resolve tokens (may require a network call)
+      let tokens: TokenRefreshResult
       if let refreshRaw = refreshRaw,
          !refreshRaw.isEmpty,
          let refreshData = refreshRaw.data(using: .utf8),
@@ -154,35 +149,29 @@ public final class NitroAutoPrefetcher: NSObject {
         print("[NitroFetch][TokenRefresh] Calling refresh endpoint: \(refreshURL)")
         let refreshed = try? await callTokenRefresh(config: refreshObj)
         if let refreshed = refreshed {
-          print("[NitroFetch][TokenRefresh] ✅ Success — got \(refreshed.count) header(s)")
-          for (k, v) in refreshed { print("[NitroFetch][TokenRefresh]   \(k): \(v)") }
-          // Cache fresh token headers for useStoredHeaders fallback on next cold start
-          if let cacheData = try? JSONSerialization.data(withJSONObject: refreshed),
-             let cacheStr = String(data: cacheData, encoding: .utf8) {
+          print("[NitroFetch][TokenRefresh] ✅ Success — got \(refreshed.headers.count) header(s)")
+          for (k, v) in refreshed.headers { print("[NitroFetch][TokenRefresh]   \(k): \(v)") }
+          // Cache fresh tokens for useStoredHeaders fallback on next cold start
+          if let cacheStr = serializeCache(refreshed) {
             try? NitroFetchSecureAtRest.setEncrypted(cacheStr, forKey: tokenCacheKey, defaults: userDefaults)
           }
-          tokenHeaders = refreshed
+          tokens = refreshed
         } else {
           print("[NitroFetch][TokenRefresh] ❌ Refresh failed — onFailure: \(onFailure)")
           if onFailure == "skip" {
             print("[NitroFetch][TokenRefresh] Skipping all prefetches")
             return
           }
-          var cached: [String: String] = [:]
-          if let cacheRaw = NitroFetchSecureAtRest.decryptedString(forKey: tokenCacheKey, defaults: userDefaults),
-             !cacheRaw.isEmpty,
-             let cacheData = cacheRaw.data(using: .utf8),
-             let cacheObj = try? JSONSerialization.jsonObject(with: cacheData) as? [String: String] {
-            cached = cacheObj
-          }
-          print("[NitroFetch][TokenRefresh] Using cached headers (\(cached.count) header(s))")
-          tokenHeaders = cached
+          let cached = deserializeCache(
+            NitroFetchSecureAtRest.decryptedString(forKey: tokenCacheKey, defaults: userDefaults))
+          print("[NitroFetch][TokenRefresh] Using cached headers (\(cached.headers.count) header(s))")
+          tokens = cached
         }
       } else {
-        tokenHeaders = [:]
+        tokens = .empty
       }
 
-      // Launch a prefetch task per entry with merged headers
+      // Launch a prefetch task per entry with merged headers + body/form injection
       print("[NitroFetch][TokenRefresh] Injecting token headers into \(arr.count) prefetch URL(s)")
       for item in arr {
         guard let obj = item as? [String: Any] else { continue }
@@ -193,7 +182,7 @@ public final class NitroAutoPrefetcher: NSObject {
         // Merge: static headers first, token headers override
         var merged: [String: String] = [:]
         for (k, v) in headersDict { merged[k] = String(describing: v) }
-        for (k, v) in tokenHeaders { merged[k] = v }
+        for (k, v) in tokens.headers { merged[k] = v }
 
         var headers: [NitroHeader] = merged.map { NitroHeader(key: $0.key, value: $0.value) }
         headers.append(NitroHeader(key: "prefetchKey", value: prefetchKey))
@@ -201,7 +190,7 @@ public final class NitroAutoPrefetcher: NSObject {
         print("[NitroFetch][TokenRefresh] Prefetching \(url) with \(merged.count) header(s)")
         for (k, v) in merged { print("[NitroFetch][TokenRefresh]   \(k): \(v)") }
 
-        let req = buildNitroRequest(from: obj, mergedHeaders: headers)
+        let req = buildNitroRequest(from: obj, mergedHeaders: headers, tokens: tokens)
         Task {
           do { try await NitroFetchClient.prefetchStatic(req) } catch { /* ignore – best effort */ }
         }
@@ -248,18 +237,19 @@ public final class NitroAutoPrefetcher: NSObject {
 
   private static func buildNitroRequest(
     from entry: [String: Any],
-    mergedHeaders: [NitroHeader]
+    mergedHeaders: [NitroHeader],
+    tokens: TokenRefreshResult = .empty
   ) -> NitroRequest {
     let url = (entry["url"] as? String) ?? ""
     let methodStr = entry["method"] as? String
     let method: NitroRequestMethod? = methodStr.flatMap { NitroRequestMethod(fromString: $0) }
-    let bodyString = entry["bodyString"] as? String
+    let bodyString = injectBodyFields(entry["bodyString"] as? String, fields: tokens.bodyFields)
     let bodyBytes = entry["bodyBytes"] as? String
     let timeoutMs = (entry["timeoutMs"] as? NSNumber)?.doubleValue
     let followRedirects = (entry["followRedirects"] as? Bool) ?? true
     let prefetchCacheTtlMs = (entry["prefetchCacheTtlMs"] as? NSNumber)?.doubleValue
 
-    let formData: [NitroFormDataPart]? = (entry["bodyFormData"] as? [[String: Any]])?.map { p in
+    let baseParts: [NitroFormDataPart] = (entry["bodyFormData"] as? [[String: Any]])?.map { p in
       NitroFormDataPart(
         name: (p["name"] as? String) ?? "",
         value: p["value"] as? String,
@@ -267,7 +257,8 @@ public final class NitroAutoPrefetcher: NSObject {
         fileName: p["fileName"] as? String,
         mimeType: p["mimeType"] as? String
       )
-    }
+    } ?? []
+    let formData: [NitroFormDataPart]? = injectFormFields(baseParts, fields: tokens.formFields)
 
     return NitroRequest(
       url: url,
@@ -285,7 +276,14 @@ public final class NitroAutoPrefetcher: NSObject {
 
   // MARK: - Token refresh
 
-  private static func callTokenRefresh(config: [String: Any]) async throws -> [String: String] {
+  struct TokenRefreshResult {
+    var headers: [String: String]
+    var bodyFields: [String: String]
+    var formFields: [String: String]
+    static let empty = TokenRefreshResult(headers: [:], bodyFields: [:], formFields: [:])
+  }
+
+  private static func callTokenRefresh(config: [String: Any]) async throws -> TokenRefreshResult {
     guard let urlStr = config["url"] as? String,
           let url = URL(string: urlStr) else {
       throw NSError(domain: "NitroAutoPrefetcher", code: -1,
@@ -315,18 +313,22 @@ public final class NitroAutoPrefetcher: NSObject {
   private static func parseTokenResponse(
     data: Data,
     config: [String: Any]
-  ) throws -> [String: String] {
+  ) throws -> TokenRefreshResult {
     let responseType = config["responseType"] as? String ?? "json"
-    var result: [String: String] = [:]
+    var headers: [String: String] = [:]
+    var bodyFields: [String: String] = [:]
+    var formFields: [String: String] = [:]
 
     if responseType == "text" {
       let text = String(data: data, encoding: .utf8) ?? ""
       if let textHeader = config["textHeader"] as? String {
-        result[textHeader] = (config["textTemplate"] as? String)
+        headers[textHeader] = (config["textTemplate"] as? String)
           .map { $0.replacingOccurrences(of: "{{value}}", with: text) }
           ?? text
       }
-      return result
+      if let bodyTextPath = config["bodyTextPath"] as? String { bodyFields[bodyTextPath] = text }
+      if let formDataTextField = config["formDataTextField"] as? String { formFields[formDataTextField] = text }
+      return TokenRefreshResult(headers: headers, bodyFields: bodyFields, formFields: formFields)
     }
 
     guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
@@ -334,17 +336,9 @@ public final class NitroAutoPrefetcher: NSObject {
                     userInfo: [NSLocalizedDescriptionKey: "Token refresh: invalid JSON response"])
     }
 
-    if let mappings = config["mappings"] as? [[String: Any]] {
-      for m in mappings {
-        guard let jsonPath = m["jsonPath"] as? String,
-              let header = m["header"] as? String else { continue }
-        if let value = getNestedField(json, dotPath: jsonPath) {
-          result[header] = (m["valueTemplate"] as? String)
-            .map { $0.replacingOccurrences(of: "{{value}}", with: value) }
-            ?? value
-        }
-      }
-    }
+    collectMappings(json, config["mappings"] as? [[String: Any]], destKey: "header", into: &headers)
+    collectMappings(json, config["bodyMappings"] as? [[String: Any]], destKey: "bodyPath", into: &bodyFields)
+    collectMappings(json, config["formDataMappings"] as? [[String: Any]], destKey: "field", into: &formFields)
 
     if let compositeHeaders = config["compositeHeaders"] as? [[String: Any]] {
       for comp in compositeHeaders {
@@ -356,11 +350,29 @@ public final class NitroAutoPrefetcher: NSObject {
           let val = getNestedField(json, dotPath: jsonPath) ?? ""
           built = built.replacingOccurrences(of: "{{\(ph)}}", with: val)
         }
-        result[header] = built
+        headers[header] = built
       }
     }
 
-    return result
+    return TokenRefreshResult(headers: headers, bodyFields: bodyFields, formFields: formFields)
+  }
+
+  // jsonPath -> value (optionally templated), keyed by each mapping's `destKey` field.
+  private static func collectMappings(
+    _ json: [String: Any],
+    _ arr: [[String: Any]]?,
+    destKey: String,
+    into: inout [String: String]
+  ) {
+    guard let arr = arr else { return }
+    for m in arr {
+      guard let jsonPath = m["jsonPath"] as? String,
+            let dest = m[destKey] as? String,
+            let value = getNestedField(json, dotPath: jsonPath) else { continue }
+      into[dest] = (m["valueTemplate"] as? String)
+        .map { $0.replacingOccurrences(of: "{{value}}", with: value) }
+        ?? value
+    }
   }
 
   private static func getNestedField(_ obj: [String: Any], dotPath: String) -> String? {
@@ -373,6 +385,90 @@ public final class NitroAutoPrefetcher: NSObject {
     }
     if let s = current as? String { return s }
     return String(describing: current)
+  }
+
+  private static func setNestedField(_ root: inout [String: Any], dotPath: String, value: String) {
+    let parts = dotPath.split(separator: ".").map(String.init)
+    guard !parts.isEmpty else { return }
+    if parts.count == 1 {
+      root[parts[0]] = value
+      return
+    }
+    var child = (root[parts[0]] as? [String: Any]) ?? [:]
+    setNestedField(&child, dotPath: parts.dropFirst().joined(separator: "."), value: value)
+    root[parts[0]] = child
+  }
+
+  // MARK: - Body / form-data injection
+
+  private static func injectBodyFields(_ rawBody: String?, fields: [String: String]) -> String? {
+    if fields.isEmpty { return rawBody }
+    // Don't synthesize a JSON body where there wasn't one (e.g. a GET or a
+    // form-data request) — only rewrite an existing JSON body.
+    guard let rawBody = rawBody, !rawBody.isEmpty else { return rawBody }
+    guard let data = rawBody.data(using: .utf8),
+          let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return rawBody
+    }
+    var root = obj
+    for (path, value) in fields {
+      setNestedField(&root, dotPath: path, value: value)
+    }
+    guard let out = try? JSONSerialization.data(withJSONObject: root),
+          let str = String(data: out, encoding: .utf8) else { return rawBody }
+    return str
+  }
+
+  private static func injectFormFields(
+    _ parts: [NitroFormDataPart],
+    fields: [String: String]
+  ) -> [NitroFormDataPart]? {
+    if fields.isEmpty { return parts.isEmpty ? nil : parts }
+    // Don't synthesize a multipart body where there wasn't one.
+    if parts.isEmpty { return nil }
+    var result = parts
+    for (name, value) in fields {
+      if let idx = result.firstIndex(where: { $0.name == name }) {
+        let old = result[idx]
+        result[idx] = NitroFormDataPart(
+          name: old.name, value: value,
+          fileUri: nil, fileName: old.fileName, mimeType: old.mimeType
+        )
+      } else {
+        result.append(NitroFormDataPart(name: name, value: value, fileUri: nil, fileName: nil, mimeType: nil))
+      }
+    }
+    return result
+  }
+
+  // MARK: - Structured token cache (back-compatible with old flat-header maps)
+
+  private static func serializeCache(_ result: TokenRefreshResult) -> String? {
+    let obj: [String: Any] = [
+      "headers": result.headers,
+      "bodyFields": result.bodyFields,
+      "formFields": result.formFields,
+    ]
+    guard let data = try? JSONSerialization.data(withJSONObject: obj) else { return nil }
+    return String(data: data, encoding: .utf8)
+  }
+
+  private static func deserializeCache(_ raw: String?) -> TokenRefreshResult {
+    guard let raw = raw, !raw.isEmpty,
+          let data = raw.data(using: .utf8),
+          let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+      return .empty
+    }
+    if obj["headers"] == nil && obj["bodyFields"] == nil && obj["formFields"] == nil {
+      // Old flat-header-map cache.
+      let headers = (obj as? [String: String]) ?? [:]
+      return TokenRefreshResult(headers: headers, bodyFields: [:], formFields: [:])
+    }
+    return TokenRefreshResult(
+      headers: (obj["headers"] as? [String: String]) ?? [:],
+      bodyFields: (obj["bodyFields"] as? [String: String]) ?? [:],
+      formFields: (obj["formFields"] as? [String: String]) ?? [:]
+    )
   }
 }
 
