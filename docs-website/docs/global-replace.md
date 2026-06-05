@@ -60,7 +60,7 @@ Setting `Request` and `Response` to `null` disables upload/download progress cap
 :::
 
 ```ts
-import axios, { type AxiosRequestConfig } from 'axios';
+import axios from 'axios';
 import { fetch as nitroFetch } from 'react-native-nitro-fetch';
 
 export const api = axios.create({
