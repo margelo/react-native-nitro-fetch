@@ -56,7 +56,8 @@ If you use [axios](https://axios-http.com), prefer axios's built-in fetch adapte
 :::warning
 Custom `env.fetch` support requires axios `v1.12.0` or newer.
 
-Setting `Request` and `Response` to `null` disables upload/download progress capture in axios's fetch adapter. Visit [axios adapter docs](https://axios.rest/pages/advanced/fetch-adapter.html) for more info
+Setting `Request` and `Response` to `null` disables upload/download progress capture in axios's fetch adapter, Also if not set to null it will use global constructors as default, It is recommended to set it to null because Nitro Fetch Request/Response are not fully compatible with global one.
+Visit [axios adapter docs](https://axios.rest/pages/advanced/fetch-adapter.html) for more info
 :::
 
 ```ts
