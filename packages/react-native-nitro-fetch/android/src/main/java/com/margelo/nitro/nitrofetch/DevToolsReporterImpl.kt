@@ -1,67 +1,58 @@
 package com.margelo.nitro.nitrofetch
 
-/**
- * Direct-dispatch backend for [DevToolsReporter]. Loaded reflectively from the facade
- * via `Class.forName`, so a missing `InspectorNetworkReporter` only prevents *this* class
- * from loading — the facade itself stays intact and degrades to a no-op.
- *
- * Once loaded, every call here is a plain JVM static invoke. No reflection, no boxing,
- * no method-handle lookups. The `@Suppress` annotations bypass RN's `internal` visibility
- * (RN has no public surface here) — this is the documented integration point.
- */
-@Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
+import java.lang.reflect.Method
+
+
 internal class DevToolsReporterImpl : DevToolsReporter.Impl {
-  override fun isDebuggingEnabled(): Boolean =
-    com.facebook.react.modules.network.InspectorNetworkReporter.isDebuggingEnabled()
+  private val cls = Class.forName("com.facebook.react.modules.network.InspectorNetworkReporter")
+
+  private fun m(name: String): Method = cls.methods.first { it.name == name }
+
+  // All targets are `public static final` on the reporter object — invoke with a null receiver.
+  private val mIsDebuggingEnabled = m("isDebuggingEnabled")
+  private val mReportRequestStart = m("reportRequestStart")
+  private val mReportConnectionTiming = m("reportConnectionTiming")
+  private val mReportResponseStart = m("reportResponseStart")
+  private val mReportDataReceivedImpl = m("reportDataReceivedImpl")
+  private val mReportResponseEnd = m("reportResponseEnd")
+  private val mReportRequestFailed = m("reportRequestFailed")
+  private val mMaybeStoreResponseBody = m("maybeStoreResponseBody")
+  private val mMaybeStoreResponseBodyIncremental = m("maybeStoreResponseBodyIncremental")
+
+  override fun isDebuggingEnabled(): Boolean = mIsDebuggingEnabled.invoke(null) as Boolean
 
   override fun reportRequestStart(
     requestId: String, url: String, method: String,
     headers: Map<String, String>, body: String, encodedDataLength: Long
   ) {
-    com.facebook.react.modules.network.InspectorNetworkReporter.reportRequestStart(
-      requestId, url, method, headers, body, encodedDataLength
-    )
-    com.facebook.react.modules.network.InspectorNetworkReporter.reportConnectionTiming(
-      requestId, headers
-    )
+    mReportRequestStart.invoke(null, requestId, url, method, headers, body, encodedDataLength)
+    mReportConnectionTiming.invoke(null, requestId, headers)
   }
 
   override fun reportResponseStart(
     requestId: String, url: String, statusCode: Int,
     headers: Map<String, String>, expectedDataLength: Long
   ) {
-    com.facebook.react.modules.network.InspectorNetworkReporter.reportResponseStart(
-      requestId, url, statusCode, headers, expectedDataLength
-    )
+    mReportResponseStart.invoke(null, requestId, url, statusCode, headers, expectedDataLength)
   }
 
   override fun reportDataReceived(requestId: String, length: Int) {
-    com.facebook.react.modules.network.InspectorNetworkReporter.reportDataReceivedImpl(
-      requestId, length
-    )
+    mReportDataReceivedImpl.invoke(null, requestId, length)
   }
 
   override fun reportResponseEnd(requestId: String, encodedDataLength: Long) {
-    com.facebook.react.modules.network.InspectorNetworkReporter.reportResponseEnd(
-      requestId, encodedDataLength
-    )
+    mReportResponseEnd.invoke(null, requestId, encodedDataLength)
   }
 
   override fun reportRequestFailed(requestId: String, cancelled: Boolean) {
-    com.facebook.react.modules.network.InspectorNetworkReporter.reportRequestFailed(
-      requestId, cancelled
-    )
+    mReportRequestFailed.invoke(null, requestId, cancelled)
   }
 
   override fun storeResponseBody(requestId: String, body: String, base64Encoded: Boolean) {
-    com.facebook.react.modules.network.InspectorNetworkReporter.maybeStoreResponseBody(
-      requestId, body, base64Encoded
-    )
+    mMaybeStoreResponseBody.invoke(null, requestId, body, base64Encoded)
   }
 
   override fun storeResponseBodyIncremental(requestId: String, data: String) {
-    com.facebook.react.modules.network.InspectorNetworkReporter.maybeStoreResponseBodyIncremental(
-      requestId, data
-    )
+    mMaybeStoreResponseBodyIncremental.invoke(null, requestId, data)
   }
 }
