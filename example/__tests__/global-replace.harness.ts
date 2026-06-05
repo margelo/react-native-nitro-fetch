@@ -5,8 +5,7 @@ import {
   Request as NitroRequest,
   Response as NitroResponse,
 } from 'react-native-nitro-fetch';
-
-const BASE = 'https://httpbin.org';
+import { BASE } from '../test-utils/server';
 
 // ---------------------------------------------------------------------------
 // Perform the global replace exactly as documented

@@ -42,7 +42,9 @@ on:
       - "**/bun.lock"
       - "**/react-native.config.js"
       - "example/__tests__/**"
+      - "example/test-utils/**"
       - "example/rn-harness.config.mjs"
+      - "test-server/**"
   pull_request:
     paths:
       - ".github/workflows/harness-ios.yml"
@@ -61,7 +63,9 @@ on:
       - "**/bun.lock"
       - "**/react-native.config.js"
       - "example/__tests__/**"
+      - "example/test-utils/**"
       - "example/rn-harness.config.mjs"
+      - "test-server/**"
 
 env:
   DEVICE_MODEL: ${{ github.event.inputs.device_model || 'iPhone 17 Pro' }}
@@ -162,4 +166,13 @@ jobs:
       - name: Run Harness E2E tests
         working-directory: example
         run: |
+          # Start the local httpbin-compatible test server on the host. The iOS
+          # Simulator shares the host network namespace, so it reaches it on
+          # 127.0.0.1.
+          bun ../test-server/server.mjs &
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:9876/get >/dev/null 2>&1; then echo "test server up"; break; fi
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:9876/get >/dev/null || { echo "test server failed to start"; exit 1; }
           bun run test:harness --harnessRunner ios

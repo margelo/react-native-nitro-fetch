@@ -50,7 +50,9 @@ on:
       - "**/bun.lock"
       - "**/react-native.config.js"
       - "example/__tests__/**"
+      - "example/test-utils/**"
       - "example/rn-harness.config.mjs"
+      - "test-server/**"
   pull_request:
     paths:
       - ".github/workflows/harness-android.yml"
@@ -69,7 +71,9 @@ on:
       - "**/bun.lock"
       - "**/react-native.config.js"
       - "example/__tests__/**"
+      - "example/test-utils/**"
       - "example/rn-harness.config.mjs"
+      - "test-server/**"
 
 env:
   DEVICE_API_LEVEL: ${{ github.event.inputs.device_api_level || '35' }}
@@ -166,6 +170,15 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
+            # Start the local httpbin-compatible test server on the host. The
+            # emulator reaches it via 10.0.2.2; readiness is checked on the host
+            # loopback that 10.0.2.2 maps to.
+            bun ../test-server/server.mjs &
+            for i in $(seq 1 30); do
+              if curl -sf http://127.0.0.1:9876/get >/dev/null 2>&1; then echo "test server up"; break; fi
+              sleep 1
+            done
+            curl -sf http://127.0.0.1:9876/get >/dev/null || { echo "test server failed to start"; exit 1; }
             adb install -r "./android/app/build/outputs/apk/debug/app-debug.apk"
             bun run test:harness --harnessRunner android
 

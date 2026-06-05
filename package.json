@@ -7,6 +7,7 @@
   "author": "Szymon Kapala <szymon20000@gmail.com'> (https://x.com/Turbo_Szymon)",
   "workspaces": [
     "example",
+    "test-server",
     "packages/react-native-nitro-fetch",
     "packages/react-native-nitro-text-decoder",
     "packages/react-native-nitro-websockets"

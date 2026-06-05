@@ -5,8 +5,7 @@ import {
   Response,
   Request,
 } from 'react-native-nitro-fetch';
-
-const BASE = 'https://httpbin.org';
+import { BASE } from '../test-utils/server';
 
 describe('Headers - Construction', () => {
   it('constructs from plain object', () => {
