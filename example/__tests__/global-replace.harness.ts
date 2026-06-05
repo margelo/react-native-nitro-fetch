@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'react-native-harness';
+import axios from 'axios';
 import {
   fetch as nitroFetch,
   Headers as NitroHeaders,
@@ -146,6 +147,97 @@ describe('Global Replace - new Response()', () => {
     const res = Response.error();
     expect(res.status).toBe(0);
     expect(res.type).toBe('error');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Axios via Nitro fetch adapter (docs: global-replace.md -> Axios)
+// ---------------------------------------------------------------------------
+const api = axios.create({
+  baseURL: BASE,
+  adapter: 'fetch',
+  // Request/Response are null (not undefined) on purpose: axios merges env
+  // with skipUndefined, so undefined would fall back to the global Request/
+  // Response and re-enable the DOM-Request / stream-wrapping path. null forces
+  // the plain fetch(url, options) path through Nitro. `null!` narrows to never,
+  // which the optional constructor types accept without a cast.
+  env: {
+    fetch: nitroFetch,
+    Request: null!,
+    Response: null!,
+  },
+});
+
+describe('Global Replace - Axios fetch adapter via Nitro', () => {
+  it('GET routes through Nitro fetch', async () => {
+    const res = await api.get('/get');
+    expect(res.status).toBe(200);
+    expect(res.data.method).toBe('GET');
+    expect(res.data.url).toContain('/get');
+  });
+
+  it('serializes query params the axios way', async () => {
+    const res = await api.get('/get', { params: { a: '1', b: 'two' } });
+    expect(res.data.args.a).toBe('1');
+    expect(res.data.args.b).toBe('two');
+  });
+
+  it('POST sends a JSON body and parses the JSON response', async () => {
+    const res = await api.post('/post', { hello: 'world', n: 42 });
+    expect(res.status).toBe(200);
+    expect(res.data.json.hello).toBe('world');
+    expect(res.data.json.n).toBe(42);
+  });
+
+  it('sends custom request headers', async () => {
+    const res = await api.get('/headers', { headers: { 'X-Custom': 'nitro' } });
+    expect(res.data.headers['X-Custom']).toBe('nitro');
+  });
+
+  it('exposes response headers', async () => {
+    const res = await api.get('/get');
+    expect(String(res.headers['content-type'])).toContain('application/json');
+  });
+
+  it('rejects on non-2xx with an AxiosError (settle semantics)', async () => {
+    let threw = false;
+    try {
+      await api.get('/status/418');
+    } catch (e: any) {
+      threw = true;
+      expect(axios.isAxiosError(e)).toBe(true);
+      expect(e.response.status).toBe(418);
+    }
+    expect(threw).toBe(true);
+  });
+
+  it('honors a validateStatus override', async () => {
+    const res = await api.get('/status/404', { validateStatus: () => true });
+    expect(res.status).toBe(404);
+  });
+
+  it('reads an arraybuffer responseType', async () => {
+    const res = await api.get('/bytes/16', { responseType: 'arraybuffer' });
+    expect(res.data.byteLength).toBe(16);
+  });
+
+  it('runs request and response interceptors', async () => {
+    const reqId = api.interceptors.request.use((config) => {
+      config.headers.set('X-Intercepted', 'yes');
+      return config;
+    });
+    const resId = api.interceptors.response.use((response) => {
+      response.data.intercepted = true;
+      return response;
+    });
+    try {
+      const res = await api.get('/headers');
+      expect(res.data.headers['X-Intercepted']).toBe('yes');
+      expect(res.data.intercepted).toBe(true);
+    } finally {
+      api.interceptors.request.eject(reqId);
+      api.interceptors.response.eject(resId);
+    }
   });
 });
 
