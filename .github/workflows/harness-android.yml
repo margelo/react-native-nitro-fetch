@@ -169,11 +169,14 @@ jobs:
           avd-name: ${{ env.AVD_NAME }}
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          # android-emulator-runner executes each script line in its own
-          # `sh -c`, so the test server, its readiness wait, and the harness all
-          # run on a single physical line (emulator reaches the host via 10.0.2.2).
+          # android-emulator-runner runs each script line in its own `sh -c` and
+          # waits for the script's output pipe to close, so everything is one
+          # physical line and the test server's output is redirected off the pipe
+          # and the server is killed after the run — otherwise the still-listening
+          # server holds the pipe open and the step hangs. Emulator reaches the
+          # host via 10.0.2.2.
           script: |
-            bun ../test-server/server.mjs & for i in $(seq 1 30); do curl -sf http://127.0.0.1:9876/get >/dev/null 2>&1 && break; sleep 1; done; curl -sf http://127.0.0.1:9876/get >/dev/null || { echo "test server failed to start"; exit 1; }; adb install -r "./android/app/build/outputs/apk/debug/app-debug.apk"; bun run test:harness --harnessRunner android
+            bun ../test-server/server.mjs >/tmp/test-server.log 2>&1 </dev/null & SRV=$!; for i in $(seq 1 30); do curl -sf http://127.0.0.1:9876/get >/dev/null 2>&1 && break; sleep 1; done; curl -sf http://127.0.0.1:9876/get >/dev/null || { echo "test server failed to start"; cat /tmp/test-server.log; exit 1; }; adb install -r "./android/app/build/outputs/apk/debug/app-debug.apk"; bun run test:harness --harnessRunner android; ec=$?; kill $SRV 2>/dev/null || true; exit $ec
 
       - name: Stop Gradle Daemon
         working-directory: example/android
