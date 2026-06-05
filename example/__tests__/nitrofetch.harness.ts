@@ -8,13 +8,12 @@ import {
   __readAutoPrefetchQueue,
 } from 'react-native-nitro-fetch';
 import { getRuntimeKind, RuntimeKind } from 'react-native-worklets';
+import { BASE } from '../test-utils/server';
 
-const image = 'https://httpbin.org/image/jpeg';
-
-const BASE = 'https://httpbin.org';
+const image = `${BASE}/image/jpeg`;
 
 describe('NitroFetch - Native registerPrefetch', () => {
-  const NP_URL = 'https://httpbin.org/anything/native-prefetch-test';
+  const NP_URL = `${BASE}/anything/native-prefetch-test`;
   const NP_KEY = 'harness-native-prefetch';
 
   it('serves a cache hit on the first JS fetch (first-run prefetching)', async () => {
@@ -59,7 +58,7 @@ describe('NitroFetch - Prefetch cache TTL', () => {
 
   it('prefetchOnAppStart persists prefetchCacheTtlMs into the queue', async () => {
     const KEY = 'pf-ttl-persisted';
-    await prefetchOnAppStart('https://httpbin.org/get', {
+    await prefetchOnAppStart(`${BASE}/get`, {
       prefetchKey: KEY,
       prefetchCacheTtlMs: 12_345,
     } as any);
@@ -73,7 +72,7 @@ describe('NitroFetch - Prefetch cache TTL', () => {
 
   it('omitting prefetchCacheTtlMs leaves the queue entry without the field', async () => {
     const KEY = 'pf-ttl-omitted';
-    await prefetchOnAppStart('https://httpbin.org/get', {
+    await prefetchOnAppStart(`${BASE}/get`, {
       prefetchKey: KEY,
     } as any);
     const entry = __readAutoPrefetchQueue().find(
@@ -90,7 +89,7 @@ describe('NitroFetch - Basic GET', () => {
     const res = await nitroFetch(`${BASE}/get`);
     expect(res.status).toBe(200);
     expect(res.ok).toBe(true);
-    expect(res.url).toContain('httpbin');
+    expect(res.url).toContain('/get');
   });
 
   it('text() returns a non-empty string', async () => {
@@ -176,10 +175,7 @@ describe('NitroFetch - Request Body Types', () => {
     expect(body.data).toContain(bodyString);
   });
 
-  // Skipped: httpbin.org returns HTML error pages under load, breaking
-  // res.json() before the assertion can run. The FormData test below covers
-  // the same wire format reliably.
-  it.skip('URLSearchParams body → echoed form or data', async () => {
+  it('URLSearchParams body → echoed form or data', async () => {
     const params = new URLSearchParams({ foo: 'bar' });
     const res = await nitroFetch(`${BASE}/post`, {
       method: 'POST',
@@ -222,7 +218,7 @@ describe('NitroFetch - Request Body Types', () => {
 });
 
 describe('NitroFetch - Response Headers', () => {
-  it('custom request header echoed by httpbin', async () => {
+  it('custom request header echoed by the server', async () => {
     const res = await nitroFetch(`${BASE}/headers`, {
       headers: { 'X-Test-Header': 'nitro' },
     });
@@ -278,7 +274,7 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
 
   it('POST + string body round-trips through the queue', async () => {
     const KEY = 'pf-post-string';
-    await prefetchOnAppStart('https://httpbin.org/post', {
+    await prefetchOnAppStart(`${BASE}/post`, {
       method: 'POST',
       body: 'hello',
       prefetchKey: KEY,
@@ -294,7 +290,7 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
   it('POST + JSON body round-trips through the queue with Content-Type', async () => {
     const KEY = 'pf-post-json';
     const payload = { user: 'alice', count: 42 };
-    await prefetchOnAppStart('https://httpbin.org/post', {
+    await prefetchOnAppStart(`${BASE}/post`, {
       method: 'POST',
       body: JSON.stringify(payload),
       headers: {
@@ -319,7 +315,7 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
     const fd = new FormData();
     fd.append('user', 'alice');
     fd.append('msg', 'hi');
-    await prefetchOnAppStart('https://httpbin.org/post', {
+    await prefetchOnAppStart(`${BASE}/post`, {
       method: 'POST',
       body: fd,
       prefetchKey: KEY,
@@ -337,7 +333,7 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
 
   it('GET (default) omits method/body from entry', async () => {
     const KEY = 'pf-get-default';
-    await prefetchOnAppStart('https://httpbin.org/get', { prefetchKey: KEY });
+    await prefetchOnAppStart(`${BASE}/get`, { prefetchKey: KEY });
     const entry = findEntry(KEY);
     expect(entry).toBeDefined();
     expect(entry!.method).toBeUndefined();
@@ -348,7 +344,7 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
 
   it('redirect=error persists followRedirects=false', async () => {
     const KEY = 'pf-noredir';
-    await prefetchOnAppStart('https://httpbin.org/get', {
+    await prefetchOnAppStart(`${BASE}/get`, {
       prefetchKey: KEY,
       redirect: 'error',
     } as any);
@@ -360,7 +356,7 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
 
   it('redirect=follow (default) omits followRedirects', async () => {
     const KEY = 'pf-yesredir';
-    await prefetchOnAppStart('https://httpbin.org/get', { prefetchKey: KEY });
+    await prefetchOnAppStart(`${BASE}/get`, { prefetchKey: KEY });
     const entry = findEntry(KEY);
     expect(entry).toBeDefined();
     expect(entry!.followRedirects).toBeUndefined();
@@ -476,6 +472,19 @@ describe('NitroFetch - nitroFetchOnWorklet', () => {
     expect((result as any)[0].id).toBe('bitcoin');
     expect((result as any)[0].usd).toBeGreaterThan(0);
     expect(runtimeKind).toBe(RuntimeKind.Worker); // Worker Runtime only
+  });
+});
+
+// Real-world HTTPS smoke test against a public API. The bulk of the suite runs
+// against the local Express server (test-server/), so this keeps coverage of an
+// actual TLS handshake + cert validation on the device's native stack.
+describe('NitroFetch - real HTTPS (PokeAPI)', () => {
+  it('GET https://pokeapi.co returns ditto over TLS', async () => {
+    const res = await nitroFetch('https://pokeapi.co/api/v2/pokemon/ditto');
+    expect(res.ok).toBe(true);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.name).toBe('ditto');
   });
 });
 

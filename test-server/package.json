@@ -1,0 +1,15 @@
+{
+  "name": "nitro-fetch-test-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "httpbin-compatible Express server used by the React Native Harness E2E tests in CI.",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "multer": "^2.0.1"
+  }
+}

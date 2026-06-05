@@ -4,8 +4,7 @@ import {
   NetworkInspector,
   generateCurl,
 } from 'react-native-nitro-fetch';
-
-const BASE = 'https://httpbin.org';
+import { BASE } from '../test-utils/server';
 
 // ---------------------------------------------------------------------------
 // NetworkInspector

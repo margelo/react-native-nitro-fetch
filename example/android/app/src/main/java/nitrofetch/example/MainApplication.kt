@@ -29,7 +29,10 @@ class MainApplication : Application(), ReactApplication {
     try {
       AutoPrefetcher.registerPrefetch(
         context = this,
-        url = "https://httpbin.org/anything/native-prefetch-test",
+        // Local httpbin-compatible Express server (test-server/) started by CI on
+        // the host; the Android emulator reaches it via 10.0.2.2. Must match
+        // NP_URL in the harness so the first JS fetch lands a cache hit.
+        url = "http://10.0.2.2:9876/anything/native-prefetch-test",
         prefetchKey = "harness-native-prefetch",
         headers = mapOf("Accept" to "application/json"),
         // Long TTL so the harness can hit the cache long after launch.
