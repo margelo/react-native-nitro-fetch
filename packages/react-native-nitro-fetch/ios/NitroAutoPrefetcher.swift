@@ -150,7 +150,9 @@ public final class NitroAutoPrefetcher: NSObject {
         let refreshed = try? await callTokenRefresh(config: refreshObj)
         if let refreshed = refreshed {
           print("[NitroFetch][TokenRefresh] ✅ Success — got \(refreshed.headers.count) header(s)")
+          #if DEBUG
           for (k, v) in refreshed.headers { print("[NitroFetch][TokenRefresh]   \(k): \(v)") }
+          #endif
           // Cache fresh tokens for useStoredHeaders fallback on next cold start
           if let cacheStr = serializeCache(refreshed) {
             try? NitroFetchSecureAtRest.setEncrypted(cacheStr, forKey: tokenCacheKey, defaults: userDefaults)
@@ -188,7 +190,9 @@ public final class NitroAutoPrefetcher: NSObject {
         headers.append(NitroHeader(key: "prefetchKey", value: prefetchKey))
 
         print("[NitroFetch][TokenRefresh] Prefetching \(url) with \(merged.count) header(s)")
+        #if DEBUG
         for (k, v) in merged { print("[NitroFetch][TokenRefresh]   \(k): \(v)") }
+        #endif
 
         let req = buildNitroRequest(from: obj, mergedHeaders: headers, tokens: tokens)
         Task {
