@@ -371,17 +371,7 @@ More detail: **[docs/websockets.md](docs/websockets.md)** · UI sample: **[examp
 - **WebSockets** are not part of `react-native-nitro-fetch` itself; use the companion package **[react-native-nitro-websockets](docs/websockets.md)** (with **react-native-nitro-text-decoder**). For other stacks, [react-native-fast-io](https://github.com/callstackincubator/react-native-fast-io) is another option.
 
 ## Documentation
-
-- [Getting Started](docs/getting-started.md)
-- [API Reference](docs/api.md)
-- [Android Details](docs/android.md)
-- [iOS Details](docs/ios.md)
-- [Prefetch & Auto-Prefetch](docs/prefetch.md)
-- [WebSockets & prewarm](docs/websockets.md)
-- [Worklets](docs/worklets.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Cronet (Android) notes](docs/cronet-android.md)
-- [Cronet (iOS) notes](docs/cronet-ios.md)
+You can find documentation at https://fetch.margelo.com
 
 ## Margelo
 
