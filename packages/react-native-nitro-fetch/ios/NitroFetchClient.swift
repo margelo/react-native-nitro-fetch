@@ -331,6 +331,8 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       r.setValue(contentType, forHTTPHeaderField: "Content-Type")
     } else if let s = req.bodyString {
       r.httpBody = s.data(using: .utf8)
+    } else if let bytes = req.bodyBytes {
+      r.httpBody = bytes.toData(copyIfNeeded: true)
     }
     if let t = req.timeoutMs, t > 0 { r.timeoutInterval = TimeInterval(t) / 1000.0 }
     return (r, nil)

@@ -217,7 +217,6 @@ public final class NitroAutoPrefetcher: NSObject {
     ]
     if let method = method, !method.isEmpty, method != "GET" { entry["method"] = method }
     if let bodyString = bodyString { entry["bodyString"] = bodyString }
-    if let bodyBytes = bodyBytes { entry["bodyBytes"] = bodyBytes }
     if let parts = bodyFormData, !parts.isEmpty {
       entry["bodyFormData"] = parts.map { part -> [String: String] in
         var clean: [String: String] = [:]
@@ -244,7 +243,6 @@ public final class NitroAutoPrefetcher: NSObject {
     let methodStr = entry["method"] as? String
     let method: NitroRequestMethod? = methodStr.flatMap { NitroRequestMethod(fromString: $0) }
     let bodyString = injectBodyFields(entry["bodyString"] as? String, fields: tokens.bodyFields)
-    let bodyBytes = entry["bodyBytes"] as? String
     let timeoutMs = (entry["timeoutMs"] as? NSNumber)?.doubleValue
     let followRedirects = (entry["followRedirects"] as? Bool) ?? true
     let prefetchCacheTtlMs = (entry["prefetchCacheTtlMs"] as? NSNumber)?.doubleValue
@@ -265,7 +263,7 @@ public final class NitroAutoPrefetcher: NSObject {
       method: method,
       headers: mergedHeaders,
       bodyString: bodyString,
-      bodyBytes: bodyBytes,
+      bodyBytes: nil,
       bodyFormData: formData,
       timeoutMs: timeoutMs,
       followRedirects: followRedirects,

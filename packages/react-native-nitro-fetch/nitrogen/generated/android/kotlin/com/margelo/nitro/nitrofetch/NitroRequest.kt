@@ -9,7 +9,7 @@ package com.margelo.nitro.nitrofetch
 
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
-
+import com.margelo.nitro.core.ArrayBuffer
 
 /**
  * Represents the JavaScript object/struct "NitroRequest".
@@ -31,7 +31,7 @@ data class NitroRequest(
   val bodyString: String?,
   @DoNotStrip
   @Keep
-  val bodyBytes: String?,
+  val bodyBytes: ArrayBuffer?,
   @DoNotStrip
   @Keep
   val bodyFormData: Array<NitroFormDataPart>?,
@@ -58,7 +58,7 @@ data class NitroRequest(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(url: String, method: NitroRequestMethod?, headers: Array<NitroHeader>?, bodyString: String?, bodyBytes: String?, bodyFormData: Array<NitroFormDataPart>?, timeoutMs: Double?, followRedirects: Boolean?, prefetchCacheTtlMs: Double?, requestId: String?): NitroRequest {
+    private fun fromCpp(url: String, method: NitroRequestMethod?, headers: Array<NitroHeader>?, bodyString: String?, bodyBytes: ArrayBuffer?, bodyFormData: Array<NitroFormDataPart>?, timeoutMs: Double?, followRedirects: Boolean?, prefetchCacheTtlMs: Double?, requestId: String?): NitroRequest {
       return NitroRequest(url, method, headers, bodyString, bodyBytes, bodyFormData, timeoutMs, followRedirects, prefetchCacheTtlMs, requestId)
     }
   }
