@@ -34,10 +34,13 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
   func requestSync(req: NitroRequest) throws -> NitroResponse {
     let semaphore = DispatchSemaphore(value: 0)
     var result: Result<NitroResponse, Error>?
+    // JS-origin ArrayBuffers are borrowed. Materialize their bytes while this
+    // synchronous Hybrid method is still running on the JS thread.
+    let (preparedReq, bodyBytes) = NitroFetchClient.prepareRequest(req)
     
     Task {
       do {
-        let response = try await NitroFetchClient.requestStatic(req)
+        let response = try await NitroFetchClient.requestStatic(preparedReq, bodyBytes: bodyBytes)
         result = .success(response)
       } catch {
         result = .failure(error)
@@ -59,6 +62,8 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
   func request(req: NitroRequest) throws -> Promise<NitroResponse> {
     let promise = Promise<NitroResponse>.init()
     let requestId = req.requestId
+    // Never capture a borrowed JS ArrayBuffer in an asynchronous Task.
+    let (preparedReq, bodyBytes) = NitroFetchClient.prepareRequest(req)
 
     let task = Task { [weak self] in
       defer {
@@ -67,7 +72,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
         }
       }
       do {
-        let response = try await NitroFetchClient.requestStatic(req)
+        let response = try await NitroFetchClient.requestStatic(preparedReq, bodyBytes: bodyBytes)
         promise.resolve(withResult: response)
       } catch {
         promise.reject(withError: error)
@@ -82,9 +87,10 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
   
   func prefetch(req: NitroRequest) throws -> Promise<Void> {
     let promise = Promise<Void>.init()
+    let (preparedReq, bodyBytes) = NitroFetchClient.prepareRequest(req)
     Task {
       do {
-        try await NitroFetchClient.prefetchStatic(req)
+        try await NitroFetchClient.prefetchStatic(preparedReq, bodyBytes: bodyBytes)
         promise.resolve(withResult: ())
       } catch {
         promise.reject(withError: error)
@@ -118,6 +124,11 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
 
 
   public class func requestStatic(_ req: NitroRequest) async throws -> NitroResponse {
+    let (preparedReq, bodyBytes) = prepareRequest(req)
+    return try await requestStatic(preparedReq, bodyBytes: bodyBytes)
+  }
+
+  private class func requestStatic(_ req: NitroRequest, bodyBytes: Data?) async throws -> NitroResponse {
     // Local resources (file://, scheme-less paths) aren't HTTP; read off disk -> 200.
     if !isHttpURL(req.url) {
       return try makeLocalFileResponse(req)
@@ -163,7 +174,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       }
     }
 
-    let (urlRequest, finalURL) = try await buildURLRequest(req)
+    let (urlRequest, finalURL) = try await buildURLRequest(req, bodyBytes: bodyBytes)
     let shouldFollowRedirects = req.followRedirects ?? true
     let delegate: URLSessionTaskDelegate? = shouldFollowRedirects ? nil : NoRedirectDelegate()
 
@@ -268,6 +279,11 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
   }
 
   public class func prefetchStatic(_ req: NitroRequest) async throws {
+    let (preparedReq, bodyBytes) = prepareRequest(req)
+    try await prefetchStatic(preparedReq, bodyBytes: bodyBytes)
+  }
+
+  private class func prefetchStatic(_ req: NitroRequest, bodyBytes: Data?) async throws {
     guard let key = findPrefetchKey(req) else {
       throw NSError(domain: "NitroFetch", code: -2, userInfo: [NSLocalizedDescriptionKey: "prefetch: missing 'prefetchKey' header"])
     }
@@ -284,7 +300,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     FetchCache.addPending(key) { _ in /* ignored here */ }
     Task.detached {
       do {
-        let (urlRequest, finalURL) = try await buildURLRequest(req)
+        let (urlRequest, finalURL) = try await buildURLRequest(req, bodyBytes: bodyBytes)
         let (data, response) = try await session.data(for: urlRequest)
         guard let http = response as? HTTPURLResponse else {
           throw NSError(domain: "NitroFetch", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
@@ -321,7 +337,26 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     return req.method?.stringValue
   }
 
-  private static func buildURLRequest(_ req: NitroRequest) async throws -> (URLRequest, URL?) {
+  private static func prepareRequest(_ req: NitroRequest) -> (NitroRequest, Data?) {
+    guard let arrayBuffer = req.bodyBytes else { return (req, nil) }
+    let bodyBytes = arrayBuffer.toData(copyIfNeeded: true)
+    let preparedReq = NitroRequest(
+      url: req.url,
+      method: req.method,
+      headers: req.headers,
+      bodyString: req.bodyString,
+      bodyBytes: nil,
+      bodyFormData: req.bodyFormData,
+      timeoutMs: req.timeoutMs,
+      followRedirects: req.followRedirects,
+      credentials: req.credentials,
+      prefetchCacheTtlMs: req.prefetchCacheTtlMs,
+      requestId: req.requestId
+    )
+    return (preparedReq, bodyBytes)
+  }
+
+  private static func buildURLRequest(_ req: NitroRequest, bodyBytes: Data?) async throws -> (URLRequest, URL?) {
     guard let url = URL(string: req.url) else {
       throw NSError(domain: "NitroFetch", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid URL: \(req.url)"])
     }
@@ -334,6 +369,8 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       let (body, contentType) = try await buildMultipartBody(parts)
       r.httpBody = body
       r.setValue(contentType, forHTTPHeaderField: "Content-Type")
+    } else if let bodyBytes {
+      r.httpBody = bodyBytes
     } else if let s = req.bodyString {
       r.httpBody = s.data(using: .utf8)
     }
