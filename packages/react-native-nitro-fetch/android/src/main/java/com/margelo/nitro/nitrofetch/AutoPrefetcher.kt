@@ -101,7 +101,9 @@ object AutoPrefetcher {
 
             val tokens: TokenRefreshResult = if (refreshed != null) {
               android.util.Log.d("NitroFetch", "[TokenRefresh] ✅ Success — got ${refreshed.headers.size} header(s)")
-              refreshed.headers.forEach { (k, v) -> android.util.Log.d("NitroFetch", "[TokenRefresh]   $k: $v") }
+              if (BuildConfig.DEBUG) {
+                refreshed.headers.forEach { (k, v) -> android.util.Log.d("NitroFetch", "[TokenRefresh]   $k: $v") }
+              }
               // Cache fresh tokens for useStoredHeaders fallback on next cold start
               NitroFetchSecureAtRest.putEncrypted(prefs, KEY_TOKEN_CACHE, serializeCache(refreshed))
               refreshed
@@ -148,7 +150,9 @@ object AutoPrefetcher {
       merged["prefetchKey"] = prefetchKey
 
       android.util.Log.d("NitroFetch", "[TokenRefresh] Prefetching $url with ${merged.size} header(s)")
-      merged.forEach { (k, v) -> android.util.Log.d("NitroFetch", "[TokenRefresh]   $k: $v") }
+      if (BuildConfig.DEBUG) {
+        merged.forEach { (k, v) -> android.util.Log.d("NitroFetch", "[TokenRefresh]   $k: $v") }
+      }
       val req = buildNitroRequestFromEntry(url, merged, o, tokens)
 
       if (FetchCache.getPending(prefetchKey) != null) continue
