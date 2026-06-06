@@ -63,6 +63,11 @@ compositeHeaders: [
   {
     header: 'X-Auth',
     template: '{{token_type}} {{access_token}}',
+    // each {{placeholder}} resolves to a dot-path in the JSON response
+    paths: {
+      token_type: 'token_type',
+      access_token: 'access_token',
+    },
   },
 ];
 ```

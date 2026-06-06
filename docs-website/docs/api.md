@@ -11,8 +11,8 @@ sidebar_position: 2
 Drop-in replacement for the global `fetch`.
 
 - Accepts `Headers`, array pairs, or plain object for `init.headers`
-- Body supports: `string`, `URLSearchParams`, `ArrayBuffer`, and typed arrays
-- Returns a `Response` when available; otherwise a minimal object with `arrayBuffer()`, `text()`, `json()`, and `headers`
+- Body supports: `string`, `URLSearchParams`, `FormData`, and `Blob`
+- Returns a spec-compliant `Response` with `text()`, `json()`, `arrayBuffer()`, `blob()`, `bytes()`, `clone()`, a `body` stream, and `headers`
 
 ```ts
 import { fetch } from 'react-native-nitro-fetch';
