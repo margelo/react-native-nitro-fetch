@@ -1,11 +1,10 @@
 # iOS
 
-- Current status: native `URLSession` client is used for requests and `prefetch()` (with an in‑memory cache for fresh results). Auto‑prefetch on app start is Android‑only.
-- Auto‑prefetch on app start is available. Call `NitroAutoPrefetcher.prefetchOnStart()` from `AppDelegate` to trigger it.
-- Cronet integration is planned; once available, the iOS client will switch to Cronet for parity with Android.
-- `nitroFetchOnWorklet` runs the mapper on the JS thread on iOS (off‑thread mapping requires Android worklets runtime).
+- The iOS client is built on native `URLSession`. It handles requests, `prefetch()` (with an in‑memory cache for fresh results), streaming (`{ stream: true }`), and auto‑prefetch on app start.
+- Auto‑prefetch on app start fires automatically after launch via the linked pod — no manual call is required (see below).
+- `nitroFetchOnWorklet` runs the mapper on a worklet runtime (requires `react-native-worklets`), falling back to the JS thread when it isn't installed.
 
-See also: `docs/cronet-ios.md` for high-level Cronet iOS integration notes.
+See also: `docs/cronet-ios.md` for notes on the iOS networking stack.
 ## Auto‑Prefetch on App Start
 
 
@@ -17,7 +16,7 @@ import { prefetchOnAppStart } from 'react-native-nitro-fetch';
 await prefetchOnAppStart('https://httpbin.org/uuid', { prefetchKey: 'uuid' });
 ```
 
-2) Trigger native prefetch on app start in `AppDelegate.swift`:
+2) (Optional) The prefetch already fires automatically on launch. You can also trigger it explicitly from `AppDelegate.swift` — the call is a no-op if it has already run:
 
 ```swift
 import NitroFetch

@@ -1,71 +1,31 @@
-Cronet C API integration (Android)
+# Cronet on Android
 
-High-level steps
+Android uses Google's **embedded Cronet** through the Java `CronetEngine` API, called from Kotlin. There is no custom C/JNI Cronet wrapper — the library talks to Cronet via `org.chromium.net.*`.
 
-- Bring Cronet binaries: add Cronet AAR or native libs/headers to your project. Options:
-  - Use Google Maven `org.chromium.net:cronet-embedded` (Java wrapper) and extract libcronet. Or
-  - Use Cronet standalone `.so` and C headers from Chromium release artifacts.
-- Update `android/CMakeLists.txt` to link `cronet.aar` or `libcronet.**.so` and include headers.
-- Initialize engine once per process from C++ and keep a pointer globally.
-- Implement a thin C++ wrapper that:
-  - Creates `Cronet_UrlRequestParams` from our `NitroRequest`.
-  - Sets callbacks for redirect, headers received, read completed, finished, error.
-  - Accumulates bytes to memory (MVP) or streams chunks via Nitro events (v2).
-  - Resolves a `NitroResponse` with status, headers, final URL, and base64 body.
-- Expose a JNI function callable from Kotlin via the Nitro spec.
+## Dependency
 
-CMake (sketch)
+`org.chromium.net:cronet-embedded` is declared in `packages/react-native-nitro-fetch/android/build.gradle`:
 
-```
-# After you obtain cronet headers + libs
-add_library(cronet SHARED IMPORTED)
-set_target_properties(cronet PROPERTIES IMPORTED_LOCATION
-  ${CMAKE_SOURCE_DIR}/path/to/libcronet.112.0.0.0.so)
-target_include_directories(${PACKAGE_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/path/to/cronet/include)
-target_link_libraries(${PACKAGE_NAME} cronet)
+```groovy
+api "org.chromium.net:cronet-embedded:${cronetVersion}"
 ```
 
-Engine init (C++)
+`cronetVersion` defaults to `141.7340.3` and can be overridden with a `NitroFetch_cronetVersion` gradle property. The embedded variant bundles the native Chromium net stack, so no Play Services dependency is required.
 
-```
-// cronet_bridge.hpp
-#include <cronet_c.h>
+## Engine
 
-bool cronet_init();
-void cronet_shutdown();
-bool cronet_request(const NitroRequest&, NitroResponse* out);
+A single `CronetEngine` is created lazily and shared for the process lifetime (`NitroFetch.kt`, `getEngine()`):
 
-// cronet_bridge.cpp
-static Cronet_EnginePtr g_engine = nullptr;
-bool cronet_init() {
-  if (g_engine) return true;
-  Cronet_EngineParamsPtr params = Cronet_EngineParams_Create();
-  Cronet_EngineParams_enable_quic_set(params, true);
-  Cronet_EngineParams_user_agent_set(params, Cronet_String_Create("NitroFetch/0.1"));
-  g_engine = Cronet_Engine_Create();
-  auto rc = Cronet_Engine_StartWithParams(g_engine, params);
-  Cronet_EngineParams_Destroy(params);
-  return rc == CRONET_RESULT_SUCCESS;
-}
-```
+- Logs every available `CronetProvider` and prefers the one whose name contains `"Native"` (avoids Play-Services DNS quirks); falls back to the default provider.
+- Built with `enableHttp2(true)`, `enableQuic(true)` (HTTP/3), and `enableBrotli(true)`.
+- Disk cache: `HTTP_CACHE_DISK`, 50 MB, at `<cacheDir>/nitrofetch_cronet_cache`.
+- User-Agent: `NitroFetch/1.0`.
+- Callbacks run on a fixed-size `NitroCronet-io` thread pool.
 
-Request (C++)
+`NitroFetch.shutdown()` tears the engine down (best-effort).
 
-```
-// Convert NitroRequest -> Cronet_UrlRequestParams
-// Create Cronet_UrlRequest with callbacks
-// In on_BytesRead, append to std::vector<uint8_t>
-// In on_Success/on_Failed, fill NitroResponse fields and return
-```
+## Request paths
 
-Kotlin hook
-
-- Implement `override suspend fun request(req: NitroRequest): NitroResponse` in `NitroFetch.kt`.
-- Call into JNI function that wraps `cronet_request` and returns a struct matching the generated Nitro type.
-
-Notes
-
-- For large bodies, prefer streaming in v2 (expose a request handle and chunk callbacks over Nitro).
-- Enable HTTP/2 and QUIC in engine params if needed.
-- Handle redirects, timeouts, and cancellation by keeping a map of active requests and calling `Cronet_UrlRequest_Cancel`.
-
+- **Buffered** (`NitroFetchClient.kt`): `request()` (async `Promise`) and `requestSync()` (used by worklets) build a `UrlRequest`, accumulate the body, and resolve a `NitroResponse`. Cancellation is wired through `cancelRequest(requestId)`.
+- **Streaming** (`NitroCronet.kt`): `newUrlRequestBuilder(url)` exposes a `UrlRequestBuilder` whose `onResponseStarted` / `onReadCompleted` callbacks drive a `ReadableStream` (used by `fetch(url, { stream: true })`).
+- **Prefetch / auto-prefetch** (`AutoPrefetcher.kt`, `NitroFetchClient.kt`): results are kept in `FetchCache` and served with a `nitroPrefetched: true` header.

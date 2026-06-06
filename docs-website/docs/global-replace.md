@@ -53,11 +53,12 @@ const socket = io('https://example.com', {
 
 If you use [axios](https://axios-http.com), prefer axios's built-in fetch adapter and pass Nitro's `fetch` explicitly. This keeps the integration at the axios instance boundary instead of relying on global replacement.
 
-:::warning
+:::tip
 Custom `env.fetch` support requires axios `v1.12.0` or newer.
 
-Setting `Request` and `Response` to `null` disables upload/download progress capture in axios's fetch adapter, Also if not set to null it will use global constructors as default, It is recommended to set it to null because Nitro Fetch Request/Response are not fully compatible with global one.
-Visit [axios adapter docs](https://axios.rest/pages/advanced/fetch-adapter.html) for more info
+Setting `Request` and `Response` to `null` is the recommended configuration: it tells axios to hand the request straight to Nitro's native client instead of wrapping it in its own JS `Request`/`Response`. Nitro performs the transfer natively, so the only trade-off is that axios's JS-level upload/download progress callbacks — which it builds on those constructors — won't fire. If you leave them unset, axios falls back to the global `Request`/`Response`, which aren't a 1:1 match for Nitro's native objects.
+
+See the [axios fetch adapter docs](https://axios.rest/pages/advanced/fetch-adapter.html) for more info.
 :::
 
 ```ts
