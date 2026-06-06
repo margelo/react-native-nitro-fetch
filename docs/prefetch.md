@@ -21,9 +21,9 @@ Provide the `prefetchKey` either as a header or via `init.prefetchKey`:
 await prefetch('https://httpbin.org/uuid', { prefetchKey: 'uuid' } as any);
 ```
 
-## Auto-Prefetch on Android
+## Auto-Prefetch on App Start
 
-Use `prefetchOnAppStart()` to enqueue requests in Shared Preferences so they are fetched on next app start:
+Use `prefetchOnAppStart()` to enqueue requests in native storage so they are fetched on the next app start (Android and iOS):
 
 ```ts
 import { prefetchOnAppStart } from 'react-native-nitro-fetch';
@@ -104,7 +104,7 @@ export function UserDetails() {
 
 ## Auto-Prefetch on iOS (with User Defaults)
 
-You can prefetch queued URLs at app startup by calling the native bootstrap in your `AppDelegate`:
+On iOS the queue is replayed automatically at launch (via the linked pod) — no AppDelegate code is required. You can also trigger it explicitly; the call is a no-op if it already ran:
 
 ```swift
 import NitroFetch

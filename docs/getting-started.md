@@ -24,5 +24,5 @@ export async function test() {
 Notes
 
 - Android uses Cronet (via `org.chromium.net:cronet-embedded`) which is already included in `android/build.gradle`.
-- iOS currently falls back to the built-in fetch path while Cronet integration is in progress.
+- iOS uses the native URLSession client.
 

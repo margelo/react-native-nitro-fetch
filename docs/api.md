@@ -4,8 +4,8 @@
 
 - Drop-in replacement for the global `fetch`.
 - Accepts `Headers`, array pairs, or plain object for `init.headers`.
-- Body supports: `string`, `URLSearchParams`, `ArrayBuffer`, and typed arrays.
-- Returns a `Response` when available; otherwise a minimal object with `arrayBuffer()`, `text()`, `json()`, and `headers`.
+- Body supports: `string`, `URLSearchParams`, `FormData`, and `Blob`.
+- Returns a spec-compliant `Response` with `text()`, `json()`, `arrayBuffer()`, `blob()`, `bytes()`, `clone()`, a `body` stream, and `headers`.
 
 Example
 
@@ -17,7 +17,7 @@ const data = await res.json();
 
 ## `nitroFetchOnWorklet(input, init, mapWorklet, options?)`
 
-- Runs the network request and then invokes `mapWorklet` on a worklet runtime (Android) or on JS as a fallback (iOS or when worklets not available).
+- Runs the network request and then invokes `mapWorklet` on a worklet runtime, falling back to the JS thread when `react-native-worklets` isn't installed.
 - `mapWorklet(payload)` receives `{ url, status, statusText, ok, redirected, headers, bodyBytes?, bodyString? }`.
 - `options.preferBytes` (default `false`) controls whether `bodyBytes` or `bodyString` is sent to the mapper.
 
@@ -40,11 +40,11 @@ const data = await nitroFetchOnWorklet('https://httpbin.org/get', undefined, map
 - Later, call `fetch(url, { headers: { prefetchKey } })` to consume a fresh or pending prefetched result.
 - On success, response will include header `nitroPrefetched: true`.
 
-## `prefetchOnAppStart(input, { prefetchKey })` (Android)
+## `prefetchOnAppStart(input, { prefetchKey })`
 
-- Enqueues a request to be prefetched at the next app start by writing into Shared Preferences under `nitrofetch_autoprefetch_queue`.
+- Enqueues a request to be prefetched at the next app start by writing into native storage under `nitrofetch_autoprefetch_queue`. Replayed on the next cold start on both Android and iOS.
 
-## `removeFromAutoPrefetch(prefetchKey)` / `removeAllFromAutoprefetch()` (Android)
+## `removeFromAutoPrefetch(prefetchKey)` / `removeAllFromAutoprefetch()`
 
 - Utilities to manage the auto-prefetch queue.
 

@@ -10,8 +10,8 @@
 - Cronet provider details
   - The library logs available Cronet providers and prefers the "Native" provider. Check Android logs for provider name/version during init.
 
-- Streaming / timeouts / cancellation not working
-  - Not implemented yet. Current implementation fetches full bodies before resolving. For streaming today, use Expo’s `expo-fetch`. Timeouts/cancellation are planned.
+- Streaming / cancellation
+  - Both are supported. Pass `{ stream: true }` to get a `ReadableStream` body, and use `AbortController` to cancel. For request timeouts, pair an `AbortController` with a timer.
 
-- WebSockets support
-  - Not supported. For high‑performance sockets and binary streams, consider `react-native-fast-io`.
+- WebSockets
+  - Supported via the companion package `react-native-nitro-websockets` (install `react-native-nitro-text-decoder` alongside it).
