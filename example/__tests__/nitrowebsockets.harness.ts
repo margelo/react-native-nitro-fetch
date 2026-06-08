@@ -98,13 +98,13 @@ let _sharedWs: NitroWebSocket | null = null;
 describe('NitroWebSocket - Connection', () => {
   it('connects: readyState is OPEN and url contains server hostname', async () => {
     const ws = await openWebSocket();
-    expect(ws.readyState).toBe('OPEN');
+    expect(ws.readyState).toBe(NitroWebSocket.OPEN);
     expect(ws.url).toContain('echo.websocket.org');
     await closeAndWait(ws);
   });
 
   it('readyState is CONNECTING before onopen fires; onopen callback fires', async () => {
-    let stateBeforeOpen: string | undefined;
+    let stateBeforeOpen: number | undefined;
     let openFired = false;
     const ws = await withTimeout(
       new Promise<NitroWebSocket>((resolve, reject) => {
@@ -117,9 +117,16 @@ describe('NitroWebSocket - Connection', () => {
         _ws.onerror = (err) => reject(new Error(err));
       })
     );
-    expect(stateBeforeOpen).toBe('CONNECTING');
+    expect(stateBeforeOpen).toBe(NitroWebSocket.CONNECTING);
     expect(openFired).toBe(true);
     await closeAndWait(ws);
+  });
+
+  it('exposes browser-compatible readyState constants on the constructor', () => {
+    expect(NitroWebSocket.CONNECTING).toBe(0);
+    expect(NitroWebSocket.OPEN).toBe(1);
+    expect(NitroWebSocket.CLOSING).toBe(2);
+    expect(NitroWebSocket.CLOSED).toBe(3);
   });
 });
 
@@ -223,7 +230,7 @@ describe('NitroWebSocket - Close', () => {
     const closeEvent = await closeAndWait(ws, 1000, '');
     expect(closeEvent.code).toBe(1000);
     expect(closeEvent.wasClean).toBe(true);
-    expect(ws.readyState).toBe('CLOSED');
+    expect(ws.readyState).toBe(NitroWebSocket.CLOSED);
   });
 
   it('onclose callback fires exactly once', async () => {
