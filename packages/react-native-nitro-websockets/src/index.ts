@@ -26,6 +26,23 @@ type WebSocketEventType = 'open' | 'message' | 'close' | 'error'
 type WebSocketEventListener =
   | ((event: any) => void)
   | { handleEvent: (event: any) => void }
+type WebSocketOptions = {
+  [optionName: string]: any
+  headers: Record<string, string>
+}
+
+function extractHeaders(
+  optionsOrHeaders?: WebSocketOptions | Record<string, string> | null
+): Record<string, string> | undefined {
+  if (optionsOrHeaders == null) return undefined
+
+  const maybeHeaders = (optionsOrHeaders as WebSocketOptions).headers
+  return typeof maybeHeaders === 'object' &&
+    maybeHeaders != null &&
+    !Array.isArray(maybeHeaders)
+    ? maybeHeaders
+    : optionsOrHeaders
+}
 
 export {
   prewarmOnAppStart,
@@ -84,9 +101,19 @@ export class NitroWebSocket {
   }
 
   constructor(
+    url: string,
+    protocols?: string | string[] | null,
+    options?: WebSocketOptions | null
+  )
+  constructor(
     url: string | URL,
     protocols?: string | string[],
     headers?: Record<string, string>
+  )
+  constructor(
+    url: string | URL,
+    protocols?: string | string[] | null,
+    optionsOrHeaders?: WebSocketOptions | Record<string, string> | null
   ) {
     const normalizedUrl = typeof url === 'string' ? url : url.toString()
     this._ws = NitroModules.createHybridObject<HybridWebSocket>('WebSocket')
@@ -95,6 +122,7 @@ export class NitroWebSocket {
         ? protocols
         : [protocols]
       : []
+    const headers = extractHeaders(optionsOrHeaders)
     const headerPairs = headers
       ? Object.entries(headers).map(([key, value]) => ({ key, value }))
       : []
@@ -115,7 +143,7 @@ export class NitroWebSocket {
         _inspector._recordWsConnected(this._inspectorId)
       }
       this._onopen?.()
-      this._emitEventListeners('open', new Event('open'))
+      this._emitEventListeners('open', { type: 'open' } as const)
     }
     this._ws.onMessage = (native: HybridWebSocketMessageEvent) => {
       const event = this._createMessageEvent(native)
@@ -133,7 +161,7 @@ export class NitroWebSocket {
       if (this._inspectorId && _inspector?.isEnabled()) {
         _inspector._recordWsError(this._inspectorId, error)
       }
-      const event = new Event('error')
+      const event = { type: 'error' } as const
       this._onerror?.(error)
       this._emitEventListeners('error', event)
     }
@@ -234,24 +262,26 @@ export class NitroWebSocket {
   }
 
   dispatchEvent(event: Event) {
-    if (event.type === 'open') {
+    const typedEvent = event as Event & { type?: string }
+
+    if (typedEvent.type === 'open') {
       this._onopen?.()
       this._emitEventListeners('open', event)
       return true
     }
-    if (event.type === 'message') {
+    if (typedEvent.type === 'message') {
       const messageEvent = event as unknown as WebSocketMessageEvent
       this._onmessage?.(messageEvent)
       this._emitEventListeners('message', messageEvent)
       return true
     }
-    if (event.type === 'close') {
+    if (typedEvent.type === 'close') {
       const closeEvent = event as unknown as NitroWSCloseEvent
       this._onclose?.(closeEvent)
       this._emitEventListeners('close', closeEvent)
       return true
     }
-    if (event.type === 'error') {
+    if (typedEvent.type === 'error') {
       this._onerror?.(event)
       this._emitEventListeners('error', event)
       return true
@@ -309,3 +339,6 @@ export class NitroWebSocket {
     }
   }
 }
+
+const test: typeof WebSocket = NitroWebSocket
+void test
