@@ -1,6 +1,7 @@
 import Foundation
 import NitroModules
 import os
+import UniformTypeIdentifiers
 
 #if NITROFETCH_TRACING
 private let fetchLog = OSLog(subsystem: "com.margelo.nitrofetch", category: "network")
@@ -117,6 +118,10 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
 
 
   public class func requestStatic(_ req: NitroRequest) async throws -> NitroResponse {
+    // Local resources (file://, scheme-less paths) aren't HTTP; read off disk -> 200.
+    if !isHttpURL(req.url) {
+      return try makeLocalFileResponse(req)
+    }
     if let key = findPrefetchKey(req) {
       // If a prefetched result is fresh, return immediately
       if let cached = FetchCache.getResultIfFresh(key, maxAgeMs: Int64(req.prefetchCacheTtlMs ?? 5_000)) {
@@ -378,6 +383,57 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       throw NSError(domain: "NitroFetch", code: -4, userInfo: [NSLocalizedDescriptionKey: "Cannot read file at: \(uri)"])
     }
     return data
+  }
+
+  private static func isHttpURL(_ url: String) -> Bool {
+    return url.hasPrefix("http://") || url.hasPrefix("https://")
+  }
+
+  private static func localData(forURI uri: String) throws -> Data {
+    // file:// via URL (honors percent-encoding); bare paths read directly.
+    if uri.hasPrefix("file://"), let fileURL = URL(string: uri) {
+      return try Data(contentsOf: fileURL)
+    }
+    let path = uri.hasPrefix("file://") ? String(uri.dropFirst(7)) : uri
+    guard let data = FileManager.default.contents(atPath: path) else {
+      throw NSError(domain: "NitroFetch", code: -4,
+                    userInfo: [NSLocalizedDescriptionKey: "Cannot read file at: \(uri)"])
+    }
+    return data
+  }
+
+  private static func mimeType(forURI uri: String) -> String {
+    let path = uri.hasPrefix("file://") ? String(uri.dropFirst(7)) : uri
+    let ext = (path as NSString).pathExtension
+    if !ext.isEmpty, let type = UTType(filenameExtension: ext),
+       let mime = type.preferredMIMEType {
+      return mime
+    }
+    return "application/octet-stream"
+  }
+
+  // Read a local file -> synthetic 200, mirroring the HTTP path's text/bytes choice.
+  private static func makeLocalFileResponse(_ req: NitroRequest) throws -> NitroResponse {
+    let data = try localData(forURI: req.url)
+    let mime = mimeType(forURI: req.url)
+    let bodyStr = String(data: data, encoding: .utf8)
+    var bodyBytesAb: ArrayBuffer? = nil
+    if bodyStr == nil && !data.isEmpty {
+      bodyBytesAb = try ArrayBuffer.copy(data: data)
+    }
+    return NitroResponse(
+      url: req.url,
+      status: 200,
+      statusText: "OK",
+      ok: true,
+      redirected: false,
+      headers: [
+        NitroHeader(key: "Content-Type", value: mime),
+        NitroHeader(key: "Content-Length", value: String(data.count)),
+      ],
+      bodyString: bodyStr,
+      bodyBytes: bodyBytesAb
+    )
   }
 
   private static func detectCharset(from http: HTTPURLResponse) -> String.Encoding? {

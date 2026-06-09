@@ -85,6 +85,11 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       onFail: (Throwable) -> Unit
     ): UrlRequest? {
       return try {
+        // Local resources (file://, content://, scheme-less paths) aren't HTTP; read off disk -> 200.
+        if (!isHttpURL(req.url)) {
+          onSuccess(makeLocalFileResponse(req))
+          return null
+        }
         val engine = NitroFetch.getEngine()
         val executor = NitroFetch.ioExecutor
         startCronet(engine, executor, req, onSuccess, onFail)
@@ -374,6 +379,46 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       }
       val path = if (uri.startsWith("file://")) uri.removePrefix("file://") else uri
       return File(path).readBytes()
+    }
+
+    private fun isHttpURL(url: String): Boolean =
+      url.startsWith("http://") || url.startsWith("https://")
+
+    private fun guessMime(uri: String): String {
+      if (uri.startsWith("content://")) {
+        NitroModules.applicationContext?.contentResolver?.getType(Uri.parse(uri))?.let { return it }
+      }
+      val path = if (uri.startsWith("file://")) uri.removePrefix("file://") else uri
+      val ext = path.substringAfterLast('.', "").lowercase()
+      if (ext.isNotEmpty()) {
+        android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)?.let { return it }
+      }
+      return java.net.URLConnection.guessContentTypeFromName(path) ?: "application/octet-stream"
+    }
+
+    // Read a local file -> synthetic 200, mirroring the HTTP path's strict text/bytes choice.
+    private fun makeLocalFileResponse(req: NitroRequest): NitroResponse {
+      val bytes = readFileBytes(req.url)
+      val mime = guessMime(req.url)
+      val bodyStr: String? = try {
+        strictDecoderFor(Charsets.UTF_8).decode(ByteBuffer.wrap(bytes)).toString()
+      } catch (_: Throwable) { null }
+      val bodyBytesAb: ArrayBuffer? = if (bodyStr == null && bytes.isNotEmpty())
+        bytes.toArrayBuffer()
+      else null
+      return NitroResponse(
+        url = req.url,
+        status = 200.0,
+        statusText = "OK",
+        ok = true,
+        redirected = false,
+        headers = arrayOf(
+          NitroHeader("Content-Type", mime),
+          NitroHeader("Content-Length", bytes.size.toString())
+        ),
+        bodyString = bodyStr,
+        bodyBytes = bodyBytesAb
+      )
     }
   }
 
