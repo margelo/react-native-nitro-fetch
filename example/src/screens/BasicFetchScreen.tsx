@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import * as RNFS from '@dr.pogodin/react-native-fs';
 import { fetch as nitroFetch } from 'react-native-nitro-fetch';
 import { theme } from '../theme';
 
@@ -89,6 +90,24 @@ export function BasicFetchScreen() {
               `❌ Binary corrupted/empty! ${bytes.length} bytes, bad signature`
             );
           }
+        } catch (e: any) {
+          addLog(`❌ Failed: ${e.message}`);
+        }
+      },
+    },
+    {
+      title: 'Read Local File',
+      action: async () => {
+        const path = `${RNFS.CachesDirectoryPath}/nitro-demo.csv`;
+        addLog(`Writing ${path}...`);
+        try {
+          await RNFS.writeFile(path, 'col1,col2\nfoo,bar\n', 'utf8');
+          // Read it back two ways: a file:// URL and a scheme-less absolute path
+          const viaUrl = await (await nitroFetch(`file://${path}`)).text();
+          const viaPath = await (await nitroFetch(path)).text();
+          addLog(
+            `✅ file://: ${viaUrl.length} chars\n✅ scheme-less path: ${viaPath.trim().replace(/\n/g, ' / ')}`
+          );
         } catch (e: any) {
           addLog(`❌ Failed: ${e.message}`);
         }
