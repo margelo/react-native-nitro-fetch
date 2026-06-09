@@ -39,6 +39,35 @@ export async function test() {
 }
 ```
 
+## Local & non-HTTP URLs
+
+Besides `http(s)`, `fetch(...)` also reads local resources, so it stays a safe drop-in even when you replace the global `fetch` (file pickers, spreadsheet/CSV imports, inline data):
+
+```ts
+// data: URLs are decoded in JS
+await fetch('data:text/plain;base64,SGVsbG8='); // -> "Hello"
+
+// file:// URLs and bare absolute paths are read off disk natively
+await fetch('file:///var/mobile/.../import.csv');
+await fetch('/var/mobile/.../import.csv'); // scheme-less absolute path
+
+// content:// URIs are read via the ContentResolver (Android)
+await fetch('content://com.android.providers.../document/1234');
+```
+
+For example, reading two local files:
+
+```ts
+import { fetch } from 'react-native-nitro-fetch';
+
+const csv = await (await fetch(`file://${pickedFileUri}`)).text(); // a picked spreadsheet
+const config = await (await fetch(`${cacheDir}/config.json`)).json(); // a cached JSON file
+```
+
+These return a normal `200` `Response` with a `Content-Type` guessed from the file extension (or the `data:` media type). `blob:` URLs are **not** supported (React Native's blob registry isn't reachable from native) and reject with a `TypeError`.
+
+`data:` text decoding uses `react-native-nitro-text-decoder` (if your app bundles it) or a global `TextDecoder`; if neither exists nitro-fetch logs a hint and the body stays available via `res.arrayBuffer()`/`res.bytes()`. `file://`/`content://` reads decode natively.
+
 ## Platform details
 
 - **Android** uses [Cronet](https://chromium.googlesource.com/chromium/src/+/lkgr/components/cronet/README.md) (via `org.chromium.net:cronet-embedded`) which is already included in `android/build.gradle`. No extra setup required.
