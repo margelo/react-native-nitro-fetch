@@ -118,8 +118,6 @@ jobs:
         with:
           path: example/ios/Pods
           key: ${{ runner.os }}-pods-nitrofetch-${{ hashFiles('**/Podfile.lock', '**/Gemfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-nitrofetch-
 
       - name: Install Pods
         working-directory: example
@@ -130,8 +128,6 @@ jobs:
         with:
           path: example/ios/build
           key: ${{ runner.os }}-dd-nitrofetch-${{ hashFiles('**/Podfile.lock', '**/Gemfile.lock', '**/package.json', '**/bun.lock') }}-xcode${{ env.XCODE_VERSION }}
-          restore-keys: |
-            ${{ runner.os }}-dd-nitrofetch-
 
       - name: Build iOS app
         working-directory: example/ios

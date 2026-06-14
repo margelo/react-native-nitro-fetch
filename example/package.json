@@ -16,7 +16,7 @@
     "@react-navigation/native": "^7.1.33",
     "@react-navigation/native-stack": "^7.14.5",
     "react": "19.2.3",
-    "react-native": "0.85.0-rc.0",
+    "react-native": "0.86.0",
     "react-native-harness": "^1.0.0-alpha.25",
     "react-native-nitro-fetch": "../packages/react-native-nitro-fetch",
     "react-native-nitro-modules": "^0.35.2",
@@ -24,7 +24,7 @@
     "react-native-nitro-websockets": "../packages/react-native-nitro-websockets",
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.24.0",
-    "react-native-worklets": "^0.8.0"
+    "react-native-worklets": "^0.9.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -37,9 +37,9 @@
     "@react-native-community/cli-platform-ios": "20.1.0",
     "@react-native-harness/platform-android": "^1.0.0-alpha.25",
     "@react-native-harness/platform-apple": "^1.0.0-alpha.25",
-    "@react-native/babel-preset": "0.85.0-rc.0",
-    "@react-native/metro-config": "0.85.0-rc.0",
-    "@react-native/typescript-config": "0.85.0-rc.0",
+    "@react-native/babel-preset": "0.86.0",
+    "@react-native/metro-config": "0.86.0",
+    "@react-native/typescript-config": "0.86.0",
     "@types/react": "^19.2.0",
     "axios": "^1.12.0",
     "react-native-builder-bob": "^0.40.13",
