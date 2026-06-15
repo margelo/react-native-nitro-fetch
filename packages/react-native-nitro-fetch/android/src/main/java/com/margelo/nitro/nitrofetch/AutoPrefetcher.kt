@@ -201,7 +201,6 @@ object AutoPrefetcher {
       put("headers", headersObj)
       if (method != null && method.isNotEmpty() && method != "GET") put("method", method)
       if (bodyString != null) put("bodyString", bodyString)
-      if (bodyBytes != null) put("bodyBytes", bodyBytes)
       if (!bodyFormData.isNullOrEmpty()) {
         val arr = JSONArray()
         bodyFormData.forEach { part ->
@@ -237,9 +236,6 @@ object AutoPrefetcher {
       ?.takeIf { it.has("bodyString") && !it.isNull("bodyString") }
       ?.optString("bodyString")
     val bodyString = injectBodyFields(rawBodyString, tokens.bodyFields)
-    val bodyBytes = entry
-      ?.takeIf { it.has("bodyBytes") && !it.isNull("bodyBytes") }
-      ?.optString("bodyBytes")
     val timeoutMs = entry
       ?.takeIf { it.has("timeoutMs") && !it.isNull("timeoutMs") }
       ?.optDouble("timeoutMs")
@@ -271,7 +267,7 @@ object AutoPrefetcher {
       method = method,
       headers = headerObjs,
       bodyString = bodyString,
-      bodyBytes = bodyBytes,
+      bodyBytes = null,
       bodyFormData = bodyFormData,
       timeoutMs = timeoutMs,
       followRedirects = followRedirects,

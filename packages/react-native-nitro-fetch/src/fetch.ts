@@ -230,7 +230,7 @@ function buildNitroRequest(
     method: (method?.toUpperCase() as any) ?? 'GET',
     headers: headers.length > 0 ? headers : undefined,
     bodyString: normalized?.bodyString,
-    bodyBytes: undefined as any,
+    bodyBytes: normalized?.bodyBytes,
     bodyFormData: normalized?.bodyFormData,
     followRedirects,
     prefetchCacheTtlMs,
@@ -376,8 +376,7 @@ export function buildNitroRequestPure(
     method: (method?.toUpperCase() as any) ?? 'GET',
     headers,
     bodyString: normalized?.bodyString,
-    // Only include bodyBytes when provided to avoid signaling upload data unintentionally
-    bodyBytes: undefined as any,
+    bodyBytes: normalized?.bodyBytes,
     followRedirects: true,
     prefetchCacheTtlMs,
   };
@@ -963,8 +962,6 @@ export async function prefetchOnAppStart(
   };
   if (req.method && req.method !== 'GET') entry.method = req.method;
   if (req.bodyString !== undefined) entry.bodyString = req.bodyString;
-  if (typeof req.bodyBytes === 'string' && req.bodyBytes.length > 0)
-    entry.bodyBytes = req.bodyBytes;
   if (req.bodyFormData && req.bodyFormData.length > 0)
     entry.bodyFormData = req.bodyFormData;
   if (typeof req.timeoutMs === 'number') entry.timeoutMs = req.timeoutMs;
