@@ -27,6 +27,6 @@ Example 10-run head-to-head (14 public endpoints, alternating order, stall-corre
 | **Median** | **190** | **148** | **22.0%** | **1.28×** | 22 total |
 | **Average** | **192** | **147** | **23.2%** | **1.30×** | — |
 
-Numbers are device-, network-, and time-specific. **Try it yourself** in the example app → **Benchmark V2** (`example/src/screens/BenchmarkV2Screen.tsx`), on a release build.
+Numbers are device-, network-, and time-specific. **Try it yourself** in the example app → the **Benchmark V2** screen (or the **Benchmark** section in the tab navigator), on a release build.
 
 If you have any concerns about the benchmark methodology, please [open an issue](https://github.com/margelo/react-native-nitro-fetch/issues).

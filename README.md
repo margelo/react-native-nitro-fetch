@@ -375,7 +375,7 @@ These numbers are **without prefetch** — a common misconception is that nitro-
 | Average (10 runs) | 192 ms | 147 ms | **23.2%** (1.30×) |
 | Median (10 runs) | 190 ms | 148 ms | **22.0%** (1.28×) |
 
-Try it yourself in the example app → **Benchmark V2** (release build). See [Benchmarks](https://fetch.margelo.com/docs/benchmarks) for the method and full table. Concerns about the benchmark? [Open an issue](https://github.com/margelo/react-native-nitro-fetch/issues).
+Try it yourself in the example app. See [Benchmarks](https://fetch.margelo.com/docs/benchmarks) for the method and full table. Concerns about the benchmark? [Open an issue](https://github.com/margelo/react-native-nitro-fetch/issues).
 
 ## Limitations & Alternatives
 
