@@ -9,6 +9,7 @@ import { theme } from './theme';
 
 import { HomeScreen } from './screens/HomeScreen';
 import { BenchmarkScreen } from './screens/BenchmarkScreen';
+import { BenchmarkV2Screen } from './screens/BenchmarkV2Screen';
 import { CryptoScreen } from './screens/CryptoScreen';
 import { PostAndUploadScreen } from './screens/PostAndUploadScreen';
 import { PrefetchScreen } from './screens/PrefetchScreen';
@@ -134,6 +135,11 @@ export default function App() {
           name="WebSocketBenchmarkScreen"
           component={WebSocketBenchmarkScreen}
           options={{ title: 'WS Benchmark' }}
+        />
+        <Stack.Screen
+          name="BenchmarkV2Screen"
+          component={BenchmarkV2Screen}
+          options={{ title: 'Benchmark V2' }}
         />
         <Stack.Screen
           name="NetworkInspectorScreen"

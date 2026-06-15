@@ -17,6 +17,7 @@ const sidebars: SidebarsConfig = {
       ],
     },
     'websockets',
+    'benchmarks',
     {
       type: 'category',
       label: 'Advanced',
