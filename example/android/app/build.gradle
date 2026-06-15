@@ -37,15 +37,21 @@ react {
     // bundleAssetName = "MyApplication.android.bundle"
     //
     //   The entry file for bundle generation. Default is 'index.android.js' or 'index.js'
-    // entryFile = file("../js/MyApplication.android.js")
+    //   `root` points at the monorepo root (for hoisted node_modules), so the
+    //   default <root>/index.js doesn't exist — point it at the example entry.
+    entryFile = file("../../index.js")
     //
     //   A list of extra flags to pass to the 'bundle' commands.
     //   See https://github.com/react-native-community/cli/blob/main/docs/commands.md#bundle
-    // extraPackagerArgs = []
+    //   `root` is the monorepo root which has no metro.config.js — point the
+    //   release bundler at the example's metro config explicitly.
+    extraPackagerArgs = ["--config", file("../../metro.config.js").absolutePath]
 
     /* Hermes Commands */
     //   The hermes compiler command to run. By default it is 'hermesc'
-    hermesCommand = "$rootDir/../../../node_modules/hermes-compiler/hermesc/%OS-BIN%/hermesc"
+    //   $rootDir is example/android, so ../../ reaches the monorepo root where
+    //   node_modules is hoisted (the original ../../../ overshot to outside the repo).
+    hermesCommand = "$rootDir/../../node_modules/hermes-compiler/hermesc/%OS-BIN%/hermesc"
     //
     //   The list of flags to pass to the Hermes compiler. By default is "-O", "-output-source-map"
     // hermesFlags = ["-O", "-output-source-map"]

@@ -366,6 +366,17 @@ Authenticated prewarms: use **`registerTokenRefresh`** with `target: 'websocket'
 
 More detail: **[docs/websockets.md](docs/websockets.md)** · UI sample: **[example/src/screens/WebSocketScreen.tsx](example/src/screens/WebSocketScreen.tsx)**.
 
+## Benchmarks
+
+These numbers are **without prefetch** — a common misconception is that nitro-fetch is only faster when prefetching. It isn't: plain `fetch` is faster on its own. In our testing it's around **15–25% faster** than the built-in `fetch` (release build, idle, Wi-Fi). The gap depends a lot on your backend — connection reuse, HTTP/2, and **HTTP/3 over QUIC** widen it. With [prefetch](#prefetching-in-js) the difference is far larger still.
+
+| | Built-in | Nitro | Faster |
+| --- | ---: | ---: | ---: |
+| Average (10 runs) | 192 ms | 147 ms | **23.2%** (1.30×) |
+| Median (10 runs) | 190 ms | 148 ms | **22.0%** (1.28×) |
+
+Try it yourself in the example app → **Benchmark V2** (release build). See [Benchmarks](https://fetch.margelo.com/docs/benchmarks) for the method and full table. Concerns about the benchmark? [Open an issue](https://github.com/margelo/react-native-nitro-fetch/issues).
+
 ## Limitations & Alternatives
 
 - **WebSockets** are not part of `react-native-nitro-fetch` itself; use the companion package **[react-native-nitro-websockets](docs/websockets.md)** (with **react-native-nitro-text-decoder**). For other stacks, [react-native-fast-io](https://github.com/callstackincubator/react-native-fast-io) is another option.

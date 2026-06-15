@@ -66,6 +66,14 @@ const EXAMPLES = [
     icon: '📡',
   },
   {
+    id: 'benchmark-v2',
+    title: 'Benchmark V2',
+    description:
+      'Fair, stall-corrected fetch + prefetch benchmark vs built-in fetch across many public APIs.',
+    screen: 'BenchmarkV2Screen' as const,
+    icon: '📊',
+  },
+  {
     id: 'network-inspector',
     title: 'Network Inspector',
     description:
