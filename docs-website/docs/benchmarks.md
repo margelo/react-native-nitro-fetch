@@ -6,7 +6,7 @@ sidebar_position: 8
 
 # Benchmarks
 
-These results are **without prefetch**. A common misconception is that nitro-fetch is only faster when you prefetch — it isn't. Plain `fetch` is faster on its own; in our testing around **15–25% faster** than React Native's built-in `fetch` for end-to-end requests (release build, device idle on Wi-Fi). Prefetch makes the difference far larger still, but it's not where the win comes from.
+These results are without prefetch. A common misconception is that nitro-fetch is only faster when you prefetch - it isn’t. Plain fetch is faster on its own; in our testing around 15–25% faster than React Native’s built-in fetch for end-to-end requests (Android, Samsung F14, release build, device idle on Wi-Fi). Prefetch makes the difference far larger still, but it’s not where the win comes from.
 
 How much faster depends heavily on how your backend is set up — connection reuse, HTTP/2, and especially **HTTP/3 over QUIC** widen the gap.
 
