@@ -10,7 +10,9 @@ Android uses Google's **embedded Cronet** through the Java `CronetEngine` API, c
 api "org.chromium.net:cronet-embedded:${cronetVersion}"
 ```
 
-`cronetVersion` defaults to `141.7340.3` and can be overridden with a `NitroFetch_cronetVersion` gradle property. The embedded variant bundles the native Chromium net stack, so no Play Services dependency is required.
+`cronetVersion` defaults to `143.7445.0` and can be overridden with a `NitroFetch_cronetVersion` gradle property. The embedded variant bundles the native Chromium net stack, so no Play Services dependency is required.
+
+> **Note:** `143.7445.0` is the minimum version required to build with Android Gradle Plugin 9+. Earlier Cronet artifacts shared the `org.chromium.net` namespace across modules, which trips AGP 9's unique-namespace enforcement during manifest merge. Fixed upstream in [crbug 406926302](https://issues.chromium.org/issues/406926302).
 
 ## Engine
 
