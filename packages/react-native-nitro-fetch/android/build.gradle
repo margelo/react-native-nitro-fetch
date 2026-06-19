@@ -125,7 +125,11 @@ repositories {
 
 def kotlin_version = getExtOrDefault("kotlinVersion")
 // ---------- Cronet (Java API only) ----------
-def cronetVersion = (getExtOrDefault("cronetVersion") ?: "141.7340.3")
+// Pinned to 143.7445.0+: earlier Cronet artifacts shared the `org.chromium.net`
+// namespace across modules (cronet-embedded/common/api/shared/...), which fails
+// the AGP 9 unique-namespace check during manifest merge. Fixed upstream in
+// https://issues.chromium.org/issues/406926302
+def cronetVersion = (getExtOrDefault("cronetVersion") ?: "143.7445.0")
 
 
 dependencies {

@@ -124,7 +124,9 @@ dependencies {
     }
 
     // Add Cronet Java implementation so CronetEngine.Builder() can find a provider.
-    // Keep version aligned with the libcronet you package.
-    def cronetVersion = project.rootProject.findProperty("NitroFetch_cronetVersion") ?: "119.6045.31"
+    // Keep version aligned with the libcronet you package (see
+    // packages/react-native-nitro-fetch/android/build.gradle). 143.7445.0+ is
+    // required for AGP 9 (unique namespaces) — https://issues.chromium.org/issues/406926302
+    def cronetVersion = project.rootProject.findProperty("NitroFetch_cronetVersion") ?: "143.7445.0"
     implementation("org.chromium.net:cronet-embedded:${cronetVersion}")
 }
