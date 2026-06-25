@@ -1,5 +1,6 @@
 import { NitroHeaders } from './Headers';
 import { stringToUTF8, utf8ToString } from './utf8';
+import { bytesToBlob } from './blob';
 
 export type RequestRedirect = 'follow' | 'error' | 'manual';
 export type RequestCache =
@@ -196,9 +197,13 @@ export class NitroRequest {
   async blob(): Promise<Blob> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
-    const buffer = this._getBodyBytes() ?? new ArrayBuffer(0);
     const contentType = this.headers.get('content-type') ?? '';
-    return new Blob([buffer], { type: contentType });
+    if (this._body == null) return new Blob([], { type: contentType });
+    if (typeof this._body === 'string') {
+      return new Blob([this._body], { type: contentType });
+    }
+    // new Blob([arrayBuffer]) throws in RN — use the native blob registry.
+    return bytesToBlob(this._getBodyBytes() ?? new ArrayBuffer(0), contentType);
   }
 
   async bytes(): Promise<Uint8Array<ArrayBuffer>> {
