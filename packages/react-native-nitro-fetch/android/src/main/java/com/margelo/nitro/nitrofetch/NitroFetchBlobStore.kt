@@ -6,6 +6,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
 import com.facebook.react.module.annotations.ReactModule
+import com.facebook.react.modules.blob.BlobModule
 
 @ReactModule(name = NitroFetchBlobStore.NAME)
 class NitroFetchBlobStore(reactContext: ReactApplicationContext) :
@@ -26,13 +27,10 @@ class NitroFetchBlobStore(reactContext: ReactApplicationContext) :
 
   private fun storeInBlobModule(bytes: ByteArray, blobId: String) {
     val blobModule =
-      reactApplicationContext.getNativeModule(
-        Class.forName("com.facebook.react.modules.blob.BlobModule")
-      ) ?: throw IllegalStateException("BlobModule is not available")
+      reactApplicationContext.getNativeModule(BlobModule::class.java)
+        ?: throw IllegalStateException("BlobModule is not available")
 
-    val storeMethod =
-      blobModule.javaClass.getMethod("store", ByteArray::class.java, String::class.java)
-    storeMethod.invoke(blobModule, bytes, blobId)
+    blobModule.store(bytes, blobId)
   }
 
   companion object {
