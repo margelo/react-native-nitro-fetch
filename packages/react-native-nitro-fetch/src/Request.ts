@@ -1,3 +1,4 @@
+import { createBlobFromBytes } from './createBlobFromBytes';
 import { NitroHeaders } from './Headers';
 import { stringToUTF8, utf8ToString } from './utf8';
 
@@ -198,7 +199,12 @@ export class NitroRequest {
     this._bodyUsed = true;
     const buffer = this._getBodyBytes() ?? new ArrayBuffer(0);
     const contentType = this.headers.get('content-type') ?? '';
-    return new Blob([buffer], { type: contentType });
+
+    if (buffer.byteLength === 0) {
+      return new Blob([], { type: contentType });
+    }
+
+    return createBlobFromBytes(buffer, contentType);
   }
 
   async bytes(): Promise<Uint8Array<ArrayBuffer>> {

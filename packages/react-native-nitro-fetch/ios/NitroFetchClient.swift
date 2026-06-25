@@ -412,13 +412,12 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     return "application/octet-stream"
   }
 
-  // Read a local file -> synthetic 200, mirroring the HTTP path's text/bytes choice.
+  // Read a local file -> synthetic 200. Always bridge raw bytes so blob() stays binary-safe.
   private static func makeLocalFileResponse(_ req: NitroRequest) throws -> NitroResponse {
     let data = try localData(forURI: req.url)
     let mime = mimeType(forURI: req.url)
-    let bodyStr = String(data: data, encoding: .utf8)
     var bodyBytesAb: ArrayBuffer? = nil
-    if bodyStr == nil && !data.isEmpty {
+    if !data.isEmpty {
       bodyBytesAb = try ArrayBuffer.copy(data: data)
     }
     return NitroResponse(
@@ -431,7 +430,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
         NitroHeader(key: "Content-Type", value: mime),
         NitroHeader(key: "Content-Length", value: String(data.count)),
       ],
-      bodyString: bodyStr,
+      bodyString: nil,
       bodyBytes: bodyBytesAb
     )
   }

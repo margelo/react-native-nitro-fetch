@@ -1,3 +1,4 @@
+import { createBlobFromBytes } from './createBlobFromBytes';
 import { NitroHeaders } from './Headers';
 import { stringToUTF8, utf8ToString } from './utf8';
 import type { NitroHeader } from './NitroFetch.nitro';
@@ -164,6 +165,34 @@ export class NitroResponse {
     return '';
   }
 
+  private async _readStreamToArrayBuffer(): Promise<ArrayBuffer> {
+    if (!this._bodyStream) {
+      return new ArrayBuffer(0);
+    }
+
+    const reader = this._bodyStream.getReader();
+    const chunks: Uint8Array[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) chunks.push(value);
+    }
+
+    let totalLen = 0;
+    for (const chunk of chunks) totalLen += chunk.byteLength;
+    const merged = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+
+    return merged.buffer.slice(
+      merged.byteOffset,
+      merged.byteOffset + merged.byteLength
+    );
+  }
+
   async text(): Promise<string> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
@@ -228,9 +257,19 @@ export class NitroResponse {
   async blob(): Promise<Blob> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
-    // RN's Blob doesn't support ArrayBuffer/ArrayBufferView — use string body
-    const bodyStr = this._getBodyString();
     const contentType = this.headers.get('content-type') ?? '';
+
+    // Binary bodies must not be stringified — RN BlobModule truncates at \0.
+    if (this._bodyStream && !this._bodyBytes && this._bodyString == null) {
+      const buffer = await this._readStreamToArrayBuffer();
+      return createBlobFromBytes(buffer, contentType);
+    }
+
+    if (this._bodyBytes != null) {
+      return createBlobFromBytes(this._bodyBytes, contentType);
+    }
+
+    const bodyStr = this._getBodyString();
     return new Blob([bodyStr], { type: contentType });
   }
 

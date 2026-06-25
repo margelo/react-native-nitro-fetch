@@ -396,16 +396,11 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       return java.net.URLConnection.guessContentTypeFromName(path) ?: "application/octet-stream"
     }
 
-    // Read a local file -> synthetic 200, mirroring the HTTP path's strict text/bytes choice.
+    // Read a local file -> synthetic 200. Always bridge raw bytes so blob() stays binary-safe.
     private fun makeLocalFileResponse(req: NitroRequest): NitroResponse {
       val bytes = readFileBytes(req.url)
       val mime = guessMime(req.url)
-      val bodyStr: String? = try {
-        strictDecoderFor(Charsets.UTF_8).decode(ByteBuffer.wrap(bytes)).toString()
-      } catch (_: Throwable) { null }
-      val bodyBytesAb: ArrayBuffer? = if (bodyStr == null && bytes.isNotEmpty())
-        bytes.toArrayBuffer()
-      else null
+      val bodyBytesAb: ArrayBuffer? = if (bytes.isNotEmpty()) bytes.toArrayBuffer() else null
       return NitroResponse(
         url = req.url,
         status = 200.0,
@@ -416,7 +411,7 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
           NitroHeader("Content-Type", mime),
           NitroHeader("Content-Length", bytes.size.toString())
         ),
-        bodyString = bodyStr,
+        bodyString = null,
         bodyBytes = bodyBytesAb
       )
     }

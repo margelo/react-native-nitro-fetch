@@ -1,4 +1,15 @@
+import { createBlobFromBytes } from '../createBlobFromBytes';
 import { NitroResponse } from '../Response';
+
+jest.mock('../createBlobFromBytes', () => ({
+  createBlobFromBytes: jest.fn(async (bytes: ArrayBuffer, type?: string) => {
+    return {
+      size: bytes.byteLength,
+      type: type ?? '',
+      _bytes: bytes,
+    } as unknown as Blob;
+  }),
+}));
 
 // Helpers
 function makeResponse(
@@ -6,6 +17,7 @@ function makeResponse(
     bodyString: string;
     bodyBytes: ArrayBuffer;
     status: number;
+    headers: { key: string; value: string }[];
   }>
 ): NitroResponse {
   return new NitroResponse({
@@ -14,7 +26,7 @@ function makeResponse(
     statusText: 'OK',
     ok: true,
     redirected: false,
-    headers: [],
+    headers: init.headers ?? [],
     bodyString: init.bodyString,
     bodyBytes: init.bodyBytes,
   });
@@ -33,6 +45,10 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
 const BINARY_BYTES = new Uint8Array([
   0x00, 0x01, 0x7f, 0x80, 0x9f, 0xa0, 0xc0, 0xfe, 0xff, 0xd0, 0xb1,
 ]);
+
+beforeEach(() => {
+  jest.clearAllMocks();
+});
 
 describe('NitroResponse — text body', () => {
   it('arrayBuffer() returns UTF-8 encoded bytes for a text body', async () => {
@@ -92,6 +108,37 @@ describe('NitroResponse — binary body via ArrayBuffer bodyBytes (native fix)',
     const cloned = res.clone();
     const buf = await cloned.arrayBuffer();
     expect(new Uint8Array(buf)).toEqual(BINARY_BYTES);
+  });
+
+  it('blob() uses binary-safe blob creation for bodyBytes', async () => {
+    const buffer = toArrayBuffer(BINARY_BYTES);
+    const res = makeResponse({
+      bodyBytes: buffer,
+      headers: [{ key: 'Content-Type', value: 'image/jpeg' }],
+    });
+
+    const blob = await res.blob();
+
+    expect(createBlobFromBytes).toHaveBeenCalledWith(buffer, 'image/jpeg');
+    expect((blob as any).size).toBe(BINARY_BYTES.byteLength);
+  });
+
+  it('blob() uses string-backed Blob for text bodies', async () => {
+    class TestBlob {
+      parts: unknown[];
+      type: string;
+      constructor(parts: unknown[], options?: { type?: string }) {
+        this.parts = parts;
+        this.type = options?.type ?? '';
+      }
+    }
+    (global as any).Blob = TestBlob;
+
+    const res = makeResponse({ bodyString: '{"ok":true}' });
+    const blob = await res.blob();
+    expect(createBlobFromBytes).not.toHaveBeenCalled();
+    expect(blob).toBeInstanceOf(TestBlob);
+    expect((blob as unknown as TestBlob).parts).toEqual(['{"ok":true}']);
   });
 });
 

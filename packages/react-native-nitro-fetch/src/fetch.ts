@@ -415,12 +415,8 @@ async function resolveBlobBody(
   if (!init?.body) return init;
   if (typeof Blob !== 'undefined' && init.body instanceof Blob) {
     const blob = init.body as Blob;
-    const text = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(reader.error);
-      reader.readAsText(blob);
-    });
+    const buffer = await blob.arrayBuffer();
+
     // Auto-set Content-Type from Blob.type if not already provided
     let headers = init.headers;
     if (blob.type) {
@@ -433,7 +429,7 @@ async function resolveBlobBody(
         headers = pairs.map((h) => [h.key, h.value] as [string, string]);
       }
     }
-    return { ...init, body: text, headers };
+    return { ...init, body: buffer, headers };
   }
   return init;
 }
