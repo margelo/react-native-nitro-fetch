@@ -1,4 +1,5 @@
 #import "NitroDevToolsReporter.h"
+#import "NitroCdpFallbackReporter.h"
 #import <React/RCTVersion.h>
 
 
@@ -52,18 +53,54 @@
   return cached;
 }
 
+// expo-dev-client's URLProtocol already intercepts + reports our URLSession traffic; reporting too would duplicate every entry
++ (BOOL)expoInterceptionActive {
+  static Class expoProtocol = Nil;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    expoProtocol = NSClassFromString(@"EXRequestInterceptorProtocol");
+  });
+  if (expoProtocol == Nil) {
+    return NO;
+  }
+  NSArray *protocols = [NSURLSessionConfiguration defaultSessionConfiguration].protocolClasses;
+  return [protocols containsObject:expoProtocol];
+}
+
++ (BOOL)fallbackEligible {
+  return ![self reporterAPIAvailable] && ![self expoInterceptionActive];
+}
+
 + (BOOL)isDebuggingEnabled {
-  return [self reporterClass] != Nil;
+  if ([self expoInterceptionActive]) {
+    return NO;
+  }
+  if ([self reporterAPIAvailable]) {
+    return [self reporterClass] != Nil;
+  }
+  return [[NitroCdpFallbackReporter shared] isActive];
 }
 
 + (void)reportRequestStartWithRequest:(NSString *)requestId
                               request:(NSURLRequest *)request {
   if (request == nil) return;
   Class cls = [self reporterClass];
-  if (cls == Nil) return;
-  int encoded = (int)(request.HTTPBody.length);
-  [cls reportRequestStart:requestId request:request encodedDataLength:encoded];
-  [cls reportConnectionTiming:requestId request:request];
+  if (cls != Nil) {
+    int encoded = (int)(request.HTTPBody.length);
+    [cls reportRequestStart:requestId request:request encodedDataLength:encoded];
+    [cls reportConnectionTiming:requestId request:request];
+    return;
+  }
+  if (![self fallbackEligible]) return;
+  NSString *body = nil;
+  if (request.HTTPBody.length > 0) {
+    body = [[NSString alloc] initWithData:request.HTTPBody encoding:NSUTF8StringEncoding];
+  }
+  [[NitroCdpFallbackReporter shared] reportRequestStart:requestId
+                                                    url:request.URL.absoluteString ?: @""
+                                                 method:request.HTTPMethod ?: @"GET"
+                                                headers:request.allHTTPHeaderFields
+                                             bodyString:body];
 }
 
 + (void)reportRequestStart:(NSString *)requestId
@@ -72,7 +109,16 @@
                    headers:(NSDictionary<NSString *, NSString *> *)headers
                 bodyString:(NSString *)bodyString {
   Class cls = [self reporterClass];
-  if (cls == Nil) return;
+  if (cls == Nil) {
+    if ([self fallbackEligible]) {
+      [[NitroCdpFallbackReporter shared] reportRequestStart:requestId
+                                                        url:url
+                                                     method:method ?: @"GET"
+                                                    headers:headers
+                                                 bodyString:bodyString];
+    }
+    return;
+  }
   NSURL *u = [NSURL URLWithString:url];
   if (u == nil) return;
   NSMutableURLRequest *req = [NSMutableURLRequest requestWithURL:u];
@@ -93,7 +139,15 @@
                  statusCode:(NSInteger)statusCode
                     headers:(NSDictionary<NSString *, NSString *> *)headers {
   Class cls = [self reporterClass];
-  if (cls == Nil) return;
+  if (cls == Nil) {
+    if ([self fallbackEligible]) {
+      [[NitroCdpFallbackReporter shared] reportResponseStart:requestId
+                                                         url:url
+                                                  statusCode:statusCode
+                                                     headers:headers];
+    }
+    return;
+  }
   NSURL *u = [NSURL URLWithString:url];
   if (u == nil) return;
   NSHTTPURLResponse *resp = [[NSHTTPURLResponse alloc] initWithURL:u
@@ -120,13 +174,23 @@
 
 + (void)reportResponseEnd:(NSString *)requestId encodedDataLength:(NSInteger)length {
   Class cls = [self reporterClass];
-  if (cls == Nil) return;
+  if (cls == Nil) {
+    if ([self fallbackEligible]) {
+      [[NitroCdpFallbackReporter shared] reportResponseEnd:requestId encodedDataLength:length];
+    }
+    return;
+  }
   [cls reportResponseEnd:requestId encodedDataLength:(int)length];
 }
 
 + (void)reportRequestFailed:(NSString *)requestId cancelled:(BOOL)cancelled {
   Class cls = [self reporterClass];
-  if (cls == Nil) return;
+  if (cls == Nil) {
+    if ([self fallbackEligible]) {
+      [[NitroCdpFallbackReporter shared] reportRequestFailed:requestId cancelled:cancelled];
+    }
+    return;
+  }
   [cls reportRequestFailed:requestId cancelled:cancelled];
 }
 
@@ -134,13 +198,23 @@
                      data:(NSData *)data
             base64Encoded:(BOOL)base64Encoded {
   Class cls = [self reporterClass];
-  if (cls == Nil) return;
+  if (cls == Nil) {
+    if ([self fallbackEligible]) {
+      [[NitroCdpFallbackReporter shared] storeResponseBody:requestId data:data base64Encoded:base64Encoded];
+    }
+    return;
+  }
   [cls maybeStoreResponseBody:requestId data:data base64Encoded:base64Encoded];
 }
 
 + (void)storeResponseBodyIncremental:(NSString *)requestId text:(NSString *)text {
   Class cls = [self reporterClass];
-  if (cls == Nil) return;
+  if (cls == Nil) {
+    if ([self fallbackEligible]) {
+      [[NitroCdpFallbackReporter shared] storeResponseBodyIncremental:requestId text:text];
+    }
+    return;
+  }
   [cls maybeStoreResponseBodyIncremental:requestId data:text];
 }
 

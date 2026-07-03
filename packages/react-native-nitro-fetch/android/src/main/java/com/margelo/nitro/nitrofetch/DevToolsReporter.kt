@@ -45,14 +45,30 @@ internal object DevToolsReporter {
 
     if (!isSoLoaderInitialized()) return null
     return try {
-      val cls = Class.forName("com.margelo.nitro.nitrofetch.DevToolsReporterImpl")
-  
+      // RN's reporter only feeds the DevTools Network panel on 0.83+; older RN gets the CDP fallback.
+      val name = if (isModernReporterAvailable()) {
+        "com.margelo.nitro.nitrofetch.DevToolsReporterImpl"
+      } else {
+        "com.margelo.nitro.nitrofetch.CdpFallbackReporterImpl"
+      }
+      val cls = Class.forName(name)
+
       val created = cls.getDeclaredConstructor().newInstance() as Impl
       impl = created
       created
     } catch (_: Throwable) {
       null
     }
+  }
+
+  // VERSION is a static field on every RN version (@JvmField / Java static), so direct access is binary-compatible
+  private fun isModernReporterAvailable(): Boolean = try {
+    val v = com.facebook.react.modules.systeminfo.ReactNativeVersion.VERSION
+    val major = (v["major"] as? Int) ?: 0
+    val minor = (v["minor"] as? Int) ?: 0
+    major > 0 || minor >= 83
+  } catch (_: Throwable) {
+    true
   }
 
   private fun isSoLoaderInitialized(): Boolean = try {
