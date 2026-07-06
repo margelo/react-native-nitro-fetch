@@ -108,6 +108,21 @@ app.all(
   echoBody
 );
 
+
+app.all('/token', (_req, res) =>
+  res.json({
+    access_token: 'tok_abc123',
+    token_type: 'Bearer',
+    expires_in: 3600,
+    refresh_token: 'refresh_zzz',
+    user: { id: 'u_42', region: 'us' },
+  })
+);
+app.all('/token/text', (_req, res) =>
+  res.set('Content-Type', 'text/plain').send('plain-token-xyz')
+);
+app.all('/token/fail', (_req, res) => res.status(500).json({ error: 'boom' }));
+
 app.all('/status/:code', (req, res) => {
   const code = parseInt(req.params.code, 10);
   res.status(Number.isFinite(code) ? code : 200).end();
