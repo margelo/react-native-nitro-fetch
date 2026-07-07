@@ -100,10 +100,12 @@ object AutoPrefetcher {
             val refreshed = callTokenRefreshSync(refreshConfig)
 
             val tokens: TokenRefreshResult = if (refreshed != null) {
-              android.util.Log.d("NitroFetch", "[TokenRefresh] ✅ Success — got ${refreshed.headers.size} header(s)")
-              if (BuildConfig.DEBUG) {
-                refreshed.headers.forEach { (k, v) -> android.util.Log.d("NitroFetch", "[TokenRefresh]   $k: $v") }
-              }
+              android.util.Log.d(
+                "NitroFetch",
+                "[TokenRefresh] ✅ Success — got ${refreshed.headers.size} header(s), " +
+                  "${refreshed.bodyFields.size} body field(s), ${refreshed.formFields.size} form field(s)"
+              )
+              if (BuildConfig.DEBUG) logTokens(refreshed)
               // Cache fresh tokens for useStoredHeaders fallback on next cold start
               NitroFetchSecureAtRest.putEncrypted(prefs, KEY_TOKEN_CACHE, serializeCache(refreshed))
               refreshed
@@ -115,11 +117,15 @@ object AutoPrefetcher {
               }
               // Use last cached tokens (or empty if none cached yet)
               val cached = deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
-              android.util.Log.d("NitroFetch", "[TokenRefresh] Using cached headers (${cached.headers.size} header(s))")
+              android.util.Log.d(
+                "NitroFetch",
+                "[TokenRefresh] Using cached tokens (${cached.headers.size} header(s), " +
+                  "${cached.bodyFields.size} body field(s), ${cached.formFields.size} form field(s))"
+              )
               cached
             }
 
-            android.util.Log.d("NitroFetch", "[TokenRefresh] Injecting token headers into ${arr.length()} prefetch URL(s)")
+            android.util.Log.d("NitroFetch", "[TokenRefresh] Injecting tokens into ${arr.length()} prefetch URL(s)")
             startPrefetches(arr, tokens)
           } catch (_: Throwable) {
             // Best-effort — never crash the app
@@ -139,21 +145,11 @@ object AutoPrefetcher {
       val o = arr.optJSONObject(i) ?: continue
       val url = o.optString("url", null) ?: continue
       val prefetchKey = o.optString("prefetchKey", null) ?: continue
-      val headersObj = o.optJSONObject("headers") ?: JSONObject()
 
-      // Merge: static headers first, token headers override
-      val merged = mutableMapOf<String, String>()
-      headersObj.keys().forEachRemaining { k ->
-        merged[k] = headersObj.optString(k, "")
-      }
-      tokens.headers.forEach { (k, v) -> merged[k] = v }
-      merged["prefetchKey"] = prefetchKey
+      android.util.Log.d("NitroFetch", "[TokenRefresh] Prefetching $url")
+      if (BuildConfig.DEBUG) logTokens(tokens)
 
-      android.util.Log.d("NitroFetch", "[TokenRefresh] Prefetching $url with ${merged.size} header(s)")
-      if (BuildConfig.DEBUG) {
-        merged.forEach { (k, v) -> android.util.Log.d("NitroFetch", "[TokenRefresh]   $k: $v") }
-      }
-      val req = buildNitroRequestFromEntry(url, merged, o, tokens)
+      val req = buildNitroRequestFromEntry(o, prefetchKey, tokens)
 
       if (FetchCache.getPending(prefetchKey) != null) continue
       val entryTtlMs = if (o.has("prefetchCacheTtlMs") && !o.isNull("prefetchCacheTtlMs")) {
@@ -222,35 +218,44 @@ object AutoPrefetcher {
   }
 
   private fun buildNitroRequestFromEntry(
-    url: String,
-    mergedHeaders: Map<String, String>,
-    entry: JSONObject?,
+    entry: JSONObject,
+    prefetchKey: String,
     tokens: TokenRefreshResult = TokenRefreshResult.EMPTY,
   ): NitroRequest {
+    val url = entry.optString("url", "")
+    val headersObj = entry.optJSONObject("headers") ?: JSONObject()
+
+    // Merge: static headers first, token headers override, then prefetchKey
+    val mergedHeaders = mutableMapOf<String, String>()
+    headersObj.keys().forEachRemaining { k ->
+      mergedHeaders[k] = headersObj.optString(k, "")
+    }
+    tokens.headers.forEach { (k, v) -> mergedHeaders[k] = v }
+    mergedHeaders["prefetchKey"] = prefetchKey
     val headerObjs = mergedHeaders.map { (k, v) -> NitroHeader(k, v) }.toTypedArray()
 
-    val methodStr = entry?.optString("method", "")?.takeIf { it.isNotEmpty() }
+    val methodStr = entry.optString("method", "").takeIf { it.isNotEmpty() }
     val method: NitroRequestMethod? = methodStr?.let {
       runCatching { NitroRequestMethod.valueOf(it) }.getOrNull()
     }
     val rawBodyString = entry
-      ?.takeIf { it.has("bodyString") && !it.isNull("bodyString") }
+      .takeIf { it.has("bodyString") && !it.isNull("bodyString") }
       ?.optString("bodyString")
     val bodyString = injectBodyFields(rawBodyString, tokens.bodyFields)
     val bodyBytes = entry
-      ?.takeIf { it.has("bodyBytes") && !it.isNull("bodyBytes") }
+      .takeIf { it.has("bodyBytes") && !it.isNull("bodyBytes") }
       ?.optString("bodyBytes")
     val timeoutMs = entry
-      ?.takeIf { it.has("timeoutMs") && !it.isNull("timeoutMs") }
+      .takeIf { it.has("timeoutMs") && !it.isNull("timeoutMs") }
       ?.optDouble("timeoutMs")
     val followRedirects = entry
-      ?.takeIf { it.has("followRedirects") && !it.isNull("followRedirects") }
+      .takeIf { it.has("followRedirects") && !it.isNull("followRedirects") }
       ?.optBoolean("followRedirects")
     val prefetchCacheTtlMs = entry
-      ?.takeIf { it.has("prefetchCacheTtlMs") && !it.isNull("prefetchCacheTtlMs") }
+      .takeIf { it.has("prefetchCacheTtlMs") && !it.isNull("prefetchCacheTtlMs") }
       ?.optDouble("prefetchCacheTtlMs")
 
-    val formArr = entry?.optJSONArray("bodyFormData")
+    val formArr = entry.optJSONArray("bodyFormData")
     val baseParts: List<NitroFormDataPart> = formArr?.let { ja ->
       List(ja.length()) { i ->
         val p = ja.optJSONObject(i) ?: JSONObject()
@@ -281,6 +286,27 @@ object AutoPrefetcher {
   }
 
   // MARK: - Token refresh (synchronous, runs on background thread)
+
+  private fun logTokens(tokens: TokenRefreshResult) {
+    if (tokens.headers.isNotEmpty()) {
+      android.util.Log.d("NitroFetch", "[TokenRefresh]   headers:")
+      tokens.headers.forEach { (k, v) ->
+        android.util.Log.d("NitroFetch", "[TokenRefresh]     $k: $v")
+      }
+    }
+    if (tokens.bodyFields.isNotEmpty()) {
+      android.util.Log.d("NitroFetch", "[TokenRefresh]   body fields:")
+      tokens.bodyFields.forEach { (k, v) ->
+        android.util.Log.d("NitroFetch", "[TokenRefresh]     $k: $v")
+      }
+    }
+    if (tokens.formFields.isNotEmpty()) {
+      android.util.Log.d("NitroFetch", "[TokenRefresh]   form fields:")
+      tokens.formFields.forEach { (k, v) ->
+        android.util.Log.d("NitroFetch", "[TokenRefresh]     $k: $v")
+      }
+    }
+  }
 
   private data class TokenRefreshResult(
     val headers: Map<String, String>,
