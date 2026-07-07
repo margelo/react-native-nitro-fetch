@@ -114,10 +114,7 @@ public final class NitroAutoPrefetcher: NSObject {
       // Late path — apply cached tokens + kick immediate prefetch
       let tokens = deserializeCache(
         NitroFetchSecureAtRest.decryptedString(forKey: tokenCacheKey, defaults: userDefaults))
-      let req = buildNitroRequest(from: entry, prefetchKey: prefetchKey, tokens: tokens)
-      Task {
-        do { try await NitroFetchClient.prefetchStatic(req) } catch { /* best-effort */ }
-      }
+      startPrefetches([entry], tokens: tokens)
     }
   }
 
@@ -169,22 +166,25 @@ public final class NitroAutoPrefetcher: NSObject {
         tokens = .empty
       }
 
-      // Launch a prefetch task per entry with token injection (headers, body, form-data)
-      print("[NitroFetch][TokenRefresh] Injecting tokens into \(arr.count) prefetch URL(s)")
-      for item in arr {
-        guard let obj = item as? [String: Any] else { continue }
-        guard let url = obj["url"] as? String, !url.isEmpty else { continue }
-        guard let prefetchKey = obj["prefetchKey"] as? String, !prefetchKey.isEmpty else { continue }
+      startPrefetches(arr, tokens: tokens)
+    }
+  }
 
-        print("[NitroFetch][TokenRefresh] Prefetching \(url)")
-        #if DEBUG
-        logTokens(tokens)
-        #endif
+  private static func startPrefetches(_ entries: [Any], tokens: TokenRefreshResult) {
+    print("[NitroFetch][TokenRefresh] Injecting tokens into \(entries.count) prefetch URL(s)")
+    for item in entries {
+      guard let obj = item as? [String: Any] else { continue }
+      guard let url = obj["url"] as? String, !url.isEmpty else { continue }
+      guard let prefetchKey = obj["prefetchKey"] as? String, !prefetchKey.isEmpty else { continue }
 
-        let req = buildNitroRequest(from: obj, prefetchKey: prefetchKey, tokens: tokens)
-        Task {
-          do { try await NitroFetchClient.prefetchStatic(req) } catch { /* ignore – best effort */ }
-        }
+      print("[NitroFetch][TokenRefresh] Prefetching \(url)")
+      #if DEBUG
+      logTokens(tokens)
+      #endif
+
+      let req = buildNitroRequest(from: obj, prefetchKey: prefetchKey, tokens: tokens)
+      Task {
+        do { try await NitroFetchClient.prefetchStatic(req) } catch { /* ignore – best effort */ }
       }
     }
   }
