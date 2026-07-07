@@ -149,7 +149,7 @@ object AutoPrefetcher {
       android.util.Log.d("NitroFetch", "[TokenRefresh] Prefetching $url")
       if (BuildConfig.DEBUG) logTokens(tokens)
 
-      val req = buildNitroRequestFromEntry(o, prefetchKey, tokens)
+      val req = buildNitroRequestFromEntry(o, tokens)
 
       if (FetchCache.getPending(prefetchKey) != null) continue
       val entryTtlMs = if (o.has("prefetchCacheTtlMs") && !o.isNull("prefetchCacheTtlMs")) {
@@ -219,10 +219,10 @@ object AutoPrefetcher {
 
   private fun buildNitroRequestFromEntry(
     entry: JSONObject,
-    prefetchKey: String,
     tokens: TokenRefreshResult = TokenRefreshResult.EMPTY,
   ): NitroRequest {
     val url = entry.optString("url", "")
+    val prefetchKey = entry.optString("prefetchKey", "")
     val headersObj = entry.optJSONObject("headers") ?: JSONObject()
 
     // Merge: static headers first, token headers override, then prefetchKey

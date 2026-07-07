@@ -182,7 +182,7 @@ public final class NitroAutoPrefetcher: NSObject {
       logTokens(tokens)
       #endif
 
-      let req = buildNitroRequest(from: obj, prefetchKey: prefetchKey, tokens: tokens)
+      let req = buildNitroRequest(from: obj, tokens: tokens)
       Task {
         do { try await NitroFetchClient.prefetchStatic(req) } catch { /* ignore – best effort */ }
       }
@@ -228,10 +228,10 @@ public final class NitroAutoPrefetcher: NSObject {
 
   private static func buildNitroRequest(
     from entry: [String: Any],
-    prefetchKey: String,
     tokens: TokenRefreshResult = .empty
   ) -> NitroRequest {
     let url = (entry["url"] as? String) ?? ""
+    let prefetchKey = (entry["prefetchKey"] as? String) ?? ""
     let headersDict = (entry["headers"] as? [String: Any]) ?? [:]
 
     // Merge: static headers first, token headers override, then prefetchKey
