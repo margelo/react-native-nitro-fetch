@@ -114,11 +114,7 @@ public final class NitroAutoPrefetcher: NSObject {
       // Late path — apply cached tokens + kick immediate prefetch
       let tokens = deserializeCache(
         NitroFetchSecureAtRest.decryptedString(forKey: tokenCacheKey, defaults: userDefaults))
-      var merged: [String: String] = headers
-      for (k, v) in tokens.headers { merged[k] = v }
-      var hdrs: [NitroHeader] = merged.map { NitroHeader(key: $0.key, value: $0.value) }
-      hdrs.append(NitroHeader(key: "prefetchKey", value: prefetchKey))
-      let req = buildNitroRequest(from: entry, mergedHeaders: hdrs, tokens: tokens)
+      let req = buildNitroRequest(from: entry, prefetchKey: prefetchKey, tokens: tokens)
       Task {
         do { try await NitroFetchClient.prefetchStatic(req) } catch { /* best-effort */ }
       }
@@ -149,9 +145,9 @@ public final class NitroAutoPrefetcher: NSObject {
         print("[NitroFetch][TokenRefresh] Calling refresh endpoint: \(refreshURL)")
         let refreshed = try? await callTokenRefresh(config: refreshObj)
         if let refreshed = refreshed {
-          print("[NitroFetch][TokenRefresh] ✅ Success — got \(refreshed.headers.count) header(s)")
+          print("[NitroFetch][TokenRefresh] ✅ Success — got \(refreshed.headers.count) header(s), \(refreshed.bodyFields.count) body field(s), \(refreshed.formFields.count) form field(s)")
           #if DEBUG
-          for (k, v) in refreshed.headers { print("[NitroFetch][TokenRefresh]   \(k): \(v)") }
+          logTokens(refreshed)
           #endif
           // Cache fresh tokens for useStoredHeaders fallback on next cold start
           if let cacheStr = serializeCache(refreshed) {
@@ -166,35 +162,26 @@ public final class NitroAutoPrefetcher: NSObject {
           }
           let cached = deserializeCache(
             NitroFetchSecureAtRest.decryptedString(forKey: tokenCacheKey, defaults: userDefaults))
-          print("[NitroFetch][TokenRefresh] Using cached headers (\(cached.headers.count) header(s))")
+          print("[NitroFetch][TokenRefresh] Using cached tokens (\(cached.headers.count) header(s), \(cached.bodyFields.count) body field(s), \(cached.formFields.count) form field(s))")
           tokens = cached
         }
       } else {
         tokens = .empty
       }
 
-      // Launch a prefetch task per entry with merged headers + body/form injection
-      print("[NitroFetch][TokenRefresh] Injecting token headers into \(arr.count) prefetch URL(s)")
+      // Launch a prefetch task per entry with token injection (headers, body, form-data)
+      print("[NitroFetch][TokenRefresh] Injecting tokens into \(arr.count) prefetch URL(s)")
       for item in arr {
         guard let obj = item as? [String: Any] else { continue }
         guard let url = obj["url"] as? String, !url.isEmpty else { continue }
         guard let prefetchKey = obj["prefetchKey"] as? String, !prefetchKey.isEmpty else { continue }
-        let headersDict = (obj["headers"] as? [String: Any]) ?? [:]
 
-        // Merge: static headers first, token headers override
-        var merged: [String: String] = [:]
-        for (k, v) in headersDict { merged[k] = String(describing: v) }
-        for (k, v) in tokens.headers { merged[k] = v }
-
-        var headers: [NitroHeader] = merged.map { NitroHeader(key: $0.key, value: $0.value) }
-        headers.append(NitroHeader(key: "prefetchKey", value: prefetchKey))
-
-        print("[NitroFetch][TokenRefresh] Prefetching \(url) with \(merged.count) header(s)")
+        print("[NitroFetch][TokenRefresh] Prefetching \(url)")
         #if DEBUG
-        for (k, v) in merged { print("[NitroFetch][TokenRefresh]   \(k): \(v)") }
+        logTokens(tokens)
         #endif
 
-        let req = buildNitroRequest(from: obj, mergedHeaders: headers, tokens: tokens)
+        let req = buildNitroRequest(from: obj, prefetchKey: prefetchKey, tokens: tokens)
         Task {
           do { try await NitroFetchClient.prefetchStatic(req) } catch { /* ignore – best effort */ }
         }
@@ -241,10 +228,19 @@ public final class NitroAutoPrefetcher: NSObject {
 
   private static func buildNitroRequest(
     from entry: [String: Any],
-    mergedHeaders: [NitroHeader],
+    prefetchKey: String,
     tokens: TokenRefreshResult = .empty
   ) -> NitroRequest {
     let url = (entry["url"] as? String) ?? ""
+    let headersDict = (entry["headers"] as? [String: Any]) ?? [:]
+
+    // Merge: static headers first, token headers override, then prefetchKey
+    var mergedHeaders: [String: String] = [:]
+    for (k, v) in headersDict { mergedHeaders[k] = String(describing: v) }
+    for (k, v) in tokens.headers { mergedHeaders[k] = v }
+    mergedHeaders["prefetchKey"] = prefetchKey
+    let headers = mergedHeaders.map { NitroHeader(key: $0.key, value: $0.value) }
+
     let methodStr = entry["method"] as? String
     let method: NitroRequestMethod? = methodStr.flatMap { NitroRequestMethod(fromString: $0) }
     let bodyString = injectBodyFields(entry["bodyString"] as? String, fields: tokens.bodyFields)
@@ -267,7 +263,7 @@ public final class NitroAutoPrefetcher: NSObject {
     return NitroRequest(
       url: url,
       method: method,
-      headers: mergedHeaders,
+      headers: headers,
       bodyString: bodyString,
       bodyBytes: bodyBytes,
       bodyFormData: formData,
@@ -279,6 +275,23 @@ public final class NitroAutoPrefetcher: NSObject {
   }
 
   // MARK: - Token refresh
+
+  #if DEBUG
+  private static func logTokens(_ tokens: TokenRefreshResult) {
+    if !tokens.headers.isEmpty {
+      print("[NitroFetch][TokenRefresh]   headers:")
+      for (k, v) in tokens.headers { print("[NitroFetch][TokenRefresh]     \(k): \(v)") }
+    }
+    if !tokens.bodyFields.isEmpty {
+      print("[NitroFetch][TokenRefresh]   body fields:")
+      for (k, v) in tokens.bodyFields { print("[NitroFetch][TokenRefresh]     \(k): \(v)") }
+    }
+    if !tokens.formFields.isEmpty {
+      print("[NitroFetch][TokenRefresh]   form fields:")
+      for (k, v) in tokens.formFields { print("[NitroFetch][TokenRefresh]     \(k): \(v)") }
+    }
+  }
+  #endif
 
   struct TokenRefreshResult {
     var headers: [String: String]
