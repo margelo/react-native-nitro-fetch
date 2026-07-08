@@ -251,6 +251,12 @@ object AutoPrefetcher {
     val followRedirects = entry
       .takeIf { it.has("followRedirects") && !it.isNull("followRedirects") }
       ?.optBoolean("followRedirects")
+    val credentials = when (entry?.optString("credentials", "")) {
+      "omit" -> NitroRequestCredentials.OMIT
+      "include" -> NitroRequestCredentials.INCLUDE
+      "same-origin" -> NitroRequestCredentials.SAME_ORIGIN
+      else -> null
+    }
     val prefetchCacheTtlMs = entry
       .takeIf { it.has("prefetchCacheTtlMs") && !it.isNull("prefetchCacheTtlMs") }
       ?.optDouble("prefetchCacheTtlMs")
@@ -280,6 +286,7 @@ object AutoPrefetcher {
       bodyFormData = bodyFormData,
       timeoutMs = timeoutMs,
       followRedirects = followRedirects,
+      credentials = credentials,
       prefetchCacheTtlMs = prefetchCacheTtlMs,
       requestId = null
     )

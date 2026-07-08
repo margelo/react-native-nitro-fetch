@@ -90,6 +90,10 @@ namespace margelo::nitro::nitrofetch {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("disableCache");
     method(_javaPart);
   }
+  void JHybridUrlRequestBuilderSpec::disableCookies() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("disableCookies");
+    method(_javaPart);
+  }
   void JHybridUrlRequestBuilderSpec::onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo::javaobject> /* callback */)>("onSucceeded_cxx");
     method(_javaPart, JFunc_void_UrlResponseInfo_cxx::fromCpp(callback));

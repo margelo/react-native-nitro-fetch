@@ -26,6 +26,8 @@ namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
 namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 // Forward declaration of `NitroHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroHeader; }
+// Forward declaration of `NitroRequestCredentials` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { enum class NitroRequestCredentials; }
 // Forward declaration of `NitroRequestMethod` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 // Forward declaration of `NitroRequest` to properly resolve imports.
@@ -48,6 +50,7 @@ namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 #include "NitroFormDataPart.hpp"
 #include "NitroHeader.hpp"
 #include "NitroRequest.hpp"
+#include "NitroRequestCredentials.hpp"
 #include "NitroRequestMethod.hpp"
 #include "NitroResponse.hpp"
 #include "RequestException.hpp"

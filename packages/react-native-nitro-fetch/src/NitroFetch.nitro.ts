@@ -10,6 +10,8 @@ export type NitroRequestMethod =
   | 'DELETE'
   | 'OPTIONS';
 
+export type NitroRequestCredentials = 'include' | 'omit' | 'same-origin';
+
 export interface NitroHeader {
   key: string;
   value: string;
@@ -36,6 +38,7 @@ export interface NitroRequest {
   // Controls
   timeoutMs?: number;
   followRedirects?: boolean; // default true
+  credentials?: NitroRequestCredentials; // default 'same-origin'; 'omit' skips cookie jar read/write
   // Max age (ms) a prefetch cache entry is considered fresh at read time.
   // Default 5000 when omitted. <= 0 disables cache hits.
   prefetchCacheTtlMs?: number;

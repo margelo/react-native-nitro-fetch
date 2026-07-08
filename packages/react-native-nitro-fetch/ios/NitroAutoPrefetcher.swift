@@ -247,6 +247,7 @@ public final class NitroAutoPrefetcher: NSObject {
     let bodyBytes = entry["bodyBytes"] as? String
     let timeoutMs = (entry["timeoutMs"] as? NSNumber)?.doubleValue
     let followRedirects = (entry["followRedirects"] as? Bool) ?? true
+    let credentials = (entry["credentials"] as? String).flatMap { NitroRequestCredentials(fromString: $0) }
     let prefetchCacheTtlMs = (entry["prefetchCacheTtlMs"] as? NSNumber)?.doubleValue
 
     let baseParts: [NitroFormDataPart] = (entry["bodyFormData"] as? [[String: Any]])?.map { p in
@@ -269,6 +270,7 @@ public final class NitroAutoPrefetcher: NSObject {
       bodyFormData: formData,
       timeoutMs: timeoutMs,
       followRedirects: followRedirects,
+      credentials: credentials,
       prefetchCacheTtlMs: prefetchCacheTtlMs,
       requestId: nil
     )

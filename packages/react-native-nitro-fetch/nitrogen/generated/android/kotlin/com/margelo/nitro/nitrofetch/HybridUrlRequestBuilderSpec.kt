@@ -45,6 +45,10 @@ abstract class HybridUrlRequestBuilderSpec: HybridObject() {
   @Keep
   abstract fun disableCache(): Unit
   
+  @DoNotStrip
+  @Keep
+  abstract fun disableCookies(): Unit
+  
   abstract fun onSucceeded(callback: (info: UrlResponseInfo) -> Unit): Unit
   
   @DoNotStrip

@@ -111,6 +111,12 @@ namespace margelo::nitro::nitrofetch {
         std::rethrow_exception(__result.error());
       }
     }
+    inline void disableCookies() override {
+      auto __result = _swiftPart.disableCookies();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
     inline void onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) override {
       auto __result = _swiftPart.onSucceeded(callback);
       if (__result.hasError()) [[unlikely]] {

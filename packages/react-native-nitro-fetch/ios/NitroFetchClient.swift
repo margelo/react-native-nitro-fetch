@@ -338,6 +338,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       r.httpBody = s.data(using: .utf8)
     }
     if let t = req.timeoutMs, t > 0 { r.timeoutInterval = TimeInterval(t) / 1000.0 }
+    if req.credentials == .omit { r.httpShouldHandleCookies = false }
     return (r, nil)
   }
 

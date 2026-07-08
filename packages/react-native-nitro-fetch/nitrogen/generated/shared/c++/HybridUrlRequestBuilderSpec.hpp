@@ -65,6 +65,7 @@ namespace margelo::nitro::nitrofetch {
       virtual void addHeader(const std::string& name, const std::string& value) = 0;
       virtual void setUploadBody(const std::variant<std::shared_ptr<ArrayBuffer>, std::string>& body) = 0;
       virtual void disableCache() = 0;
+      virtual void disableCookies() = 0;
       virtual void onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) = 0;
       virtual void onFailed(const std::function<void(const std::optional<UrlResponseInfo>& /* info */, const RequestException& /* error */)>& callback) = 0;
       virtual void onCanceled(const std::function<void(const std::optional<UrlResponseInfo>& /* info */)>& callback) = 0;

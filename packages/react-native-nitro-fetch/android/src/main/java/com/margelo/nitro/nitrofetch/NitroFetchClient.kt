@@ -108,6 +108,7 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
     ): UrlRequest {
       val url = req.url
       val shouldFollowRedirects = req.followRedirects ?: true
+      val omitCredentials = req.credentials == NitroRequestCredentials.OMIT
       val traceLabel = if (BuildConfig.NITRO_FETCH_TRACING) {
         "NitroFetch ${req.method?.name ?: "GET"} ${Uri.parse(url).path ?: url}"
       } else ""
@@ -133,7 +134,9 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         override fun onRedirectReceived(request: UrlRequest, info: UrlResponseInfo, newLocationUrl: String) {
           if (shouldFollowRedirects) {
             // Apply Set-Cookie in-memory; flush once in onSucceeded (avoid flush per hop).
-            if (NitroCookieSync.storeSetCookieFromUrlResponseInfo(info.url, info, flush = false)) {
+            if (!omitCredentials &&
+              NitroCookieSync.storeSetCookieFromUrlResponseInfo(info.url, info, flush = false)
+            ) {
               setCookieAppliedOnRedirect = true
             }
             request.followRedirect()
@@ -203,7 +206,7 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
             DevToolsReporter.reportResponseEnd(devToolsRequestId, devToolsBytes.toLong())
           }
           try {
-            val storedOnFinal =
+            val storedOnFinal = !omitCredentials &&
               NitroCookieSync.storeSetCookieFromUrlResponseInfo(info.url, info, flush = false)
             if (storedOnFinal || setCookieAppliedOnRedirect) {
               NitroCookieSync.flushCookieManager()
@@ -274,10 +277,12 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       builder.setHttpMethod(method)
       req.headers?.forEach { (k, v) -> builder.addHeader(k, v) }
 
-      NitroCookieSync.attachCookieFromManagerIfMissing(
-        url,
-        NitroCookieSync.hasCookieHeaderInNitroRequest(req.headers)
-      ) { key, value -> builder.addHeader(key, value) }
+      if (!omitCredentials) {
+        NitroCookieSync.attachCookieFromManagerIfMissing(
+          url,
+          NitroCookieSync.hasCookieHeaderInNitroRequest(req.headers)
+        ) { key, value -> builder.addHeader(key, value) }
+      }
 
       val formParts = req.bodyFormData
       if (formParts != null && formParts.isNotEmpty()) {

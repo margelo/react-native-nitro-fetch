@@ -181,6 +181,17 @@ open class HybridUrlRequestBuilderSpec_cxx {
   }
   
   @inline(__always)
+  public final func disableCookies() -> bridge.Result_void_ {
+    do {
+      try self.__implementation.disableCookies()
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func onSucceeded(callback: bridge.Func_void_UrlResponseInfo) -> bridge.Result_void_ {
     do {
       try self.__implementation.onSucceeded(callback: { () -> (UrlResponseInfo) -> Void in

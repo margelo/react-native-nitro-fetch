@@ -5,6 +5,7 @@ import {
   Response,
   Request,
 } from 'react-native-nitro-fetch';
+import { Platform } from 'react-native';
 import { BASE } from '../test-utils/server';
 
 describe('Headers - Construction', () => {
@@ -477,6 +478,56 @@ describe('Fetch - cache option', () => {
     const pragma = body.headers.Pragma || body.headers.pragma || '';
     expect(cc).toContain('no-cache');
     expect(pragma).toContain('no-cache');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// credentials option
+// ---------------------------------------------------------------------------
+describe('Fetch - credentials option', () => {
+  it('accepts "include", "omit" and "same-origin"', async () => {
+    for (const credentials of ['include', 'omit', 'same-origin'] as const) {
+      const res = await nitroFetch(`${BASE}/get`, { credentials } as any);
+      expect(res.status).toBe(200);
+    }
+  });
+
+  it('"omit" does not send stored cookies', async () => {
+    await nitroFetch(`${BASE}/cookies/set?omitsend=1`, {
+      credentials: 'include',
+    } as any);
+    const res = await nitroFetch(`${BASE}/cookies`, {
+      credentials: 'omit',
+    } as any);
+    const body = await res.json();
+    expect('omitsend' in body.cookies).toBe(false);
+  });
+
+  it('"omit" does not store response cookies', async () => {
+    await nitroFetch(`${BASE}/cookies/set?omitstore=1`, {
+      credentials: 'omit',
+    } as any);
+    const res = await nitroFetch(`${BASE}/cookies`);
+    const body = await res.json();
+    expect('omitstore' in body.cookies).toBe(false);
+  });
+
+  it('credentials on a Request object are honored', async () => {
+    await nitroFetch(`${BASE}/cookies/set?reqomit=1`, {
+      credentials: 'include',
+    } as any);
+    const req = new Request(`${BASE}/cookies`, { credentials: 'omit' } as any);
+    const res = await nitroFetch(req as any);
+    const body = await res.json();
+    expect('reqomit' in body.cookies).toBe(false);
+  });
+
+  it('sends stored cookies by default (iOS cookie jar)', async () => {
+    if (Platform.OS !== 'ios') return;
+    await nitroFetch(`${BASE}/cookies/set?defaultsend=1`);
+    const res = await nitroFetch(`${BASE}/cookies`);
+    const body = await res.json();
+    expect(body.cookies.defaultsend).toBe('1');
   });
 });
 
