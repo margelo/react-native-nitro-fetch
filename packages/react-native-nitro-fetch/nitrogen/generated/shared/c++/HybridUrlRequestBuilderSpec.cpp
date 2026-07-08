@@ -18,6 +18,7 @@ namespace margelo::nitro::nitrofetch {
       prototype.registerHybridMethod("addHeader", &HybridUrlRequestBuilderSpec::addHeader);
       prototype.registerHybridMethod("setUploadBody", &HybridUrlRequestBuilderSpec::setUploadBody);
       prototype.registerHybridMethod("disableCache", &HybridUrlRequestBuilderSpec::disableCache);
+      prototype.registerHybridMethod("disableCookies", &HybridUrlRequestBuilderSpec::disableCookies);
       prototype.registerHybridMethod("onSucceeded", &HybridUrlRequestBuilderSpec::onSucceeded);
       prototype.registerHybridMethod("onFailed", &HybridUrlRequestBuilderSpec::onFailed);
       prototype.registerHybridMethod("onCanceled", &HybridUrlRequestBuilderSpec::onCanceled);

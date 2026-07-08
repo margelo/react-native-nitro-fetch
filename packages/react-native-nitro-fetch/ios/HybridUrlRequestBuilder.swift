@@ -87,6 +87,10 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     self.urlRequest.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
   }
 
+  func disableCookies() throws {
+    self.urlRequest.httpShouldHandleCookies = false
+  }
+
   func build() throws -> any HybridUrlRequestSpec {
     let delegate = URLSessionDelegateAdapter(
       onRedirectReceived: onRedirectReceivedCallback,

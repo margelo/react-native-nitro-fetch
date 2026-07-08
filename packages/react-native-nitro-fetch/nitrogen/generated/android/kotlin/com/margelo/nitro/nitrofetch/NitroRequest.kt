@@ -43,6 +43,9 @@ data class NitroRequest(
   val followRedirects: Boolean?,
   @DoNotStrip
   @Keep
+  val credentials: NitroRequestCredentials?,
+  @DoNotStrip
+  @Keep
   val prefetchCacheTtlMs: Double?,
   @DoNotStrip
   @Keep
@@ -58,8 +61,8 @@ data class NitroRequest(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(url: String, method: NitroRequestMethod?, headers: Array<NitroHeader>?, bodyString: String?, bodyBytes: String?, bodyFormData: Array<NitroFormDataPart>?, timeoutMs: Double?, followRedirects: Boolean?, prefetchCacheTtlMs: Double?, requestId: String?): NitroRequest {
-      return NitroRequest(url, method, headers, bodyString, bodyBytes, bodyFormData, timeoutMs, followRedirects, prefetchCacheTtlMs, requestId)
+    private fun fromCpp(url: String, method: NitroRequestMethod?, headers: Array<NitroHeader>?, bodyString: String?, bodyBytes: String?, bodyFormData: Array<NitroFormDataPart>?, timeoutMs: Double?, followRedirects: Boolean?, credentials: NitroRequestCredentials?, prefetchCacheTtlMs: Double?, requestId: String?): NitroRequest {
+      return NitroRequest(url, method, headers, bodyString, bodyBytes, bodyFormData, timeoutMs, followRedirects, credentials, prefetchCacheTtlMs, requestId)
     }
   }
 }

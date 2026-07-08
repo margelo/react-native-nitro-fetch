@@ -183,6 +183,7 @@ function buildNitroRequest(
   let cacheOption: RequestCache | undefined = init?.cache as
     | RequestCache
     | undefined;
+  let credentialsOption: RequestCredentials | undefined = init?.credentials;
 
   if (input instanceof NitroRequestClass) {
     url = input.url;
@@ -191,6 +192,7 @@ function buildNitroRequest(
     body = init?.body ?? input.body ?? null;
     if (!init?.redirect) redirectOption = input.redirect;
     if (!init?.cache) cacheOption = input.cache;
+    if (!init?.credentials) credentialsOption = input.credentials;
   } else if (typeof input === 'string' || input instanceof URL) {
     url = String(input);
     method = init?.method;
@@ -202,6 +204,7 @@ function buildNitroRequest(
     method = input.method;
     headersInit = input.headers as any;
     body = init?.body ?? null;
+    if (!init?.credentials) credentialsOption = (input as Request).credentials;
   }
 
   const headers = headersToPairs(headersInit) ?? [];
@@ -233,6 +236,7 @@ function buildNitroRequest(
     bodyBytes: undefined as any,
     bodyFormData: normalized?.bodyFormData,
     followRedirects,
+    credentials: credentialsOption,
     prefetchCacheTtlMs,
   };
 }
@@ -379,6 +383,7 @@ export function buildNitroRequestPure(
     // Only include bodyBytes when provided to avoid signaling upload data unintentionally
     bodyBytes: undefined as any,
     followRedirects: true,
+    credentials: init?.credentials,
     prefetchCacheTtlMs,
   };
 }
@@ -739,6 +744,7 @@ async function nitroStreamFetch(
 
   const builder = NitroCronetSingleton.newUrlRequestBuilder(url);
   builder.setHttpMethod(method);
+  if (init?.credentials === 'omit') builder.disableCookies();
   headers?.forEach((h) => builder.addHeader(h.key, h.value));
 
   const body = init?.body;
@@ -969,6 +975,8 @@ export async function prefetchOnAppStart(
     entry.bodyFormData = req.bodyFormData;
   if (typeof req.timeoutMs === 'number') entry.timeoutMs = req.timeoutMs;
   if (req.followRedirects === false) entry.followRedirects = false;
+  if (req.credentials && req.credentials !== 'same-origin')
+    entry.credentials = req.credentials;
   if (typeof req.prefetchCacheTtlMs === 'number')
     entry.prefetchCacheTtlMs = req.prefetchCacheTtlMs;
 

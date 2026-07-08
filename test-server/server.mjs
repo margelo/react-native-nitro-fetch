@@ -123,6 +123,30 @@ app.all('/token/text', (_req, res) =>
 );
 app.all('/token/fail', (_req, res) => res.status(500).json({ error: 'boom' }));
 
+app.use('/cookies', (req, _res, next) => {
+  // eslint-disable-next-line no-console
+  console.log(
+    `[cookies] ${req.method} ${req.originalUrl} Cookie: ${req.headers.cookie || '(none)'}`
+  );
+  next();
+});
+
+app.get('/cookies', (req, res) => {
+  const cookies = {};
+  for (const part of (req.headers.cookie || '').split(';')) {
+    const i = part.indexOf('=');
+    if (i > 0) cookies[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+  }
+  res.json({ cookies });
+});
+
+app.get('/cookies/set', (req, res) => {
+  for (const [k, v] of Object.entries(req.query)) {
+    res.append('Set-Cookie', `${k}=${v}; Path=/`);
+  }
+  res.json({ ok: true });
+});
+
 app.all('/status/:code', (req, res) => {
   const code = parseInt(req.params.code, 10);
   res.status(Number.isFinite(code) ? code : 200).end();

@@ -200,6 +200,10 @@ class NitroUrlRequestBuilder(
     builder.disableCache()
   }
 
+  // Cronet has no cookie jar; nothing to skip on Android
+  override fun disableCookies() {
+  }
+
   override fun onSucceeded(callback: (info: UrlResponseInfo) -> Unit) {
     this.onSucceededCallback = callback
   }

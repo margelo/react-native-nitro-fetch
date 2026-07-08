@@ -41,6 +41,7 @@ export interface UrlRequestBuilder extends HybridObject<{
   addHeader(name: string, value: string): void;
   setUploadBody(body: ArrayBuffer | string): void;
   disableCache(): void;
+  disableCookies(): void;
   onSucceeded(callback: (info: UrlResponseInfo) => void): void;
   onFailed(
     callback: (

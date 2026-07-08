@@ -28,6 +28,8 @@ namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
 namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 // Forward declaration of `NitroHeader` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroHeader; }
+// Forward declaration of `NitroRequestCredentials` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { enum class NitroRequestCredentials; }
 // Forward declaration of `NitroRequestMethod` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 // Forward declaration of `NitroResponse` to properly resolve imports.
@@ -61,6 +63,7 @@ namespace NitroFetch { class HybridUrlRequestSpec_cxx; }
 #include "HybridUrlRequestSpec.hpp"
 #include "NitroFormDataPart.hpp"
 #include "NitroHeader.hpp"
+#include "NitroRequestCredentials.hpp"
 #include "NitroRequestMethod.hpp"
 #include "NitroResponse.hpp"
 #include "RequestException.hpp"
@@ -550,6 +553,21 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return optional.has_value();
   }
   inline bool get_std__optional_bool_(const std::optional<bool>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::optional<NitroRequestCredentials>
+  /**
+   * Specialized version of `std::optional<NitroRequestCredentials>`.
+   */
+  using std__optional_NitroRequestCredentials_ = std::optional<NitroRequestCredentials>;
+  inline std::optional<NitroRequestCredentials> create_std__optional_NitroRequestCredentials_(const NitroRequestCredentials& value) noexcept {
+    return std::optional<NitroRequestCredentials>(value);
+  }
+  inline bool has_value_std__optional_NitroRequestCredentials_(const std::optional<NitroRequestCredentials>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline NitroRequestCredentials get_std__optional_NitroRequestCredentials_(const std::optional<NitroRequestCredentials>& optional) noexcept {
     return optional.value();
   }
   

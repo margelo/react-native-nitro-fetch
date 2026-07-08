@@ -12,9 +12,11 @@
 
 #include "JNitroFormDataPart.hpp"
 #include "JNitroHeader.hpp"
+#include "JNitroRequestCredentials.hpp"
 #include "JNitroRequestMethod.hpp"
 #include "NitroFormDataPart.hpp"
 #include "NitroHeader.hpp"
+#include "NitroRequestCredentials.hpp"
 #include "NitroRequestMethod.hpp"
 #include <optional>
 #include <string>
@@ -55,6 +57,8 @@ namespace margelo::nitro::nitrofetch {
       jni::local_ref<jni::JDouble> timeoutMs = this->getFieldValue(fieldTimeoutMs);
       static const auto fieldFollowRedirects = clazz->getField<jni::JBoolean>("followRedirects");
       jni::local_ref<jni::JBoolean> followRedirects = this->getFieldValue(fieldFollowRedirects);
+      static const auto fieldCredentials = clazz->getField<JNitroRequestCredentials>("credentials");
+      jni::local_ref<JNitroRequestCredentials> credentials = this->getFieldValue(fieldCredentials);
       static const auto fieldPrefetchCacheTtlMs = clazz->getField<jni::JDouble>("prefetchCacheTtlMs");
       jni::local_ref<jni::JDouble> prefetchCacheTtlMs = this->getFieldValue(fieldPrefetchCacheTtlMs);
       static const auto fieldRequestId = clazz->getField<jni::JString>("requestId");
@@ -86,6 +90,7 @@ namespace margelo::nitro::nitrofetch {
         }()) : std::nullopt,
         timeoutMs != nullptr ? std::make_optional(timeoutMs->value()) : std::nullopt,
         followRedirects != nullptr ? std::make_optional(static_cast<bool>(followRedirects->value())) : std::nullopt,
+        credentials != nullptr ? std::make_optional(credentials->toCpp()) : std::nullopt,
         prefetchCacheTtlMs != nullptr ? std::make_optional(prefetchCacheTtlMs->value()) : std::nullopt,
         requestId != nullptr ? std::make_optional(requestId->toStdString()) : std::nullopt
       );
@@ -97,7 +102,7 @@ namespace margelo::nitro::nitrofetch {
      */
     [[maybe_unused]]
     static jni::local_ref<JNitroRequest::javaobject> fromCpp(const NitroRequest& value) {
-      using JSignature = JNitroRequest(jni::alias_ref<jni::JString>, jni::alias_ref<JNitroRequestMethod>, jni::alias_ref<jni::JArrayClass<JNitroHeader>>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JArrayClass<JNitroFormDataPart>>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JBoolean>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JString>);
+      using JSignature = JNitroRequest(jni::alias_ref<jni::JString>, jni::alias_ref<JNitroRequestMethod>, jni::alias_ref<jni::JArrayClass<JNitroHeader>>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JArrayClass<JNitroFormDataPart>>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JBoolean>, jni::alias_ref<JNitroRequestCredentials>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JString>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
@@ -128,6 +133,7 @@ namespace margelo::nitro::nitrofetch {
         }() : nullptr,
         value.timeoutMs.has_value() ? jni::JDouble::valueOf(value.timeoutMs.value()) : nullptr,
         value.followRedirects.has_value() ? jni::JBoolean::valueOf(value.followRedirects.value()) : nullptr,
+        value.credentials.has_value() ? JNitroRequestCredentials::fromCpp(value.credentials.value()) : nullptr,
         value.prefetchCacheTtlMs.has_value() ? jni::JDouble::valueOf(value.prefetchCacheTtlMs.value()) : nullptr,
         value.requestId.has_value() ? jni::make_jstring(value.requestId.value()) : nullptr
       );
