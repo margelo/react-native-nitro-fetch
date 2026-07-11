@@ -334,6 +334,8 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
       let (body, contentType) = try await buildMultipartBody(parts)
       r.httpBody = body
       r.setValue(contentType, forHTTPHeaderField: "Content-Type")
+    } else if let bodyBytes = req.bodyBytes, let data = Data(base64Encoded: bodyBytes) {
+      r.httpBody = data
     } else if let s = req.bodyString {
       r.httpBody = s.data(using: .utf8)
     }

@@ -17,7 +17,48 @@ import { NitroRequest as NitroRequestClass } from './Request';
 import type { RequestRedirect, RequestCache } from './Request';
 import { NetworkInspector } from './NetworkInspector';
 
-// No base64: pass strings/ArrayBuffers directly
+function bytesToBase64(buffer: ArrayBuffer): string {
+  'worklet';
+  const bytes = new Uint8Array(buffer);
+  const encode = (globalThis as { btoa?: (value: string) => string }).btoa;
+  if (typeof encode === 'function') {
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]!);
+    }
+    return encode(binary);
+  }
+
+  // Keep the alphabet local so worklet serialization does not capture module scope.
+  /* eslint-disable no-bitwise */
+  const alphabet =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  let base64 = '';
+  let i = 0;
+  for (; i + 2 < bytes.length; i += 3) {
+    const value = (bytes[i]! << 16) | (bytes[i + 1]! << 8) | bytes[i + 2]!;
+    base64 +=
+      alphabet[(value >> 18) & 63] +
+      alphabet[(value >> 12) & 63] +
+      alphabet[(value >> 6) & 63] +
+      alphabet[value & 63];
+  }
+  const remaining = bytes.length - i;
+  if (remaining === 1) {
+    const value = bytes[i]! << 16;
+    base64 +=
+      alphabet[(value >> 18) & 63] + alphabet[(value >> 12) & 63] + '==';
+  } else if (remaining === 2) {
+    const value = (bytes[i]! << 16) | (bytes[i + 1]! << 8);
+    base64 +=
+      alphabet[(value >> 18) & 63] +
+      alphabet[(value >> 12) & 63] +
+      alphabet[(value >> 6) & 63] +
+      '=';
+  }
+  return base64;
+  /* eslint-enable no-bitwise */
+}
 
 function headersToPairs(headers?: HeadersInit): NitroHeader[] | undefined {
   'worklet';
@@ -233,7 +274,9 @@ function buildNitroRequest(
     method: (method?.toUpperCase() as any) ?? 'GET',
     headers: headers.length > 0 ? headers : undefined,
     bodyString: normalized?.bodyString,
-    bodyBytes: undefined as any,
+    bodyBytes: normalized?.bodyBytes
+      ? bytesToBase64(normalized.bodyBytes)
+      : undefined,
     bodyFormData: normalized?.bodyFormData,
     followRedirects,
     credentials: credentialsOption,
@@ -380,8 +423,9 @@ export function buildNitroRequestPure(
     method: (method?.toUpperCase() as any) ?? 'GET',
     headers,
     bodyString: normalized?.bodyString,
-    // Only include bodyBytes when provided to avoid signaling upload data unintentionally
-    bodyBytes: undefined as any,
+    bodyBytes: normalized?.bodyBytes
+      ? bytesToBase64(normalized.bodyBytes)
+      : undefined,
     followRedirects: true,
     credentials: init?.credentials,
     prefetchCacheTtlMs,
