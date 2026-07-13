@@ -1,10 +1,21 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  Platform,
+} from 'react-native';
 import {
   fetch as nitroFetch,
   nitroFetchOnWorklet,
 } from 'react-native-nitro-fetch';
 import { theme } from '../theme';
+
+// Local test-server (test-server/); the Android emulator reaches the host via 10.0.2.2.
+const TEST_SERVER =
+  Platform.OS === 'android' ? 'http://10.0.2.2:9876' : 'http://127.0.0.1:9876';
 
 export function PostAndUploadScreen() {
   const [result, setResult] = React.useState<string>(
@@ -131,11 +142,43 @@ export function PostAndUploadScreen() {
     }
   };
 
+  const sendBinary = async () => {
+    logResult('Uploading binary body...');
+    // 00 7F 80 FF FE — the bytes a UTF-8 round-trip would corrupt.
+    const bytes = new Uint8Array([0, 127, 128, 255, 254]);
+    const EXPECTED = 'AH+A//4=';
+    try {
+      const res = await nitroFetch(`${TEST_SERVER}/post`, {
+        method: 'POST',
+        body: bytes,
+        headers: { 'Content-Type': 'application/octet-stream' },
+      });
+      const json = await res.json();
+      const big = await nitroFetch(`${TEST_SERVER}/post`, {
+        method: 'POST',
+        body: new Uint8Array(256).map((_, i) => i),
+        headers: { 'Content-Type': 'application/octet-stream' },
+      });
+      const bigJson = await big.json();
+      const ok = json.dataBase64 === EXPECTED && bigJson.dataLength === 256;
+      logResult(
+        `${ok ? '✅ PASS — byte-exact' : '❌ FAIL — body was mangled'}\n\n` +
+          `Uint8Array [0,127,128,255,254]\n` +
+          `  sent     ${EXPECTED}\n  echoed   ${json.dataBase64}\n` +
+          `  length   ${json.dataLength} (expected 5)\n\n` +
+          `256-byte payload\n  length   ${bigJson.dataLength} (expected 256)`
+      );
+    } catch (e: any) {
+      logResult(`Binary upload error: ${e?.message ?? String(e)}`);
+    }
+  };
+
   const buttons = [
     { title: 'JSON POST (Worklet)', onPress: sendPostWorklet, icon: '🚀' },
     { title: 'FormData (Fields)', onPress: sendFormDataText, icon: '📝' },
     { title: 'FormData (Image)', onPress: sendFormDataImage, icon: '🖼️' },
     { title: 'FormData (PDF)', onPress: sendFormDataPdf, icon: '📄' },
+    { title: 'Binary POST (bytes)', onPress: sendBinary, icon: '🧬' },
   ];
 
   return (

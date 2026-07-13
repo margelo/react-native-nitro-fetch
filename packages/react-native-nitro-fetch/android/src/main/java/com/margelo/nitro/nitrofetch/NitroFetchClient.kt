@@ -291,14 +291,8 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
         val provider = createUploadProvider(multipartBody)
         builder.setUploadDataProvider(provider, executor)
       } else {
-        val bodyBytes = req.bodyBytes
-        val bodyStr = req.bodyString
-        if ((bodyBytes != null) || !bodyStr.isNullOrEmpty()) {
-          val body: ByteArray = when {
-            bodyBytes != null -> ByteArray(1)
-            !bodyStr.isNullOrEmpty() -> bodyStr!!.toByteArray(Charsets.UTF_8)
-            else -> ByteArray(0)
-          }
+        val body = uploadBytes(req)
+        if (body != null) {
           val provider = createUploadProvider(body)
           builder.setUploadDataProvider(provider, executor)
         }
@@ -320,6 +314,18 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
       }
       request.start()
       return request
+    }
+
+    // bodyBytesBase64 is the auto-prefetch path: replayed from JSON, never a Nitro ArrayBuffer.
+    private fun uploadBytes(req: NitroRequest): ByteArray? {
+      req.bodyBytes?.let { ab ->
+        val buf = ab.getBuffer(false)
+        return ByteArray(buf.remaining()).also { buf.get(it) }
+      }
+      req.bodyBytesBase64?.takeIf { it.isNotEmpty() }?.let {
+        return runCatching { android.util.Base64.decode(it, android.util.Base64.DEFAULT) }.getOrNull()
+      }
+      return req.bodyString?.takeIf { it.isNotEmpty() }?.toByteArray(Charsets.UTF_8)
     }
 
     private fun createUploadProvider(body: ByteArray): org.chromium.net.UploadDataProvider {

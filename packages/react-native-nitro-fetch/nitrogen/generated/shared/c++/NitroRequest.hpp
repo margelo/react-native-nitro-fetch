@@ -42,6 +42,7 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestCredentials; }
 #include <optional>
 #include "NitroHeader.hpp"
 #include <vector>
+#include <NitroModules/ArrayBuffer.hpp>
 #include "NitroFormDataPart.hpp"
 #include "NitroRequestCredentials.hpp"
 
@@ -56,7 +57,8 @@ namespace margelo::nitro::nitrofetch {
     std::optional<NitroRequestMethod> method     SWIFT_PRIVATE;
     std::optional<std::vector<NitroHeader>> headers     SWIFT_PRIVATE;
     std::optional<std::string> bodyString     SWIFT_PRIVATE;
-    std::optional<std::string> bodyBytes     SWIFT_PRIVATE;
+    std::optional<std::shared_ptr<ArrayBuffer>> bodyBytes     SWIFT_PRIVATE;
+    std::optional<std::string> bodyBytesBase64     SWIFT_PRIVATE;
     std::optional<std::vector<NitroFormDataPart>> bodyFormData     SWIFT_PRIVATE;
     std::optional<double> timeoutMs     SWIFT_PRIVATE;
     std::optional<bool> followRedirects     SWIFT_PRIVATE;
@@ -66,7 +68,7 @@ namespace margelo::nitro::nitrofetch {
 
   public:
     NitroRequest() = default;
-    explicit NitroRequest(std::string url, std::optional<NitroRequestMethod> method, std::optional<std::vector<NitroHeader>> headers, std::optional<std::string> bodyString, std::optional<std::string> bodyBytes, std::optional<std::vector<NitroFormDataPart>> bodyFormData, std::optional<double> timeoutMs, std::optional<bool> followRedirects, std::optional<NitroRequestCredentials> credentials, std::optional<double> prefetchCacheTtlMs, std::optional<std::string> requestId): url(url), method(method), headers(headers), bodyString(bodyString), bodyBytes(bodyBytes), bodyFormData(bodyFormData), timeoutMs(timeoutMs), followRedirects(followRedirects), credentials(credentials), prefetchCacheTtlMs(prefetchCacheTtlMs), requestId(requestId) {}
+    explicit NitroRequest(std::string url, std::optional<NitroRequestMethod> method, std::optional<std::vector<NitroHeader>> headers, std::optional<std::string> bodyString, std::optional<std::shared_ptr<ArrayBuffer>> bodyBytes, std::optional<std::string> bodyBytesBase64, std::optional<std::vector<NitroFormDataPart>> bodyFormData, std::optional<double> timeoutMs, std::optional<bool> followRedirects, std::optional<NitroRequestCredentials> credentials, std::optional<double> prefetchCacheTtlMs, std::optional<std::string> requestId): url(url), method(method), headers(headers), bodyString(bodyString), bodyBytes(bodyBytes), bodyBytesBase64(bodyBytesBase64), bodyFormData(bodyFormData), timeoutMs(timeoutMs), followRedirects(followRedirects), credentials(credentials), prefetchCacheTtlMs(prefetchCacheTtlMs), requestId(requestId) {}
 
   public:
     friend bool operator==(const NitroRequest& lhs, const NitroRequest& rhs) = default;
@@ -86,7 +88,8 @@ namespace margelo::nitro {
         JSIConverter<std::optional<margelo::nitro::nitrofetch::NitroRequestMethod>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "method"))),
         JSIConverter<std::optional<std::vector<margelo::nitro::nitrofetch::NitroHeader>>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "headers"))),
         JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bodyString"))),
-        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bodyBytes"))),
+        JSIConverter<std::optional<std::shared_ptr<ArrayBuffer>>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bodyBytes"))),
+        JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bodyBytesBase64"))),
         JSIConverter<std::optional<std::vector<margelo::nitro::nitrofetch::NitroFormDataPart>>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bodyFormData"))),
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "timeoutMs"))),
         JSIConverter<std::optional<bool>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "followRedirects"))),
@@ -101,7 +104,8 @@ namespace margelo::nitro {
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "method"), JSIConverter<std::optional<margelo::nitro::nitrofetch::NitroRequestMethod>>::toJSI(runtime, arg.method));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "headers"), JSIConverter<std::optional<std::vector<margelo::nitro::nitrofetch::NitroHeader>>>::toJSI(runtime, arg.headers));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "bodyString"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.bodyString));
-      obj.setProperty(runtime, PropNameIDCache::get(runtime, "bodyBytes"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.bodyBytes));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "bodyBytes"), JSIConverter<std::optional<std::shared_ptr<ArrayBuffer>>>::toJSI(runtime, arg.bodyBytes));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "bodyBytesBase64"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.bodyBytesBase64));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "bodyFormData"), JSIConverter<std::optional<std::vector<margelo::nitro::nitrofetch::NitroFormDataPart>>>::toJSI(runtime, arg.bodyFormData));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "timeoutMs"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.timeoutMs));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "followRedirects"), JSIConverter<std::optional<bool>>::toJSI(runtime, arg.followRedirects));
@@ -122,7 +126,8 @@ namespace margelo::nitro {
       if (!JSIConverter<std::optional<margelo::nitro::nitrofetch::NitroRequestMethod>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "method")))) return false;
       if (!JSIConverter<std::optional<std::vector<margelo::nitro::nitrofetch::NitroHeader>>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "headers")))) return false;
       if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bodyString")))) return false;
-      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bodyBytes")))) return false;
+      if (!JSIConverter<std::optional<std::shared_ptr<ArrayBuffer>>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bodyBytes")))) return false;
+      if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bodyBytesBase64")))) return false;
       if (!JSIConverter<std::optional<std::vector<margelo::nitro::nitrofetch::NitroFormDataPart>>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bodyFormData")))) return false;
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "timeoutMs")))) return false;
       if (!JSIConverter<std::optional<bool>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "followRedirects")))) return false;

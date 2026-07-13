@@ -18,7 +18,7 @@ public extension NitroRequest {
   /**
    * Create a new instance of `NitroRequest`.
    */
-  init(url: String, method: NitroRequestMethod?, headers: [NitroHeader]?, bodyString: String?, bodyBytes: String?, bodyFormData: [NitroFormDataPart]?, timeoutMs: Double?, followRedirects: Bool?, credentials: NitroRequestCredentials?, prefetchCacheTtlMs: Double?, requestId: String?) {
+  init(url: String, method: NitroRequestMethod?, headers: [NitroHeader]?, bodyString: String?, bodyBytes: ArrayBuffer?, bodyBytesBase64: String?, bodyFormData: [NitroFormDataPart]?, timeoutMs: Double?, followRedirects: Bool?, credentials: NitroRequestCredentials?, prefetchCacheTtlMs: Double?, requestId: String?) {
     self.init(std.string(url), { () -> bridge.std__optional_NitroRequestMethod_ in
       if let __unwrappedValue = method {
         return bridge.create_std__optional_NitroRequestMethod_(__unwrappedValue)
@@ -43,8 +43,14 @@ public extension NitroRequest {
       } else {
         return .init()
       }
-    }(), { () -> bridge.std__optional_std__string_ in
+    }(), { () -> bridge.std__optional_std__shared_ptr_ArrayBuffer__ in
       if let __unwrappedValue = bodyBytes {
+        return bridge.create_std__optional_std__shared_ptr_ArrayBuffer__(__unwrappedValue.getArrayBuffer())
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_std__string_ in
+      if let __unwrappedValue = bodyBytesBase64 {
         return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
       } else {
         return .init()
@@ -138,10 +144,22 @@ public extension NitroRequest {
   }
   
   @inline(__always)
-  var bodyBytes: String? {
+  var bodyBytes: ArrayBuffer? {
+    return { () -> ArrayBuffer? in
+      if bridge.has_value_std__optional_std__shared_ptr_ArrayBuffer__(self.__bodyBytes) {
+        let __unwrapped = bridge.get_std__optional_std__shared_ptr_ArrayBuffer__(self.__bodyBytes)
+        return ArrayBuffer(__unwrapped)
+      } else {
+        return nil
+      }
+    }()
+  }
+  
+  @inline(__always)
+  var bodyBytesBase64: String? {
     return { () -> String? in
-      if bridge.has_value_std__optional_std__string_(self.__bodyBytes) {
-        let __unwrapped = bridge.get_std__optional_std__string_(self.__bodyBytes)
+      if bridge.has_value_std__optional_std__string_(self.__bodyBytesBase64) {
+        let __unwrapped = bridge.get_std__optional_std__string_(self.__bodyBytesBase64)
         return String(__unwrapped)
       } else {
         return nil

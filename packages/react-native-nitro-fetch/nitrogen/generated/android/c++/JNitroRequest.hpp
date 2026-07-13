@@ -18,6 +18,8 @@
 #include "NitroHeader.hpp"
 #include "NitroRequestCredentials.hpp"
 #include "NitroRequestMethod.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
+#include <NitroModules/JArrayBuffer.hpp>
 #include <optional>
 #include <string>
 #include <vector>
@@ -49,8 +51,10 @@ namespace margelo::nitro::nitrofetch {
       jni::local_ref<jni::JArrayClass<JNitroHeader>> headers = this->getFieldValue(fieldHeaders);
       static const auto fieldBodyString = clazz->getField<jni::JString>("bodyString");
       jni::local_ref<jni::JString> bodyString = this->getFieldValue(fieldBodyString);
-      static const auto fieldBodyBytes = clazz->getField<jni::JString>("bodyBytes");
-      jni::local_ref<jni::JString> bodyBytes = this->getFieldValue(fieldBodyBytes);
+      static const auto fieldBodyBytes = clazz->getField<JArrayBuffer::javaobject>("bodyBytes");
+      jni::local_ref<JArrayBuffer::javaobject> bodyBytes = this->getFieldValue(fieldBodyBytes);
+      static const auto fieldBodyBytesBase64 = clazz->getField<jni::JString>("bodyBytesBase64");
+      jni::local_ref<jni::JString> bodyBytesBase64 = this->getFieldValue(fieldBodyBytesBase64);
       static const auto fieldBodyFormData = clazz->getField<jni::JArrayClass<JNitroFormDataPart>>("bodyFormData");
       jni::local_ref<jni::JArrayClass<JNitroFormDataPart>> bodyFormData = this->getFieldValue(fieldBodyFormData);
       static const auto fieldTimeoutMs = clazz->getField<jni::JDouble>("timeoutMs");
@@ -77,7 +81,8 @@ namespace margelo::nitro::nitrofetch {
           return __vector;
         }()) : std::nullopt,
         bodyString != nullptr ? std::make_optional(bodyString->toStdString()) : std::nullopt,
-        bodyBytes != nullptr ? std::make_optional(bodyBytes->toStdString()) : std::nullopt,
+        bodyBytes != nullptr ? std::make_optional(bodyBytes->cthis()->getArrayBuffer()) : std::nullopt,
+        bodyBytesBase64 != nullptr ? std::make_optional(bodyBytesBase64->toStdString()) : std::nullopt,
         bodyFormData != nullptr ? std::make_optional([&]() {
           size_t __size = bodyFormData->size();
           std::vector<NitroFormDataPart> __vector;
@@ -102,7 +107,7 @@ namespace margelo::nitro::nitrofetch {
      */
     [[maybe_unused]]
     static jni::local_ref<JNitroRequest::javaobject> fromCpp(const NitroRequest& value) {
-      using JSignature = JNitroRequest(jni::alias_ref<jni::JString>, jni::alias_ref<JNitroRequestMethod>, jni::alias_ref<jni::JArrayClass<JNitroHeader>>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JArrayClass<JNitroFormDataPart>>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JBoolean>, jni::alias_ref<JNitroRequestCredentials>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JString>);
+      using JSignature = JNitroRequest(jni::alias_ref<jni::JString>, jni::alias_ref<JNitroRequestMethod>, jni::alias_ref<jni::JArrayClass<JNitroHeader>>, jni::alias_ref<jni::JString>, jni::alias_ref<JArrayBuffer::javaobject>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JArrayClass<JNitroFormDataPart>>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JBoolean>, jni::alias_ref<JNitroRequestCredentials>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JString>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
@@ -120,7 +125,8 @@ namespace margelo::nitro::nitrofetch {
           return __array;
         }() : nullptr,
         value.bodyString.has_value() ? jni::make_jstring(value.bodyString.value()) : nullptr,
-        value.bodyBytes.has_value() ? jni::make_jstring(value.bodyBytes.value()) : nullptr,
+        value.bodyBytes.has_value() ? JArrayBuffer::wrap(value.bodyBytes.value()) : nullptr,
+        value.bodyBytesBase64.has_value() ? jni::make_jstring(value.bodyBytesBase64.value()) : nullptr,
         value.bodyFormData.has_value() ? [&]() {
           size_t __size = value.bodyFormData.value().size();
           jni::local_ref<jni::JArrayClass<JNitroFormDataPart>> __array = jni::JArrayClass<JNitroFormDataPart>::newArray(__size);

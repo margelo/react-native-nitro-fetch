@@ -26,7 +26,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       headers: ["Accept": "application/json"],
       method: nil,
       bodyString: nil,
-      bodyBytes: nil,
+      bodyBytesBase64: nil,
+      bodyFormData: nil,
+      timeoutMs: nil,
+      followRedirects: nil,
+      prefetchCacheTtlMs: NSNumber(value: 300_000)
+    )
+
+    // Binary body on the cold-start path: bytes arrive base64 because Nitro is not up yet.
+    NitroAutoPrefetcher.registerPrefetch(
+      withURL: "http://127.0.0.1:9876/post",
+      prefetchKey: "harness-native-prefetch-binary",
+      headers: ["Content-Type": "application/octet-stream"],
+      method: "POST",
+      bodyString: nil,
+      bodyBytesBase64: "AH+A//4=",
       bodyFormData: nil,
       timeoutMs: nil,
       followRedirects: nil,

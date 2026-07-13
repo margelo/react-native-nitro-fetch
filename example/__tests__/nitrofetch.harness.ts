@@ -28,10 +28,29 @@ describe('NitroFetch - Native registerPrefetch', () => {
     expect(res.headers.get('nitroPrefetched')).toBe('true');
   });
 
+  it('replays a natively-registered binary body byte-exact on cold start', async () => {
+    // The cold-start replay runs before Nitro exists, so the bytes travel as base64
+    // and are decoded natively. AppDelegate / MainApplication register [0,127,128,255,254].
+    const res = await nitroFetch(`${BASE}/post`, {
+      method: 'POST',
+      body: new Uint8Array([0, 127, 128, 255, 254]),
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'prefetchKey': 'harness-native-prefetch-binary',
+      },
+      prefetchCacheTtlMs: 300_000,
+    } as any);
+    expect(res.ok).toBe(true);
+    expect(res.headers.get('nitroPrefetched')).toBe('true');
+    const json = (await res.json()) as any;
+    expect(json.dataBase64).toBe('AH+A//4=');
+  });
+
   it('removeFromAutoPrefetch deletes the natively-registered entry', async () => {
     // Native registration shares storage with JS prefetchOnAppStart, so
     // removeFromAutoPrefetch is the canonical removal API for both paths.
     await removeFromAutoPrefetch(NP_KEY);
+    await removeFromAutoPrefetch('harness-native-prefetch-binary');
   });
 });
 
@@ -328,6 +347,44 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
     const userPart = entry!.bodyFormData.find((p: any) => p.name === 'user');
     expect(userPart).toBeDefined();
     expect(userPart.value).toBe('alice');
+    await removeFromAutoPrefetch(KEY);
+  });
+
+  it('POST + ArrayBuffer body persists as base64 and uploads byte-exact', async () => {
+    const KEY = 'pf-post-bytes';
+    const bytes = new Uint8Array([0, 127, 128, 255, 254]);
+    await prefetchOnAppStart(`${BASE}/post`, {
+      method: 'POST',
+      body: bytes,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'prefetchKey': KEY,
+      },
+    });
+    const entry = findEntry(KEY);
+    expect(entry).toBeDefined();
+    expect(entry!.method).toBe('POST');
+    expect(entry!.bodyBytesBase64).toBe('AH+A//4=');
+    expect(entry!.bodyString).toBeUndefined();
+
+    await prefetch(`${BASE}/post`, {
+      method: 'POST',
+      body: bytes,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'prefetchKey': KEY,
+      },
+    } as any);
+    const res = await nitroFetch(`${BASE}/post`, {
+      method: 'POST',
+      body: bytes,
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'prefetchKey': KEY,
+      },
+    });
+    const json = (await res.json()) as any;
+    expect(json.dataBase64).toBe('AH+A//4=');
     await removeFromAutoPrefetch(KEY);
   });
 

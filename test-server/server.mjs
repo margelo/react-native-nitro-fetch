@@ -76,6 +76,9 @@ const echoBody = (req, res) => {
     }
   } else {
     const raw = req.rawBody ? req.rawBody.toString('utf8') : '';
+    // Byte-exact echo so binary bodies can be asserted without UTF-8 mangling.
+    out.dataBase64 = req.rawBody ? req.rawBody.toString('base64') : '';
+    out.dataLength = req.rawBody ? req.rawBody.length : 0;
     if (ct.includes('application/x-www-form-urlencoded')) {
       out.form = Object.fromEntries(new URLSearchParams(raw));
     } else {

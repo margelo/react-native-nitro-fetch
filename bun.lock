@@ -73,7 +73,7 @@
     },
     "packages/react-native-nitro-fetch": {
       "name": "react-native-nitro-fetch",
-      "version": "1.4.2",
+      "version": "1.5.0",
       "dependencies": {
         "web-streams-polyfill": "^4.2.0",
       },
