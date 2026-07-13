@@ -13,11 +13,35 @@ import {
 import { NativeStorage as NativeStorageSingleton } from './NitroInstances';
 import { NitroHeaders } from './Headers';
 import { NitroResponse } from './Response';
-import { NitroRequest as NitroRequestClass } from './Request';
+import { NitroRequest as NitroRequestClass, rawBodyOf } from './Request';
 import type { RequestRedirect, RequestCache } from './Request';
 import { NetworkInspector } from './NetworkInspector';
+import { base64FromBytes } from './blob';
 
-// No base64: pass strings/ArrayBuffers directly
+const TEXT_CONTENT_TYPE = 'text/plain;charset=UTF-8';
+const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded;charset=UTF-8';
+// Browsers send no Content-Type for byte bodies, but Cronet rejects uploads without one.
+const BYTES_CONTENT_TYPE = 'application/octet-stream';
+
+// A view spanning its whole buffer needs no copy.
+function viewToBuffer(view: ArrayBufferView): ArrayBuffer {
+  'worklet';
+  const buf = view.buffer as ArrayBuffer;
+  if (view.byteOffset === 0 && view.byteLength === buf.byteLength) return buf;
+  return buf.slice(view.byteOffset, view.byteOffset + view.byteLength);
+}
+
+function applyDefaultContentType(
+  headers: NitroHeader[],
+  contentType: string | undefined
+): void {
+  'worklet';
+  if (!contentType) return;
+  for (let i = 0; i < headers.length; i++) {
+    if (headers[i]!.key.toLowerCase() === 'content-type') return;
+  }
+  headers.push({ key: 'Content-Type', value: contentType });
+}
 
 function headersToPairs(headers?: HeadersInit): NitroHeader[] | undefined {
   'worklet';
@@ -125,27 +149,23 @@ function normalizeBody(body: BodyInit | null | undefined):
       bodyString?: string;
       bodyBytes?: ArrayBuffer;
       bodyFormData?: NitroFormDataPart[];
+      contentType?: string;
     }
   | undefined {
   'worklet';
   if (body == null) return undefined;
-  if (typeof body === 'string') return { bodyString: body };
+  if (typeof body === 'string')
+    return { bodyString: body, contentType: TEXT_CONTENT_TYPE };
 
   if (isFormData(body)) {
     return { bodyFormData: serializeFormData(body as FormData) };
   }
-  if (body instanceof URLSearchParams) return { bodyString: body.toString() };
+  if (body instanceof URLSearchParams)
+    return { bodyString: body.toString(), contentType: FORM_CONTENT_TYPE };
   if (typeof ArrayBuffer !== 'undefined' && body instanceof ArrayBuffer)
-    return { bodyBytes: body };
+    return { bodyBytes: body, contentType: BYTES_CONTENT_TYPE };
   if (ArrayBuffer.isView(body)) {
-    const view = body as ArrayBufferView;
-    return {
-      //@ts-ignore
-      bodyBytes: view.buffer.slice(
-        view.byteOffset,
-        view.byteOffset + view.byteLength
-      ),
-    };
+    return { bodyBytes: viewToBuffer(body), contentType: BYTES_CONTENT_TYPE };
   }
   throw new Error('Unsupported body type for nitro fetch');
 }
@@ -189,7 +209,7 @@ function buildNitroRequest(
     url = input.url;
     method = init?.method ?? input.method;
     headersInit = init?.headers ?? (input.headers as any);
-    body = init?.body ?? input.body ?? null;
+    body = init?.body ?? rawBodyOf(input) ?? null;
     if (!init?.redirect) redirectOption = input.redirect;
     if (!init?.cache) cacheOption = input.cache;
     if (!init?.credentials) credentialsOption = input.credentials;
@@ -209,6 +229,7 @@ function buildNitroRequest(
 
   const headers = headersToPairs(headersInit) ?? [];
   const normalized = normalizeBody(body);
+  applyDefaultContentType(headers, normalized?.contentType);
 
   // Inject cache-control headers based on cache option
   if (cacheOption === 'no-store') {
@@ -233,7 +254,7 @@ function buildNitroRequest(
     method: (method?.toUpperCase() as any) ?? 'GET',
     headers: headers.length > 0 ? headers : undefined,
     bodyString: normalized?.bodyString,
-    bodyBytes: undefined as any,
+    bodyBytes: normalized?.bodyBytes,
     bodyFormData: normalized?.bodyFormData,
     followRedirects,
     credentials: credentialsOption,
@@ -296,10 +317,13 @@ function headersToPairsPure(headers?: HeadersInit): NitroHeader[] | undefined {
 // Pure JS version of buildNitroRequest that doesnt use anything that breaks worklets
 function normalizeBodyPure(
   body: BodyInit | null | undefined
-): { bodyString?: string; bodyBytes?: ArrayBuffer } | undefined {
+):
+  | { bodyString?: string; bodyBytes?: ArrayBuffer; contentType?: string }
+  | undefined {
   'worklet';
   if (body == null) return undefined;
-  if (typeof body === 'string') return { bodyString: body };
+  if (typeof body === 'string')
+    return { bodyString: body, contentType: TEXT_CONTENT_TYPE };
 
   // Check for URLSearchParams (duck typing)
   // It should be an object, have a toString method, and typically append/delete methods
@@ -310,7 +334,7 @@ function normalizeBodyPure(
     typeof (body as any).toString === 'function' &&
     Object.prototype.toString.call(body) === '[object URLSearchParams]'
   ) {
-    return { bodyString: body.toString() };
+    return { bodyString: body.toString(), contentType: FORM_CONTENT_TYPE };
   }
 
   // Check for ArrayBuffer (using toString tag to avoid instanceof)
@@ -318,18 +342,11 @@ function normalizeBodyPure(
     typeof ArrayBuffer !== 'undefined' &&
     Object.prototype.toString.call(body) === '[object ArrayBuffer]'
   ) {
-    return { bodyBytes: body as ArrayBuffer };
+    return { bodyBytes: body as ArrayBuffer, contentType: BYTES_CONTENT_TYPE };
   }
 
   if (ArrayBuffer.isView(body)) {
-    const view = body as ArrayBufferView;
-    return {
-      //@ts-ignore
-      bodyBytes: view.buffer.slice(
-        view.byteOffset,
-        view.byteOffset + view.byteLength
-      ),
-    };
+    return { bodyBytes: viewToBuffer(body), contentType: BYTES_CONTENT_TYPE };
   }
   throw new Error(
     'Unsupported body type for nitro fetch worklet (FormData is not available in worklets)'
@@ -367,8 +384,9 @@ export function buildNitroRequestPure(
     body = init?.body ?? null;
   }
 
-  const headers = headersToPairsPure(headersInit);
+  const headers = headersToPairsPure(headersInit) ?? [];
   const normalized = normalizeBodyPure(body);
+  applyDefaultContentType(headers, normalized?.contentType);
 
   const prefetchCacheTtlMs =
     typeof init?.prefetchCacheTtlMs === 'number'
@@ -378,10 +396,9 @@ export function buildNitroRequestPure(
   return {
     url,
     method: (method?.toUpperCase() as any) ?? 'GET',
-    headers,
+    headers: headers.length > 0 ? headers : undefined,
     bodyString: normalized?.bodyString,
-    // Only include bodyBytes when provided to avoid signaling upload data unintentionally
-    bodyBytes: undefined as any,
+    bodyBytes: normalized?.bodyBytes,
     followRedirects: true,
     credentials: init?.credentials,
     prefetchCacheTtlMs,
@@ -399,13 +416,33 @@ async function resolveRequestBody(
   init: RequestInit | undefined
 ): Promise<RequestInit | undefined> {
   if (typeof input === 'string' || input instanceof URL) return init;
-  if (input instanceof NitroRequestClass) return init;
+  if (input instanceof NitroRequestClass) {
+    const raw = rawBodyOf(input);
+    if (init?.body == null && raw != null)
+      return {
+        ...(init ?? {}),
+        headers: init?.headers ?? (input.headers as any),
+        body: raw,
+      };
+    return init;
+  }
   if (init?.body != null) return init;
   const req = input as Request;
   if (typeof req.clone !== 'function') return init;
   const method = (init?.method ?? req.method ?? 'GET').toUpperCase();
   if (method === 'GET' || method === 'HEAD') return init;
   try {
+    // whatwg-fetch keeps the original BodyInit here; only bytes need the lossless read.
+    const raw = (req as { _bodyInit?: unknown })._bodyInit;
+    const isBinary =
+      (typeof Blob !== 'undefined' && raw instanceof Blob) ||
+      (typeof ArrayBuffer !== 'undefined' && raw instanceof ArrayBuffer) ||
+      ArrayBuffer.isView(raw);
+    if (isBinary && typeof req.arrayBuffer === 'function') {
+      const bytes = await req.clone().arrayBuffer();
+      if (bytes.byteLength === 0) return init;
+      return { ...(init ?? {}), body: bytes };
+    }
     const text = await req.clone().text();
     if (text.length === 0) return init;
     return { ...(init ?? {}), body: text };
@@ -420,11 +457,11 @@ async function resolveBlobBody(
   if (!init?.body) return init;
   if (typeof Blob !== 'undefined' && init.body instanceof Blob) {
     const blob = init.body as Blob;
-    const text = await new Promise<string>((resolve, reject) => {
+    const bytes = await new Promise<ArrayBuffer>((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
       reader.onerror = () => reject(reader.error);
-      reader.readAsText(blob);
+      reader.readAsArrayBuffer(blob);
     });
     // Auto-set Content-Type from Blob.type if not already provided
     let headers = init.headers;
@@ -438,7 +475,7 @@ async function resolveBlobBody(
         headers = pairs.map((h) => [h.key, h.value] as [string, string]);
       }
     }
-    return { ...init, body: text, headers };
+    return { ...init, body: bytes, headers };
   }
   return init;
 }
@@ -725,9 +762,12 @@ async function nitroStreamFetch(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<Response> {
-  const url = typeof input === 'string' ? input : String(input);
-  const method = init?.method?.toUpperCase() ?? 'GET';
-  const headers = headersToPairs(init?.headers);
+  const url = getUrlString(input);
+  const src = input as { method?: string; headers?: HeadersInit };
+  const method = (init?.method ?? src?.method)?.toUpperCase() ?? 'GET';
+  const headers = headersToPairs(init?.headers ?? src?.headers) ?? [];
+  const normalized = normalizeBody(init?.body);
+  applyDefaultContentType(headers, normalized?.contentType);
 
   // Inspector: record start
   let inspectorId: string | undefined;
@@ -737,21 +777,19 @@ async function nitroStreamFetch(
       inspectorId,
       url,
       method,
-      headers ?? [],
-      typeof init?.body === 'string' ? init.body : undefined
+      headers,
+      normalized?.bodyString
     );
   }
 
   const builder = NitroCronetSingleton.newUrlRequestBuilder(url);
   builder.setHttpMethod(method);
   if (init?.credentials === 'omit') builder.disableCookies();
-  headers?.forEach((h) => builder.addHeader(h.key, h.value));
+  headers.forEach((h) => builder.addHeader(h.key, h.value));
 
-  const body = init?.body;
-  if (body != null) {
-    if (typeof body === 'string') builder.setUploadBody(body);
-    else if (body instanceof ArrayBuffer) builder.setUploadBody(body);
-  }
+  if (normalized?.bodyBytes) builder.setUploadBody(normalized.bodyBytes);
+  else if (normalized?.bodyString != null)
+    builder.setUploadBody(normalized.bodyString);
 
   return new Promise((resolveResponse, rejectResponse) => {
     let streamController: ReadableStreamDefaultController<
@@ -872,6 +910,8 @@ export async function nitroFetch(
 
   // Streaming is http(s)-only; local URLs fall through to nitroFetchRaw (check runs only when streaming).
   if ((init as any)?.stream === true && isHttpUrl(getUrlString(input))) {
+    init = await resolveRequestBody(input, init);
+    init = await resolveBlobBody(init);
     return nitroStreamFetch(input, init);
   }
 
@@ -909,6 +949,9 @@ export async function prefetch(
     typeof (NitroFetchHybrid as any)?.createClient === 'function';
   if (!hasNative) return;
 
+  init = await resolveRequestBody(input, init);
+  init = await resolveBlobBody(init);
+
   // Build NitroRequest and ensure prefetchKey header exists
   const req = buildNitroRequest(input, init);
   const hasKey =
@@ -941,6 +984,8 @@ export async function prefetchOnAppStart(
   init?: RequestInit & { prefetchKey?: string }
 ): Promise<void> {
   // Resolve request and prefetchKey
+  init = await resolveRequestBody(input, init);
+  init = await resolveBlobBody(init);
   const req = buildNitroRequest(input, init);
   const fromHeader = req.headers?.find(
     (h) => h.key.toLowerCase() === 'prefetchkey'
@@ -969,8 +1014,8 @@ export async function prefetchOnAppStart(
   };
   if (req.method && req.method !== 'GET') entry.method = req.method;
   if (req.bodyString !== undefined) entry.bodyString = req.bodyString;
-  if (typeof req.bodyBytes === 'string' && req.bodyBytes.length > 0)
-    entry.bodyBytes = req.bodyBytes;
+  if (req.bodyBytes && req.bodyBytes.byteLength > 0)
+    entry.bodyBytesBase64 = base64FromBytes(new Uint8Array(req.bodyBytes));
   if (req.bodyFormData && req.bodyFormData.length > 0)
     entry.bodyFormData = req.bodyFormData;
   if (typeof req.timeoutMs === 'number') entry.timeoutMs = req.timeoutMs;

@@ -32,7 +32,9 @@ export interface NitroRequest {
   headers?: NitroHeader[];
   // Body as either UTF-8 string or raw bytes.
   bodyString?: string;
-  bodyBytes?: string; //will be ArrayBuffer in future
+  bodyBytes?: ArrayBuffer;
+  // Base64 body for the persisted prefetch queue, replayed from JSON before Nitro exists.
+  bodyBytesBase64?: string;
   // Multipart form data parts (for file uploads)
   bodyFormData?: NitroFormDataPart[];
   // Controls

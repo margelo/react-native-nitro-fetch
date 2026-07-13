@@ -34,7 +34,7 @@ object AutoPrefetcher {
     headers: Map<String, String> = emptyMap(),
     method: String? = null,
     bodyString: String? = null,
-    bodyBytes: String? = null,
+    bodyBytesBase64: String? = null,
     bodyFormData: List<Map<String, String?>>? = null,
     timeoutMs: Double? = null,
     followRedirects: Boolean? = null,
@@ -43,7 +43,7 @@ object AutoPrefetcher {
     if (url.isEmpty() || prefetchKey.isEmpty()) return
     val entry = buildEntryJson(
       url, prefetchKey, headers,
-      method, bodyString, bodyBytes, bodyFormData, timeoutMs, followRedirects,
+      method, bodyString, bodyBytesBase64, bodyFormData, timeoutMs, followRedirects,
       prefetchCacheTtlMs
     )
     try {
@@ -183,7 +183,7 @@ object AutoPrefetcher {
     headers: Map<String, String>,
     method: String?,
     bodyString: String?,
-    bodyBytes: String?,
+    bodyBytesBase64: String?,
     bodyFormData: List<Map<String, String?>>?,
     timeoutMs: Double?,
     followRedirects: Boolean?,
@@ -197,7 +197,7 @@ object AutoPrefetcher {
       put("headers", headersObj)
       if (method != null && method.isNotEmpty() && method != "GET") put("method", method)
       if (bodyString != null) put("bodyString", bodyString)
-      if (bodyBytes != null) put("bodyBytes", bodyBytes)
+      if (bodyBytesBase64 != null) put("bodyBytesBase64", bodyBytesBase64)
       if (!bodyFormData.isNullOrEmpty()) {
         val arr = JSONArray()
         bodyFormData.forEach { part ->
@@ -242,9 +242,9 @@ object AutoPrefetcher {
       .takeIf { it.has("bodyString") && !it.isNull("bodyString") }
       ?.optString("bodyString")
     val bodyString = injectBodyFields(rawBodyString, tokens.bodyFields)
-    val bodyBytes = entry
-      .takeIf { it.has("bodyBytes") && !it.isNull("bodyBytes") }
-      ?.optString("bodyBytes")
+    val bodyBytesBase64 = entry
+      .takeIf { it.has("bodyBytesBase64") && !it.isNull("bodyBytesBase64") }
+      ?.optString("bodyBytesBase64")
     val timeoutMs = entry
       .takeIf { it.has("timeoutMs") && !it.isNull("timeoutMs") }
       ?.optDouble("timeoutMs")
@@ -282,7 +282,8 @@ object AutoPrefetcher {
       method = method,
       headers = headerObjs,
       bodyString = bodyString,
-      bodyBytes = bodyBytes,
+      bodyBytes = null,
+      bodyBytesBase64 = bodyBytesBase64,
       bodyFormData = bodyFormData,
       timeoutMs = timeoutMs,
       followRedirects = followRedirects,

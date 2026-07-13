@@ -38,6 +38,16 @@ class MainApplication : Application(), ReactApplication {
         // Long TTL so the harness can hit the cache long after launch.
         prefetchCacheTtlMs = 300_000.0
       )
+      // Binary body on the cold-start path: bytes arrive base64 because Nitro is not up yet.
+      AutoPrefetcher.registerPrefetch(
+        context = this,
+        url = "http://10.0.2.2:9876/post",
+        prefetchKey = "harness-native-prefetch-binary",
+        headers = mapOf("Content-Type" to "application/octet-stream"),
+        method = "POST",
+        bodyBytesBase64 = "AH+A//4=",
+        prefetchCacheTtlMs = 300_000.0
+      )
     } catch (_: Throwable) {}
     // Best-effort auto prefetch when engine initializes (app start)
     try { AutoPrefetcher.prefetchOnStart(this) } catch (_: Throwable) {}

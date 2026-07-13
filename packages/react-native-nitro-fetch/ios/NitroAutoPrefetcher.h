@@ -25,7 +25,7 @@ NS_ASSUME_NONNULL_BEGIN
                         headers:(NSDictionary<NSString *, NSString *> *)headers
                          method:(nullable NSString *)method
                      bodyString:(nullable NSString *)bodyString
-                      bodyBytes:(nullable NSString *)bodyBytes
+               bodyBytesBase64:(nullable NSString *)bodyBytesBase64
                    bodyFormData:(nullable NSArray<NSDictionary<NSString *, NSString *> *> *)bodyFormData
                       timeoutMs:(nullable NSNumber *)timeoutMs
                 followRedirects:(nullable NSNumber *)followRedirects;
@@ -35,7 +35,7 @@ NS_ASSUME_NONNULL_BEGIN
                         headers:(NSDictionary<NSString *, NSString *> *)headers
                          method:(nullable NSString *)method
                      bodyString:(nullable NSString *)bodyString
-                      bodyBytes:(nullable NSString *)bodyBytes
+               bodyBytesBase64:(nullable NSString *)bodyBytesBase64
                    bodyFormData:(nullable NSArray<NSDictionary<NSString *, NSString *> *> *)bodyFormData
                       timeoutMs:(nullable NSNumber *)timeoutMs
                 followRedirects:(nullable NSNumber *)followRedirects

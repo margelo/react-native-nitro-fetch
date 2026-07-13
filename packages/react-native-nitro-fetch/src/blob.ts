@@ -6,7 +6,7 @@ import { utf8ToString } from './utf8';
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
 /* eslint-disable no-bitwise */
-function base64FromBytes(bytes: Uint8Array): string {
+export function base64FromBytes(bytes: Uint8Array): string {
   let out = '';
   for (let i = 0; i < bytes.length; i += 3) {
     const b0 = bytes[i] ?? 0;

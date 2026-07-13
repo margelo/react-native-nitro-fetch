@@ -224,3 +224,8 @@ export class NitroRequest {
     throw new TypeError('formData() is not supported in NitroRequest');
   }
 }
+
+// Raw BodyInit for buildNitroRequest; the spec `body` getter hands back a stream.
+export function rawBodyOf(req: NitroRequest): BodyInit | null {
+  return (req as unknown as { _body: BodyInit | null })._body;
+}
