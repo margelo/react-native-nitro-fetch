@@ -49,7 +49,7 @@ public:
   void handleReceive(const void* in, size_t len, bool isBinary);
   void handleReceiveFragment(lws* wsi, const void* in, size_t len);
   int  handleWriteable(lws* wsi);
-  void handleClose(int code, const char* reason, size_t len);
+  void handleClose();
   void handlePeerClose(const void* in, size_t len);
   void handleError(const char* msg);
   void handleAppendHandshakeHeader(uint8_t** p, uint8_t* end, lws* wsi);
@@ -100,9 +100,12 @@ private:
   std::vector<uint8_t> _rxBuf;
   bool _rxBinary = false;
 
-  // lws does not pass the peer's close code/reason to LWS_CALLBACK_CLIENT_CLOSED.
+  // LWS_CALLBACK_CLIENT_CLOSED carries no code/reason, so remember who closed
+  // and why. Neither set => transport dropped without a handshake (1006).
   int _peerCloseCode = 0;
   std::string _peerCloseReason;
+  int _localCloseCode = 0;
+  std::string _localCloseReason;
 };
 
 } // namespace margelo::nitro::nitrofetchwebsockets

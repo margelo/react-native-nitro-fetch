@@ -61,8 +61,15 @@ private:
   std::deque<BufferedMessage> _msgBuffer;
   std::mutex _msgMu;
 
-  int _receivedCloseCode{1005};
-  std::string _receivedCloseReason;
+  // Who closed and why (0 = didn't). Neither set => transport dropped
+  // without a close handshake (1006).
+  // NB: NSURLSession maps close codes outside NSURLSessionWebSocketCloseCode
+  // (1012/1013/1014) to 1005 and drops the reason — the raw frame is not
+  // reachable through NSURLSessionWebSocketTask.
+  int _peerCloseCode{0};
+  std::string _peerCloseReason;
+  int _localCloseCode{0};
+  std::string _localCloseReason;
 
   void scheduleReceive();
   void fireClose(int code, const std::string& reason, bool wasClean);

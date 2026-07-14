@@ -246,12 +246,15 @@ describe('NitroWebSocket - Close', () => {
 // ─── Server-initiated close ───────────────────────────────────────────────────
 
 describe('NitroWebSocket - Server-initiated close', () => {
-  it('server close(1012, reason) → onclose with that code+reason, no message event', async () => {
+  // 1011, not 1012: NSURLSession maps codes outside its
+  // NSURLSessionWebSocketCloseCode enum (1012/1013/1014) to 1005 and drops the
+  // reason, so iOS can never report them.
+  it('server close(1011, reason) → onclose with that code+reason, no message event', async () => {
     const messages: WebSocketMessageEvent[] = [];
     const closeEvent = await withTimeout(
       new Promise<WebSocketCloseEvent>((resolve, reject) => {
         const ws = new NitroWebSocket(
-          `${WS_BASE}/ws/close?code=1012&reason=server%20shutdown&delay=200`
+          `${WS_BASE}/ws/close?code=1011&reason=server%20shutdown&delay=200`
         );
         ws.onmessage = (e) => messages.push(e);
         ws.onerror = (err) => reject(new Error(`Unexpected error: ${err}`));
@@ -262,9 +265,23 @@ describe('NitroWebSocket - Server-initiated close', () => {
     );
 
     expect(messages).toEqual([]);
-    expect(closeEvent.code).toBe(1012);
+    expect(closeEvent.code).toBe(1011);
     expect(closeEvent.reason).toBe('server shutdown');
     expect(closeEvent.wasClean).toBe(true);
+  });
+
+  it('server dies without a close frame → onclose 1006, wasClean=false', async () => {
+    const closeEvent = await withTimeout(
+      new Promise<WebSocketCloseEvent>((resolve) => {
+        const ws = new NitroWebSocket(`${WS_BASE}/ws/kill?delay=200`);
+        ws.onclose = resolve;
+      }),
+      10_000,
+      'abrupt server death'
+    );
+
+    expect(closeEvent.code).toBe(1006);
+    expect(closeEvent.wasClean).toBe(false);
   });
 
   it('echoes normally against the local server before the close arrives', async () => {

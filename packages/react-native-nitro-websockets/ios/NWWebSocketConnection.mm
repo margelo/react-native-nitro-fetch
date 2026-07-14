@@ -112,8 +112,10 @@ void NWWebSocketConnection::connect(
 #endif
   _closeFired = false;
   _openFired = false;
-  _receivedCloseCode = 1005;
-  _receivedCloseReason.clear();
+  _peerCloseCode = 0;
+  _peerCloseReason.clear();
+  _localCloseCode = 0;
+  _localCloseReason.clear();
 
   if (_impl->task) {
     [_impl->task cancel];
@@ -203,9 +205,9 @@ void NWWebSocketConnection::connect(
     if (!strong) return;
     auto* conn = static_cast<NWWebSocketConnection*>(strong.get());
 
-    conn->_receivedCloseCode = code;
+    conn->_peerCloseCode = code > 0 ? code : 1005;
     if (reason) {
-      conn->_receivedCloseReason = [reason UTF8String];
+      conn->_peerCloseReason = [reason UTF8String];
     }
 
     State expected = State::OPEN;
@@ -222,18 +224,17 @@ void NWWebSocketConnection::connect(
     State prev = conn->_state.load(std::memory_order_acquire);
     if (prev == State::CLOSED) return;
 
-    bool hadCloseFrame = (conn->_receivedCloseCode != 1005);
-
-    if (hadCloseFrame) {
-      conn->fireClose(
-        conn->_receivedCloseCode, conn->_receivedCloseReason, true);
-    } else if (error && error.code != NSURLErrorCancelled) {
-      std::string msg =
-        [[error localizedDescription] UTF8String] ?: "Connection error";
-      conn->fireError(msg);
-      conn->fireClose(1006, "", false);
+    if (conn->_peerCloseCode > 0) {
+      conn->fireClose(conn->_peerCloseCode, conn->_peerCloseReason, true);
+    } else if (conn->_localCloseCode > 0) {
+      conn->fireClose(conn->_localCloseCode, conn->_localCloseReason, true);
     } else {
-      conn->fireClose(1000, "", true);
+      if (error && error.code != NSURLErrorCancelled) {
+        std::string msg =
+          [[error localizedDescription] UTF8String] ?: "Connection error";
+        conn->fireError(msg);
+      }
+      conn->fireClose(1006, "", false);
     }
   };
 
@@ -256,8 +257,8 @@ void NWWebSocketConnection::close(int code, const std::string& reason) {
   }
 
   int closeCode = (code >= 1000 && code <= 4999) ? code : 1000;
-  _receivedCloseCode = closeCode;
-  _receivedCloseReason = reason;
+  _localCloseCode = closeCode;
+  _localCloseReason = reason;
 
   if (!_impl->task) return;
 
