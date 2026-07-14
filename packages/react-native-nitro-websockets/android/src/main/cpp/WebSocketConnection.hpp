@@ -50,6 +50,7 @@ public:
   void handleReceiveFragment(lws* wsi, const void* in, size_t len);
   int  handleWriteable(lws* wsi);
   void handleClose(int code, const char* reason, size_t len);
+  void handlePeerClose(const void* in, size_t len);
   void handleError(const char* msg);
   void handleAppendHandshakeHeader(uint8_t** p, uint8_t* end, lws* wsi);
   void handleRedirect(const std::string& location);
@@ -98,6 +99,10 @@ private:
 
   std::vector<uint8_t> _rxBuf;
   bool _rxBinary = false;
+
+  // lws does not pass the peer's close code/reason to LWS_CALLBACK_CLIENT_CLOSED.
+  int _peerCloseCode = 0;
+  std::string _peerCloseReason;
 };
 
 } // namespace margelo::nitro::nitrofetchwebsockets

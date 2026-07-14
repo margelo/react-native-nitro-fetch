@@ -4,6 +4,7 @@ import type {
   WebSocketMessageEvent,
   WebSocketCloseEvent,
 } from 'react-native-nitro-websockets';
+import { WS_BASE } from '../test-utils/server';
 
 const ECHO_URL = 'wss://echo.websocket.org';
 const TIMEOUT_MS = 10_000;
@@ -239,6 +240,49 @@ describe('NitroWebSocket - Close', () => {
       })
     );
     expect(count).toBe(1);
+  });
+});
+
+// ─── Server-initiated close ───────────────────────────────────────────────────
+
+describe('NitroWebSocket - Server-initiated close', () => {
+  it('server close(1012, reason) → onclose with that code+reason, no message event', async () => {
+    const messages: WebSocketMessageEvent[] = [];
+    const closeEvent = await withTimeout(
+      new Promise<WebSocketCloseEvent>((resolve, reject) => {
+        const ws = new NitroWebSocket(
+          `${WS_BASE}/ws/close?code=1012&reason=server%20shutdown&delay=200`
+        );
+        ws.onmessage = (e) => messages.push(e);
+        ws.onerror = (err) => reject(new Error(`Unexpected error: ${err}`));
+        ws.onclose = resolve;
+      }),
+      5_000,
+      'server-initiated close'
+    );
+
+    expect(messages).toEqual([]);
+    expect(closeEvent.code).toBe(1012);
+    expect(closeEvent.reason).toBe('server shutdown');
+    expect(closeEvent.wasClean).toBe(true);
+  });
+
+  it('echoes normally against the local server before the close arrives', async () => {
+    const ws = await withTimeout(
+      new Promise<NitroWebSocket>((resolve, reject) => {
+        const _ws = new NitroWebSocket(`${WS_BASE}/ws/echo`);
+        _ws.onopen = () => resolve(_ws);
+        _ws.onerror = (err) => reject(new Error(err));
+      })
+    );
+    const echoed = await withTimeout(
+      new Promise<WebSocketMessageEvent>((resolve) => {
+        ws.onmessage = resolve;
+        ws.send('ping-payload');
+      })
+    );
+    expect(echoed.data).toBe('ping-payload');
+    await closeAndWait(ws);
   });
 });
 

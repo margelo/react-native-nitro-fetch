@@ -77,6 +77,10 @@ int nitroWsCallback(lws* wsi, enum lws_callback_reasons reason,
       if (conn) return conn->handleWriteable(wsi);
       return 0;
 
+    case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE:
+      if (conn) conn->handlePeerClose(in, len);
+      break;
+
     case LWS_CALLBACK_CLIENT_CLOSED:
       if (conn) conn->handleClose(0, nullptr, 0);
       break;
@@ -391,6 +395,15 @@ int WebSocketConnection::handleWriteable(lws* wsi) {
   return 0;
 }
 
+void WebSocketConnection::handlePeerClose(const void* in, size_t len) {
+  const auto* p = static_cast<const uint8_t*>(in);
+  if (p && len >= 2) {
+    _peerCloseCode   = (p[0] << 8) | p[1];
+    _peerCloseReason = std::string(reinterpret_cast<const char*>(p + 2), len - 2);
+  }
+  _state = State::CLOSING;
+}
+
 void WebSocketConnection::handleClose(int code, const char* reason, size_t len) {
 #if defined(NITRO_WS_TRACING)
   ATrace_beginSection("NitroWS close");
@@ -398,8 +411,9 @@ void WebSocketConnection::handleClose(int code, const char* reason, size_t len) 
   _state = State::CLOSED;
   _wsi   = nullptr;
   if (_onClose) {
-    std::string r = (reason && len > 0) ? std::string(reason, len) : "";
-    _onClose(code > 0 ? code : 1000, r, true);
+    std::string r = (reason && len > 0) ? std::string(reason, len) : _peerCloseReason;
+    int c = code > 0 ? code : (_peerCloseCode > 0 ? _peerCloseCode : 1000);
+    _onClose(c, r, true);
   }
 #if defined(NITRO_WS_TRACING)
   ATrace_endSection();

@@ -10,6 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import multer from 'multer';
+import { WebSocketServer } from 'ws';
 
 const PORT = Number(process.env.PORT) || 9876;
 const upload = multer({ storage: multer.memoryStorage() });
@@ -216,7 +217,23 @@ app.all('/delay/:n', (req, res) => {
   res.on('close', () => clearTimeout(timer));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
   console.log(`nitro-fetch-test-server listening on http://0.0.0.0:${PORT}`);
+});
+
+// WebSocket endpoints for the nitrowebsockets harness.
+//   /ws/echo                                -> echoes every frame back
+//   /ws/close?code=1012&reason=x&delay=200  -> server-initiated close
+const wss = new WebSocketServer({ server });
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  ws.on('message', (data, isBinary) => ws.send(data, { binary: isBinary }));
+
+  if (url.pathname === '/ws/close') {
+    const code = Number(url.searchParams.get('code')) || 1012;
+    const reason = url.searchParams.get('reason') ?? 'server shutdown';
+    const delay = Number(url.searchParams.get('delay')) || 200;
+    setTimeout(() => ws.close(code, reason), delay);
+  }
 });
