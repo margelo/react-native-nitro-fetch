@@ -1,7 +1,6 @@
 package com.margelo.nitro.nitrofetch
 
 import android.app.Application
-import android.util.Log
 import com.facebook.proguard.annotations.DoNotStrip
 import org.chromium.net.CronetEngine
 import org.chromium.net.CronetProvider
@@ -40,7 +39,7 @@ class NitroFetch : HybridNitroFetchSpec() {
 
         // Log available providers and prefer the Native one (avoids Play-Services DNS quirks)
         val providers = CronetProvider.getAllProviders(app)
-        providers.forEach { Log.i("NitroFetch", "Cronet provider: ${it.name} v=${it.version}") }
+        providers.forEach { NitroLogger.i("NitroFetch", "Cronet provider: ${it.name} v=${it.version}") }
         val nativeProvider = providers.firstOrNull { it.name.contains("Native", ignoreCase = true) }
 
         val cacheDir = File(app.cacheDir, "nitrofetch_cronet_cache").apply { mkdirs() }
@@ -61,7 +60,7 @@ class NitroFetch : HybridNitroFetchSpec() {
         // builder.setExperimentalOptions("""{"HostResolverRules":{"host_resolver_rules":"MAP httpbin.org 54.167.17.38"}}""")
 
         val engine = builder.build()
-        Log.i("NitroFetch", "CronetEngine initialized. Provider=${nativeProvider?.name ?: "Default"} Cache=${cacheDir.absolutePath}")
+        NitroLogger.i("NitroFetch", "CronetEngine initialized. Provider=${nativeProvider?.name ?: "Default"} Cache=${cacheDir.absolutePath}")
         engineRef = engine
         return engine
       }
