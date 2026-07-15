@@ -226,11 +226,18 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 //   /ws/echo                                -> echoes every frame back
 //   /ws/close?code=1012&reason=x&delay=200  -> server-initiated close handshake
 //   /ws/kill?delay=200                      -> socket destroyed, no close frame
+// `ws` is not declared here on purpose: adding it to any package.json trips a
+// bun 1.2.22 --frozen-lockfile bug. It is already hoisted into the root
+// node_modules by react-native/metro, so this import resolves.
 const wss = new WebSocketServer({ server });
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const delay = Number(url.searchParams.get('delay')) || 200;
-  ws.on('message', (data, isBinary) => ws.send(data, { binary: isBinary }));
+  // ws@7 message handler has no isBinary arg; derive it from the payload type
+  // (Buffer => binary, string => text) so echo works on ws@7 and ws@8.
+  ws.on('message', (data, isBinary) =>
+    ws.send(data, { binary: isBinary ?? typeof data !== 'string' })
+  );
 
   if (url.pathname === '/ws/close') {
     const code = Number(url.searchParams.get('code')) || 1012;
