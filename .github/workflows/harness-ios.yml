@@ -164,7 +164,9 @@ jobs:
         run: |
           # Start the local httpbin-compatible test server on the host. The iOS
           # Simulator shares the host network namespace, so it reaches it on
-          # 127.0.0.1.
+          # 127.0.0.1. test-server is not a workspace (it owns its own lockfile),
+          # so install its deps first.
+          (cd ../test-server && bun install --frozen-lockfile)
           bun ../test-server/server.mjs &
           for i in $(seq 1 30); do
             if curl -sf http://127.0.0.1:9876/get >/dev/null 2>&1; then echo "test server up"; break; fi

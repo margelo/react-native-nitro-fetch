@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "express": "^4.21.2",
-    "multer": "^2.0.1"
+    "multer": "^2.0.1",
+    "ws": "^8.18.0"
   }
 }

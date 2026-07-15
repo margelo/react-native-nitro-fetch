@@ -77,8 +77,12 @@ int nitroWsCallback(lws* wsi, enum lws_callback_reasons reason,
       if (conn) return conn->handleWriteable(wsi);
       return 0;
 
+    case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE:
+      if (conn) conn->handlePeerClose(in, len);
+      break;
+
     case LWS_CALLBACK_CLIENT_CLOSED:
-      if (conn) conn->handleClose(0, nullptr, 0);
+      if (conn) conn->handleClose();
       break;
 
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR: {
@@ -198,6 +202,9 @@ void WebSocketConnection::connect(
 void WebSocketConnection::close(int code, const std::string& reason) {
   if (_state == State::CLOSED || _state == State::CLOSING) return;
   _state = State::CLOSING;
+
+  _localCloseCode   = (code >= 1000 && code <= 4999) ? code : LWS_CLOSE_STATUS_NORMAL;
+  _localCloseReason = reason;
 
   auto self = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
   LwsContext::instance().schedule([self, code, reason]() {
@@ -391,15 +398,30 @@ int WebSocketConnection::handleWriteable(lws* wsi) {
   return 0;
 }
 
-void WebSocketConnection::handleClose(int code, const char* reason, size_t len) {
+void WebSocketConnection::handlePeerClose(const void* in, size_t len) {
+  const auto* p = static_cast<const uint8_t*>(in);
+  if (p && len >= 2) {
+    _peerCloseCode   = (p[0] << 8) | p[1];
+    _peerCloseReason = std::string(reinterpret_cast<const char*>(p + 2), len - 2);
+  }
+  _state = State::CLOSING;
+}
+
+void WebSocketConnection::handleClose() {
 #if defined(NITRO_WS_TRACING)
   ATrace_beginSection("NitroWS close");
 #endif
   _state = State::CLOSED;
   _wsi   = nullptr;
   if (_onClose) {
-    std::string r = (reason && len > 0) ? std::string(reason, len) : "";
-    _onClose(code > 0 ? code : 1000, r, true);
+    if (_peerCloseCode > 0) {
+      _onClose(_peerCloseCode, _peerCloseReason, true);
+    } else if (_localCloseCode > 0) {
+      _onClose(_localCloseCode, _localCloseReason, true);
+    } else {
+      // Transport dropped without a close handshake.
+      _onClose(1006, "", false);
+    }
   }
 #if defined(NITRO_WS_TRACING)
   ATrace_endSection();
