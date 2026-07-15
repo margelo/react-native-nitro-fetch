@@ -9,3 +9,4 @@ const PORT = 9876;
 const HOST = Platform.OS === 'android' ? '10.0.2.2' : '127.0.0.1';
 
 export const BASE = `http://${HOST}:${PORT}`;
+export const WS_BASE = `ws://${HOST}:${PORT}`;

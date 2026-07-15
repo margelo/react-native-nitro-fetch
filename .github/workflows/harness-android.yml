@@ -176,7 +176,7 @@ jobs:
           # server holds the pipe open and the step hangs. Emulator reaches the
           # host via 10.0.2.2.
           script: |
-            bun ../test-server/server.mjs >/tmp/test-server.log 2>&1 </dev/null & SRV=$!; for i in $(seq 1 30); do curl -sf http://127.0.0.1:9876/get >/dev/null 2>&1 && break; sleep 1; done; curl -sf http://127.0.0.1:9876/get >/dev/null || { echo "test server failed to start"; cat /tmp/test-server.log; exit 1; }; adb install -r "./android/app/build/outputs/apk/debug/app-debug.apk"; bun run test:harness --harnessRunner android; ec=$?; kill $SRV 2>/dev/null || true; exit $ec
+            (cd ../test-server && bun install --frozen-lockfile); bun ../test-server/server.mjs >/tmp/test-server.log 2>&1 </dev/null & SRV=$!; for i in $(seq 1 30); do curl -sf http://127.0.0.1:9876/get >/dev/null 2>&1 && break; sleep 1; done; curl -sf http://127.0.0.1:9876/get >/dev/null || { echo "test server failed to start"; cat /tmp/test-server.log; exit 1; }; adb install -r "./android/app/build/outputs/apk/debug/app-debug.apk"; bun run test:harness --harnessRunner android; ec=$?; kill $SRV 2>/dev/null || true; exit $ec
 
       - name: Stop Gradle Daemon
         working-directory: example/android
