@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
-import android.util.Log
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.NitroModules
 import java.security.KeyStore
@@ -121,14 +120,14 @@ class NativeStorage : HybridNativeStorageSpec() {
     return try {
       val value = sharedPreferences.getString(key, null)
       if (value != null) {
-        Log.d(TAG, "Retrieved value for key: $key")
+        NitroLogger.d(TAG, "Retrieved value for key: $key")
         value
       } else {
-        Log.d(TAG, "Key not found: $key, returning empty string")
+        NitroLogger.d(TAG, "Key not found: $key, returning empty string")
         ""
       }
     } catch (t: Throwable) {
-      Log.e(TAG, "Error getting string for key: $key", t)
+      NitroLogger.e(TAG, "Error getting string for key: $key", t)
       throw RuntimeException("Failed to get string for key: $key", t)
     }
   }
@@ -139,13 +138,13 @@ class NativeStorage : HybridNativeStorageSpec() {
       editor.putString(key, value)
       val success = editor.commit()
       if (success) {
-        Log.d(TAG, "Successfully stored value for key: $key")
+        NitroLogger.d(TAG, "Successfully stored value for key: $key")
       } else {
-        Log.e(TAG, "Failed to commit value for key: $key")
+        NitroLogger.e(TAG, "Failed to commit value for key: $key")
         throw RuntimeException("Failed to store value for key: $key")
       }
     } catch (t: Throwable) {
-      Log.e(TAG, "Error setting string for key: $key", t)
+      NitroLogger.e(TAG, "Error setting string for key: $key", t)
       throw RuntimeException("Failed to set string for key: $key", t)
     }
   }
@@ -156,13 +155,13 @@ class NativeStorage : HybridNativeStorageSpec() {
       editor.remove(key)
       val success = editor.commit()
       if (success) {
-        Log.d(TAG, "Successfully deleted key: $key")
+        NitroLogger.d(TAG, "Successfully deleted key: $key")
       } else {
-        Log.e(TAG, "Failed to commit deletion for key: $key")
+        NitroLogger.e(TAG, "Failed to commit deletion for key: $key")
         throw RuntimeException("Failed to delete key: $key")
       }
     } catch (t: Throwable) {
-      Log.e(TAG, "Error deleting key: $key", t)
+      NitroLogger.e(TAG, "Error deleting key: $key", t)
       throw RuntimeException("Failed to delete key: $key", t)
     }
   }
@@ -171,7 +170,7 @@ class NativeStorage : HybridNativeStorageSpec() {
     return try {
       NitroFetchSecureAtRest.getDecryptedForPrefs(sharedPreferences, key) ?: ""
     } catch (t: Throwable) {
-      Log.e(TAG, "Error getSecureString for key: $key", t)
+      NitroLogger.e(TAG, "Error getSecureString for key: $key", t)
       throw RuntimeException("Failed to get secure string for key: $key", t)
     }
   }
@@ -181,7 +180,7 @@ class NativeStorage : HybridNativeStorageSpec() {
       val ok = NitroFetchSecureAtRest.putEncrypted(sharedPreferences, key, value)
       if (!ok) throw RuntimeException("commit failed")
     } catch (t: Throwable) {
-      Log.e(TAG, "Error setSecureString for key: $key", t)
+      NitroLogger.e(TAG, "Error setSecureString for key: $key", t)
       throw RuntimeException("Failed to set secure string for key: $key", t)
     }
   }
@@ -191,7 +190,7 @@ class NativeStorage : HybridNativeStorageSpec() {
       val ok = NitroFetchSecureAtRest.removeFromPrefs(sharedPreferences, key)
       if (!ok) throw RuntimeException("commit failed")
     } catch (t: Throwable) {
-      Log.e(TAG, "Error removeSecureString for key: $key", t)
+      NitroLogger.e(TAG, "Error removeSecureString for key: $key", t)
       throw RuntimeException("Failed to remove secure string for key: $key", t)
     }
   }

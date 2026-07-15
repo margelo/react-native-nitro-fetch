@@ -135,7 +135,7 @@ object NitroWebSocketAutoPrewarmer {
       val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
       val raw = prefs.getString(KEY_QUEUE, null) ?: return
       val arr = JSONArray(raw)
-      android.util.Log.d("NitroWS", "Auto-prewarmer starting — ${arr.length()} URL(s) in queue")
+      NitroLogger.d("NitroWS", "Auto-prewarmer starting — ${arr.length()} URL(s) in queue")
 
       val refreshRaw = NitroWSSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_REFRESH)
 
@@ -146,22 +146,22 @@ object NitroWebSocketAutoPrewarmer {
             val refreshConfig = JSONObject(refreshRaw)
             val onFailure = refreshConfig.optString("onFailure", "useStoredHeaders")
             val refreshURL = refreshConfig.optString("url", "(unknown)")
-            android.util.Log.d("NitroWS", "[TokenRefresh] Calling refresh endpoint: $refreshURL")
+            NitroLogger.d("NitroWS", "[TokenRefresh] Calling refresh endpoint: $refreshURL")
 
             val refreshed = callTokenRefreshSync(refreshConfig)
 
             val tokenHeaders: Map<String, String> = if (refreshed != null) {
-              android.util.Log.d("NitroWS", "[TokenRefresh] ✅ Success — got ${refreshed.size} header(s)")
-              refreshed.forEach { (k, v) -> android.util.Log.d("NitroWS", "[TokenRefresh]   $k: $v") }
+              NitroLogger.d("NitroWS", "[TokenRefresh] ✅ Success — got ${refreshed.size} header(s)")
+              refreshed.forEach { (k, v) -> NitroLogger.d("NitroWS", "[TokenRefresh]   $k: $v") }
               // Cache fresh token headers for useStoredHeaders fallback on next cold start
               val cacheJson = JSONObject()
               refreshed.forEach { (k, v) -> cacheJson.put(k, v) }
               NitroWSSecureAtRest.putEncrypted(prefs, KEY_TOKEN_CACHE, cacheJson.toString())
               refreshed
             } else {
-              android.util.Log.d("NitroWS", "[TokenRefresh] ❌ Refresh failed — onFailure: $onFailure")
+              NitroLogger.d("NitroWS", "[TokenRefresh] ❌ Refresh failed — onFailure: $onFailure")
               if (onFailure == "skip") {
-                android.util.Log.d("NitroWS", "[TokenRefresh] Skipping all prewarms")
+                NitroLogger.d("NitroWS", "[TokenRefresh] Skipping all prewarms")
                 return@Thread
               }
               // Use last cached token headers (or empty map if none cached yet)
@@ -174,11 +174,11 @@ object NitroWebSocketAutoPrewarmer {
               } else {
                 emptyMap()
               }
-              android.util.Log.d("NitroWS", "[TokenRefresh] Using cached headers (${cached.size} header(s))")
+              NitroLogger.d("NitroWS", "[TokenRefresh] Using cached headers (${cached.size} header(s))")
               cached
             }
 
-            android.util.Log.d("NitroWS", "[TokenRefresh] Injecting token headers into ${arr.length()} prewarm URL(s)")
+            NitroLogger.d("NitroWS", "[TokenRefresh] Injecting token headers into ${arr.length()} prewarm URL(s)")
             startPrewarms(arr, tokenHeaders)
           } catch (_: Throwable) {
             // Best-effort — never crash the app
@@ -197,7 +197,7 @@ object NitroWebSocketAutoPrewarmer {
     for (i in 0 until arr.length()) {
       val obj = arr.optJSONObject(i) ?: continue
       val url = obj.optString("url", null) ?: continue
-      android.util.Log.d("NitroWS", "Pre-warming $url")
+      NitroLogger.d("NitroWS", "Pre-warming $url")
 
       val protocols = mutableListOf<String>()
       val protocolsArr = obj.optJSONArray("protocols")
@@ -217,8 +217,8 @@ object NitroWebSocketAutoPrewarmer {
       }
       tokenHeaders.forEach { (k, v) -> merged[k] = v }
 
-      android.util.Log.d("NitroWS", "[TokenRefresh] Pre-warming $url with ${merged.size} header(s)")
-      merged.forEach { (k, v) -> android.util.Log.d("NitroWS", "[TokenRefresh]   $k: $v") }
+      NitroLogger.d("NitroWS", "[TokenRefresh] Pre-warming $url with ${merged.size} header(s)")
+      merged.forEach { (k, v) -> NitroLogger.d("NitroWS", "[TokenRefresh]   $k: $v") }
       NitroWebSocketPrewarmer.preWarm(url, protocols, merged)
     }
   }

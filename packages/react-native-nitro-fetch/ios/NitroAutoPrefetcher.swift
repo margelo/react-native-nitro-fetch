@@ -139,27 +139,25 @@ public final class NitroAutoPrefetcher: NSObject {
          let refreshObj = try? JSONSerialization.jsonObject(with: refreshData) as? [String: Any] {
         let onFailure = refreshObj["onFailure"] as? String ?? "useStoredHeaders"
         let refreshURL = refreshObj["url"] as? String ?? "(unknown)"
-        print("[NitroFetch][TokenRefresh] Calling refresh endpoint: \(refreshURL)")
+        NitroLogger.log("[NitroFetch][TokenRefresh] Calling refresh endpoint: \(refreshURL)")
         let refreshed = try? await callTokenRefresh(config: refreshObj)
         if let refreshed = refreshed {
-          print("[NitroFetch][TokenRefresh] ✅ Success — got \(refreshed.headers.count) header(s), \(refreshed.bodyFields.count) body field(s), \(refreshed.formFields.count) form field(s)")
-          #if DEBUG
+          NitroLogger.log("[NitroFetch][TokenRefresh] ✅ Success — got \(refreshed.headers.count) header(s), \(refreshed.bodyFields.count) body field(s), \(refreshed.formFields.count) form field(s)")
           logTokens(refreshed)
-          #endif
           // Cache fresh tokens for useStoredHeaders fallback on next cold start
           if let cacheStr = serializeCache(refreshed) {
             try? NitroFetchSecureAtRest.setEncrypted(cacheStr, forKey: tokenCacheKey, defaults: userDefaults)
           }
           tokens = refreshed
         } else {
-          print("[NitroFetch][TokenRefresh] ❌ Refresh failed — onFailure: \(onFailure)")
+          NitroLogger.log("[NitroFetch][TokenRefresh] ❌ Refresh failed — onFailure: \(onFailure)")
           if onFailure == "skip" {
-            print("[NitroFetch][TokenRefresh] Skipping all prefetches")
+            NitroLogger.log("[NitroFetch][TokenRefresh] Skipping all prefetches")
             return
           }
           let cached = deserializeCache(
             NitroFetchSecureAtRest.decryptedString(forKey: tokenCacheKey, defaults: userDefaults))
-          print("[NitroFetch][TokenRefresh] Using cached tokens (\(cached.headers.count) header(s), \(cached.bodyFields.count) body field(s), \(cached.formFields.count) form field(s))")
+          NitroLogger.log("[NitroFetch][TokenRefresh] Using cached tokens (\(cached.headers.count) header(s), \(cached.bodyFields.count) body field(s), \(cached.formFields.count) form field(s))")
           tokens = cached
         }
       } else {
@@ -171,16 +169,14 @@ public final class NitroAutoPrefetcher: NSObject {
   }
 
   private static func startPrefetches(_ entries: [Any], tokens: TokenRefreshResult) {
-    print("[NitroFetch][TokenRefresh] Injecting tokens into \(entries.count) prefetch URL(s)")
+    NitroLogger.log("[NitroFetch][TokenRefresh] Injecting tokens into \(entries.count) prefetch URL(s)")
     for item in entries {
       guard let obj = item as? [String: Any] else { continue }
       guard let url = obj["url"] as? String, !url.isEmpty else { continue }
       guard let prefetchKey = obj["prefetchKey"] as? String, !prefetchKey.isEmpty else { continue }
 
-      print("[NitroFetch][TokenRefresh] Prefetching \(url)")
-      #if DEBUG
+      NitroLogger.log("[NitroFetch][TokenRefresh] Prefetching \(url)")
       logTokens(tokens)
-      #endif
 
       let req = buildNitroRequest(from: obj, tokens: tokens)
       Task {
@@ -279,22 +275,20 @@ public final class NitroAutoPrefetcher: NSObject {
 
   // MARK: - Token refresh
 
-  #if DEBUG
   private static func logTokens(_ tokens: TokenRefreshResult) {
     if !tokens.headers.isEmpty {
-      print("[NitroFetch][TokenRefresh]   headers:")
-      for (k, v) in tokens.headers { print("[NitroFetch][TokenRefresh]     \(k): \(v)") }
+      NitroLogger.log("[NitroFetch][TokenRefresh]   headers:")
+      for (k, v) in tokens.headers { NitroLogger.log("[NitroFetch][TokenRefresh]     \(k): \(v)") }
     }
     if !tokens.bodyFields.isEmpty {
-      print("[NitroFetch][TokenRefresh]   body fields:")
-      for (k, v) in tokens.bodyFields { print("[NitroFetch][TokenRefresh]     \(k): \(v)") }
+      NitroLogger.log("[NitroFetch][TokenRefresh]   body fields:")
+      for (k, v) in tokens.bodyFields { NitroLogger.log("[NitroFetch][TokenRefresh]     \(k): \(v)") }
     }
     if !tokens.formFields.isEmpty {
-      print("[NitroFetch][TokenRefresh]   form fields:")
-      for (k, v) in tokens.formFields { print("[NitroFetch][TokenRefresh]     \(k): \(v)") }
+      NitroLogger.log("[NitroFetch][TokenRefresh]   form fields:")
+      for (k, v) in tokens.formFields { NitroLogger.log("[NitroFetch][TokenRefresh]     \(k): \(v)") }
     }
   }
-  #endif
 
   struct TokenRefreshResult {
     var headers: [String: String]

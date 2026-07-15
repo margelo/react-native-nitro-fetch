@@ -1,6 +1,5 @@
 package com.margelo.nitro.nitrofetch
 
-import android.util.Log
 import android.webkit.CookieManager
 import org.json.JSONObject
 import org.chromium.net.UrlResponseInfo
@@ -60,7 +59,7 @@ object NitroCookieSync {
         addHeader("Cookie", cookieHeader)
       }
     } catch (exception: Exception) {
-      Log.w(LOG_TAG, "Failed to attach cookie header", exception)
+      NitroLogger.w(LOG_TAG, "Failed to attach cookie header", exception)
     }
   }
 
@@ -90,7 +89,7 @@ object NitroCookieSync {
       }
       true
     } catch (exception: Exception) {
-      Log.w(LOG_TAG, "Failed to store response cookies", exception)
+      NitroLogger.w(LOG_TAG, "Failed to store response cookies", exception)
       false
     }
   }
@@ -121,7 +120,7 @@ object NitroCookieSync {
       }
       anySet
     } catch (exception: Exception) {
-      Log.w(LOG_TAG, "Failed to store response cookies (HttpURLConnection)", exception)
+      NitroLogger.w(LOG_TAG, "Failed to store response cookies (HttpURLConnection)", exception)
       false
     }
   }
@@ -132,7 +131,7 @@ object NitroCookieSync {
     try {
       CookieManager.getInstance().flush()
     } catch (exception: Exception) {
-      Log.w(LOG_TAG, "Failed to flush CookieManager", exception)
+      NitroLogger.w(LOG_TAG, "Failed to flush CookieManager", exception)
     }
   }
 }
