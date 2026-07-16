@@ -29,7 +29,7 @@ namespace margelo::nitro::nitrofetch {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ struct "NitroRequest" and the the Kotlin data class "NitroRequest".
+   * The C++ JNI bridge between the C++ struct "NitroRequest" and the Kotlin data class "NitroRequest".
    */
   struct JNitroRequest final: public jni::JavaClass<JNitroRequest> {
   public:
@@ -70,29 +70,29 @@ namespace margelo::nitro::nitrofetch {
       return NitroRequest(
         url->toStdString(),
         method != nullptr ? std::make_optional(method->toCpp()) : std::nullopt,
-        headers != nullptr ? std::make_optional([&]() {
-          size_t __size = headers->size();
+        headers != nullptr ? std::make_optional([&](auto&& __input) {
+          size_t __size = __input->size();
           std::vector<NitroHeader> __vector;
           __vector.reserve(__size);
           for (size_t __i = 0; __i < __size; __i++) {
-            auto __element = headers->getElement(__i);
+            auto __element = __input->getElement(__i);
             __vector.push_back(__element->toCpp());
           }
           return __vector;
-        }()) : std::nullopt,
+        }(headers)) : std::nullopt,
         bodyString != nullptr ? std::make_optional(bodyString->toStdString()) : std::nullopt,
         bodyBytes != nullptr ? std::make_optional(bodyBytes->cthis()->getArrayBuffer()) : std::nullopt,
         bodyBytesBase64 != nullptr ? std::make_optional(bodyBytesBase64->toStdString()) : std::nullopt,
-        bodyFormData != nullptr ? std::make_optional([&]() {
-          size_t __size = bodyFormData->size();
+        bodyFormData != nullptr ? std::make_optional([&](auto&& __input) {
+          size_t __size = __input->size();
           std::vector<NitroFormDataPart> __vector;
           __vector.reserve(__size);
           for (size_t __i = 0; __i < __size; __i++) {
-            auto __element = bodyFormData->getElement(__i);
+            auto __element = __input->getElement(__i);
             __vector.push_back(__element->toCpp());
           }
           return __vector;
-        }()) : std::nullopt,
+        }(bodyFormData)) : std::nullopt,
         timeoutMs != nullptr ? std::make_optional(timeoutMs->value()) : std::nullopt,
         followRedirects != nullptr ? std::make_optional(static_cast<bool>(followRedirects->value())) : std::nullopt,
         credentials != nullptr ? std::make_optional(credentials->toCpp()) : std::nullopt,
@@ -114,29 +114,29 @@ namespace margelo::nitro::nitrofetch {
         clazz,
         jni::make_jstring(value.url),
         value.method.has_value() ? JNitroRequestMethod::fromCpp(value.method.value()) : nullptr,
-        value.headers.has_value() ? [&]() {
-          size_t __size = value.headers.value().size();
+        value.headers.has_value() ? [&](auto&& __input) {
+          size_t __size = __input.size();
           jni::local_ref<jni::JArrayClass<JNitroHeader>> __array = jni::JArrayClass<JNitroHeader>::newArray(__size);
           for (size_t __i = 0; __i < __size; __i++) {
-            const auto& __element = value.headers.value()[__i];
+            const auto& __element = __input[__i];
             auto __elementJni = JNitroHeader::fromCpp(__element);
             __array->setElement(__i, *__elementJni);
           }
           return __array;
-        }() : nullptr,
+        }(value.headers.value()) : nullptr,
         value.bodyString.has_value() ? jni::make_jstring(value.bodyString.value()) : nullptr,
         value.bodyBytes.has_value() ? JArrayBuffer::wrap(value.bodyBytes.value()) : nullptr,
         value.bodyBytesBase64.has_value() ? jni::make_jstring(value.bodyBytesBase64.value()) : nullptr,
-        value.bodyFormData.has_value() ? [&]() {
-          size_t __size = value.bodyFormData.value().size();
+        value.bodyFormData.has_value() ? [&](auto&& __input) {
+          size_t __size = __input.size();
           jni::local_ref<jni::JArrayClass<JNitroFormDataPart>> __array = jni::JArrayClass<JNitroFormDataPart>::newArray(__size);
           for (size_t __i = 0; __i < __size; __i++) {
-            const auto& __element = value.bodyFormData.value()[__i];
+            const auto& __element = __input[__i];
             auto __elementJni = JNitroFormDataPart::fromCpp(__element);
             __array->setElement(__i, *__elementJni);
           }
           return __array;
-        }() : nullptr,
+        }(value.bodyFormData.value()) : nullptr,
         value.timeoutMs.has_value() ? jni::JDouble::valueOf(value.timeoutMs.value()) : nullptr,
         value.followRedirects.has_value() ? jni::JBoolean::valueOf(value.followRedirects.value()) : nullptr,
         value.credentials.has_value() ? JNitroRequestCredentials::fromCpp(value.credentials.value()) : nullptr,

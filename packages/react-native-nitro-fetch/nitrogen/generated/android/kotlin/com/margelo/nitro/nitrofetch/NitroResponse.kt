@@ -9,6 +9,7 @@ package com.margelo.nitro.nitrofetch
 
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
+import java.util.Objects
 import com.margelo.nitro.core.ArrayBuffer
 
 /**
@@ -43,6 +44,32 @@ data class NitroResponse(
   val bodyBytes: ArrayBuffer?
 ) {
   /* primary constructor */
+
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is NitroResponse) return false
+    return Objects.deepEquals(this.url, other.url)
+      && Objects.deepEquals(this.status, other.status)
+      && Objects.deepEquals(this.statusText, other.statusText)
+      && Objects.deepEquals(this.ok, other.ok)
+      && Objects.deepEquals(this.redirected, other.redirected)
+      && Objects.deepEquals(this.headers, other.headers)
+      && Objects.deepEquals(this.bodyString, other.bodyString)
+      && Objects.deepEquals(this.bodyBytes, other.bodyBytes)
+  }
+
+  override fun hashCode(): Int {
+    return arrayOf<Any?>(
+      url,
+      status,
+      statusText,
+      ok,
+      redirected,
+      headers,
+      bodyString,
+      bodyBytes
+    ).contentDeepHashCode()
+  }
 
   companion object {
     /**

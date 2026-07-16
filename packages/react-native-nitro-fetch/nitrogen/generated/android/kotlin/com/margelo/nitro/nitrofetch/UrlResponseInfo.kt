@@ -9,6 +9,7 @@ package com.margelo.nitro.nitrofetch
 
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
+import java.util.Objects
 
 
 /**
@@ -49,6 +50,36 @@ data class UrlResponseInfo(
   val wasCached: Boolean
 ) {
   /* primary constructor */
+
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is UrlResponseInfo) return false
+    return Objects.deepEquals(this.url, other.url)
+      && Objects.deepEquals(this.httpStatusCode, other.httpStatusCode)
+      && Objects.deepEquals(this.httpStatusText, other.httpStatusText)
+      && Objects.deepEquals(this.allHeaders, other.allHeaders)
+      && Objects.deepEquals(this.allHeadersAsList, other.allHeadersAsList)
+      && Objects.deepEquals(this.urlChain, other.urlChain)
+      && Objects.deepEquals(this.negotiatedProtocol, other.negotiatedProtocol)
+      && Objects.deepEquals(this.proxyServer, other.proxyServer)
+      && Objects.deepEquals(this.receivedByteCount, other.receivedByteCount)
+      && Objects.deepEquals(this.wasCached, other.wasCached)
+  }
+
+  override fun hashCode(): Int {
+    return arrayOf<Any?>(
+      url,
+      httpStatusCode,
+      httpStatusText,
+      allHeaders,
+      allHeadersAsList,
+      urlChain,
+      negotiatedProtocol,
+      proxyServer,
+      receivedByteCount,
+      wasCached
+    ).contentDeepHashCode()
+  }
 
   companion object {
     /**

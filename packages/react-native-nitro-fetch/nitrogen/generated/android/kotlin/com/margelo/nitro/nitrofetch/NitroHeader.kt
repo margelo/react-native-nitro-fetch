@@ -9,6 +9,7 @@ package com.margelo.nitro.nitrofetch
 
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
+import java.util.Objects
 
 
 /**
@@ -25,6 +26,20 @@ data class NitroHeader(
   val value: String
 ) {
   /* primary constructor */
+
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is NitroHeader) return false
+    return Objects.deepEquals(this.key, other.key)
+      && Objects.deepEquals(this.value, other.value)
+  }
+
+  override fun hashCode(): Int {
+    return arrayOf<Any?>(
+      key,
+      value
+    ).contentDeepHashCode()
+  }
 
   companion object {
     /**

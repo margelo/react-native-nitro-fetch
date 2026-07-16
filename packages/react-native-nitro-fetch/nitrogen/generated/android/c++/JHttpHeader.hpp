@@ -17,7 +17,7 @@ namespace margelo::nitro::nitrofetch {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ struct "HttpHeader" and the the Kotlin data class "HttpHeader".
+   * The C++ JNI bridge between the C++ struct "HttpHeader" and the Kotlin data class "HttpHeader".
    */
   struct JHttpHeader final: public jni::JavaClass<JHttpHeader> {
   public:

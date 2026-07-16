@@ -15,7 +15,7 @@ namespace margelo::nitro::nitrofetch {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ enum "NitroRequestMethod" and the the Kotlin enum "NitroRequestMethod".
+   * The C++ JNI bridge between the C++ enum "NitroRequestMethod" and the Kotlin enum "NitroRequestMethod".
    */
   struct JNitroRequestMethod final: public jni::JavaClass<JNitroRequestMethod> {
   public:

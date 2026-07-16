@@ -54,7 +54,7 @@
     "react": "19.2.3",
     "react-native": "0.86.0",
     "react-native-builder-bob": "^0.40.13",
-    "react-native-nitro-modules": "^0.35.2",
+    "react-native-nitro-modules": "^0.36.1",
     "release-it": "^17.10.0",
     "turbo": "^1.10.7",
     "typescript": "^5.8.3"
@@ -92,6 +92,6 @@
   },
   "patchedDependencies": {
     "react-native-worklets-core@1.6.2": "patches/react-native-worklets-core@1.6.2.patch",
-    "nitrogen@0.35.2": "patches/nitrogen@0.35.2.patch"
+    "nitrogen@0.36.1": "patches/nitrogen@0.36.1.patch"
   }
 }
