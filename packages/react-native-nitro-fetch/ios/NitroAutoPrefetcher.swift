@@ -314,7 +314,7 @@ public final class NitroAutoPrefetcher: NSObject {
       request.httpBody = body.data(using: .utf8)
     }
 
-    let (data, response) = try await URLSession.shared.data(for: request)
+    let (data, response) = try await NitroURLSession.shared.data(for: request)
     guard let http = response as? HTTPURLResponse,
           (200...299).contains(http.statusCode) else {
       throw NSError(domain: "NitroAutoPrefetcher", code: -2,
