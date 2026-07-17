@@ -16,7 +16,7 @@ api "org.chromium.net:cronet-embedded:${cronetVersion}"
 
 ## Engine
 
-A single `CronetEngine` is created lazily and shared for the process lifetime (`NitroFetch.kt`, `getEngine()`):
+A single `CronetEngine` is created lazily and shared for the process lifetime (`HybridNitroFetch.kt`, `getEngine()`):
 
 - Logs every available `CronetProvider` and prefers the one whose name contains `"Native"` (avoids Play-Services DNS quirks); falls back to the default provider.
 - Built with `enableHttp2(true)`, `enableQuic(true)` (HTTP/3), and `enableBrotli(true)`.
@@ -28,6 +28,6 @@ A single `CronetEngine` is created lazily and shared for the process lifetime (`
 
 ## Request paths
 
-- **Buffered** (`NitroFetchClient.kt`): `request()` (async `Promise`) and `requestSync()` (used by worklets) build a `UrlRequest`, accumulate the body, and resolve a `NitroResponse`. Cancellation is wired through `cancelRequest(requestId)`.
-- **Streaming** (`NitroCronet.kt`): `newUrlRequestBuilder(url)` exposes a `UrlRequestBuilder` whose `onResponseStarted` / `onReadCompleted` callbacks drive a `ReadableStream` (used by `fetch(url, { stream: true })`).
-- **Prefetch / auto-prefetch** (`AutoPrefetcher.kt`, `NitroFetchClient.kt`): results are kept in `FetchCache` and served with a `nitroPrefetched: true` header.
+- **Buffered** (`HybridNitroFetchClient.kt`): `request()` (async `Promise`) and `requestSync()` (used by worklets) build a `UrlRequest`, accumulate the body, and resolve a `NitroResponse`. Cancellation is wired through `cancelRequest(requestId)`.
+- **Streaming** (`HybridNitroCronet.kt`): `newUrlRequestBuilder(url)` exposes a `HybridUrlRequestBuilder` whose `onResponseStarted` / `onReadCompleted` callbacks drive a `ReadableStream` (used by `fetch(url, { stream: true })`).
+- **Prefetch / auto-prefetch** (`AutoPrefetcher.kt`, `HybridNitroFetchClient.kt`): results are kept in `FetchCache` and served with a `nitroPrefetched: true` header.

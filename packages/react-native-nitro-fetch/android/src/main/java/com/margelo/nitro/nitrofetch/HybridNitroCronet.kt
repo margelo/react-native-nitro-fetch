@@ -13,10 +13,10 @@ import java.util.concurrent.Executors
  * Manages the Cronet engine and provides URL request building for streaming.
  */
 @DoNotStrip
-class NitroCronet : HybridNitroCronetSpec() {
+class HybridNitroCronet : HybridNitroCronetSpec() {
 
   override fun newUrlRequestBuilder(url: String): HybridUrlRequestBuilderSpec {
-    return NitroUrlRequestBuilder(
+    return HybridUrlRequestBuilder(
       engine = getOrCreateCronetEngine(),
       url = url,
       executor = ioExecutor

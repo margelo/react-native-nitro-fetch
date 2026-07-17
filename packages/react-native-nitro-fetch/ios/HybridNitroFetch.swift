@@ -1,8 +1,8 @@
 import Foundation
 
-final class NitroFetch: HybridNitroFetchSpec {
+final class HybridNitroFetch: HybridNitroFetchSpec {
   func createClient() throws -> (any HybridNitroFetchClientSpec) {
-    return NitroFetchClient()
+    return HybridNitroFetchClient()
   }
   
 }

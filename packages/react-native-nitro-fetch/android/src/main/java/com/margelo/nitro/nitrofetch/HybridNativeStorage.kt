@@ -102,7 +102,7 @@ internal object NitroFetchSecureAtRest {
 }
 
 @DoNotStrip
-class NativeStorage : HybridNativeStorageSpec() {
+class HybridNativeStorage : HybridNativeStorageSpec() {
 
   companion object {
     private const val TAG = "HybridNativeStorage"

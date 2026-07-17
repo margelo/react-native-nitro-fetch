@@ -9,10 +9,10 @@ import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
 @DoNotStrip
-class NitroFetch : HybridNitroFetchSpec() {
+class HybridNitroFetch : HybridNitroFetchSpec() {
   // Generated base may expect env-less createClient.
-  override fun createClient(): NitroFetchClient {
-    return NitroFetchClient(getEngine(), ioExecutor)
+  override fun createClient(): HybridNitroFetchClient {
+    return HybridNitroFetchClient(getEngine(), ioExecutor)
   }
 
   companion object {

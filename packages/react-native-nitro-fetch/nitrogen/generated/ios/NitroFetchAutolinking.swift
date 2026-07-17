@@ -13,7 +13,7 @@ public final class NitroFetchAutolinking {
   public typealias bridge = margelo.nitro.nitrofetch.bridge.swift
 
   public static func createNitroFetch() -> bridge.std__shared_ptr_HybridNitroFetchSpec_ {
-    let hybridObject = NitroFetch()
+    let hybridObject = HybridNitroFetch()
     return { () -> bridge.std__shared_ptr_HybridNitroFetchSpec_ in
       let __cxxWrapped = hybridObject.getCxxWrapper()
       return __cxxWrapped.getCxxPart()
@@ -21,11 +21,11 @@ public final class NitroFetchAutolinking {
   }
   
   public static func isNitroFetchRecyclable() -> Bool {
-    return NitroFetch.self is any RecyclableView.Type
+    return HybridNitroFetch.self is any RecyclableView.Type
   }
   
   public static func createNitroFetchClient() -> bridge.std__shared_ptr_HybridNitroFetchClientSpec_ {
-    let hybridObject = NitroFetchClient()
+    let hybridObject = HybridNitroFetchClient()
     return { () -> bridge.std__shared_ptr_HybridNitroFetchClientSpec_ in
       let __cxxWrapped = hybridObject.getCxxWrapper()
       return __cxxWrapped.getCxxPart()
@@ -33,11 +33,11 @@ public final class NitroFetchAutolinking {
   }
   
   public static func isNitroFetchClientRecyclable() -> Bool {
-    return NitroFetchClient.self is any RecyclableView.Type
+    return HybridNitroFetchClient.self is any RecyclableView.Type
   }
   
   public static func createNativeStorage() -> bridge.std__shared_ptr_HybridNativeStorageSpec_ {
-    let hybridObject = NativeStorage()
+    let hybridObject = HybridNativeStorage()
     return { () -> bridge.std__shared_ptr_HybridNativeStorageSpec_ in
       let __cxxWrapped = hybridObject.getCxxWrapper()
       return __cxxWrapped.getCxxPart()
@@ -45,7 +45,7 @@ public final class NitroFetchAutolinking {
   }
   
   public static func isNativeStorageRecyclable() -> Bool {
-    return NativeStorage.self is any RecyclableView.Type
+    return HybridNativeStorage.self is any RecyclableView.Type
   }
   
   public static func createNitroCronet() -> bridge.std__shared_ptr_HybridNitroCronetSpec_ {

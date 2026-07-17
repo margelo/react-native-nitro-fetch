@@ -5,7 +5,7 @@ import org.chromium.net.UrlRequest as CronetUrlRequest
 import java.nio.ByteBuffer
 
 @DoNotStrip
-class NitroUrlRequest(
+class HybridUrlRequest(
   private val cronetRequest: CronetUrlRequest,
   private val byteBuffer: ByteBuffer
 ) : HybridUrlRequestSpec() {
