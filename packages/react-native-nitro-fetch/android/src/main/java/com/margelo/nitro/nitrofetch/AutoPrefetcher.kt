@@ -143,8 +143,8 @@ object AutoPrefetcher {
   private fun startPrefetches(arr: JSONArray, tokens: TokenRefreshResult) {
     for (i in 0 until arr.length()) {
       val o = arr.optJSONObject(i) ?: continue
-      val url = o.optString("url", null) ?: continue
-      val prefetchKey = o.optString("prefetchKey", null) ?: continue
+      val url = o.optStringOrNull("url") ?: continue
+      val prefetchKey = o.optStringOrNull("prefetchKey") ?: continue
 
       NitroLogger.d("NitroFetch", "[TokenRefresh] Prefetching $url")
       logTokens(tokens)
@@ -328,10 +328,10 @@ object AutoPrefetcher {
 
   private fun callTokenRefreshSync(config: JSONObject): TokenRefreshResult? {
     return try {
-      val urlStr = config.optString("url", null) ?: return null
+      val urlStr = config.optStringOrNull("url") ?: return null
       val method = config.optString("method", "POST")
       val reqHeaders = config.optJSONObject("headers")
-      val body = config.optString("body", null)
+      val body = config.optStringOrNull("body")
       val responseType = config.optString("responseType", "json")
 
       val conn = URL(urlStr).openConnection() as HttpURLConnection
@@ -380,13 +380,13 @@ object AutoPrefetcher {
     val formFields = mutableMapOf<String, String>()
 
     if (responseType == "text") {
-      val textHeader = config.optString("textHeader", null)
+      val textHeader = config.optStringOrNull("textHeader")
       if (textHeader != null) {
-        val textTemplate = config.optString("textTemplate", null)
+        val textTemplate = config.optStringOrNull("textTemplate")
         headers[textHeader] = textTemplate?.replace("{{value}}", body) ?: body
       }
-      config.optString("bodyTextPath", null)?.let { bodyFields[it] = body }
-      config.optString("formDataTextField", null)?.let { formFields[it] = body }
+      config.optStringOrNull("bodyTextPath")?.let { bodyFields[it] = body }
+      config.optStringOrNull("formDataTextField")?.let { formFields[it] = body }
       return TokenRefreshResult(headers, bodyFields, formFields)
     }
 
@@ -403,8 +403,8 @@ object AutoPrefetcher {
     if (compositeHeaders != null) {
       for (i in 0 until compositeHeaders.length()) {
         val comp = compositeHeaders.optJSONObject(i) ?: continue
-        val header = comp.optString("header", null) ?: continue
-        val template = comp.optString("template", null) ?: continue
+        val header = comp.optStringOrNull("header") ?: continue
+        val template = comp.optStringOrNull("template") ?: continue
         val paths = comp.optJSONObject("paths") ?: continue
         var built = template
         paths.keys().forEachRemaining { ph ->
@@ -428,10 +428,10 @@ object AutoPrefetcher {
     if (arr == null) return
     for (i in 0 until arr.length()) {
       val m = arr.optJSONObject(i) ?: continue
-      val jsonPath = m.optString("jsonPath", null) ?: continue
-      val dest = m.optString(destKey, null) ?: continue
+      val jsonPath = m.optStringOrNull("jsonPath") ?: continue
+      val dest = m.optStringOrNull(destKey) ?: continue
       val value = getNestedField(json, jsonPath) ?: continue
-      val tmpl = m.optString("valueTemplate", null)
+      val tmpl = m.optStringOrNull("valueTemplate")
       into[dest] = tmpl?.replace("{{value}}", value) ?: value
     }
   }

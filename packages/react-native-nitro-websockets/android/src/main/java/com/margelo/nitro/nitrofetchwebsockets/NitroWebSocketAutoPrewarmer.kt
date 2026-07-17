@@ -196,7 +196,7 @@ object NitroWebSocketAutoPrewarmer {
   private fun startPrewarms(arr: JSONArray, tokenHeaders: Map<String, String>) {
     for (i in 0 until arr.length()) {
       val obj = arr.optJSONObject(i) ?: continue
-      val url = obj.optString("url", null) ?: continue
+      val url = obj.optStringOrNull("url") ?: continue
       NitroLogger.d("NitroWS", "Pre-warming $url")
 
       val protocols = mutableListOf<String>()
@@ -227,10 +227,10 @@ object NitroWebSocketAutoPrewarmer {
 
   private fun callTokenRefreshSync(config: JSONObject): Map<String, String>? {
     return try {
-      val urlStr = config.optString("url", null) ?: return null
+      val urlStr = config.optStringOrNull("url") ?: return null
       val method = config.optString("method", "POST")
       val reqHeaders = config.optJSONObject("headers")
-      val body = config.optString("body", null)
+      val body = config.optStringOrNull("body")
       val responseType = config.optString("responseType", "json")
 
       val conn = URL(urlStr).openConnection() as HttpURLConnection
@@ -267,9 +267,9 @@ object NitroWebSocketAutoPrewarmer {
     val result = mutableMapOf<String, String>()
 
     if (responseType == "text") {
-      val textHeader = config.optString("textHeader", null)
+      val textHeader = config.optStringOrNull("textHeader")
       if (textHeader != null) {
-        val textTemplate = config.optString("textTemplate", null)
+        val textTemplate = config.optStringOrNull("textTemplate")
         result[textHeader] = textTemplate?.replace("{{value}}", body) ?: body
       }
       return result
@@ -282,10 +282,10 @@ object NitroWebSocketAutoPrewarmer {
     if (mappings != null) {
       for (i in 0 until mappings.length()) {
         val m = mappings.optJSONObject(i) ?: continue
-        val jsonPath = m.optString("jsonPath", null) ?: continue
-        val header = m.optString("header", null) ?: continue
+        val jsonPath = m.optStringOrNull("jsonPath") ?: continue
+        val header = m.optStringOrNull("header") ?: continue
         val value = getNestedField(json, jsonPath) ?: continue
-        val tmpl = m.optString("valueTemplate", null)
+        val tmpl = m.optStringOrNull("valueTemplate")
         result[header] = tmpl?.replace("{{value}}", value) ?: value
       }
     }
@@ -294,8 +294,8 @@ object NitroWebSocketAutoPrewarmer {
     if (compositeHeaders != null) {
       for (i in 0 until compositeHeaders.length()) {
         val comp = compositeHeaders.optJSONObject(i) ?: continue
-        val header = comp.optString("header", null) ?: continue
-        val template = comp.optString("template", null) ?: continue
+        val header = comp.optStringOrNull("header") ?: continue
+        val template = comp.optStringOrNull("template") ?: continue
         val paths = comp.optJSONObject("paths") ?: continue
         var built = template
         paths.keys().forEachRemaining { ph ->
