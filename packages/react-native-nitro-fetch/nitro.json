@@ -11,31 +11,31 @@
     "NitroFetch": {
       "ios": {
         "language": "swift",
-        "implementationClassName": "NitroFetch"
+        "implementationClassName": "HybridNitroFetch"
       },
       "android": {
         "language": "kotlin",
-        "implementationClassName": "NitroFetch"
+        "implementationClassName": "HybridNitroFetch"
       }
     },
     "NitroFetchClient": {
       "ios": {
         "language": "swift",
-        "implementationClassName": "NitroFetchClient"
+        "implementationClassName": "HybridNitroFetchClient"
       },
       "android": {
         "language": "kotlin",
-        "implementationClassName": "NitroFetchClient"
+        "implementationClassName": "HybridNitroFetchClient"
       }
     },
     "NativeStorage": {
       "ios": {
         "language": "swift",
-        "implementationClassName": "NativeStorage"
+        "implementationClassName": "HybridNativeStorage"
       },
       "android": {
         "language": "kotlin",
-        "implementationClassName": "NativeStorage"
+        "implementationClassName": "HybridNativeStorage"
       }
     },
     "NitroCronet": {
@@ -45,7 +45,7 @@
       },
       "android": {
         "language": "kotlin",
-        "implementationClassName": "NitroCronet"
+        "implementationClassName": "HybridNitroCronet"
       }
     }
   },

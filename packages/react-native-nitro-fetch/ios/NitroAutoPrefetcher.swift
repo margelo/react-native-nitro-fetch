@@ -14,7 +14,7 @@ public final class NitroAutoPrefetcher: NSObject {
   /// deduped by `prefetchKey`.
   ///
   /// If called after `prefetchOnStart` already ran (late registration), the
-  /// entry is also kicked immediately via `NitroFetchClient.prefetchStatic`.
+  /// entry is also kicked immediately via `HybridNitroFetchClient.prefetchStatic`.
   @objc
   public static func registerPrefetch(
     url: String,
@@ -180,7 +180,7 @@ public final class NitroAutoPrefetcher: NSObject {
 
       let req = buildNitroRequest(from: obj, tokens: tokens)
       Task {
-        do { try await NitroFetchClient.prefetchStatic(req) } catch { /* ignore – best effort */ }
+        do { try await HybridNitroFetchClient.prefetchStatic(req) } catch { /* ignore – best effort */ }
       }
     }
   }

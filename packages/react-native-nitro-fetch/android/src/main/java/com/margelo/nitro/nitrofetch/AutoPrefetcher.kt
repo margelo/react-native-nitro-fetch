@@ -22,7 +22,7 @@ object AutoPrefetcher {
    * the JS `prefetchOnAppStart` API; entries are deduped by `prefetchKey`.
    *
    * If called after `prefetchOnStart` already ran (late registration), the
-   * entry is also kicked immediately via `NitroFetchClient.fetch` so the
+   * entry is also kicked immediately via `HybridNitroFetchClient.fetch` so the
    * current session benefits without waiting for the next cold launch.
    */
   @JvmStatic
@@ -159,7 +159,7 @@ object AutoPrefetcher {
 
       val future = CompletableFuture<NitroResponse>()
       FetchCache.setPending(prefetchKey, future)
-      NitroFetchClient.fetch(req,
+      HybridNitroFetchClient.fetch(req,
         onSuccess = { res ->
           try {
             FetchCache.complete(prefetchKey, res)

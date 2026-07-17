@@ -58,7 +58,7 @@ private fun ByteArray.toArrayBuffer(): ArrayBuffer {
 }
 
 @DoNotStrip
-class NitroFetchClient(private val engine: CronetEngine, private val executor: Executor) : HybridNitroFetchClientSpec() {
+class HybridNitroFetchClient(private val engine: CronetEngine, private val executor: Executor) : HybridNitroFetchClientSpec() {
   
   private val activeRequests = ConcurrentHashMap<String, UrlRequest>()
 
@@ -90,8 +90,8 @@ class NitroFetchClient(private val engine: CronetEngine, private val executor: E
           onSuccess(makeLocalFileResponse(req))
           return null
         }
-        val engine = NitroFetch.getEngine()
-        val executor = NitroFetch.ioExecutor
+        val engine = HybridNitroFetch.getEngine()
+        val executor = HybridNitroFetch.ioExecutor
         startCronet(engine, executor, req, onSuccess, onFail)
       } catch (t: Throwable) {
         onFail(t)

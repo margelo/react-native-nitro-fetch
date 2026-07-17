@@ -11,7 +11,7 @@ import java.util.UUID
 import java.util.concurrent.Executor as JavaExecutor
 
 @DoNotStrip
-class NitroUrlRequestBuilder(
+class HybridUrlRequestBuilder(
   private val engine: CronetEngine,
   private val url: String,
   private val executor: JavaExecutor
@@ -240,6 +240,6 @@ class NitroUrlRequestBuilder(
         uploadBodyLength
       )
     }
-    return NitroUrlRequest(cronetRequest, byteBuffer)
+    return HybridUrlRequest(cronetRequest, byteBuffer)
   }
 }

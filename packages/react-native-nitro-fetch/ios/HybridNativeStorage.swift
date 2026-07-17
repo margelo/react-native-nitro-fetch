@@ -1,5 +1,5 @@
 //
-//  NativeStorage.swift
+//  HybridNativeStorage.swift
 //
 
 import CryptoKit
@@ -110,13 +110,13 @@ internal enum NitroFetchSecureAtRest {
   }
 }
 
-final class NativeStorage: HybridNativeStorageSpec {
+final class HybridNativeStorage: HybridNativeStorageSpec {
   private static let suiteName = "nitro_fetch_storage"
 
   private let userDefaults: UserDefaults
 
   public override init() {
-    if let suite = UserDefaults(suiteName: NativeStorage.suiteName) {
+    if let suite = UserDefaults(suiteName: HybridNativeStorage.suiteName) {
       self.userDefaults = suite
     } else {
       self.userDefaults = UserDefaults.standard

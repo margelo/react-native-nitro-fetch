@@ -4,7 +4,7 @@ iOS does **not** use Chromium Cronet. The iOS client is built entirely on Apple'
 
 ## Client
 
-`NitroFetchClient.swift` (`HybridNitroFetchClientSpec`) drives requests through a shared `URLSession`:
+`HybridNitroFetchClient.swift` (`HybridNitroFetchClientSpec`) drives requests through a shared `URLSession`:
 
 - `URLSessionConfiguration.default` with a `URLCache` (disk path `nitrofetch_urlcache`).
 - `request(req:)` returns a `Promise<NitroResponse>`; `requestSync(req:)` is the synchronous variant used by `nitroFetchOnWorklet`.

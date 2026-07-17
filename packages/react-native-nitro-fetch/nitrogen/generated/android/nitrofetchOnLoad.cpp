@@ -37,7 +37,7 @@ int initialize(JavaVM* vm) {
 }
 
 struct JHybridNitroFetchSpecImpl: public jni::JavaClass<JHybridNitroFetchSpecImpl, JHybridNitroFetchSpec::JavaPart> {
-  static constexpr auto kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/NitroFetch;";
+  static constexpr auto kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/HybridNitroFetch;";
   static std::shared_ptr<JHybridNitroFetchSpec> create() {
     static const auto constructorFn = javaClassStatic()->getConstructor<JHybridNitroFetchSpecImpl::javaobject()>();
     jni::local_ref<JHybridNitroFetchSpec::JavaPart> javaPart = javaClassStatic()->newObject(constructorFn);
@@ -45,7 +45,7 @@ struct JHybridNitroFetchSpecImpl: public jni::JavaClass<JHybridNitroFetchSpecImp
   }
 };
 struct JHybridNitroFetchClientSpecImpl: public jni::JavaClass<JHybridNitroFetchClientSpecImpl, JHybridNitroFetchClientSpec::JavaPart> {
-  static constexpr auto kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/NitroFetchClient;";
+  static constexpr auto kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/HybridNitroFetchClient;";
   static std::shared_ptr<JHybridNitroFetchClientSpec> create() {
     static const auto constructorFn = javaClassStatic()->getConstructor<JHybridNitroFetchClientSpecImpl::javaobject()>();
     jni::local_ref<JHybridNitroFetchClientSpec::JavaPart> javaPart = javaClassStatic()->newObject(constructorFn);
@@ -53,7 +53,7 @@ struct JHybridNitroFetchClientSpecImpl: public jni::JavaClass<JHybridNitroFetchC
   }
 };
 struct JHybridNativeStorageSpecImpl: public jni::JavaClass<JHybridNativeStorageSpecImpl, JHybridNativeStorageSpec::JavaPart> {
-  static constexpr auto kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/NativeStorage;";
+  static constexpr auto kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/HybridNativeStorage;";
   static std::shared_ptr<JHybridNativeStorageSpec> create() {
     static const auto constructorFn = javaClassStatic()->getConstructor<JHybridNativeStorageSpecImpl::javaobject()>();
     jni::local_ref<JHybridNativeStorageSpec::JavaPart> javaPart = javaClassStatic()->newObject(constructorFn);
@@ -61,7 +61,7 @@ struct JHybridNativeStorageSpecImpl: public jni::JavaClass<JHybridNativeStorageS
   }
 };
 struct JHybridNitroCronetSpecImpl: public jni::JavaClass<JHybridNitroCronetSpecImpl, JHybridNitroCronetSpec::JavaPart> {
-  static constexpr auto kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/NitroCronet;";
+  static constexpr auto kJavaDescriptor = "Lcom/margelo/nitro/nitrofetch/HybridNitroCronet;";
   static std::shared_ptr<JHybridNitroCronetSpec> create() {
     static const auto constructorFn = javaClassStatic()->getConstructor<JHybridNitroCronetSpecImpl::javaobject()>();
     jni::local_ref<JHybridNitroCronetSpec::JavaPart> javaPart = javaClassStatic()->newObject(constructorFn);

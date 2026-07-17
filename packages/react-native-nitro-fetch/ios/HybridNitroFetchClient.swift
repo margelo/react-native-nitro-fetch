@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 private let fetchLog = OSLog(subsystem: "com.margelo.nitrofetch", category: "network")
 #endif
 
-final class NitroFetchClient: HybridNitroFetchClientSpec {
+final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
 
   private var _lock = os_unfair_lock()
   private var activeTasks: [String: Task<Void, Never>] = [:]
@@ -34,11 +34,11 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
   func requestSync(req: NitroRequest) throws -> NitroResponse {
     let semaphore = DispatchSemaphore(value: 0)
     var result: Result<NitroResponse, Error>?
-    let bodyData = NitroFetchClient.uploadData(from: req)
+    let bodyData = HybridNitroFetchClient.uploadData(from: req)
 
     Task {
       do {
-        let response = try await NitroFetchClient.requestStatic(req, bodyData: bodyData)
+        let response = try await HybridNitroFetchClient.requestStatic(req, bodyData: bodyData)
         result = .success(response)
       } catch {
         result = .failure(error)
@@ -60,7 +60,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
   func request(req: NitroRequest) throws -> Promise<NitroResponse> {
     let promise = Promise<NitroResponse>.init()
     let requestId = req.requestId
-    let bodyData = NitroFetchClient.uploadData(from: req)
+    let bodyData = HybridNitroFetchClient.uploadData(from: req)
 
     let task = Task { [weak self] in
       defer {
@@ -69,7 +69,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
         }
       }
       do {
-        let response = try await NitroFetchClient.requestStatic(req, bodyData: bodyData)
+        let response = try await HybridNitroFetchClient.requestStatic(req, bodyData: bodyData)
         promise.resolve(withResult: response)
       } catch {
         promise.reject(withError: error)
@@ -84,10 +84,10 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
   
   func prefetch(req: NitroRequest) throws -> Promise<Void> {
     let promise = Promise<Void>.init()
-    let bodyData = NitroFetchClient.uploadData(from: req)
+    let bodyData = HybridNitroFetchClient.uploadData(from: req)
     Task {
       do {
-        try await NitroFetchClient.prefetchStatic(req, bodyData: bodyData)
+        try await HybridNitroFetchClient.prefetchStatic(req, bodyData: bodyData)
         promise.resolve(withResult: ())
       } catch {
         promise.reject(withError: error)
@@ -254,7 +254,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     // Choose bodyString by default (matching Android’s first pass).
     // For binary responses that can’t be decoded as text, bridge the raw bytes
     // as an ArrayBuffer so arrayBuffer() / bytes() return them with no base64.
-    let charset = NitroFetchClient.detectCharset(from: http) ?? String.Encoding.utf8
+    let charset = HybridNitroFetchClient.detectCharset(from: http) ?? String.Encoding.utf8
     let bodyStr = String(data: data, encoding: charset) ?? String(data: data, encoding: .utf8)
     var bodyBytesAb: ArrayBuffer? = nil
     if bodyStr == nil && !data.isEmpty {
@@ -308,7 +308,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
           guard let key = k as? String else { return nil }
           return NitroHeader(key: key, value: String(describing: v))
         }
-        let charset = NitroFetchClient.detectCharset(from: http) ?? .utf8
+        let charset = HybridNitroFetchClient.detectCharset(from: http) ?? .utf8
         let bodyStr = String(data: data, encoding: charset) ?? String(data: data, encoding: .utf8)
         var bodyBytesAb: ArrayBuffer? = nil
         if bodyStr == nil && !data.isEmpty {
