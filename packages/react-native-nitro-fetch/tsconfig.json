@@ -18,6 +18,7 @@
     ],
     "module": "esnext",
     "moduleResolution": "bundler",
+    "noEmit": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
     "noImplicitUseStrict": false,
