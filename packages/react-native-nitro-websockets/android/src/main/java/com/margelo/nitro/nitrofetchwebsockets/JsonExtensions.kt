@@ -2,9 +2,6 @@ package com.margelo.nitro.nitrofetchwebsockets
 
 import org.json.JSONObject
 
-// `optString(name, null)` warns because the `fallback` parameter is annotated @NonNull.
-// Guards on `has` rather than `isNull` to keep the existing behaviour exactly: `optString`
-// coerces the JSONObject.NULL sentinel to the string "null", so an explicit `"key": null`
-// returns "null" and only an absent key returns null.
+// isNull() maps both a missing key and an explicit JSON null to null, without optString(name, null)'s @NonNull warning.
 internal fun JSONObject.optStringOrNull(name: String): String? =
-  if (has(name)) optString(name) else null
+  if (isNull(name)) null else optString(name)
