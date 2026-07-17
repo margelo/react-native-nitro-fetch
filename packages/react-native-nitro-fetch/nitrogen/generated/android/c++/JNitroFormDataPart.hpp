@@ -18,7 +18,7 @@ namespace margelo::nitro::nitrofetch {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ struct "NitroFormDataPart" and the the Kotlin data class "NitroFormDataPart".
+   * The C++ JNI bridge between the C++ struct "NitroFormDataPart" and the Kotlin data class "NitroFormDataPart".
    */
   struct JNitroFormDataPart final: public jni::JavaClass<JNitroFormDataPart> {
   public:

@@ -9,6 +9,7 @@ package com.margelo.nitro.nitrofetch
 
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
+import java.util.Objects
 import com.margelo.nitro.core.ArrayBuffer
 
 /**
@@ -55,6 +56,40 @@ data class NitroRequest(
   val requestId: String?
 ) {
   /* primary constructor */
+
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is NitroRequest) return false
+    return Objects.deepEquals(this.url, other.url)
+      && Objects.deepEquals(this.method, other.method)
+      && Objects.deepEquals(this.headers, other.headers)
+      && Objects.deepEquals(this.bodyString, other.bodyString)
+      && Objects.deepEquals(this.bodyBytes, other.bodyBytes)
+      && Objects.deepEquals(this.bodyBytesBase64, other.bodyBytesBase64)
+      && Objects.deepEquals(this.bodyFormData, other.bodyFormData)
+      && Objects.deepEquals(this.timeoutMs, other.timeoutMs)
+      && Objects.deepEquals(this.followRedirects, other.followRedirects)
+      && Objects.deepEquals(this.credentials, other.credentials)
+      && Objects.deepEquals(this.prefetchCacheTtlMs, other.prefetchCacheTtlMs)
+      && Objects.deepEquals(this.requestId, other.requestId)
+  }
+
+  override fun hashCode(): Int {
+    return arrayOf<Any?>(
+      url,
+      method,
+      headers,
+      bodyString,
+      bodyBytes,
+      bodyBytesBase64,
+      bodyFormData,
+      timeoutMs,
+      followRedirects,
+      credentials,
+      prefetchCacheTtlMs,
+      requestId
+    ).contentDeepHashCode()
+  }
 
   companion object {
     /**

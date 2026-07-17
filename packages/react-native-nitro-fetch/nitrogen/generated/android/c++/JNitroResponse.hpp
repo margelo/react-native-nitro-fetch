@@ -23,7 +23,7 @@ namespace margelo::nitro::nitrofetch {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ struct "NitroResponse" and the the Kotlin data class "NitroResponse".
+   * The C++ JNI bridge between the C++ struct "NitroResponse" and the Kotlin data class "NitroResponse".
    */
   struct JNitroResponse final: public jni::JavaClass<JNitroResponse> {
   public:
@@ -59,16 +59,16 @@ namespace margelo::nitro::nitrofetch {
         statusText->toStdString(),
         static_cast<bool>(ok),
         static_cast<bool>(redirected),
-        [&]() {
-          size_t __size = headers->size();
+        [&](auto&& __input) {
+          size_t __size = __input->size();
           std::vector<NitroHeader> __vector;
           __vector.reserve(__size);
           for (size_t __i = 0; __i < __size; __i++) {
-            auto __element = headers->getElement(__i);
+            auto __element = __input->getElement(__i);
             __vector.push_back(__element->toCpp());
           }
           return __vector;
-        }(),
+        }(headers),
         bodyString != nullptr ? std::make_optional(bodyString->toStdString()) : std::nullopt,
         bodyBytes != nullptr ? std::make_optional(bodyBytes->cthis()->getArrayBuffer()) : std::nullopt
       );
@@ -90,16 +90,16 @@ namespace margelo::nitro::nitrofetch {
         jni::make_jstring(value.statusText),
         value.ok,
         value.redirected,
-        [&]() {
-          size_t __size = value.headers.size();
+        [&](auto&& __input) {
+          size_t __size = __input.size();
           jni::local_ref<jni::JArrayClass<JNitroHeader>> __array = jni::JArrayClass<JNitroHeader>::newArray(__size);
           for (size_t __i = 0; __i < __size; __i++) {
-            const auto& __element = value.headers[__i];
+            const auto& __element = __input[__i];
             auto __elementJni = JNitroHeader::fromCpp(__element);
             __array->setElement(__i, *__elementJni);
           }
           return __array;
-        }(),
+        }(value.headers),
         value.bodyString.has_value() ? jni::make_jstring(value.bodyString.value()) : nullptr,
         value.bodyBytes.has_value() ? JArrayBuffer::wrap(value.bodyBytes.value()) : nullptr
       );

@@ -9,6 +9,7 @@ package com.margelo.nitro.nitrofetch
 
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
+import java.util.Objects
 
 
 /**
@@ -34,6 +35,26 @@ data class NitroFormDataPart(
   val mimeType: String?
 ) {
   /* primary constructor */
+
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is NitroFormDataPart) return false
+    return Objects.deepEquals(this.name, other.name)
+      && Objects.deepEquals(this.value, other.value)
+      && Objects.deepEquals(this.fileUri, other.fileUri)
+      && Objects.deepEquals(this.fileName, other.fileName)
+      && Objects.deepEquals(this.mimeType, other.mimeType)
+  }
+
+  override fun hashCode(): Int {
+    return arrayOf<Any?>(
+      name,
+      value,
+      fileUri,
+      fileName,
+      mimeType
+    ).contentDeepHashCode()
+  }
 
   companion object {
     /**

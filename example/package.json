@@ -19,7 +19,7 @@
     "react-native": "0.86.0",
     "react-native-harness": "^1.0.0-alpha.25",
     "react-native-nitro-fetch": "../packages/react-native-nitro-fetch",
-    "react-native-nitro-modules": "^0.35.2",
+    "react-native-nitro-modules": "^0.36.1",
     "react-native-nitro-text-decoder": "../packages/react-native-nitro-text-decoder",
     "react-native-nitro-websockets": "../packages/react-native-nitro-websockets",
     "react-native-safe-area-context": "^5.7.0",

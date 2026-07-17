@@ -21,7 +21,7 @@ namespace margelo::nitro::nitrofetch {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ struct "UrlResponseInfo" and the the Kotlin data class "UrlResponseInfo".
+   * The C++ JNI bridge between the C++ struct "UrlResponseInfo" and the Kotlin data class "UrlResponseInfo".
    */
   struct JUrlResponseInfo final: public jni::JavaClass<JUrlResponseInfo> {
   public:
@@ -67,26 +67,26 @@ namespace margelo::nitro::nitrofetch {
           }
           return __map;
         }(),
-        [&]() {
-          size_t __size = allHeadersAsList->size();
+        [&](auto&& __input) {
+          size_t __size = __input->size();
           std::vector<HttpHeader> __vector;
           __vector.reserve(__size);
           for (size_t __i = 0; __i < __size; __i++) {
-            auto __element = allHeadersAsList->getElement(__i);
+            auto __element = __input->getElement(__i);
             __vector.push_back(__element->toCpp());
           }
           return __vector;
-        }(),
-        [&]() {
-          size_t __size = urlChain->size();
+        }(allHeadersAsList),
+        [&](auto&& __input) {
+          size_t __size = __input->size();
           std::vector<std::string> __vector;
           __vector.reserve(__size);
           for (size_t __i = 0; __i < __size; __i++) {
-            auto __element = urlChain->getElement(__i);
+            auto __element = __input->getElement(__i);
             __vector.push_back(__element->toStdString());
           }
           return __vector;
-        }(),
+        }(urlChain),
         negotiatedProtocol->toStdString(),
         proxyServer->toStdString(),
         receivedByteCount,
@@ -115,26 +115,26 @@ namespace margelo::nitro::nitrofetch {
           }
           return __map;
         }(),
-        [&]() {
-          size_t __size = value.allHeadersAsList.size();
+        [&](auto&& __input) {
+          size_t __size = __input.size();
           jni::local_ref<jni::JArrayClass<JHttpHeader>> __array = jni::JArrayClass<JHttpHeader>::newArray(__size);
           for (size_t __i = 0; __i < __size; __i++) {
-            const auto& __element = value.allHeadersAsList[__i];
+            const auto& __element = __input[__i];
             auto __elementJni = JHttpHeader::fromCpp(__element);
             __array->setElement(__i, *__elementJni);
           }
           return __array;
-        }(),
-        [&]() {
-          size_t __size = value.urlChain.size();
+        }(value.allHeadersAsList),
+        [&](auto&& __input) {
+          size_t __size = __input.size();
           jni::local_ref<jni::JArrayClass<jni::JString>> __array = jni::JArrayClass<jni::JString>::newArray(__size);
           for (size_t __i = 0; __i < __size; __i++) {
-            const auto& __element = value.urlChain[__i];
+            const auto& __element = __input[__i];
             auto __elementJni = jni::make_jstring(__element);
             __array->setElement(__i, *__elementJni);
           }
           return __array;
-        }(),
+        }(value.urlChain),
         jni::make_jstring(value.negotiatedProtocol),
         jni::make_jstring(value.proxyServer),
         value.receivedByteCount,

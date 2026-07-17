@@ -9,6 +9,7 @@ package com.margelo.nitro.nitrofetch
 
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
+import java.util.Objects
 
 
 /**
@@ -22,6 +23,18 @@ data class RequestException(
   val message: String
 ) {
   /* primary constructor */
+
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (other !is RequestException) return false
+    return Objects.deepEquals(this.message, other.message)
+  }
+
+  override fun hashCode(): Int {
+    return arrayOf<Any?>(
+      message
+    ).contentDeepHashCode()
+  }
 
   companion object {
     /**
