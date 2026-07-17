@@ -104,7 +104,7 @@ final class NitroFetchClient: HybridNitroFetchClientSpec {
     config.urlCache = URLCache(memoryCapacity: 32 * 1024 * 1024,
                                diskCapacity: 100 * 1024 * 1024,
                                diskPath: "nitrofetch_urlcache")
-    return URLSession(configuration: config)
+    return NitroURLSession.make(configuration: config)
   }()
 
   private static func findPrefetchKey(_ req: NitroRequest) -> String? {

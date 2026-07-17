@@ -11,7 +11,7 @@ class HybridNitroCronet: HybridNitroCronetSpec {
       diskCapacity: 100 * 1024 * 1024,
       diskPath: "nitrofetch_urlcache"
     )
-    return URLSession(configuration: config)
+    return NitroURLSession.make(configuration: config)
   }()
 
   // Shared executor queue
