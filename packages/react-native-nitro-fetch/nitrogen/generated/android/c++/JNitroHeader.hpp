@@ -17,7 +17,7 @@ namespace margelo::nitro::nitrofetch {
   using namespace facebook;
 
   /**
-   * The C++ JNI bridge between the C++ struct "NitroHeader" and the the Kotlin data class "NitroHeader".
+   * The C++ JNI bridge between the C++ struct "NitroHeader" and the Kotlin data class "NitroHeader".
    */
   struct JNitroHeader final: public jni::JavaClass<JNitroHeader> {
   public:
