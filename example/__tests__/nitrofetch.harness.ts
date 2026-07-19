@@ -546,6 +546,49 @@ describe('NitroFetch - real HTTPS (PokeAPI)', () => {
 });
 
 describe('NitroFetch - Streaming', () => {
+  it('pre-aborted streamed request rejects with AbortError', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    let threw = false;
+
+    try {
+      await (nitroFetch as any)(`${BASE}/drip?duration=0&numbytes=1&delay=0`, {
+        stream: true,
+        signal: controller.signal,
+      });
+    } catch (error: any) {
+      threw = true;
+      expect(error.name).toBe('AbortError');
+    }
+
+    expect(threw).toBe(true);
+  });
+
+  it('aborting after the first /drip chunk rejects the next read with AbortError', async () => {
+    const controller = new AbortController();
+    const res = (await (nitroFetch as any)(
+      `${BASE}/drip?duration=5&numbytes=5&delay=0`,
+      { stream: true, signal: controller.signal }
+    )) as any;
+    const readable = res.body?.getReader?.();
+    expect(readable).toBeDefined();
+
+    const first = await readable.read();
+    expect(first.done).toBe(false);
+    expect(first.value?.byteLength).toBeGreaterThan(0);
+
+    controller.abort();
+    let threw = false;
+    try {
+      await readable.read();
+    } catch (error: any) {
+      threw = true;
+      expect(error.name).toBe('AbortError');
+    }
+
+    expect(threw).toBe(true);
+  });
+
   it('streams JSON lines from /stream/5 and produces non-empty text', async () => {
     const res = (await (nitroFetch as any)(`${BASE}/stream/5`, {
       stream: true,
