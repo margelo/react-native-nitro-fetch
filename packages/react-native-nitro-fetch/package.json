@@ -1,6 +1,6 @@
 {
   "name": "react-native-nitro-fetch",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Awesome Fetch :)",
   "main": "./lib/module/index.js",
   "module": "./lib/module/index.js",
@@ -140,6 +140,9 @@
     }
   },
   "release-it": {
+    "hooks": {
+      "after:bump": "rm -rf ../../node_modules && bun install --cwd ../.. && bun --cwd ../.. prepare"
+    },
     "git": false,
     "npm": {
       "publish": true
