@@ -762,6 +762,11 @@ async function nitroStreamFetch(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<Response> {
+  const signal = init?.signal as AbortSignal | undefined | null;
+  if (signal?.aborted) {
+    throw createAbortError();
+  }
+
   const url = getUrlString(input);
   const src = input as { method?: string; headers?: HeadersInit };
   const method = (init?.method ?? src?.method)?.toUpperCase() ?? 'GET';
@@ -795,6 +800,13 @@ async function nitroStreamFetch(
     let streamController: ReadableStreamDefaultController<
       Uint8Array<ArrayBuffer>
     >;
+    let abortListener: (() => void) | undefined;
+
+    const cleanupAbortListener = () => {
+      if (!signal || !abortListener) return;
+      signal.removeEventListener('abort', abortListener);
+      abortListener = undefined;
+    };
 
     const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
       start(controller) {
@@ -806,7 +818,7 @@ async function nitroStreamFetch(
     let streamBytesReceived = 0;
 
     builder.onResponseStarted((info) => {
-      if (responseResolved) return;
+      if (responseResolved || signal?.aborted) return;
       responseResolved = true;
       const status = info.httpStatusCode;
       const responseHeaders = new NitroHeaders(
@@ -828,6 +840,7 @@ async function nitroStreamFetch(
     });
 
     builder.onReadCompleted((_info, byteBuffer, bytesRead) => {
+      if (signal?.aborted) return;
       const chunk = new Uint8Array(byteBuffer, 0, bytesRead).slice();
       streamBytesReceived += bytesRead;
       streamController.enqueue(chunk);
@@ -837,6 +850,7 @@ async function nitroStreamFetch(
     });
 
     builder.onSucceeded((_info) => {
+      cleanupAbortListener();
       streamController.close();
       if (inspectorId) {
         const info = _info as any;
@@ -853,7 +867,10 @@ async function nitroStreamFetch(
     });
 
     builder.onFailed((_info, error) => {
-      const err = new Error(error.message);
+      cleanupAbortListener();
+      const err = signal?.aborted
+        ? createAbortError()
+        : new Error(error.message);
       if (inspectorId) {
         NetworkInspector._recordEnd(inspectorId, 0, '', [], 0, error.message);
       }
@@ -866,6 +883,7 @@ async function nitroStreamFetch(
     });
 
     builder.onCanceled(() => {
+      cleanupAbortListener();
       const err = createAbortError();
       if (inspectorId) {
         NetworkInspector._recordEnd(
@@ -886,6 +904,16 @@ async function nitroStreamFetch(
     });
 
     const request = builder.build();
+    if (signal) {
+      abortListener = () => {
+        try {
+          request.cancel();
+        } catch {
+          return;
+        }
+      };
+      signal.addEventListener('abort', abortListener, { once: true });
+    }
     request.start();
   });
 }
