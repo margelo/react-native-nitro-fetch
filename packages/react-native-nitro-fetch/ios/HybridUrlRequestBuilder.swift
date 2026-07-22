@@ -104,17 +104,8 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
       devToolsRequestId: devToolsRequestId
     )
 
-    let config = URLSessionConfiguration.default
-    config.urlCache = session.configuration.urlCache
-    config.requestCachePolicy = urlRequest.cachePolicy
-
-    let delegateSession = URLSession(
-      configuration: config,
-      delegate: delegate,
-      delegateQueue: nil
-    )
-
-    let task: URLSessionDataTask = delegateSession.dataTask(with: urlRequest)
+    let task: URLSessionDataTask = session.dataTask(with: urlRequest)
+    task.delegate = delegate
 
     task.priority = priority
     delegate.task = task
