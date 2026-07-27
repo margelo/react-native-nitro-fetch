@@ -119,6 +119,48 @@ describe('Local URLs - file:// and scheme-less paths', () => {
   });
 });
 
+describe('Local URLs - percent-encoded file:// paths', () => {
+  const dir = RNFS.CachesDirectoryPath;
+  const plusPath = `${dir}/nitro+fetch encoded.txt`;
+  const dotPath = `${dir}/nitro-fetch-encoded-dot.txt`;
+  const TEXT = 'encoded\n';
+
+  beforeAll(async () => {
+    await RNFS.writeFile(plusPath, TEXT, 'utf8');
+    await RNFS.writeFile(dotPath, TEXT, 'utf8');
+  });
+
+  afterAll(async () => {
+    for (const p of [plusPath, dotPath]) {
+      try {
+        await RNFS.unlink(p);
+      } catch {
+        // best-effort cleanup
+      }
+    }
+  });
+
+  it('decodes %2B to a literal + in the filename', async () => {
+    const encoded = `file://${dir}/nitro%2Bfetch%20encoded.txt`;
+    const res = await nitroFetch(encoded);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe(TEXT);
+  });
+
+  it('treats a bare + as a literal +, not a space', async () => {
+    const res = await nitroFetch(`file://${dir}/nitro+fetch%20encoded.txt`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe(TEXT);
+  });
+
+  it('derives Content-Type from the decoded extension', async () => {
+    const encoded = `file://${dir}/nitro-fetch-encoded-dot%2Etxt`;
+    const res = await nitroFetch(encoded);
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('text/plain');
+  });
+});
+
 // blob: unsupported (RN blob registry unreachable); content:// shares the tested readFileBytes path.
 describe('Local URLs - unsupported schemes', () => {
   it('rejects blob: URLs with a TypeError', async () => {
