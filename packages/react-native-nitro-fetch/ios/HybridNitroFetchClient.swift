@@ -396,24 +396,22 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
       let (data, _) = try await session.data(from: url)
       return data
     }
-    let path = uri.hasPrefix("file://") ? String(uri.dropFirst(7)) : uri
-    guard let data = FileManager.default.contents(atPath: path) else {
-      throw NSError(domain: "NitroFetch", code: -4, userInfo: [NSLocalizedDescriptionKey: "Cannot read file at: \(uri)"])
-    }
-    return data
+    return try localData(forURI: uri)
   }
 
   private static func isHttpURL(_ url: String) -> Bool {
     return url.hasPrefix("http://") || url.hasPrefix("https://")
   }
 
+  // Some files are % encoded we need to convert it to correct format
+  private static func localPath(forURI uri: String) -> String {
+    guard uri.hasPrefix("file://") else { return uri }
+    if let url = URL(string: uri), url.isFileURL { return url.path }
+    return String(uri.dropFirst(7))
+  }
+
   private static func localData(forURI uri: String) throws -> Data {
-    // file:// via URL (honors percent-encoding); bare paths read directly.
-    if uri.hasPrefix("file://"), let fileURL = URL(string: uri) {
-      return try Data(contentsOf: fileURL)
-    }
-    let path = uri.hasPrefix("file://") ? String(uri.dropFirst(7)) : uri
-    guard let data = FileManager.default.contents(atPath: path) else {
+    guard let data = FileManager.default.contents(atPath: localPath(forURI: uri)) else {
       throw NSError(domain: "NitroFetch", code: -4,
                     userInfo: [NSLocalizedDescriptionKey: "Cannot read file at: \(uri)"])
     }
@@ -421,7 +419,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
   }
 
   private static func mimeType(forURI uri: String) -> String {
-    let path = uri.hasPrefix("file://") ? String(uri.dropFirst(7)) : uri
+    let path = localPath(forURI: uri)
     let ext = (path as NSString).pathExtension
     if !ext.isEmpty, let type = UTType(filenameExtension: ext),
        let mime = type.preferredMIMEType {

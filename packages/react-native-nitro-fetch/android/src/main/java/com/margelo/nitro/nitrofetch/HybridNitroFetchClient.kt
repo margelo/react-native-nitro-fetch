@@ -388,9 +388,12 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           ?: throw IllegalArgumentException("Cannot open content URI: $uri")
         return inputStream.use { it.readBytes() }
       }
-      val path = if (uri.startsWith("file://")) uri.removePrefix("file://") else uri
-      return File(path).readBytes()
+      return File(localPath(uri)).readBytes()
     }
+
+    // file:// paths are percent-encoded; bare paths are already literal.
+    private fun localPath(uri: String): String =
+      if (uri.startsWith("file://")) Uri.parse(uri).path ?: uri.removePrefix("file://") else uri
 
     private fun isHttpURL(url: String): Boolean =
       url.startsWith("http://") || url.startsWith("https://")
@@ -399,7 +402,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       if (uri.startsWith("content://")) {
         NitroModules.applicationContext?.contentResolver?.getType(Uri.parse(uri))?.let { return it }
       }
-      val path = if (uri.startsWith("file://")) uri.removePrefix("file://") else uri
+      val path = localPath(uri)
       val ext = path.substringAfterLast('.', "").lowercase()
       if (ext.isNotEmpty()) {
         android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)?.let { return it }
