@@ -460,6 +460,17 @@ describe('Fetch - cache option', () => {
     expect(cc).toContain('no-store');
   });
 
+  it('"no-store" applies to streaming requests', async () => {
+    const res = await nitroFetch(`${BASE}/headers`, {
+      cache: 'no-store',
+      stream: true,
+    } as any);
+    const body = await res.json();
+    const cc =
+      body.headers['Cache-Control'] || body.headers['cache-control'] || '';
+    expect(cc).toContain('no-store');
+  });
+
   it('"no-cache" sends Cache-Control: no-cache header', async () => {
     const res = await nitroFetch(`${BASE}/headers`, {
       cache: 'no-cache',
