@@ -305,6 +305,54 @@ describe('NitroWebSocket - Server-initiated close', () => {
   });
 });
 
+describe('NitroWebSocket - Handshake headers', () => {
+  function handshake(
+    protocols?: string[],
+    extraHeaders?: Record<string, string>
+  ): Promise<{ ws: NitroWebSocket; headers: Record<string, string> }> {
+    return withTimeout(
+      new Promise<{ ws: NitroWebSocket; headers: Record<string, string> }>(
+        (resolve, reject) => {
+          const ws = new NitroWebSocket(
+            `${WS_BASE}/ws/headers`,
+            protocols,
+            extraHeaders
+          );
+          ws.onmessage = (e) => resolve({ ws, headers: JSON.parse(e.data) });
+          ws.onerror = (err) => reject(new Error(`Connection error: ${err}`));
+        }
+      ),
+      5_000,
+      'handshake header echo'
+    );
+  }
+
+  it('sends no Sec-WebSocket-Protocol and no Origin when no protocols requested', async () => {
+    const { ws, headers } = await handshake();
+    expect(headers['sec-websocket-protocol']).toBe(undefined);
+    expect(headers.origin).toBe(undefined);
+    expect(ws.protocol).toBe('');
+    await closeAndWait(ws);
+  });
+
+  it('offers requested subprotocols and reports the negotiated one', async () => {
+    const { ws, headers } = await handshake(['chat', 'superchat']);
+    expect(headers['sec-websocket-protocol']).toContain('chat');
+    expect(headers['sec-websocket-protocol']).toContain('superchat');
+    expect(ws.protocol).toBe('chat');
+    await closeAndWait(ws);
+  });
+
+  it('still sends caller-supplied custom headers', async () => {
+    const { ws, headers } = await handshake(undefined, {
+      'x-nitro-test': 'handshake',
+    });
+    expect(headers['x-nitro-test']).toBe('handshake');
+    expect(headers['sec-websocket-protocol']).toBe(undefined);
+    await closeAndWait(ws);
+  });
+});
+
 // ─── Error Handling ───────────────────────────────────────────────────────────
 
 describe('NitroWebSocket - Error Handling', () => {

@@ -65,6 +65,10 @@ int nitroWsCallback(lws* wsi, enum lws_callback_reasons reason,
   auto* conn = static_cast<WebSocketConnection*>(lws_wsi_user(wsi));
 
   switch (reason) {
+    case LWS_CALLBACK_CLIENT_FILTER_PRE_ESTABLISH:
+      if (conn) conn->handleFilterPreEstablish(wsi);
+      break;
+
     case LWS_CALLBACK_CLIENT_ESTABLISHED:
       if (conn) conn->handleEstablished(wsi);
       break;
@@ -139,6 +143,7 @@ void WebSocketConnection::connect(
 
   _url   = url;
   _state = State::CONNECTING;
+  _negotiatedProtocol.clear();
 
 #if defined(NITRO_WS_TRACING)
   ATrace_beginSection(("NitroWS connect " + url).c_str());
@@ -180,8 +185,8 @@ void WebSocketConnection::connect(
     i.port         = port;
     i.path         = path.c_str();
     i.host         = host.c_str();
-    i.origin       = host.c_str();
-    i.protocol     = protoStr.empty() ? "nitro-ws" : protoStr.c_str();
+    i.protocol     = protoStr.empty() ? nullptr : protoStr.c_str();
+    i.local_protocol_name = "nitro-ws";
     i.userdata     = self.get();
     i.ssl_connection = isWss ? LCCSCF_USE_SSL : 0;
 
@@ -295,6 +300,14 @@ void WebSocketConnection::setOnError(OnError cb) {
 
 
 
+// Server-selected subprotocol must be read here: lws detaches the header
+// table before LWS_CALLBACK_CLIENT_ESTABLISHED fires.
+void WebSocketConnection::handleFilterPreEstablish(lws* wsi) {
+  char buf[256];
+  int n = lws_hdr_copy(wsi, buf, sizeof(buf), WSI_TOKEN_PROTOCOL);
+  if (n > 0) _negotiatedProtocol.assign(buf, static_cast<size_t>(n));
+}
+
 void WebSocketConnection::handleEstablished(lws* wsi) {
 #if defined(NITRO_WS_TRACING)
   ATrace_beginSection("NitroWS established");
@@ -302,9 +315,6 @@ void WebSocketConnection::handleEstablished(lws* wsi) {
   _wsi   = wsi;
   _state = State::OPEN;
   _redirectCount = 0;
-
-  const lws_protocols* proto = lws_get_protocol(wsi);
-  if (proto && proto->name) _negotiatedProtocol = proto->name;
 
   if (_onOpen) {
     _onOpen();

@@ -227,6 +227,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 
 // WebSocket endpoints for the nitrowebsockets harness.
 //   /ws/echo                                -> echoes every frame back
+//   /ws/headers                             -> first message is the handshake headers as JSON
 //   /ws/close?code=1011&reason=x&delay=200  -> server-initiated close handshake
 //   /ws/kill?delay=200                      -> socket destroyed, no close frame
 const wss = new WebSocketServer({ server });
@@ -236,7 +237,9 @@ wss.on('connection', (ws, req) => {
 
   ws.on('message', (data, isBinary) => ws.send(data, { binary: isBinary }));
 
-  if (url.pathname === '/ws/close') {
+  if (url.pathname === '/ws/headers') {
+    ws.send(JSON.stringify(req.headers));
+  } else if (url.pathname === '/ws/close') {
     const code = Number(url.searchParams.get('code')) || 1011;
     const reason = url.searchParams.get('reason') ?? 'server shutdown';
     setTimeout(() => ws.close(code, reason), delay);
