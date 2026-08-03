@@ -6,11 +6,7 @@ class HybridNitroCronet: HybridNitroCronetSpec {
   private static let session: URLSession = {
     let config = URLSessionConfiguration.default
     config.requestCachePolicy = .useProtocolCachePolicy
-    config.urlCache = URLCache(
-      memoryCapacity: 32 * 1024 * 1024,
-      diskCapacity: 100 * 1024 * 1024,
-      diskPath: "nitrofetch_urlcache"
-    )
+    config.urlCache = NitroURLCache.shared
     return NitroURLSession.make(configuration: config)
   }()
 
