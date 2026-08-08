@@ -29,7 +29,11 @@ class HybridUrlRequestBuilder(
   private val byteBuffer: ByteBuffer
   // BuildConfig.DEBUG short-circuits in release so R8 strips DevTools paths.
   // UUID generation is gated too so SecureRandom isn't touched in release.
-  private val devToolsEnabled: Boolean = BuildConfig.DEBUG && DevToolsReporter.isDebuggingEnabled()
+  // Opt out via `NitroFetch_disableDevToolsReporting=true` in gradle.properties
+  //  Avoids double-logging with expo-dev-client
+  private val devToolsEnabled: Boolean = BuildConfig.DEBUG &&
+    !BuildConfig.NITRO_FETCH_DISABLE_DEVTOOLS_REPORTING &&
+    DevToolsReporter.isDebuggingEnabled()
   private val devToolsRequestId: String = if (devToolsEnabled) UUID.randomUUID().toString() else ""
   private var devToolsBytes: Int = 0
   private var devToolsTextual: Boolean = false

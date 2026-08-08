@@ -53,7 +53,11 @@
 }
 
 + (BOOL)isDebuggingEnabled {
+#if defined(NITROFETCH_DISABLE_DEVTOOLS_REPORTING)
+  return NO;
+#else
   return [self reporterClass] != Nil;
+#endif
 }
 
 + (void)reportRequestStartWithRequest:(NSString *)requestId
