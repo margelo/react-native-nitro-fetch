@@ -120,7 +120,11 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       // && so every `if (devToolsEnabled)` block below becomes dead code and
       // the DevToolsReporter classes drop out of the release APK entirely.
       // The UUID generation is gated too so SecureRandom isn't touched in release.
-      val devToolsEnabled = BuildConfig.DEBUG && DevToolsReporter.isDebuggingEnabled()
+      // Opt out via `NitroFetch_disableDevToolsReporting=true` in gradle.properties
+      //  Avoids double-logging with expo-dev-client
+      val devToolsEnabled = BuildConfig.DEBUG &&
+        !BuildConfig.NITRO_FETCH_DISABLE_DEVTOOLS_REPORTING &&
+        DevToolsReporter.isDebuggingEnabled()
       val devToolsRequestId = if (devToolsEnabled) (req.requestId ?: UUID.randomUUID().toString()) else ""
       val callback = object : UrlRequest.Callback() {
         private val buffer = ByteBuffer.allocateDirect(16 * 1024)

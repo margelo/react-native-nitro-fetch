@@ -39,5 +39,13 @@ Pod::Spec.new do |s|
     })
   end
 
+  if ENV['NITROFETCH_DISABLE_DEVTOOLS_REPORTING'] == '1'
+    current_xcconfig = s.attributes_hash['pod_target_xcconfig'] || {}
+    existing = current_xcconfig['GCC_PREPROCESSOR_DEFINITIONS'] || '$(inherited)'
+    s.pod_target_xcconfig = current_xcconfig.merge({
+      'GCC_PREPROCESSOR_DEFINITIONS' => "#{existing} NITROFETCH_DISABLE_DEVTOOLS_REPORTING=1"
+    })
+  end
+
   install_modules_dependencies(s)
 end
