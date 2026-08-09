@@ -546,14 +546,12 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       promise.resolve(Unit)
       return promise
     }
-    // If already pending, resolve when it's done
-    FetchCache.getPending(key)?.let { fut ->
+    // Atomic begin: if another prefetch won the race, resolve when it's done
+    val future = java.util.concurrent.CompletableFuture<NitroResponse>()
+    FetchCache.beginPending(key, future)?.let { fut ->
       fut.whenComplete { _, err -> if (err != null) promise.reject(err) else promise.resolve(Unit) }
       return promise
     }
-    // Start new prefetch
-    val future = java.util.concurrent.CompletableFuture<NitroResponse>()
-    FetchCache.setPending(key, future)
     fetch(
       req,
       onSuccess = { res ->
