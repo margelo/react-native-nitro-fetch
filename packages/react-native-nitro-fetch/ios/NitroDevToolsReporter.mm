@@ -40,7 +40,13 @@
   return available;
 }
 
+// Opting out here — rather than in +isDebuggingEnabled — makes every entry point below a no-op,
+// since they all resolve the class through here. Set NITROFETCH_DISABLE_DEVTOOLS_REPORTING=1
+// before `pod install` to avoid double-logging with expo-dev-client.
 + (Class _Nullable)reporterClass {
+#if defined(NITROFETCH_DISABLE_DEVTOOLS_REPORTING)
+  return Nil;
+#else
   if (![self reporterAPIAvailable]) {
     return Nil;
   }
@@ -50,6 +56,7 @@
     cached = NSClassFromString(@"RCTInspectorNetworkReporter");
   });
   return cached;
+#endif
 }
 
 + (BOOL)isDebuggingEnabled {

@@ -6,7 +6,7 @@ sidebar_position: 9
 
 # Network Inspection
 
-Nitro Fetch ships with a built-in **NetworkInspector** that records HTTP and WebSocket activity at the JS level, and native **Perfetto / Instruments tracing** for zero-overhead profiling in production.
+Nitro Fetch ships with a built-in **NetworkInspector** that records HTTP and WebSocket activity at the JS level, reports requests to the **React Native DevTools** Network panel in debug builds, and emits native **Perfetto / Instruments traces** for zero-overhead profiling in production.
 
 ## JS Network Inspector
 
@@ -169,6 +169,38 @@ export function NetworkDebugger() {
 :::tip
 The example app includes a full-featured inspector screen with filter tabs (All / HTTP / WS), detail views, curl export, and a live log console. See [`example/src/screens/NetworkInspectorScreen.tsx`](https://github.com/margelo/react-native-nitro-fetch/blob/main/example/src/screens/NetworkInspectorScreen.tsx) for the complete implementation.
 :::
+
+---
+
+## React Native DevTools Network panel
+
+In **debug builds only**, Nitro Fetch reports each request to the React Native DevTools **Network** panel natively — through `InspectorNetworkReporter` on Android and `RCTInspectorNetworkReporter` (RN 0.83+) on iOS. This is on by default and needs no setup. In release builds the whole path is compiled out.
+
+### Opting out
+
+If another tool already reports the same traffic, every request shows up twice. The usual case is **`expo-dev-client` on iOS**: it swizzles `URLSessionConfiguration.default`, which Nitro Fetch's `URLSession` is built from, so expo-dev-launcher reports the request over its own CDP socket while Nitro Fetch reports the same request through `RCTInspectorNetworkReporter`.
+
+Turn Nitro Fetch's native reporting off at build time:
+
+#### Android
+
+Add to your app's `gradle.properties`, then rebuild:
+
+```properties
+NitroFetch_disableDevToolsReporting=true
+```
+
+#### iOS
+
+Set the environment variable **before** running `pod install`:
+
+```bash
+NITROFETCH_DISABLE_DEVTOOLS_REPORTING=1 bundle exec pod install
+```
+
+Then rebuild. Run `pod install` explicitly when flipping this flag — `npx expo run:ios` and `yarn ios` skip it when the `Podfile` hasn't changed, so the flag would otherwise appear to have no effect.
+
+
 
 ---
 
