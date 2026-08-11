@@ -43,6 +43,21 @@ function applyDefaultContentType(
   headers.push({ key: 'Content-Type', value: contentType });
 }
 
+function applyCacheHeaders(
+  headers: NitroHeader[],
+  cache: RequestCache | undefined
+): void {
+  'worklet';
+  if (cache === 'no-store') {
+    headers.push({ key: 'Cache-Control', value: 'no-store' });
+  } else if (cache === 'no-cache') {
+    headers.push({ key: 'Cache-Control', value: 'no-cache' });
+  } else if (cache === 'reload') {
+    headers.push({ key: 'Cache-Control', value: 'no-cache' });
+    headers.push({ key: 'Pragma', value: 'no-cache' });
+  }
+}
+
 function headersToPairs(headers?: HeadersInit): NitroHeader[] | undefined {
   'worklet';
   if (!headers) return undefined;
@@ -231,15 +246,7 @@ function buildNitroRequest(
   const normalized = normalizeBody(body);
   applyDefaultContentType(headers, normalized?.contentType);
 
-  // Inject cache-control headers based on cache option
-  if (cacheOption === 'no-store') {
-    headers.push({ key: 'Cache-Control', value: 'no-store' });
-  } else if (cacheOption === 'no-cache') {
-    headers.push({ key: 'Cache-Control', value: 'no-cache' });
-  } else if (cacheOption === 'reload') {
-    headers.push({ key: 'Cache-Control', value: 'no-cache' });
-    headers.push({ key: 'Pragma', value: 'no-cache' });
-  }
+  applyCacheHeaders(headers, cacheOption);
 
   // Determine followRedirects based on redirect option
   const followRedirects = redirectOption === 'follow';
@@ -387,6 +394,7 @@ export function buildNitroRequestPure(
   const headers = headersToPairsPure(headersInit) ?? [];
   const normalized = normalizeBodyPure(body);
   applyDefaultContentType(headers, normalized?.contentType);
+  applyCacheHeaders(headers, init?.cache as RequestCache | undefined);
 
   const prefetchCacheTtlMs =
     typeof init?.prefetchCacheTtlMs === 'number'
@@ -773,6 +781,7 @@ async function nitroStreamFetch(
   const headers = headersToPairs(init?.headers ?? src?.headers) ?? [];
   const normalized = normalizeBody(init?.body);
   applyDefaultContentType(headers, normalized?.contentType);
+  applyCacheHeaders(headers, init?.cache as RequestCache | undefined);
 
   // Inspector: record start
   let inspectorId: string | undefined;

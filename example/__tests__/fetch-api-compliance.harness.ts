@@ -7,6 +7,7 @@ import {
 } from 'react-native-nitro-fetch';
 import { Platform } from 'react-native';
 import { BASE } from '../test-utils/server';
+import { TextDecoder } from 'react-native-nitro-text-decoder';
 
 describe('Headers - Construction', () => {
   it('constructs from plain object', () => {
@@ -455,6 +456,25 @@ describe('Fetch - cache option', () => {
       cache: 'no-store',
     } as any);
     const body = await res.json();
+    const cc =
+      body.headers['Cache-Control'] || body.headers['cache-control'] || '';
+    expect(cc).toContain('no-store');
+  });
+
+  it('"no-store" applies to streaming requests', async () => {
+    const res = (await nitroFetch(`${BASE}/headers`, {
+      cache: 'no-store',
+      stream: true,
+    } as any)) as any;
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let text = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) text += decoder.decode(value, { stream: true });
+    }
+    const body = JSON.parse(text);
     const cc =
       body.headers['Cache-Control'] || body.headers['cache-control'] || '';
     expect(cc).toContain('no-store');
