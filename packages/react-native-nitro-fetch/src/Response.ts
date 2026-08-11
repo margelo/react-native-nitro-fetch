@@ -192,8 +192,9 @@ export class NitroResponse {
   }
 
   async json(): Promise<any> {
-    // text() drains both buffered and streamed bodies.
-    const t = await this.text();
+    this._throwIfBodyUsed();
+    this._bodyUsed = true;
+    const t = this._getBodyString();
     return JSON.parse(t || '{}');
   }
 
