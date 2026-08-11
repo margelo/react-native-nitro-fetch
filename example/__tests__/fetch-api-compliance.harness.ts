@@ -7,6 +7,11 @@ import {
 } from 'react-native-nitro-fetch';
 import { Platform } from 'react-native';
 import { BASE } from '../test-utils/server';
+import { TextDecoder as NitroTextDecoder } from 'react-native-nitro-text-decoder';
+
+// Most apps ship a global TextDecoder; provide one so streamed bodies decode.
+const g = globalThis as { TextDecoder?: unknown };
+if (g.TextDecoder == null) g.TextDecoder = NitroTextDecoder;
 
 describe('Headers - Construction', () => {
   it('constructs from plain object', () => {
