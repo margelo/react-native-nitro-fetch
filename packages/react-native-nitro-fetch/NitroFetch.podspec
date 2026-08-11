@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   s.license      = package["license"]
   s.authors      = package["author"]
 
-  s.platforms    = { :ios => min_ios_version_supported }
+  s.platforms    = { :ios => min_ios_version_supported, :tvos => min_ios_version_supported }
   s.source       = { :git => "http://google.com.git", :tag => "#{s.version}" }
 
 
@@ -36,6 +36,14 @@ Pod::Spec.new do |s|
     existing = current_xcconfig['SWIFT_ACTIVE_COMPILATION_CONDITIONS'] || '$(inherited)'
     s.pod_target_xcconfig = current_xcconfig.merge({
       'SWIFT_ACTIVE_COMPILATION_CONDITIONS' => "#{existing} NITROFETCH_TRACING"
+    })
+  end
+
+  if ENV['NITROFETCH_DISABLE_DEVTOOLS_REPORTING'] == '1'
+    current_xcconfig = s.attributes_hash['pod_target_xcconfig'] || {}
+    existing = current_xcconfig['GCC_PREPROCESSOR_DEFINITIONS'] || '$(inherited)'
+    s.pod_target_xcconfig = current_xcconfig.merge({
+      'GCC_PREPROCESSOR_DEFINITIONS' => "#{existing} NITROFETCH_DISABLE_DEVTOOLS_REPORTING=1"
     })
   end
 

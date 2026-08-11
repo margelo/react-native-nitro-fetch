@@ -101,9 +101,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
   private static let session: URLSession = {
     let config = URLSessionConfiguration.default
     config.requestCachePolicy = .useProtocolCachePolicy
-    config.urlCache = URLCache(memoryCapacity: 32 * 1024 * 1024,
-                               diskCapacity: 100 * 1024 * 1024,
-                               diskPath: "nitrofetch_urlcache")
+    config.urlCache = NitroURLCache.shared
     return NitroURLSession.make(configuration: config)
   }()
 
@@ -152,28 +150,33 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
                              bodyBytes: cached.bodyBytes)
       }
 
-      // If a prefetch is already pending, await and reuse its result
       if FetchCache.getPending(key) {
-        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<NitroResponse, Error>) in
-          FetchCache.addPending(key) { result in
+        let joined: NitroResponse? = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<NitroResponse?, Error>) in
+          let attached = FetchCache.joinPending(key) { result in
             switch result {
             case .success(let res):
-              // Mirror Android: mark response as coming from prefetch
-              var headers = res.headers ?? []
-              headers.append(NitroHeader(key: "nitroPrefetched", value: "true"))
-              let wrapped = NitroResponse(url: res.url,
-                                          status: res.status,
-                                          statusText: res.statusText,
-                                          ok: res.ok,
-                                          redirected: res.redirected,
-                                          headers: headers,
-                                          bodyString: res.bodyString,
-                                          bodyBytes: res.bodyBytes)
-              continuation.resume(returning: wrapped)
+              continuation.resume(returning: res)
             case .failure(let err):
               continuation.resume(throwing: err)
             }
           }
+
+          if !attached {
+            continuation.resume(returning: FetchCache.getResultIfFresh(key, maxAgeMs: Int64(req.prefetchCacheTtlMs ?? 5_000)))
+          }
+        }
+        if let res = joined {
+          // Mirror Android: mark response as coming from prefetch
+          var headers = res.headers ?? []
+          headers.append(NitroHeader(key: "nitroPrefetched", value: "true"))
+          return NitroResponse(url: res.url,
+                               status: res.status,
+                               statusText: res.statusText,
+                               ok: res.ok,
+                               redirected: res.redirected,
+                               headers: headers,
+                               bodyString: res.bodyString,
+                               bodyBytes: res.bodyBytes)
         }
       }
     }
@@ -291,12 +294,11 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
       return // already have a fresh result
     }
 
-    if FetchCache.getPending(key) {
+    // Mark pending and start the request. beginPending is atomic, so two racing
+    // prefetches for the same key cannot both start one.
+    guard FetchCache.beginPending(key) else {
       return // already pending
     }
-
-    // Mark pending and start the request
-    FetchCache.addPending(key) { _ in /* ignored here */ }
     Task.detached {
       do {
         let (urlRequest, finalURL) = try await buildURLRequest(req, bodyData: bodyData)

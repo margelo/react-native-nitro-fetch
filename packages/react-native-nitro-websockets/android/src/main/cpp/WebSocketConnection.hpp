@@ -45,6 +45,7 @@ public:
   void setOnError(OnError cb) override;
 
   // lws callback handlers (internal, not part of the base interface)
+  void handleFilterPreEstablish(lws* wsi);
   void handleEstablished(lws* wsi);
   void handleReceive(const void* in, size_t len, bool isBinary);
   void handleReceiveFragment(lws* wsi, const void* in, size_t len);

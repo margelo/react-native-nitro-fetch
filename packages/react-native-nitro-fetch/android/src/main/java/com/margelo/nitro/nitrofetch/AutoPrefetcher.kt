@@ -151,14 +151,13 @@ object AutoPrefetcher {
 
       val req = buildNitroRequestFromEntry(o, tokens)
 
-      if (FetchCache.getPending(prefetchKey) != null) continue
       val entryTtlMs = if (o.has("prefetchCacheTtlMs") && !o.isNull("prefetchCacheTtlMs")) {
         o.optDouble("prefetchCacheTtlMs").toLong()
       } else 5_000L
       if (FetchCache.hasFreshResult(prefetchKey, entryTtlMs)) continue
 
       val future = CompletableFuture<NitroResponse>()
-      FetchCache.setPending(prefetchKey, future)
+      if (FetchCache.beginPending(prefetchKey, future) != null) continue
       HybridNitroFetchClient.fetch(req,
         onSuccess = { res ->
           try {

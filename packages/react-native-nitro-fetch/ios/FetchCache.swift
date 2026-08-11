@@ -6,58 +6,54 @@ final class FetchCache {
     let timestampMs: Int64
   }
 
-  private static let queue = DispatchQueue(label: "nitrofetch.cache", attributes: .concurrent)
+  private static let lock = NSLock()
   private static var pending: [String: [(Result<NitroResponse, Error>) -> Void]] = [:]
   private static var results: [String: CachedEntry] = [:]
 
   static func getPending(_ key: String) -> Bool {
-    var has = false
-    queue.sync { has = pending[key] != nil }
-    return has
+    lock.lock()
+    defer { lock.unlock() }
+    return pending[key] != nil
   }
 
-  static func addPending(_ key: String, completion: @escaping (Result<NitroResponse, Error>) -> Void) {
-    queue.async(flags: .barrier) {
-      var arr = pending[key] ?? []
-      arr.append(completion)
-      pending[key] = arr
-    }
+  static func beginPending(_ key: String) -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    if pending[key] != nil { return false }
+    pending[key] = []
+    return true
+  }
+
+
+  static func joinPending(
+    _ key: String,
+    completion: @escaping (Result<NitroResponse, Error>) -> Void
+  ) -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    guard pending[key] != nil else { return false }
+    pending[key]?.append(completion)
+    return true
   }
 
   static func complete(_ key: String, with result: Result<NitroResponse, Error>) {
-    queue.async(flags: .barrier) {
-      let callbacks = pending.removeValue(forKey: key) ?? []
-      if case let .success(resp) = result {
-        results[key] = CachedEntry(response: resp, timestampMs: Int64(Date().timeIntervalSince1970 * 1000))
-      }
-      callbacks.forEach { $0(result) }
+    lock.lock()
+    let callbacks = pending.removeValue(forKey: key) ?? []
+    if case let .success(resp) = result {
+      results[key] = CachedEntry(response: resp, timestampMs: Int64(Date().timeIntervalSince1970 * 1000))
     }
+    lock.unlock()
+    // Outside the lock: a callback may re-enter FetchCache.
+    callbacks.forEach { $0(result) }
   }
 
   static func getResultIfFresh(_ key: String, maxAgeMs: Int64) -> NitroResponse? {
-    var out: NitroResponse?
-    var shouldEvict = false
-    queue.sync {
-      if let entry = results[key] {
-        let age = Int64(Date().timeIntervalSince1970 * 1000) - entry.timestampMs
-        if age <= maxAgeMs {
-          out = entry.response
-        } else {
-          shouldEvict = true
-        }
-      }
-    }
-    if shouldEvict {
-      queue.async(flags: .barrier) {
-        if let entry = results[key] {
-          let age = Int64(Date().timeIntervalSince1970 * 1000) - entry.timestampMs
-          if age > maxAgeMs {
-            results.removeValue(forKey: key)
-          }
-        }
-      }
-    }
-    return out
+    lock.lock()
+    defer { lock.unlock() }
+    guard let entry = results[key] else { return nil }
+    let age = Int64(Date().timeIntervalSince1970 * 1000) - entry.timestampMs
+    if age <= maxAgeMs { return entry.response }
+    results.removeValue(forKey: key)
+    return nil
   }
 }
-

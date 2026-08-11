@@ -120,7 +120,11 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       // && so every `if (devToolsEnabled)` block below becomes dead code and
       // the DevToolsReporter classes drop out of the release APK entirely.
       // The UUID generation is gated too so SecureRandom isn't touched in release.
-      val devToolsEnabled = BuildConfig.DEBUG && DevToolsReporter.isDebuggingEnabled()
+      // Opt out via `NitroFetch_disableDevToolsReporting=true` in gradle.properties
+      //  Avoids double-logging with expo-dev-client
+      val devToolsEnabled = BuildConfig.DEBUG &&
+        !BuildConfig.NITRO_FETCH_DISABLE_DEVTOOLS_REPORTING &&
+        DevToolsReporter.isDebuggingEnabled()
       val devToolsRequestId = if (devToolsEnabled) (req.requestId ?: UUID.randomUUID().toString()) else ""
       val callback = object : UrlRequest.Callback() {
         private val buffer = ByteBuffer.allocateDirect(16 * 1024)
@@ -542,14 +546,12 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       promise.resolve(Unit)
       return promise
     }
-    // If already pending, resolve when it's done
-    FetchCache.getPending(key)?.let { fut ->
+    // Atomic begin: if another prefetch won the race, resolve when it's done
+    val future = java.util.concurrent.CompletableFuture<NitroResponse>()
+    FetchCache.beginPending(key, future)?.let { fut ->
       fut.whenComplete { _, err -> if (err != null) promise.reject(err) else promise.resolve(Unit) }
       return promise
     }
-    // Start new prefetch
-    val future = java.util.concurrent.CompletableFuture<NitroResponse>()
-    FetchCache.setPending(key, future)
     fetch(
       req,
       onSuccess = { res ->
