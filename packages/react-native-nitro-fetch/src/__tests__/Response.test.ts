@@ -102,3 +102,36 @@ describe('NitroResponse — empty body', () => {
     expect(buf.byteLength).toBe(0);
   });
 });
+
+describe('NitroResponse — streamed body', () => {
+  function makeStreamResponse(payload: string): NitroResponse {
+    const bytes = new TextEncoder().encode(payload);
+    const body = new ReadableStream<Uint8Array<ArrayBuffer>>({
+      start(controller) {
+        controller.enqueue(bytes as Uint8Array<ArrayBuffer>);
+        controller.close();
+      },
+    });
+    return new NitroResponse({
+      url: 'https://example.com',
+      status: 200,
+      statusText: 'OK',
+      ok: true,
+      redirected: false,
+      headers: [],
+      body,
+    });
+  }
+
+  it('text() drains a streamed body', async () => {
+    const res = makeStreamResponse('{"ok":true}');
+    expect(await res.text()).toBe('{"ok":true}');
+  });
+
+  it('json() drains and parses a streamed body', async () => {
+    const res = makeStreamResponse('{"headers":{"Cache-Control":"no-store"}}');
+    await expect(res.json()).resolves.toEqual({
+      headers: { 'Cache-Control': 'no-store' },
+    });
+  });
+});

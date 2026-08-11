@@ -465,7 +465,10 @@ describe('Fetch - cache option', () => {
       cache: 'no-store',
       stream: true,
     } as any);
+    // Streamed responses must still expose a consumable JSON body so the
+    // echo endpoint can assert the outbound Cache-Control header.
     const body = await res.json();
+    expect(body.headers).toBeDefined();
     const cc =
       body.headers['Cache-Control'] || body.headers['cache-control'] || '';
     expect(cc).toContain('no-store');

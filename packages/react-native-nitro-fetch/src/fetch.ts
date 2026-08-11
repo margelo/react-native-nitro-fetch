@@ -47,6 +47,7 @@ function applyCacheHeaders(
   headers: NitroHeader[],
   cache: RequestCache | undefined
 ): void {
+  'worklet';
   if (cache === 'no-store') {
     headers.push({ key: 'Cache-Control', value: 'no-store' });
   } else if (cache === 'no-cache') {
@@ -393,6 +394,7 @@ export function buildNitroRequestPure(
   const headers = headersToPairsPure(headersInit) ?? [];
   const normalized = normalizeBodyPure(body);
   applyDefaultContentType(headers, normalized?.contentType);
+  applyCacheHeaders(headers, init?.cache as RequestCache | undefined);
 
   const prefetchCacheTtlMs =
     typeof init?.prefetchCacheTtlMs === 'number'
