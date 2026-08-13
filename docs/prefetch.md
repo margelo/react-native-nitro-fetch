@@ -119,3 +119,5 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 ```
 
 The queue is the same JSON array under key `nitrofetch_autoprefetch_queue` written by `prefetchOnAppStart()` on JS.
+
+Because an entry carries the request's headers, the queue is stored encrypted at rest — AES-GCM with the key held in the Android Keystore / iOS Keychain — so registering an authenticated prefetch does not leave a credential in plain `SharedPreferences` / `UserDefaults`. A queue written by an older version is read back and re-written encrypted on first access.

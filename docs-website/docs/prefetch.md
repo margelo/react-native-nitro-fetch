@@ -109,6 +109,8 @@ For FormData with file uploads, only reference stable URIs (bundled assets, pers
 
 The fields are JSON-serialized in `NativeStorage` under `nitrofetch_autoprefetch_queue`. Defaults are omitted to keep entries compact and backward-compatible: a body-less GET stays `{ url, prefetchKey, headers }`.
 
+Because an entry carries the request's headers, the queue is stored **encrypted at rest** — AES-GCM with the key held in the Android Keystore / iOS Keychain — so registering an authenticated prefetch does not leave a credential in plain `SharedPreferences` / `UserDefaults`. A queue written by a version older than the one that introduced this is read back and re-written encrypted on first access.
+
 ## Cache TTL
 
 A cached prefetch is considered fresh for **5 seconds** by default. The check happens at *read time* — when `fetch()` looks up the entry, anything older than the TTL is evicted and the request goes to the network. Five seconds is fine for "prewarm the next screen the user is about to tap," but too short for cross-launch prefetches that have to survive the JS bundle boot, or for screens reached via a slow route.

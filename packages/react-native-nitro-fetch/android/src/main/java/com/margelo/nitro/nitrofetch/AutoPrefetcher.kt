@@ -49,7 +49,11 @@ object AutoPrefetcher {
     try {
       val prefs = context.applicationContext
         .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-      val raw = prefs.getString(KEY_QUEUE, null) ?: ""
+      // Queue entries embed the request headers, so the value can hold a
+      // credential — keep it on the encrypted-at-rest path. A value written in
+      // the clear by an older version is read back and migrated by
+      // getDecryptedForPrefs.
+      val raw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: ""
       val arr = if (raw.isEmpty()) JSONArray() else try { JSONArray(raw) } catch (_: Throwable) { JSONArray() }
 
       val next = JSONArray()
@@ -59,7 +63,7 @@ object AutoPrefetcher {
         next.put(o)
       }
       next.put(entry)
-      prefs.edit().putString(KEY_QUEUE, next.toString()).apply()
+      NitroFetchSecureAtRest.putEncrypted(prefs, KEY_QUEUE, next.toString())
     } catch (_: Throwable) {
       // best-effort
     }
@@ -82,7 +86,9 @@ object AutoPrefetcher {
     initialized = true
     try {
       val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-      val raw = prefs.getString(KEY_QUEUE, null) ?: ""
+      // Same as registerPrefetch: the queue can hold credentials, so it lives on
+      // the encrypted-at-rest path and a legacy plaintext value is migrated.
+      val raw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: ""
       if (raw.isEmpty()) return
       val arr = JSONArray(raw)
 

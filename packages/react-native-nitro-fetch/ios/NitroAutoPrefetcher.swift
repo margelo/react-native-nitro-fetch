@@ -97,7 +97,11 @@ public final class NitroAutoPrefetcher: NSObject {
     let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
 
     var arr: [[String: Any]] = []
-    if let raw = userDefaults.string(forKey: queueKey),
+    // Queue entries embed the request headers, so the value can hold a
+    // credential — keep it on the encrypted-at-rest path. A value written in the
+    // clear by an older version is returned as-is and migrated by
+    // decryptedString.
+    if let raw = NitroFetchSecureAtRest.decryptedString(forKey: queueKey, defaults: userDefaults),
        !raw.isEmpty,
        let data = raw.data(using: .utf8),
        let parsed = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
@@ -107,7 +111,7 @@ public final class NitroAutoPrefetcher: NSObject {
     arr.append(entry)
     if let data = try? JSONSerialization.data(withJSONObject: arr),
        let str = String(data: data, encoding: .utf8) {
-      userDefaults.set(str, forKey: queueKey)
+      try? NitroFetchSecureAtRest.setEncrypted(str, forKey: queueKey, defaults: userDefaults)
     }
 
     if initialized {
@@ -124,7 +128,12 @@ public final class NitroAutoPrefetcher: NSObject {
     initialized = true
 
     let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
-    guard let raw = userDefaults.string(forKey: queueKey), !raw.isEmpty else { return }
+    // Same as registerPrefetchInternal: the queue can hold credentials, so it
+    // lives on the encrypted-at-rest path and a legacy plaintext value is
+    // migrated. The token-refresh config a few lines below already goes through
+    // the same Keychain-backed key.
+    guard let raw = NitroFetchSecureAtRest.decryptedString(forKey: queueKey, defaults: userDefaults),
+          !raw.isEmpty else { return }
     guard let data = raw.data(using: .utf8) else { return }
     guard let arr = try? JSONSerialization.jsonObject(with: data, options: []) as? [Any] else { return }
 
