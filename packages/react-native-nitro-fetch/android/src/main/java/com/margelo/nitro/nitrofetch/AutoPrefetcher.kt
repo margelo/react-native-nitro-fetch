@@ -84,6 +84,16 @@ object AutoPrefetcher {
   fun prefetchOnStart(app: Application) {
     if (initialized) return
     initialized = true
+    // Called from `Application.onCreate()`, before React Native boots, so
+    // anything synchronous here sits on the startup critical path. Reading the
+    // queue is a Keystore-backed decrypt, and the token-refresh branch makes a
+    // blocking network call, so run the whole body on a background thread.
+    // Nothing below needs the main thread: `startPrefetches` only hands the
+    // requests to Cronet, which dispatches asynchronously.
+    Thread { runPrefetchOnStart(app) }.start()
+  }
+
+  private fun runPrefetchOnStart(app: Application) {
     try {
       val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
       // Same as registerPrefetch: the queue can hold credentials, so it lives on
@@ -95,54 +105,47 @@ object AutoPrefetcher {
       val refreshRaw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_REFRESH)
 
       if (!refreshRaw.isNullOrEmpty()) {
-        // Token refresh requires a network call — run everything on a background thread
-        Thread {
-          try {
-            val refreshConfig = JSONObject(refreshRaw)
-            val onFailure = refreshConfig.optString("onFailure", "useStoredHeaders")
-            val refreshURL = refreshConfig.optString("url", "(unknown)")
-            NitroLogger.d("NitroFetch", "[TokenRefresh] Calling refresh endpoint: $refreshURL")
+        val refreshConfig = JSONObject(refreshRaw)
+        val onFailure = refreshConfig.optString("onFailure", "useStoredHeaders")
+        val refreshURL = refreshConfig.optString("url", "(unknown)")
+        NitroLogger.d("NitroFetch", "[TokenRefresh] Calling refresh endpoint: $refreshURL")
 
-            val refreshed = callTokenRefreshSync(refreshConfig)
+        val refreshed = callTokenRefreshSync(refreshConfig)
 
-            val tokens: TokenRefreshResult = if (refreshed != null) {
-              NitroLogger.d(
-                "NitroFetch",
-                "[TokenRefresh] ✅ Success — got ${refreshed.headers.size} header(s), " +
-                  "${refreshed.bodyFields.size} body field(s), ${refreshed.formFields.size} form field(s)"
-              )
-              logTokens(refreshed)
-              // Cache fresh tokens for useStoredHeaders fallback on next cold start
-              NitroFetchSecureAtRest.putEncrypted(prefs, KEY_TOKEN_CACHE, serializeCache(refreshed))
-              refreshed
-            } else {
-              NitroLogger.d("NitroFetch", "[TokenRefresh] ❌ Refresh failed — onFailure: $onFailure")
-              if (onFailure == "skip") {
-                NitroLogger.d("NitroFetch", "[TokenRefresh] Skipping all prefetches")
-                return@Thread
-              }
-              // Use last cached tokens (or empty if none cached yet)
-              val cached = deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
-              NitroLogger.d(
-                "NitroFetch",
-                "[TokenRefresh] Using cached tokens (${cached.headers.size} header(s), " +
-                  "${cached.bodyFields.size} body field(s), ${cached.formFields.size} form field(s))"
-              )
-              cached
-            }
-
-            NitroLogger.d("NitroFetch", "[TokenRefresh] Injecting tokens into ${arr.length()} prefetch URL(s)")
-            startPrefetches(arr, tokens)
-          } catch (_: Throwable) {
-            // Best-effort — never crash the app
+        val tokens: TokenRefreshResult = if (refreshed != null) {
+          NitroLogger.d(
+            "NitroFetch",
+            "[TokenRefresh] ✅ Success — got ${refreshed.headers.size} header(s), " +
+              "${refreshed.bodyFields.size} body field(s), ${refreshed.formFields.size} form field(s)"
+          )
+          logTokens(refreshed)
+          // Cache fresh tokens for useStoredHeaders fallback on next cold start
+          NitroFetchSecureAtRest.putEncrypted(prefs, KEY_TOKEN_CACHE, serializeCache(refreshed))
+          refreshed
+        } else {
+          NitroLogger.d("NitroFetch", "[TokenRefresh] ❌ Refresh failed — onFailure: $onFailure")
+          if (onFailure == "skip") {
+            NitroLogger.d("NitroFetch", "[TokenRefresh] Skipping all prefetches")
+            return
           }
-        }.start()
+          // Use last cached tokens (or empty if none cached yet)
+          val cached = deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
+          NitroLogger.d(
+            "NitroFetch",
+            "[TokenRefresh] Using cached tokens (${cached.headers.size} header(s), " +
+              "${cached.bodyFields.size} body field(s), ${cached.formFields.size} form field(s))"
+          )
+          cached
+        }
+
+        NitroLogger.d("NitroFetch", "[TokenRefresh] Injecting tokens into ${arr.length()} prefetch URL(s)")
+        startPrefetches(arr, tokens)
       } else {
-        // No token refresh config — proceed on current thread (Cronet is async)
+        // No token refresh config — Cronet is async, so this only enqueues.
         startPrefetches(arr, TokenRefreshResult.EMPTY)
       }
     } catch (_: Throwable) {
-      // ignore – prefetch-on-start is best-effort
+      // ignore – prefetch-on-start is best-effort, never crash the app
     }
   }
 
