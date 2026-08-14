@@ -492,7 +492,9 @@ describe('NitroFetch - AbortController', () => {
 });
 
 describe('NitroFetch - nitroFetchOnWorklet', () => {
-  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(['bitcoin'].join(','))}&vs_currencies=usd`;
+  const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(
+    ['bitcoin'].join(',')
+  )}&vs_currencies=usd`;
   const mapper = (payload: { bodyString?: string }) => {
     'worklet';
     const txt = payload.bodyString ?? '';
@@ -670,7 +672,8 @@ it('never sends prefetchKey to the server on any request path', async () => {
     stream: true,
   })) as any;
   const reader = streamed.body.getReader();
-  const decoder = new (require('react-native-nitro-text-decoder').TextDecoder)();
+  const decoder =
+    new (require('react-native-nitro-text-decoder').TextDecoder)();
   let text = '';
   while (true) {
     const { done, value } = await reader.read();
@@ -689,4 +692,3 @@ it('never sends prefetchKey to the server on any request path', async () => {
 
   await removeFromAutoPrefetch(key);
 });
-
