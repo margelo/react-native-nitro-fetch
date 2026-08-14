@@ -305,6 +305,61 @@ describe('NitroWebSocket - Server-initiated close', () => {
   });
 });
 
+// ─── close() during the handshake (issue #163) ───────────────────────────────
+// /ws/stall accepts the TCP connection but never sends its 101, so the socket
+// is guaranteed to still be CONNECTING when close() lands. On Android this used
+// to abort the process inside lws_close_reason(): the wsi still had an HTTP
+// role, so `assert(lwsi_role_ws(wsi))` failed. A regression here kills the
+// whole harness process, not just this test.
+
+describe('NitroWebSocket - close during handshake', () => {
+  it('close() while CONNECTING terminates the socket instead of crashing', async () => {
+    const ws = new NitroWebSocket(`${WS_BASE}/ws/stall`);
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 300));
+    expect(ws.readyState).toBe('CONNECTING');
+
+    const terminated = await withTimeout(
+      new Promise<'close' | 'error'>((resolve) => {
+        ws.onclose = () => resolve('close');
+        ws.onerror = () => resolve('error');
+        ws.close(1000, 'closing mid-handshake');
+      }),
+      10_000,
+      'close during handshake'
+    );
+
+    expect(terminated === 'close' || terminated === 'error').toBe(true);
+    expect(ws.readyState).toBe('CLOSED');
+  });
+
+  it('survives repeated connect+close cycles during the handshake', async () => {
+    for (let i = 0; i < 5; i++) {
+      const ws = new NitroWebSocket(`${WS_BASE}/ws/stall`);
+      await new Promise<void>((resolve) => setTimeout(resolve, 50));
+      ws.close(1000, `cycle ${i}`);
+    }
+    await new Promise<void>((resolve) => setTimeout(resolve, 1_000));
+
+    // Still alive and usable: the service thread survived every teardown.
+    const ws = await withTimeout(
+      new Promise<NitroWebSocket>((resolve, reject) => {
+        const _ws = new NitroWebSocket(`${WS_BASE}/ws/echo`);
+        _ws.onopen = () => resolve(_ws);
+        _ws.onerror = (err) => reject(new Error(err));
+      })
+    );
+    const echoed = await withTimeout(
+      new Promise<WebSocketMessageEvent>((resolve) => {
+        ws.onmessage = resolve;
+        ws.send('still-alive');
+      })
+    );
+    expect(echoed.data).toBe('still-alive');
+    await closeAndWait(ws);
+  });
+});
+
 describe('NitroWebSocket - Handshake headers', () => {
   function handshake(
     protocols?: string[],
