@@ -650,3 +650,43 @@ describe('NitroFetch - Streaming', () => {
     expect(total).toBe(numBytes);
   });
 });
+
+it('never sends prefetchKey to the server on any request path', async () => {
+  const url = `${BASE}/headers`;
+  const key = `harness-strip-${String(Date.now())}`;
+  const init = {
+    headers: { 'prefetchKey': key, 'X-Nitro-Test': 'keep' },
+    prefetchCacheTtlMs: 60_000,
+  } as any;
+  const sentKeys = (json: any): string[] =>
+    Object.keys(json.headers ?? {}).map((k) => k.toLowerCase());
+
+  const plain = await nitroFetch(url, init);
+  expect(plain.ok).toBe(true);
+  expect(sentKeys(await plain.json())).not.toContain('prefetchkey');
+
+  const streamed = (await (nitroFetch as any)(url, {
+    ...init,
+    stream: true,
+  })) as any;
+  const reader = streamed.body.getReader();
+  const decoder = new (require('react-native-nitro-text-decoder').TextDecoder)();
+  let text = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) text += decoder.decode(value, { stream: true });
+  }
+  expect(sentKeys(JSON.parse(text))).not.toContain('prefetchkey');
+
+  await prefetch(url, init);
+  const cached = await nitroFetch(url, init);
+  expect(cached.headers.get('nitroPrefetched')).toBe('true');
+  // Body echoes the prefetch's own outbound request.
+  const cachedKeys = sentKeys(await cached.json());
+  expect(cachedKeys).not.toContain('prefetchkey');
+  expect(cachedKeys).toContain('x-nitro-test');
+
+  await removeFromAutoPrefetch(key);
+});
+
