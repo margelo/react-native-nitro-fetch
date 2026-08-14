@@ -345,7 +345,10 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     var r = URLRequest(url: url)
     if let m = req.method?.rawValue { r.httpMethod = reqToHttpMethod(req) }
     if let headers = req.headers {
-      for h in headers { r.addValue(h.value, forHTTPHeaderField: h.key) }
+      // prefetchKey is an internal cache key, never sent on the server
+      for h in headers where h.key.caseInsensitiveCompare("prefetchKey") != .orderedSame {
+        r.addValue(h.value, forHTTPHeaderField: h.key)
+      }
     }
     if let parts = req.bodyFormData, !parts.isEmpty {
       let (body, contentType) = try await buildMultipartBody(parts)

@@ -799,7 +799,11 @@ async function nitroStreamFetch(
   const builder = NitroCronetSingleton.newUrlRequestBuilder(url);
   builder.setHttpMethod(method);
   if (init?.credentials === 'omit') builder.disableCookies();
-  headers.forEach((h) => builder.addHeader(h.key, h.value));
+  // prefetchKey is an internal cache key, never sent on the server
+  headers.forEach((h) => {
+    if (h.key.toLowerCase() === 'prefetchkey') return;
+    builder.addHeader(h.key, h.value);
+  });
 
   if (normalized?.bodyBytes) builder.setUploadBody(normalized.bodyBytes);
   else if (normalized?.bodyString != null)

@@ -279,7 +279,11 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       val builder = engine.newUrlRequestBuilder(url, callback, executor)
       val method = req.method?.name ?: "GET"
       builder.setHttpMethod(method)
-      req.headers?.forEach { (k, v) -> builder.addHeader(k, v) }
+      // prefetchKey is an internal cache key, never sent on the server
+      req.headers?.forEach { (k, v) ->
+        if (k.equals("prefetchKey", ignoreCase = true)) return@forEach
+        builder.addHeader(k, v)
+      }
 
       if (!omitCredentials) {
         NitroCookieSync.attachCookieFromManagerIfMissing(
