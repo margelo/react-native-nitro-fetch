@@ -205,16 +205,23 @@ void WebSocketConnection::connect(
 
 
 void WebSocketConnection::close(int code, const std::string& reason) {
-  if (_state == State::CLOSED || _state == State::CLOSING) return;
-  _state = State::CLOSING;
+  State prev = _state.load();
+  do {
+    if (prev == State::CLOSING || prev == State::CLOSED) return;
+  } while (!_state.compare_exchange_weak(prev, State::CLOSING));
 
-  _localCloseCode   = (code >= 1000 && code <= 4999) ? code : LWS_CLOSE_STATUS_NORMAL;
+  int closeCode     = (code >= 1000 && code <= 4999) ? code : LWS_CLOSE_STATUS_NORMAL;
+  _localCloseCode   = closeCode;
   _localCloseReason = reason;
 
   auto self = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
-  LwsContext::instance().schedule([self, code, reason]() {
+  LwsContext::instance().schedule([self, prev, closeCode, reason]() {
     if (!self->_wsi) return;
-    int closeCode = (code >= 1000 && code <= 4999) ? code : LWS_CLOSE_STATUS_NORMAL;
+    if (prev == State::CONNECTING) {
+      // Mid-handshake the wsi still has an HTTP role; lws_close_reason() would assert.
+      lws_set_timeout(self->_wsi, PENDING_TIMEOUT_USER_OK, LWS_TO_KILL_ASYNC);
+      return;
+    }
     lws_close_reason(self->_wsi,
                      static_cast<lws_close_status>(closeCode),
                      reinterpret_cast<unsigned char*>(const_cast<char*>(reason.c_str())),
@@ -312,14 +319,16 @@ void WebSocketConnection::handleEstablished(lws* wsi) {
 #if defined(NITRO_WS_TRACING)
   ATrace_beginSection("NitroWS established");
 #endif
-  _wsi   = wsi;
-  _state = State::OPEN;
+  _wsi = wsi;
   _redirectCount = 0;
 
-  if (_onOpen) {
-    _onOpen();
-  } else {
-    _openFired = true;
+  State expected = State::CONNECTING;
+  if (_state.compare_exchange_strong(expected, State::OPEN)) {
+    if (_onOpen) {
+      _onOpen();
+    } else {
+      _openFired = true;
+    }
   }
 #if defined(NITRO_WS_TRACING)
   ATrace_endSection();

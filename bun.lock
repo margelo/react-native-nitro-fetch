@@ -146,7 +146,7 @@
     },
     "packages/react-native-nitro-websockets": {
       "name": "react-native-nitro-websockets",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "devDependencies": {
         "@expo/config-plugins": "^9.0.0",
         "@react-native/eslint-config": "^0.86.0",

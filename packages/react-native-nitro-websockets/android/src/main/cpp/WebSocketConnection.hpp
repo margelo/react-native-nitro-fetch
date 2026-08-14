@@ -64,7 +64,7 @@ private:
   std::string _url;
   std::string _negotiatedProtocol;
   std::string _extensions;
-  State       _state = State::CONNECTING;
+  std::atomic<State> _state{State::CONNECTING};
 
   OnOpen    _onOpen;
   OnMessage _onMessage;
