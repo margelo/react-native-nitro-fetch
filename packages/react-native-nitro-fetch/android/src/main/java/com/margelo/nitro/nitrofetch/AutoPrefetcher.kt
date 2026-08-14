@@ -7,10 +7,13 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executors
 
 
 object AutoPrefetcher {
   @Volatile private var initialized = false
+  // Serializes queue reads/writes and keeps Keystore work off the caller (main) thread.
+  private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "NitroAutoPrefetch") }
   private const val KEY_QUEUE = "nitrofetch_autoprefetch_queue"
   private const val KEY_TOKEN_REFRESH = "nitro_token_refresh_fetch"
   private const val KEY_TOKEN_CACHE = "nitro_token_refresh_fetch_cache"
@@ -46,58 +49,45 @@ object AutoPrefetcher {
       method, bodyString, bodyBytesBase64, bodyFormData, timeoutMs, followRedirects,
       prefetchCacheTtlMs
     )
-    try {
-      val prefs = context.applicationContext
-        .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-      // Queue entries embed the request headers, so the value can hold a
-      // credential — keep it on the encrypted-at-rest path. A value written in
-      // the clear by an older version is read back and migrated by
-      // getDecryptedForPrefs.
-      val raw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: ""
-      val arr = if (raw.isEmpty()) JSONArray() else try { JSONArray(raw) } catch (_: Throwable) { JSONArray() }
-
-      val next = JSONArray()
-      for (i in 0 until arr.length()) {
-        val o = arr.optJSONObject(i) ?: continue
-        if (o.optString("prefetchKey", "") == prefetchKey) continue
-        next.put(o)
-      }
-      next.put(entry)
-      NitroFetchSecureAtRest.putEncrypted(prefs, KEY_QUEUE, next.toString())
-    } catch (_: Throwable) {
-      // best-effort
-    }
-
-    if (initialized) {
-      // late path — kick a single immediate prefetch with cached tokens
+    val appContext = context.applicationContext
+    executor.execute {
       try {
-        val prefs = context.applicationContext
-          .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val tokens = deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        // Entries embed request headers (may hold credentials) — encrypted-at-rest; legacy plaintext migrates on read.
+        val raw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: ""
+        val arr = if (raw.isEmpty()) JSONArray() else try { JSONArray(raw) } catch (_: Throwable) { JSONArray() }
 
-        val single = JSONArray().apply { put(entry) }
-        startPrefetches(single, tokens)
-      } catch (_: Throwable) {}
+        val next = JSONArray()
+        for (i in 0 until arr.length()) {
+          val o = arr.optJSONObject(i) ?: continue
+          if (o.optString("prefetchKey", "") == prefetchKey) continue
+          next.put(o)
+        }
+        next.put(entry)
+        NitroFetchSecureAtRest.putEncrypted(prefs, KEY_QUEUE, next.toString())
+
+        if (initialized) {
+          // late path — kick a single immediate prefetch with cached tokens
+          val tokens = deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
+          val single = JSONArray().apply { put(entry) }
+          startPrefetches(single, tokens)
+        }
+      } catch (_: Throwable) {
+        // best-effort
+      }
     }
   }
 
   fun prefetchOnStart(app: Application) {
-    if (initialized) return
-    initialized = true
-    // Called from `Application.onCreate()`, before React Native boots, so
-    // anything synchronous here sits on the startup critical path. Reading the
-    // queue is a Keystore-backed decrypt, and the token-refresh branch makes a
-    // blocking network call, so run the whole body on a background thread.
-    // Nothing below needs the main thread: `startPrefetches` only hands the
-    // requests to Cronet, which dispatches asynchronously.
-    Thread { runPrefetchOnStart(app) }.start()
+    // Queue decrypt + token refresh are blocking — keep them off the startup critical path.
+    executor.execute { runPrefetchOnStart(app) }
   }
 
   private fun runPrefetchOnStart(app: Application) {
+    if (initialized) return
+    initialized = true
     try {
       val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-      // Same as registerPrefetch: the queue can hold credentials, so it lives on
-      // the encrypted-at-rest path and a legacy plaintext value is migrated.
       val raw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: ""
       if (raw.isEmpty()) return
       val arr = JSONArray(raw)

@@ -109,7 +109,7 @@ For FormData with file uploads, only reference stable URIs (bundled assets, pers
 
 The fields are JSON-serialized in `NativeStorage` under `nitrofetch_autoprefetch_queue`. Defaults are omitted to keep entries compact and backward-compatible: a body-less GET stays `{ url, prefetchKey, headers }`.
 
-Because an entry carries the request's headers, the queue is stored **encrypted at rest** — AES-GCM with the key held in the Android Keystore / iOS Keychain — so registering an authenticated prefetch does not leave a credential in plain `SharedPreferences` / `UserDefaults`. A queue written by a version older than the one that introduced this is read back and re-written encrypted on first access.
+Because an entry carries the request's headers, the queue is stored **encrypted at rest** — AES-GCM with the key held in the Android Keystore / iOS Keychain — so registering an authenticated prefetch does not leave a credential in plain `SharedPreferences` / `UserDefaults`. A queue written by a version older than the one that introduced this is read back and re-written encrypted on first access. If the Keystore/Keychain is unavailable, writes fall back to plaintext so a registration is never lost.
 
 ## Cache TTL
 
