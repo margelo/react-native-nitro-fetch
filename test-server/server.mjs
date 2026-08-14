@@ -230,7 +230,20 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 //   /ws/headers                             -> first message is the handshake headers as JSON
 //   /ws/close?code=1011&reason=x&delay=200  -> server-initiated close handshake
 //   /ws/kill?delay=200                      -> socket destroyed, no close frame
-const wss = new WebSocketServer({ server });
+//   /ws/stall                               -> accepts the upgrade, never sends 101
+const wss = new WebSocketServer({ noServer: true });
+
+// /ws/stall holds the TCP connection open without completing the handshake, so
+// the client stays in CONNECTING. Everything else goes to the ws server.
+server.on('upgrade', (req, socket, head) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  if (url.pathname === '/ws/stall') {
+    socket.on('error', () => {});
+    return;
+  }
+  wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+});
+
 wss.on('connection', (ws, req) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const delay = Number(url.searchParams.get('delay')) || 200;
