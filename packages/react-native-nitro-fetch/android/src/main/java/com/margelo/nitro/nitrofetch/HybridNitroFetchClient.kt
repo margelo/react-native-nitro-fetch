@@ -279,10 +279,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       val builder = engine.newUrlRequestBuilder(url, callback, executor)
       val method = req.method?.name ?: "GET"
       builder.setHttpMethod(method)
-      // `prefetchKey` is an internal cache key, not a request header — every
-      // caller that needs it has already read it off the original NitroRequest
-      // via findPrefetchKey() before reaching this point, so it must not go out
-      // on the wire.
+      // prefetchKey is an internal cache key, never sent on the server
       req.headers?.forEach { (k, v) ->
         if (k.equals("prefetchKey", ignoreCase = true)) return@forEach
         builder.addHeader(k, v)

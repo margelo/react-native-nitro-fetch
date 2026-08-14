@@ -345,10 +345,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     var r = URLRequest(url: url)
     if let m = req.method?.rawValue { r.httpMethod = reqToHttpMethod(req) }
     if let headers = req.headers {
-      // `prefetchKey` is an internal cache key, not a request header — every
-      // caller that needs it has already read it off the original NitroRequest
-      // via findPrefetchKey() before reaching this point, so it must not go out
-      // on the wire.
+      // prefetchKey is an internal cache key, never sent on the server
       for h in headers where h.key.caseInsensitiveCompare("prefetchKey") != .orderedSame {
         r.addValue(h.value, forHTTPHeaderField: h.key)
       }

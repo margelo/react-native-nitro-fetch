@@ -799,9 +799,7 @@ async function nitroStreamFetch(
   const builder = NitroCronetSingleton.newUrlRequestBuilder(url);
   builder.setHttpMethod(method);
   if (init?.credentials === 'omit') builder.disableCookies();
-  // `prefetchKey` is an internal cache key, not a request header. The streaming
-  // path does not consult the prefetch cache at all, so it is inert here — but a
-  // caller reusing a request shape that carries it should not have it sent.
+  // prefetchKey is an internal cache key, never sent on the server
   headers.forEach((h) => {
     if (h.key.toLowerCase() === 'prefetchkey') return;
     builder.addHeader(h.key, h.value);
