@@ -73,7 +73,7 @@ internal object NitroFetchSecureAtRest {
     return String(cipher.doFinal(ciphertext), Charsets.UTF_8)
   }
 
-  /** Plaintext for JSON parsing, or null if key absent. Migrates legacy plaintext to encrypted. */
+  /** Plaintext for JSON parsing, or null if absent/undecryptable. Migrates legacy plaintext to encrypted. */
   fun getDecryptedForPrefs(prefs: SharedPreferences, key: String): String? {
     val raw = prefs.getString(key, null) ?: return null
     if (raw.isEmpty()) return ""
@@ -81,7 +81,7 @@ internal object NitroFetchSecureAtRest {
       try {
         decrypt(raw.substring(ENC_PREFIX.length))
       } catch (_: Throwable) {
-        raw
+        null
       }
     } else {
       try {
@@ -92,8 +92,14 @@ internal object NitroFetchSecureAtRest {
   }
 
   fun putEncrypted(prefs: SharedPreferences, key: String, plain: String): Boolean {
-    val enc = ENC_PREFIX + encrypt(plain)
-    return prefs.edit().putString(key, enc).commit()
+    // Falls back to plaintext if the Keystore is unavailable — never lose the write.
+    val value = try {
+      ENC_PREFIX + encrypt(plain)
+    } catch (t: Throwable) {
+      NitroLogger.w("NitroFetchSecureAtRest", "Keystore unavailable — storing \"$key\" unencrypted", t)
+      plain
+    }
+    return prefs.edit().putString(key, value).commit()
   }
 
   fun removeFromPrefs(prefs: SharedPreferences, key: String): Boolean {

@@ -14,7 +14,7 @@ internal enum NitroFetchSecureAtRest {
   private static let keychainAccount = "master"
 
   private static func loadOrCreateSymmetricKey() throws -> SymmetricKey {
-    if let data = try? loadKeyData(), data.count == 32 {
+    if let data = try loadKeyData(), data.count == 32 {
       return SymmetricKey(data: data)
     }
     var bytes = [UInt8](repeating: 0, count: 32)
@@ -27,7 +27,8 @@ internal enum NitroFetchSecureAtRest {
     return SymmetricKey(data: data)
   }
 
-  private static func loadKeyData() throws -> Data {
+  /// Nil only if the key doesn't exist; throws otherwise so a transient Keychain error never regenerates the key.
+  private static func loadKeyData() throws -> Data? {
     let query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: keychainService,
@@ -37,6 +38,7 @@ internal enum NitroFetchSecureAtRest {
     ]
     var out: CFTypeRef?
     let status = SecItemCopyMatching(query as CFDictionary, &out)
+    if status == errSecItemNotFound { return nil }
     guard status == errSecSuccess, let d = out as? Data else {
       throw NSError(domain: "NitroFetchSecure", code: Int(status), userInfo: nil)
     }
@@ -85,22 +87,28 @@ internal enum NitroFetchSecureAtRest {
     return s
   }
 
-  /// Plaintext, or nil if missing.
+  /// Plaintext, or nil if missing/undecryptable. Migrates legacy plaintext to encrypted.
   static func decryptedString(forKey key: String, defaults: UserDefaults) -> String? {
     guard let stored = defaults.string(forKey: key) else { return nil }
     if stored.isEmpty { return "" }
     if stored.hasPrefix(encPrefix) {
       let payload = String(stored.dropFirst(encPrefix.count))
-      if let s = try? decryptPayload(payload) { return s }
-      return stored
+      return try? decryptPayload(payload)
     }
-    _ = try? setEncrypted(stored, forKey: key, defaults: defaults)
+    setEncrypted(stored, forKey: key, defaults: defaults)
     return stored
   }
 
-  static func setEncrypted(_ plain: String, forKey key: String, defaults: UserDefaults) throws {
-    let enc = try encrypt(plain)
-    defaults.set(enc, forKey: key)
+  /// Falls back to plaintext if the Keychain is unavailable — never lose the write.
+  static func setEncrypted(_ plain: String, forKey key: String, defaults: UserDefaults) {
+    let value: String
+    do {
+      value = try encrypt(plain)
+    } catch {
+      NitroLogger.log("[NitroFetch] Keychain unavailable — storing \"\(key)\" unencrypted (\(error))")
+      value = plain
+    }
+    defaults.set(value, forKey: key)
     defaults.synchronize()
   }
 
@@ -146,7 +154,7 @@ final class HybridNativeStorage: HybridNativeStorageSpec {
   }
 
   func setSecureString(key: String, value: String) throws {
-    try NitroFetchSecureAtRest.setEncrypted(value, forKey: key, defaults: userDefaults)
+    NitroFetchSecureAtRest.setEncrypted(value, forKey: key, defaults: userDefaults)
   }
 
   func removeSecureString(key: String) throws {
