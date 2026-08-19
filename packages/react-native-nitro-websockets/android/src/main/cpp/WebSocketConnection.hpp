@@ -21,7 +21,6 @@ namespace margelo::nitro::nitrofetchwebsockets {
 class WebSocketConnection : public WebSocketConnectionBase {
 public:
   WebSocketConnection();
-  ~WebSocketConnection() override;
 
   WebSocketConnection(const WebSocketConnection&) = delete;
   WebSocketConnection& operator=(const WebSocketConnection&) = delete;
@@ -56,9 +55,14 @@ public:
   void handleAppendHandshakeHeader(uint8_t** p, uint8_t* end, lws* wsi);
   void handleRedirect(const std::string& location);
   bool consumeRedirectFlag() { return _isRedirecting.exchange(false); }
+  std::shared_ptr<WebSocketConnection> takeSelfRef() { return std::move(_selfRef); }
 
 private:
   void requestWrite();
+  void fireClose(int code, const std::string& reason, bool wasClean);
+
+  // Held while a wsi points at us, so lws can never call into a freed object.
+  std::shared_ptr<WebSocketConnection> _selfRef;
 
   lws*        _wsi = nullptr;
   std::string _url;
@@ -72,6 +76,7 @@ private:
   OnError   _onError;
 
   std::atomic<bool> _openFired{false};
+  std::atomic<bool> _closeFired{false};
   std::atomic<bool> _isRedirecting{false};
   std::atomic<int>  _redirectCount{0};
   static constexpr int kMaxRedirects = 5;

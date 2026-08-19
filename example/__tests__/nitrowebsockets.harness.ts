@@ -333,6 +333,32 @@ describe('NitroWebSocket - close during handshake', () => {
     expect(ws.readyState).toBe('CLOSED');
   });
 
+  it('close() while CONNECTING still fires onclose with 1006, wasClean=false', async () => {
+    const ws = new NitroWebSocket(`${WS_BASE}/ws/stall`);
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 300));
+    expect(ws.readyState).toBe('CONNECTING');
+
+    let closeCount = 0;
+    const closeEvent = await withTimeout(
+      new Promise<WebSocketCloseEvent>((resolve) => {
+        ws.onclose = (event) => {
+          closeCount++;
+          resolve(event);
+        };
+        ws.close(1000, 'closing mid-handshake');
+      }),
+      10_000,
+      'onclose during handshake'
+    );
+
+    expect(closeEvent.code).toBe(1006);
+    expect(closeEvent.wasClean).toBe(false);
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 500));
+    expect(closeCount).toBe(1);
+  });
+
   it('survives repeated connect+close cycles during the handshake', async () => {
     for (let i = 0; i < 5; i++) {
       const ws = new NitroWebSocket(`${WS_BASE}/ws/stall`);
