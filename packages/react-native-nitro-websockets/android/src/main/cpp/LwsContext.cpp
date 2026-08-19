@@ -75,14 +75,17 @@ void LwsContext::wakeup() {
 
 void LwsContext::loop() {
   while (_running) {
-    // Drain pending operations before each service call
-    std::vector<std::function<void()>> ops;
+    // Drain pending operations before each service call. Scoped so the ops
+    // release their captured refs now, not after lws_service blocks.
     {
-      std::lock_guard<std::mutex> lock(_mu);
-      ops.swap(_pending);
-    }
-    for (auto& fn : ops) {
-      fn();
+      std::vector<std::function<void()>> ops;
+      {
+        std::lock_guard<std::mutex> lock(_mu);
+        ops.swap(_pending);
+      }
+      for (auto& fn : ops) {
+        fn();
+      }
     }
 
     lws_service(_ctx, 50);

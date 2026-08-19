@@ -85,18 +85,22 @@ int nitroWsCallback(lws* wsi, enum lws_callback_reasons reason,
       if (conn) conn->handlePeerClose(in, len);
       break;
 
-    case LWS_CALLBACK_CLIENT_CLOSED:
-      if (conn) conn->handleClose();
+    case LWS_CALLBACK_CLIENT_CLOSED: {
+      if (!conn) break;
+      auto keepAlive = conn->takeSelfRef();
+      conn->handleClose();
       break;
+    }
 
     case LWS_CALLBACK_CLIENT_CONNECTION_ERROR: {
-      if (conn) {
-        if (conn->consumeRedirectFlag()) break;
-        const char* msg = (in && len > 0)
-          ? static_cast<const char*>(in)
-          : "connection error";
-        conn->handleError(msg);
-      }
+      if (!conn) break;
+      // A redirect replaces the wsi, so the self-reference must survive it.
+      if (conn->consumeRedirectFlag()) break;
+      auto keepAlive = conn->takeSelfRef();
+      const char* msg = (in && len > 0)
+        ? static_cast<const char*>(in)
+        : "connection error";
+      conn->handleError(msg);
       break;
     }
 
@@ -127,14 +131,6 @@ int nitroWsCallback(lws* wsi, enum lws_callback_reasons reason,
 
 WebSocketConnection::WebSocketConnection() {}
 
-WebSocketConnection::~WebSocketConnection() {
-  if (_wsi != nullptr) {
-    lws_set_wsi_user(_wsi, nullptr);
-    lws_cancel_service(LwsContext::instance().ctx());
-    _wsi = nullptr;
-  }
-}
-
 
 void WebSocketConnection::connect(
     const std::string& url,
@@ -153,8 +149,13 @@ void WebSocketConnection::connect(
   try {
     parsed = parseUrl(url);
   } catch (const std::exception& e) {
-    if (_onError) _onError(e.what());
+    std::string what = e.what();
     _state = State::CLOSED;
+    auto self = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
+    LwsContext::instance().schedule([self, what]() {
+      if (self->_onError) self->_onError(what);
+      self->fireClose(1006, "", false);
+    });
     return;
   }
 
@@ -179,6 +180,8 @@ void WebSocketConnection::connect(
   auto isWss       = parsed.isWss;
 
   LwsContext::instance().schedule([self, host, port, path, protoStr, isWss]() {
+    self->_selfRef = self;
+
     lws_client_connect_info i = {};
     i.context      = LwsContext::instance().ctx();
     i.address      = host.c_str();
@@ -192,8 +195,9 @@ void WebSocketConnection::connect(
 
     lws* wsi = lws_client_connect_via_info(&i);
     if (wsi == nullptr) {
+      self->_selfRef.reset();
       if (self->_onError) self->_onError("lws_client_connect_via_info returned null");
-      self->_state = State::CLOSED;
+      self->fireClose(1006, "", false);
     } else {
       self->_wsi = wsi;
     }
@@ -210,12 +214,12 @@ void WebSocketConnection::close(int code, const std::string& reason) {
     if (prev == State::CLOSING || prev == State::CLOSED) return;
   } while (!_state.compare_exchange_weak(prev, State::CLOSING));
 
-  int closeCode     = (code >= 1000 && code <= 4999) ? code : LWS_CLOSE_STATUS_NORMAL;
-  _localCloseCode   = closeCode;
-  _localCloseReason = reason;
+  int closeCode = (code >= 1000 && code <= 4999) ? code : LWS_CLOSE_STATUS_NORMAL;
 
   auto self = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
   LwsContext::instance().schedule([self, prev, closeCode, reason]() {
+    self->_localCloseCode   = closeCode;
+    self->_localCloseReason = reason;
     if (!self->_wsi) return;
     if (prev == State::CONNECTING) {
       // Mid-handshake the wsi still has an HTTP role; lws_close_reason() would assert.
@@ -276,33 +280,47 @@ void WebSocketConnection::requestWrite() {
 }
 
 
+// The lws service thread invokes these, so it also owns them: assigning from
+// the JS thread would free a std::function mid-call.
 void WebSocketConnection::setOnOpen(OnOpen cb) {
-  _onOpen = std::move(cb);
-  if (_onOpen && _openFired.exchange(false)) {
-    _onOpen();
-  }
+  auto self = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
+  LwsContext::instance().schedule([self, cb = std::move(cb)]() mutable {
+    self->_onOpen = std::move(cb);
+    if (self->_onOpen && self->_openFired.exchange(false)) {
+      self->_onOpen();
+    }
+  });
 }
 
 void WebSocketConnection::setOnMessage(OnMessage cb) {
-  _onMessage = std::move(cb);
-  if (_onMessage) {
+  auto self = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
+  LwsContext::instance().schedule([self, cb = std::move(cb)]() mutable {
+    self->_onMessage = std::move(cb);
+    if (!self->_onMessage) return;
+
     std::deque<BufferedMessage> buf;
     {
-      std::lock_guard<std::mutex> lock(_msgMu);
-      buf = std::move(_msgBuffer);
+      std::lock_guard<std::mutex> lock(self->_msgMu);
+      buf = std::move(self->_msgBuffer);
     }
     for (auto& m : buf) {
-      _onMessage(m.data.data(), m.data.size(), m.isBinary);
+      self->_onMessage(m.data.data(), m.data.size(), m.isBinary);
     }
-  }
+  });
 }
 
 void WebSocketConnection::setOnClose(OnClose cb) {
-  _onClose = std::move(cb);
+  auto self = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
+  LwsContext::instance().schedule([self, cb = std::move(cb)]() mutable {
+    self->_onClose = std::move(cb);
+  });
 }
 
 void WebSocketConnection::setOnError(OnError cb) {
-  _onError = std::move(cb);
+  auto self = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
+  LwsContext::instance().schedule([self, cb = std::move(cb)]() mutable {
+    self->_onError = std::move(cb);
+  });
 }
 
 
@@ -426,27 +444,32 @@ void WebSocketConnection::handlePeerClose(const void* in, size_t len) {
   _state = State::CLOSING;
 }
 
+void WebSocketConnection::fireClose(int code, const std::string& reason, bool wasClean) {
+  if (_closeFired.exchange(true)) return;
+  _state = State::CLOSED;
+  if (_onClose) _onClose(code, reason, wasClean);
+}
+
 void WebSocketConnection::handleClose() {
 #if defined(NITRO_WS_TRACING)
   ATrace_beginSection("NitroWS close");
 #endif
-  _state = State::CLOSED;
-  _wsi   = nullptr;
-  if (_onClose) {
-    if (_peerCloseCode > 0) {
-      _onClose(_peerCloseCode, _peerCloseReason, true);
-    } else if (_localCloseCode > 0) {
-      _onClose(_localCloseCode, _localCloseReason, true);
-    } else {
-      // Transport dropped without a close handshake.
-      _onClose(1006, "", false);
-    }
+  _wsi = nullptr;
+  if (_peerCloseCode > 0) {
+    fireClose(_peerCloseCode, _peerCloseReason, true);
+  } else if (_localCloseCode > 0) {
+    fireClose(_localCloseCode, _localCloseReason, true);
+  } else {
+    // Transport dropped without a close handshake.
+    fireClose(1006, "", false);
   }
 #if defined(NITRO_WS_TRACING)
   ATrace_endSection();
 #endif
 }
 
+// lws makes CLIENT_CONNECTION_ERROR and CLIENT_CLOSED mutually exclusive, so
+// this is the only place a failed connection can still emit its close event.
 void WebSocketConnection::handleError(const char* msg) {
 #if defined(NITRO_WS_TRACING)
   ATrace_beginSection("NitroWS error");
@@ -454,6 +477,7 @@ void WebSocketConnection::handleError(const char* msg) {
   _state = State::CLOSED;
   _wsi   = nullptr;
   if (_onError) _onError(msg ? std::string(msg) : "WebSocket error");
+  fireClose(1006, "", false);
 #if defined(NITRO_WS_TRACING)
   ATrace_endSection();
 #endif
