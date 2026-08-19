@@ -247,8 +247,9 @@ void NWWebSocketConnection::connect(
 
 void NWWebSocketConnection::close(int code, const std::string& reason) {
   State expected = State::OPEN;
-  if (!_state.compare_exchange_strong(expected, State::CLOSING,
-        std::memory_order_acq_rel)) {
+  bool wasOpen = _state.compare_exchange_strong(expected, State::CLOSING,
+        std::memory_order_acq_rel);
+  if (!wasOpen) {
     if (expected == State::CONNECTING) {
       _state.store(State::CLOSING, std::memory_order_release);
     } else {
@@ -257,8 +258,12 @@ void NWWebSocketConnection::close(int code, const std::string& reason) {
   }
 
   int closeCode = (code >= 1000 && code <= 4999) ? code : 1000;
-  _localCloseCode = closeCode;
-  _localCloseReason = reason;
+  // Mid-handshake there is no close handshake to complete, so the close event
+  // has to report 1006/not-clean rather than the requested code.
+  if (wasOpen) {
+    _localCloseCode = closeCode;
+    _localCloseReason = reason;
+  }
 
   if (!_impl->task) return;
 
