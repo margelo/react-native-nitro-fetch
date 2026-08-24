@@ -180,7 +180,7 @@ app.get('/stream/:n', (req, res) => {
   res.set('Content-Type', 'application/json');
   let i = 0;
   let closed = false;
-  res.on('close', () => {
+  req.on('close', () => {
     closed = true;
   });
   const tick = () => {
@@ -208,7 +208,7 @@ app.get('/drip', (req, res) => {
   let closed = false;
   const report = { sent: 0, finished: false, disconnected: false, total: numbytes };
   if (id) dripReports.set(id, report);
-  res.on('close', () => {
+  req.on('close', () => {
     closed = true;
     if (!report.finished) report.disconnected = true;
   });
@@ -233,7 +233,7 @@ app.get('/drip-report/:id', (req, res) => {
 app.all('/delay/:n', (req, res) => {
   const n = Math.min(60, Math.max(0, parseInt(req.params.n, 10) || 0));
   const timer = setTimeout(() => res.json(baseInfo(req)), n * 1000);
-  res.on('close', () => clearTimeout(timer));
+  req.on('close', () => clearTimeout(timer));
 });
 
 const server = app.listen(PORT, '0.0.0.0', () => {
