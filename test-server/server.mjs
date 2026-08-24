@@ -193,25 +193,41 @@ app.get('/stream/:n', (req, res) => {
   tick();
 });
 
+// Reports for /drip?id=... so tests can assert the client actually hung up
+// mid-body instead of draining the response to completion.
+const dripReports = new Map();
+
 app.get('/drip', (req, res) => {
   const duration = parseFloat(req.query.duration ?? '2');
   const numbytes = Math.max(0, parseInt(req.query.numbytes ?? '10', 10));
   const delay = parseFloat(req.query.delay ?? '0');
+  const id = req.query.id;
   res.set('Content-Type', 'application/octet-stream');
   const interval = numbytes > 0 ? Math.max(1, (duration * 1000) / numbytes) : 0;
   let sent = 0;
   let closed = false;
+  const report = { sent: 0, finished: false, disconnected: false, total: numbytes };
+  if (id) dripReports.set(id, report);
   res.on('close', () => {
     closed = true;
+    if (!report.finished) report.disconnected = true;
   });
   const drip = () => {
     if (closed) return;
-    if (sent >= numbytes) return res.end();
+    if (sent >= numbytes) {
+      report.finished = true;
+      return res.end();
+    }
     res.write(Buffer.from([0x2a]));
     sent++;
+    report.sent = sent;
     setTimeout(drip, interval);
   };
   setTimeout(drip, delay * 1000);
+});
+
+app.get('/drip-report/:id', (req, res) => {
+  res.json(dripReports.get(req.params.id) ?? { missing: true });
 });
 
 app.all('/delay/:n', (req, res) => {
