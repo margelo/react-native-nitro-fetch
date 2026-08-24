@@ -102,7 +102,7 @@
   "peerDependencies": {
     "react": "*",
     "react-native": "*",
-    "react-native-nitro-modules": "^0.36.1",
+    "react-native-nitro-modules": ">=0.36.1",
     "react-native-worklets": ">=0.8.0"
   },
   "peerDependenciesMeta": {
