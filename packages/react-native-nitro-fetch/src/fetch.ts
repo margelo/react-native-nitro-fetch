@@ -822,9 +822,19 @@ async function nitroStreamFetch(
       abortListener = undefined;
     };
 
+    let streamCancelled = false;
     const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
       start(controller) {
         streamController = controller;
+      },
+      cancel() {
+        streamCancelled = true;
+        cleanupAbortListener();
+        try {
+          request.cancel();
+        } catch {
+          return;
+        }
       },
     });
 
@@ -854,7 +864,8 @@ async function nitroStreamFetch(
     });
 
     builder.onReadCompleted((_info, byteBuffer, bytesRead) => {
-      if (signal?.aborted) return;
+      // A cancelled stream can still receive an in-flight native read.
+      if (streamCancelled || signal?.aborted) return;
       const chunk = new Uint8Array(byteBuffer, 0, bytesRead).slice();
       streamBytesReceived += bytesRead;
       streamController.enqueue(chunk);
@@ -865,6 +876,7 @@ async function nitroStreamFetch(
 
     builder.onSucceeded((_info) => {
       cleanupAbortListener();
+      if (streamCancelled) return;
       streamController.close();
       if (inspectorId) {
         const info = _info as any;

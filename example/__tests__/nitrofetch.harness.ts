@@ -591,6 +591,69 @@ describe('NitroFetch - Streaming', () => {
     expect(threw).toBe(true);
   });
 
+  // The server drips for 10s. Polling stops the moment it records either
+  // outcome, so a request that drains to completion fails fast rather than
+  // burning the whole budget. Cronet can take a few seconds to close the
+  // socket when the cancel lands before the first read completes.
+  const openDrip = async (id: string) =>
+    (await (nitroFetch as any)(
+      `${BASE}/drip?duration=10&numbytes=100&delay=0&id=${id}`,
+      { stream: true }
+    )) as any;
+
+  const awaitDripOutcome = async (id: string) => {
+    const deadline = Date.now() + 8_000;
+    let report: any;
+    do {
+      report = await (await nitroFetch(`${BASE}/drip-report/${id}`)).json();
+      if (report.disconnected || report.finished) return report;
+      await new Promise((r) => setTimeout(r, 250));
+    } while (Date.now() < deadline);
+    return report;
+  };
+
+  it('reader.cancel() disconnects the native request from the server', async () => {
+    const id = `reader-cancel-${String(Date.now())}`;
+    const res = await openDrip(id);
+    const reader = res.body.getReader();
+    const first = await reader.read();
+    expect(first.done).toBe(false);
+    await reader.cancel();
+
+    const report = await awaitDripOutcome(id);
+    expect(report.disconnected).toBe(true);
+    expect(report.finished).toBe(false);
+    expect(report.sent).toBeLessThan(report.total);
+  });
+
+  it('response.body.cancel() before the first read disconnects too', async () => {
+    const id = `body-cancel-${String(Date.now())}`;
+    const res = await openDrip(id);
+    await res.body.cancel();
+
+    const report = await awaitDripOutcome(id);
+    expect(report.disconnected).toBe(true);
+    expect(report.finished).toBe(false);
+  });
+
+  // Smoke check, not a discriminator: a throw from a Nitro callback is
+  // swallowed natively, so this only catches a cancel that wedges the client.
+  it('repeated mid-stream cancels leave the client usable', async () => {
+    for (let i = 0; i < 3; i++) {
+      const res = (await (nitroFetch as any)(
+        `${BASE}/drip?duration=3&numbytes=60&delay=0`,
+        { stream: true }
+      )) as any;
+      const reader = res.body.getReader();
+      await reader.read();
+      await reader.cancel();
+    }
+    await new Promise((r) => setTimeout(r, 1_000));
+
+    const after = await nitroFetch(`${BASE}/get`);
+    expect(after.ok).toBe(true);
+  });
+
   it('streams JSON lines from /stream/5 and produces non-empty text', async () => {
     const res = (await (nitroFetch as any)(`${BASE}/stream/5`, {
       stream: true,
