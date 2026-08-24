@@ -50,6 +50,10 @@ export type TokenRefreshConfig = {
 export async function fetch(
   input: RequestInfo | URL,
   init?: RequestInit & {
+    /**
+     * Accepted for parity with the native build and ignored on web — the
+     * platform `fetch` always streams `response.body`.
+     */
     stream?: boolean;
     redirect?: RequestRedirect;
     cache?: RequestCache;

@@ -935,6 +935,25 @@ async function nitroStreamFetch(
 export async function nitroFetch(
   input: RequestInfo | URL,
   init?: RequestInit & {
+    /**
+     * Opt in to the streaming transport. Required for SSE, token streams, or any
+     * progressive body — omitting it is silent, not an error.
+     *
+     * When `true` (http(s) URLs only), the promise resolves as soon as response
+     * headers arrive and `response.body` emits one chunk per native read.
+     *
+     * When omitted or `false`, the whole body is buffered natively and the
+     * promise resolves only after the last byte. `response.body` is still a
+     * `ReadableStream`, so a reader loop compiles and parses every frame
+     * correctly — but it enqueues the entire body as a single chunk and closes.
+     * Nothing arrives early.
+     *
+     * Not a free upgrade: the streaming transport is a separate native client.
+     * It does not consult the prefetch cache, always reports
+     * `response.redirected === false`, and ignores `redirect: 'error'`.
+     *
+     * @default false
+     */
     stream?: boolean;
     redirect?: RequestRedirect;
     cache?: RequestCache;
