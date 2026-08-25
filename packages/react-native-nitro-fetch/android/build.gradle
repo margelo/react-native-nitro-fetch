@@ -33,6 +33,7 @@ def getExtOrIntegerDefault(name) {
 android {
   namespace "com.margelo.nitro.nitrofetch"
 
+  ndkVersion getExtOrDefault("ndkVersion")
   compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
 
   defaultConfig {
