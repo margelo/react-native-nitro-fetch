@@ -50,6 +50,11 @@ jobs:
       - name: Build package
         run: bun prepare
 
+      - name: Verify WebSocket package entrypoints
+        run: |
+          bun websockets clean
+          node scripts/verify-package-entrypoints.mjs packages/react-native-nitro-websockets
+
   build-android:
     runs-on: ubuntu-latest
     env:

@@ -77,7 +77,7 @@
     "build:plugin": "cd expo/plugins && npx tsc",
     "release": "npm run build:plugin && release-it --only-version",
     "specs": "tsc --noEmit false && nitrogen --logLevel=\"debug\"",
-    "prepack": "cp ../../README.md ./README.md",
+    "prepack": "tsc --build --force && bun run build:plugin && cp ../../README.md ./README.md",
     "postpack": "rm -f ./README.md"
   },
   "keywords": [
