@@ -1,6 +1,6 @@
 {
   "name": "react-native-nitro-websockets",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "react-native-nitro-websockets",
   "main": "lib/index",
   "module": "lib/index",
