@@ -1,6 +1,5 @@
 import { NitroHeaders } from './Headers';
-import { stringToUTF8, utf8ToString } from './utf8';
-import { bytesToBlob } from './blob';
+import { Body } from './Body';
 import type { NitroHeader } from './NitroFetch.nitro';
 
 export type ResponseType =
@@ -43,10 +42,7 @@ export class NitroResponse {
   readonly headers: NitroHeaders;
   readonly type: ResponseType;
 
-  private _bodyBytes: ArrayBuffer | undefined;
-  private _bodyString: string | undefined;
-  private _bodyStream: ReadableStream<Uint8Array<ArrayBuffer>> | undefined;
-  private _bodyUsed: boolean = false;
+  private _body: Body;
 
   constructor(body?: BodyInit | null, init?: ResponseInit);
   constructor(init: NitroResponseInit);
@@ -64,48 +60,66 @@ export class NitroResponse {
       this.redirected = nitroInit.redirected;
       this.type = nitroInit.type ?? 'basic';
 
-      if (nitroInit.headers instanceof NitroHeaders) {
-        this.headers = nitroInit.headers;
-      } else {
-        this.headers = new NitroHeaders(nitroInit.headers);
-      }
-
-      this._bodyBytes = nitroInit.bodyBytes;
-      this._bodyString = nitroInit.bodyString;
-      this._bodyStream = nitroInit.body;
+      this.headers = new NitroHeaders(nitroInit.headers);
+      this._body = new Body({
+        bytes: nitroInit.bodyBytes,
+        text: nitroInit.bodyString,
+        stream: nitroInit.body,
+      });
     } else {
       // Public constructor: new Response(body?, init?)
       const body = bodyOrInit as BodyInit | null | undefined;
       this.status = init?.status ?? 200;
       this.statusText = init?.statusText ?? '';
+      if (
+        !Number.isInteger(this.status) ||
+        this.status < 200 ||
+        this.status > 599
+      ) {
+        throw new RangeError(
+          'Response status must be an integer between 200 and 599.'
+        );
+      }
+      if (/[^\t\x20-\x7e\x80-\xff]/.test(this.statusText)) {
+        throw new TypeError('Invalid response status text.');
+      }
+      if (body != null && [204, 205, 304].includes(this.status)) {
+        throw new TypeError('This response status cannot have a body.');
+      }
       this.ok = this.status >= 200 && this.status < 300;
       this.url = '';
       this.redirected = false;
       this.type = 'default';
       this.headers = new NitroHeaders(init?.headers as any);
+      this._body = new Body();
 
       if (body == null) {
         // no body
       } else if (typeof body === 'string') {
-        this._bodyString = body;
+        this._body = new Body({ text: body });
+        if (!this.headers.has('content-type')) {
+          this.headers.set('content-type', 'text/plain;charset=UTF-8');
+        }
       } else if (body instanceof ArrayBuffer) {
-        this._bodyBytes = body;
+        this._body = new Body({ bytes: body.slice(0) });
       } else if (ArrayBuffer.isView(body)) {
         const view = body as ArrayBufferView;
-        this._bodyBytes = (view.buffer as ArrayBuffer).slice(
-          view.byteOffset,
-          view.byteOffset + view.byteLength
-        );
+        this._body = new Body({
+          bytes: (view.buffer as ArrayBuffer).slice(
+            view.byteOffset,
+            view.byteOffset + view.byteLength
+          ),
+        });
       } else if (
         typeof ReadableStream !== 'undefined' &&
         body instanceof ReadableStream
       ) {
-        this._bodyStream = body;
+        this._body = new Body({ stream: body });
       } else if (
         typeof URLSearchParams !== 'undefined' &&
         body instanceof URLSearchParams
       ) {
-        this._bodyString = body.toString();
+        this._body = new Body({ text: body.toString() });
         if (!this.headers.has('content-type')) {
           this.headers.set(
             'content-type',
@@ -113,178 +127,58 @@ export class NitroResponse {
           );
         }
       } else if (typeof Blob !== 'undefined' && body instanceof Blob) {
-        // Store as string — RN Blobs are string-backed
-        this._bodyString = '';
-        this._bodyStream = body.stream?.() as
-          | ReadableStream<Uint8Array<ArrayBuffer>>
-          | undefined;
+        this._body = new Body({ blob: body });
+        if (body.type && !this.headers.has('content-type')) {
+          this.headers.set('content-type', body.type);
+        }
+      } else {
+        throw new TypeError('Unsupported NitroResponse body type.');
       }
     }
   }
 
   get bodyUsed(): boolean {
-    return this._bodyUsed;
+    return this._body.used;
   }
 
   get body(): ReadableStream<Uint8Array<ArrayBuffer>> | null {
-    if (this._bodyStream) return this._bodyStream;
-    const bytes = this._getBodyBytes();
-    if (!bytes) return null;
-    return new ReadableStream<Uint8Array<ArrayBuffer>>({
-      start(controller) {
-        controller.enqueue(new Uint8Array(bytes));
-        controller.close();
-      },
-    });
-  }
-
-  private _throwIfBodyUsed(): void {
-    if (this._bodyUsed) {
-      throw new TypeError('Body has already been consumed.');
-    }
-  }
-
-  private _getBodyBytes(): ArrayBuffer | undefined {
-    // TODO: copy buffer to avoid clone being modifying res
-    if (this._bodyBytes != null) return this._bodyBytes;
-    if (this._bodyString != null) {
-      const encoded = stringToUTF8(this._bodyString);
-      return (encoded.buffer as ArrayBuffer).slice(
-        encoded.byteOffset,
-        encoded.byteOffset + encoded.byteLength
-      );
-    }
-    return undefined;
-  }
-
-  private _getBodyString(): string {
-    if (this._bodyString != null) return this._bodyString;
-    if (this._bodyBytes) {
-      return utf8ToString(new Uint8Array(this._bodyBytes));
-    }
-    return '';
+    return this._body.stream;
   }
 
   async text(): Promise<string> {
-    this._throwIfBodyUsed();
-    this._bodyUsed = true;
-    if (this._bodyStream && !this._bodyBytes && this._bodyString == null) {
-      const reader = this._bodyStream.getReader();
-      const chunks: Uint8Array[] = [];
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (value) chunks.push(value);
-      }
-      // Concatenate chunks
-      let totalLen = 0;
-      for (const c of chunks) totalLen += c.byteLength;
-      const merged = new Uint8Array(totalLen);
-      let offset = 0;
-      for (const c of chunks) {
-        merged.set(c, offset);
-        offset += c.byteLength;
-      }
-      return utf8ToString(merged);
-    }
-
-    return this._getBodyString();
+    return this._body.text();
   }
 
   async json(): Promise<any> {
-    this._throwIfBodyUsed();
-    this._bodyUsed = true;
-    const t = this._getBodyString();
-    return JSON.parse(t || '{}');
+    return JSON.parse(await this.text());
   }
 
   async arrayBuffer(): Promise<ArrayBuffer> {
-    this._throwIfBodyUsed();
-    this._bodyUsed = true;
-    if (this._bodyStream && !this._bodyBytes && this._bodyString == null) {
-      const reader = this._bodyStream.getReader();
-      const chunks: Uint8Array[] = [];
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (value) chunks.push(value);
-      }
-      let totalLen = 0;
-      for (const c of chunks) totalLen += c.byteLength;
-      const merged = new Uint8Array(totalLen);
-      let offset = 0;
-      for (const c of chunks) {
-        merged.set(c, offset);
-        offset += c.byteLength;
-      }
-      return merged.buffer.slice(
-        merged.byteOffset,
-        merged.byteOffset + merged.byteLength
-      );
-    }
-
-    return this._getBodyBytes() ?? new ArrayBuffer(0);
-  }
-
-  // Same merge as arrayBuffer(); used only by blob().
-  private async _drainStream(): Promise<ArrayBuffer> {
-    const reader = this._bodyStream!.getReader();
-    const chunks: Uint8Array[] = [];
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value) chunks.push(value);
-    }
-    let totalLen = 0;
-    for (const c of chunks) totalLen += c.byteLength;
-    const merged = new Uint8Array(totalLen);
-    let offset = 0;
-    for (const c of chunks) {
-      merged.set(c, offset);
-      offset += c.byteLength;
-    }
-    return merged.buffer.slice(
-      merged.byteOffset,
-      merged.byteOffset + merged.byteLength
-    );
+    return this._body.arrayBuffer();
   }
 
   async blob(): Promise<Blob> {
-    this._throwIfBodyUsed();
-    this._bodyUsed = true;
     const contentType = this.headers.get('content-type') ?? '';
-    if (this._bodyStream && !this._bodyBytes && this._bodyString == null) {
-      return bytesToBlob(await this._drainStream(), contentType);
-    }
-    // Prefer raw bytes: _bodyString is empty/lossy for non-UTF-8 bodies.
-    if (this._bodyBytes != null) {
-      return bytesToBlob(this._bodyBytes, contentType);
-    }
-    return new Blob([this._getBodyString()], { type: contentType });
+    return this._body.blob(contentType);
   }
 
   async bytes(): Promise<Uint8Array<ArrayBuffer>> {
-    this._throwIfBodyUsed();
-    this._bodyUsed = true;
-    const buffer = this._getBodyBytes() ?? new ArrayBuffer(0);
-    return new Uint8Array(buffer);
+    return new Uint8Array(await this.arrayBuffer());
   }
 
   clone(): NitroResponse {
-    if (this._bodyUsed) {
-      throw new TypeError('Cannot clone a Response whose body has been used.');
-    }
-    return new NitroResponse({
+    const body = this._body.clone();
+    const cloned = new NitroResponse({
       url: this.url,
       status: this.status,
       statusText: this.statusText,
       ok: this.ok,
       redirected: this.redirected,
       headers: this.headers,
-      bodyBytes: this._bodyBytes,
-      bodyString: this._bodyString,
       type: this.type,
     });
+    cloned._body = body;
+    return cloned;
   }
 
   async formData(): Promise<never> {
@@ -305,27 +199,18 @@ export class NitroResponse {
     });
   }
 
-  static json(
-    data: unknown,
-    init?: {
-      status?: number;
-      statusText?: string;
-      headers?: Record<string, string> | [string, string][];
-    }
-  ): NitroResponse {
+  static json(data: unknown, init?: ResponseInit): NitroResponse {
     const body = JSON.stringify(data);
+    if (body === undefined) {
+      throw new TypeError('The value cannot be serialized as JSON.');
+    }
     const headers = new NitroHeaders(init?.headers as any);
     if (!headers.has('content-type')) {
       headers.set('content-type', 'application/json');
     }
-    return new NitroResponse({
-      url: '',
-      status: init?.status ?? 200,
-      statusText: init?.statusText ?? '',
-      ok: (init?.status ?? 200) >= 200 && (init?.status ?? 200) < 300,
-      redirected: false,
-      headers,
-      bodyString: body,
+    return new NitroResponse(body, {
+      ...init,
+      headers: headers as unknown as HeadersInit,
     });
   }
 
@@ -333,7 +218,9 @@ export class NitroResponse {
     const validStatuses = [301, 302, 303, 307, 308];
     if (!validStatuses.includes(status)) {
       throw new RangeError(
-        `Invalid redirect status: ${status}. Must be one of ${validStatuses.join(', ')}`
+        `Invalid redirect status: ${status}. Must be one of ${validStatuses.join(
+          ', '
+        )}`
       );
     }
     const headers = new NitroHeaders();

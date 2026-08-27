@@ -2,7 +2,8 @@
 // Native (Cronet/URLSession) is unavailable on the web, so we delegate to the
 // browser's built-in fetch and stub native-only APIs with console.warn.
 
-import { NitroRequest as NitroRequestClass } from './Request';
+import { platformFetch } from './platformFetch';
+import { utf8ToString } from './utf8';
 import type { RequestRedirect, RequestCache } from './Request';
 
 export { NitroHeaders as Headers } from './Headers';
@@ -57,31 +58,10 @@ export async function fetch(
     stream?: boolean;
     redirect?: RequestRedirect;
     cache?: RequestCache;
+    prefetchCacheTtlMs?: number;
   }
 ): Promise<Response> {
-  let resolvedInput: RequestInfo | URL = input;
-  let resolvedInit = init;
-  if (input instanceof NitroRequestClass) {
-    const method = (init?.method ?? input.method).toUpperCase();
-    const hasBodyMethod = method !== 'GET' && method !== 'HEAD';
-    let body: BodyInit | null | undefined = init?.body;
-    if (body === undefined && hasBodyMethod) {
-      const bytes = await input.arrayBuffer().catch(() => undefined);
-      body = bytes && bytes.byteLength > 0 ? bytes : null;
-    }
-    resolvedInput = input.url;
-    resolvedInit = {
-      ...init,
-      method,
-      headers: (init?.headers ??
-        (input.headers as unknown as HeadersInit)) as HeadersInit,
-      body,
-      redirect: init?.redirect ?? input.redirect,
-      cache: init?.cache ?? input.cache,
-      signal: init?.signal ?? input.signal,
-    };
-  }
-  return globalThis.fetch(resolvedInput as RequestInfo, resolvedInit);
+  return platformFetch(input, init);
 }
 
 export type NitroWorkletMapper<T> = (payload: {
@@ -104,11 +84,11 @@ export async function nitroFetchOnWorklet<T>(
   console.warn(
     'nitroFetchOnWorklet: worklets are not available on web; running on the JS thread'
   );
-  const res = await globalThis.fetch(input as RequestInfo, init);
-  const bodyBytes = await res.clone().arrayBuffer();
+  const res = await fetch(input, init);
+  const bodyBytes = await res.arrayBuffer();
   let bodyString: string | undefined;
   try {
-    bodyString = await res.clone().text();
+    bodyString = utf8ToString(new Uint8Array(bodyBytes));
   } catch {
     bodyString = undefined;
   }
@@ -128,14 +108,14 @@ export async function nitroFetchOnWorklet<T>(
 
 export async function prefetch(
   _input: RequestInfo | URL,
-  _init?: RequestInit
+  _init?: RequestInit & { prefetchKey?: string; prefetchCacheTtlMs?: number }
 ): Promise<void> {
   console.warn('prefetch is not available on web');
 }
 
 export async function prefetchOnAppStart(
   _input: RequestInfo | URL,
-  _init?: RequestInit & { prefetchKey?: string }
+  _init?: RequestInit & { prefetchKey?: string; prefetchCacheTtlMs?: number }
 ): Promise<void> {
   console.warn('prefetchOnAppStart is not available on web');
 }

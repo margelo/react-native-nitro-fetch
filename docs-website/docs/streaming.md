@@ -71,3 +71,11 @@ Pass `{ stream: true }` in the fetch options to enable streaming mode. Without i
 4. Decode each `Uint8Array` chunk with `TextDecoder` for UTF-8 text
 
 Streaming is supported on both Android and iOS.
+
+## Body consumption and redirects
+
+`text()`, `json()`, `arrayBuffer()`, `bytes()` and `blob()` consume the stream. A consumed or locked body cannot be read or cloned again; clone before reading when two consumers need it. Empty input is not valid JSON.
+
+Streaming honors `redirect: 'follow' | 'manual' | 'error'`. Native manual mode returns the 3xx response without following it; browser manual mode retains the browser's opaque-response behavior. Aborting rejects the response promise or errors an already-resolved response body.
+
+Streaming does not consult the prefetch cache. iOS delivers data without URLSession backpressure, so slow consumers and slow clone branches can accumulate buffered data.

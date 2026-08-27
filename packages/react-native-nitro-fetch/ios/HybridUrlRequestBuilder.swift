@@ -28,13 +28,13 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     url: String,
     session: URLSession,
     executor: DispatchQueue
-  ) {
+  ) throws {
     self.url = url
     self.session = session
     self.executor = executor
 
     guard let urlObj = URL(string: url) else {
-      fatalError("Invalid URL: \(url)")
+      throw URLError(.badURL)
     }
     self.urlRequest = URLRequest(url: urlObj)
   }
@@ -172,15 +172,18 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
     newRequest request: URLRequest,
     completionHandler: @escaping (URLRequest?) -> Void
   ) {
-    executor.sync { [weak self] in
-      guard let self = self else { return }
-      if let callback = self.onRedirectReceived {
+    if let callback = onRedirectReceived, let hybridRequest = hybridRequest {
+      // Nitro callbacks reach JS asynchronously. Hold the native completion
+      // until JS explicitly follows or cancels, matching Android/Cronet.
+      hybridRequest.waitForRedirect(request, completion: completionHandler)
+      executor.sync {
         let info = response.toNitro()
         let newUrl = request.url?.absoluteString ?? ""
         callback(info, newUrl)
       }
+    } else {
+      completionHandler(request)
     }
-    completionHandler(request)
   }
 
   func urlSession(

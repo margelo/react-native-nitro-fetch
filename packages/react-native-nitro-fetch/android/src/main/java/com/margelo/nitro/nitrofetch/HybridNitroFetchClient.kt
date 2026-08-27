@@ -14,8 +14,6 @@ import org.chromium.net.UrlResponseInfo
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
-import java.nio.charset.Charset
-import java.nio.charset.CharsetDecoder
 import java.nio.charset.CodingErrorAction
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -40,15 +38,6 @@ private val utf8StrictDecoder = ThreadLocal.withInitial {
     .onMalformedInput(CodingErrorAction.REPORT)
     .onUnmappableCharacter(CodingErrorAction.REPORT)
 }
-
-private fun strictDecoderFor(charset: Charset): CharsetDecoder =
-  if (charset == Charsets.UTF_8) {
-    utf8StrictDecoder.get()
-  } else {
-    charset.newDecoder()
-      .onMalformedInput(CodingErrorAction.REPORT)
-      .onUnmappableCharacter(CodingErrorAction.REPORT)
-  }
 
 // Wrap raw bytes into a Nitro ArrayBuffer for zero-base64 bridging to JS.
 private fun ByteArray.toArrayBuffer(): ArrayBuffer {
@@ -77,12 +66,16 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
     return null
   }
 
+  private fun cacheTtlMs(req: NitroRequest): Long =
+    req.prefetchCacheTtlMs?.let { if (it.isFinite()) it.toLong() else 0L } ?: 5_000L
+
   companion object {
     @JvmStatic
     fun fetch(
       req: NitroRequest,
       onSuccess: (NitroResponse) -> Unit,
-      onFail: (Throwable) -> Unit
+      onFail: (Throwable) -> Unit,
+      onStart: (UrlRequest) -> Unit = {}
     ): UrlRequest? {
       return try {
         // Local resources (file://, content://, scheme-less paths) aren't HTTP; read off disk -> 200.
@@ -92,7 +85,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         }
         val engine = HybridNitroFetch.getEngine()
         val executor = HybridNitroFetch.ioExecutor
-        startCronet(engine, executor, req, onSuccess, onFail)
+        startCronet(engine, executor, req, onSuccess, onFail, onStart)
       } catch (t: Throwable) {
         onFail(t)
         null
@@ -104,7 +97,8 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       executor: Executor,
       req: NitroRequest,
       onSuccess: (NitroResponse) -> Unit,
-      onFail: (Throwable) -> Unit
+      onFail: (Throwable) -> Unit,
+      onStart: (UrlRequest) -> Unit
     ): UrlRequest {
       val url = req.url
       val shouldFollowRedirects = req.followRedirects ?: true
@@ -219,20 +213,10 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
               info.allHeadersAsList.map { NitroHeader(it.key, it.value) }.toTypedArray()
             val status = info.httpStatusCode
             val bytes = out.toByteArray()
-            val contentType = info.allHeaders["Content-Type"] ?: info.allHeaders["content-type"]
-            val charset = run {
-              val ct = contentType ?: ""
-              val m = Regex("charset=([A-Za-z0-9_\\-:.]+)", RegexOption.IGNORE_CASE).find(ct.toString())
-              try {
-                if (m != null) java.nio.charset.Charset.forName(m.groupValues[1]) else Charsets.UTF_8
-              } catch (_: Throwable) {
-                Charsets.UTF_8
-              }
-            }
-            // Strict-decode the body as text. If it fails the response is binary,
-            // so we bridge the raw bytes as an ArrayBuffer instead — no base64.
+            // Only UTF-8 round-trips losslessly through the string bridge.
+            // Preserve other encodings as bytes for the Fetch body readers.
             val bodyStr: String? = try {
-              strictDecoderFor(charset).decode(ByteBuffer.wrap(bytes)).toString()
+              utf8StrictDecoder.get().decode(ByteBuffer.wrap(bytes)).toString()
             } catch (_: Throwable) { null }
             val bodyBytesAb: ArrayBuffer? = if (bodyStr == null && bytes.isNotEmpty())
               bytes.toArrayBuffer()
@@ -320,6 +304,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           encoded
         )
       }
+      onStart(request)
       request.start()
       return request
     }
@@ -333,7 +318,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       req.bodyBytesBase64?.takeIf { it.isNotEmpty() }?.let {
         return runCatching { android.util.Base64.decode(it, android.util.Base64.DEFAULT) }.getOrNull()
       }
-      return req.bodyString?.takeIf { it.isNotEmpty() }?.toByteArray(Charsets.UTF_8)
+      return req.bodyString?.toByteArray(Charsets.UTF_8)
     }
 
     private fun createUploadProvider(body: ByteArray): org.chromium.net.UploadDataProvider {
@@ -385,7 +370,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
     }
 
     private fun readFileBytes(uri: String): ByteArray {
-      if (uri.startsWith("http://") || uri.startsWith("https://")) {
+      if (isHttpURL(uri)) {
         val url = java.net.URL(uri)
         return url.openStream().use { it.readBytes() }
       }
@@ -404,7 +389,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       if (uri.startsWith("file://")) Uri.parse(uri).path ?: uri.removePrefix("file://") else uri
 
     private fun isHttpURL(url: String): Boolean =
-      url.startsWith("http://") || url.startsWith("https://")
+      url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true)
 
     private fun guessMime(uri: String): String {
       if (uri.startsWith("content://")) {
@@ -423,7 +408,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       val bytes = readFileBytes(req.url)
       val mime = guessMime(req.url)
       val bodyStr: String? = try {
-        strictDecoderFor(Charsets.UTF_8).decode(ByteBuffer.wrap(bytes)).toString()
+        utf8StrictDecoder.get().decode(ByteBuffer.wrap(bytes)).toString()
       } catch (_: Throwable) { null }
       val bodyBytesAb: ArrayBuffer? = if (bodyStr == null && bytes.isNotEmpty())
         bytes.toArrayBuffer()
@@ -470,7 +455,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           throw e.cause ?: e
         }
       }
-      FetchCache.getResultIfFresh(key, req.prefetchCacheTtlMs?.toLong() ?: 5_000L)?.let { cached ->
+      FetchCache.getResultIfFresh(key, cacheTtlMs(req))?.let { cached ->
         return withPrefetchedHeader(cached)
       }
     }
@@ -513,13 +498,13 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         return promise
       }
       // If a fresh prefetched result exists, return it immediately
-      FetchCache.getResultIfFresh(key, req.prefetchCacheTtlMs?.toLong() ?: 5_000L)?.let { cached ->
+      FetchCache.getResultIfFresh(key, cacheTtlMs(req))?.let { cached ->
         promise.resolve(withPrefetchedHeader(cached))
         return promise
       }
     }
     val requestId = req.requestId
-    val urlRequest = fetch(
+    fetch(
       req,
       onSuccess = { res ->
         if (requestId != null) activeRequests.remove(requestId)
@@ -528,13 +513,11 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       onFail = { err ->
         if (requestId != null) activeRequests.remove(requestId)
         promise.reject(err)
+      },
+      onStart = { request ->
+        if (requestId != null) activeRequests[requestId] = request
       }
     )
-    // Store after start() — if cancelRequest races and misses, the JS
-    // catch block checks signal.aborted and throws AbortError anyway.
-    if (requestId != null && urlRequest != null) {
-      activeRequests[requestId] = urlRequest
-    }
     return promise
   }
 
@@ -546,7 +529,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       return promise
     }
     // If already have a fresh result, resolve immediately (NON-DESTRUCTIVE CHECK)
-    if (FetchCache.hasFreshResult(key, req.prefetchCacheTtlMs?.toLong() ?: 5_000L)) {
+    if (FetchCache.hasFreshResult(key, cacheTtlMs(req))) {
       promise.resolve(Unit)
       return promise
     }

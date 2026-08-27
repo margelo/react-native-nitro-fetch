@@ -5,6 +5,8 @@ class HybridUrlRequest: HybridUrlRequestSpec {
   private weak var task: URLSessionDataTask?
   private weak var delegate: URLSessionDelegate?
   private var isDoneFlag = false
+  private let lock = NSLock()
+  private var pendingRedirect: (URLRequest, (URLRequest?) -> Void)?
 
   init(task: URLSessionDataTask, delegate: URLSessionDelegate) {
     self.task = task
@@ -17,8 +19,11 @@ class HybridUrlRequest: HybridUrlRequestSpec {
   }
 
   func followRedirect() throws {
-    // Redirects are handled automatically by URLSession
-    // This is a no-op on iOS but required for API compatibility
+    lock.lock()
+    let pending = pendingRedirect
+    pendingRedirect = nil
+    lock.unlock()
+    if let (request, completion) = pending { completion(request) }
   }
 
   func read() throws {
@@ -27,15 +32,33 @@ class HybridUrlRequest: HybridUrlRequestSpec {
   }
 
   func cancel() throws {
+    markDone()
     task?.cancel()
-    isDoneFlag = true
   }
 
   func isDone() throws -> Bool {
+    lock.lock()
+    defer { lock.unlock() }
     return isDoneFlag
   }
 
   func markDone() {
+    lock.lock()
     isDoneFlag = true
+    let pending = pendingRedirect
+    pendingRedirect = nil
+    lock.unlock()
+    pending?.1(nil)
+  }
+
+  func waitForRedirect(_ request: URLRequest, completion: @escaping (URLRequest?) -> Void) {
+    lock.lock()
+    if isDoneFlag {
+      lock.unlock()
+      completion(nil)
+    } else {
+      pendingRedirect = (request, completion)
+      lock.unlock()
+    }
   }
 }

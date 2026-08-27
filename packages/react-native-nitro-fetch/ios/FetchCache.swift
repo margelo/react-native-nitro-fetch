@@ -3,7 +3,7 @@ import Foundation
 final class FetchCache {
   struct CachedEntry {
     let response: NitroResponse
-    let timestampMs: Int64
+    let timestampMs: Double
   }
 
   private static let lock = NSLock()
@@ -40,19 +40,19 @@ final class FetchCache {
     lock.lock()
     let callbacks = pending.removeValue(forKey: key) ?? []
     if case let .success(resp) = result {
-      results[key] = CachedEntry(response: resp, timestampMs: Int64(Date().timeIntervalSince1970 * 1000))
+      results[key] = CachedEntry(response: resp, timestampMs: ProcessInfo.processInfo.systemUptime * 1000)
     }
     lock.unlock()
     // Outside the lock: a callback may re-enter FetchCache.
     callbacks.forEach { $0(result) }
   }
 
-  static func getResultIfFresh(_ key: String, maxAgeMs: Int64) -> NitroResponse? {
+  static func getResultIfFresh(_ key: String, maxAgeMs: Double) -> NitroResponse? {
     lock.lock()
     defer { lock.unlock() }
     guard let entry = results[key] else { return nil }
-    let age = Int64(Date().timeIntervalSince1970 * 1000) - entry.timestampMs
-    if age <= maxAgeMs { return entry.response }
+    let age = ProcessInfo.processInfo.systemUptime * 1000 - entry.timestampMs
+    if maxAgeMs.isFinite && maxAgeMs > 0 && age <= maxAgeMs { return entry.response }
     results.removeValue(forKey: key)
     return nil
   }

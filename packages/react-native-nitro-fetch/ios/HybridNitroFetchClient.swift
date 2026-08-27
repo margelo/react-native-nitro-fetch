@@ -12,12 +12,6 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
   private var _lock = os_unfair_lock()
   private var activeTasks: [String: Task<Void, Never>] = [:]
 
-  private func storeTask(_ task: Task<Void, Never>, forKey key: String) {
-    os_unfair_lock_lock(&_lock)
-    activeTasks[key] = task
-    os_unfair_lock_unlock(&_lock)
-  }
-
   private func removeTask(forKey key: String) {
     os_unfair_lock_lock(&_lock)
     activeTasks.removeValue(forKey: key)
@@ -62,6 +56,8 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     let requestId = req.requestId
     let bodyData = HybridNitroFetchClient.uploadData(from: req)
 
+    // Completion and cancellation must not race ahead of registration.
+    if requestId != nil { os_unfair_lock_lock(&_lock) }
     let task = Task { [weak self] in
       defer {
         if let rid = requestId {
@@ -77,7 +73,8 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     }
 
     if let rid = requestId {
-      storeTask(task, forKey: rid)
+      activeTasks[rid] = task
+      os_unfair_lock_unlock(&_lock)
     }
     return promise
   }
@@ -137,7 +134,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     }
     if let key = findPrefetchKey(req) {
       // If a prefetched result is fresh, return immediately
-      if let cached = FetchCache.getResultIfFresh(key, maxAgeMs: Int64(req.prefetchCacheTtlMs ?? 5_000)) {
+      if let cached = FetchCache.getResultIfFresh(key, maxAgeMs: req.prefetchCacheTtlMs ?? 5_000) {
         var headers = cached.headers ?? []
         headers.append(NitroHeader(key: "nitroPrefetched", value: "true"))
         return NitroResponse(url: cached.url,
@@ -162,7 +159,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
           }
 
           if !attached {
-            continuation.resume(returning: FetchCache.getResultIfFresh(key, maxAgeMs: Int64(req.prefetchCacheTtlMs ?? 5_000)))
+            continuation.resume(returning: FetchCache.getResultIfFresh(key, maxAgeMs: req.prefetchCacheTtlMs ?? 5_000))
           }
         }
         if let res = joined {
@@ -181,7 +178,12 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
       }
     }
 
-    let (urlRequest, finalURL) = try await buildURLRequest(req, bodyData: bodyData)
+    return try await performRequest(req, bodyData: bodyData)
+  }
+
+  private static func performRequest(_ req: NitroRequest, bodyData: Data?) async throws -> NitroResponse {
+    if !isHttpURL(req.url) { return try makeLocalFileResponse(req) }
+    let urlRequest = try await buildURLRequest(req, bodyData: bodyData)
     let shouldFollowRedirects = req.followRedirects ?? true
     let delegate: URLSessionTaskDelegate? = shouldFollowRedirects ? nil : NoRedirectDelegate()
 
@@ -235,7 +237,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
       for h in headersPairs { headerDict[h.key] = h.value }
       NitroDevToolsReporter.reportResponseStart(
         devToolsId,
-        url: finalURL?.absoluteString ?? http.url?.absoluteString ?? req.url,
+        url: http.url?.absoluteString ?? req.url,
         statusCode: http.statusCode,
         headers: headerDict
       )
@@ -254,22 +256,20 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     }
     #endif
 
-    // Choose bodyString by default (matching Android’s first pass).
-    // For binary responses that can’t be decoded as text, bridge the raw bytes
-    // as an ArrayBuffer so arrayBuffer() / bytes() return them with no base64.
-    let charset = HybridNitroFetchClient.detectCharset(from: http) ?? String.Encoding.utf8
-    let bodyStr = String(data: data, encoding: charset) ?? String(data: data, encoding: .utf8)
+    // Only UTF-8 round-trips losslessly through the string bridge. Other
+    // encodings stay as bytes; Fetch body readers always decode as UTF-8.
+    let bodyStr = String(data: data, encoding: .utf8)
     var bodyBytesAb: ArrayBuffer? = nil
     if bodyStr == nil && !data.isEmpty {
       bodyBytesAb = try ArrayBuffer.copy(data: data)
     }
 
     let res = NitroResponse(
-      url: finalURL?.absoluteString ?? http.url?.absoluteString ?? req.url,
+      url: http.url?.absoluteString ?? req.url,
       status: Double(http.statusCode),
       statusText: HTTPURLResponse.localizedString(forStatusCode: http.statusCode),
       ok: (200...299).contains(http.statusCode),
-      redirected: (finalURL?.absoluteString ?? http.url?.absoluteString ?? req.url) != req.url,
+      redirected: (http.url?.absoluteString ?? req.url) != req.url,
       headers: headersPairs,
       bodyString: bodyStr,
       bodyBytes: bodyBytesAb
@@ -290,60 +290,37 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
       throw NSError(domain: "NitroFetch", code: -2, userInfo: [NSLocalizedDescriptionKey: "prefetch: missing 'prefetchKey' header"])
     }
 
-    if FetchCache.getResultIfFresh(key, maxAgeMs: Int64(req.prefetchCacheTtlMs ?? 5_000)) != nil {
-      return // already have a fresh result
-    }
-
-    // Mark pending and start the request. beginPending is atomic, so two racing
-    // prefetches for the same key cannot both start one.
-    guard FetchCache.beginPending(key) else {
-      return // already pending
-    }
-    Task.detached {
-      do {
-        let (urlRequest, finalURL) = try await buildURLRequest(req, bodyData: bodyData)
-        let (data, response) = try await session.data(for: urlRequest)
-        guard let http = response as? HTTPURLResponse else {
-          throw NSError(domain: "NitroFetch", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
-        }
-        let headersPairs: [NitroHeader] = http.allHeaderFields.compactMap { k, v in
-          guard let key = k as? String else { return nil }
-          return NitroHeader(key: key, value: String(describing: v))
-        }
-        let charset = HybridNitroFetchClient.detectCharset(from: http) ?? .utf8
-        let bodyStr = String(data: data, encoding: charset) ?? String(data: data, encoding: .utf8)
-        var bodyBytesAb: ArrayBuffer? = nil
-        if bodyStr == nil && !data.isEmpty {
-          bodyBytesAb = try ArrayBuffer.copy(data: data)
-        }
-        let res = NitroResponse(
-          url: finalURL?.absoluteString ?? http.url?.absoluteString ?? req.url,
-          status: Double(http.statusCode),
-          statusText: HTTPURLResponse.localizedString(forStatusCode: http.statusCode),
-          ok: (200...299).contains(http.statusCode),
-          redirected: (finalURL?.absoluteString ?? http.url?.absoluteString ?? req.url) != req.url,
-          headers: headersPairs,
-          bodyString: bodyStr,
-          bodyBytes: bodyBytesAb
-        )
-        FetchCache.complete(key, with: .success(res))
-      } catch {
-        FetchCache.complete(key, with: .failure(error))
+    while true {
+      if FetchCache.getResultIfFresh(key, maxAgeMs: req.prefetchCacheTtlMs ?? 5_000) != nil {
+        return
       }
+      if FetchCache.beginPending(key) { break }
+      let joined = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
+        let attached = FetchCache.joinPending(key) { result in
+          continuation.resume(with: result.map { _ in true })
+        }
+        if !attached { continuation.resume(returning: false) }
+      }
+      if joined { return }
+      // The previous request completed between beginPending and joinPending.
+      // Recheck the cache before trying to become the next owner.
+    }
+    do {
+      let response = try await performRequest(req, bodyData: bodyData)
+      FetchCache.complete(key, with: .success(response))
+    } catch {
+      FetchCache.complete(key, with: .failure(error))
+      throw error
     }
   }
 
 
-  private static func reqToHttpMethod(_ req: NitroRequest) -> String? {
-    return req.method?.stringValue
-  }
-
-  private static func buildURLRequest(_ req: NitroRequest, bodyData: Data? = nil) async throws -> (URLRequest, URL?) {
+  private static func buildURLRequest(_ req: NitroRequest, bodyData: Data? = nil) async throws -> URLRequest {
     guard let url = URL(string: req.url) else {
       throw NSError(domain: "NitroFetch", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid URL: \(req.url)"])
     }
     var r = URLRequest(url: url)
-    if let m = req.method?.rawValue { r.httpMethod = reqToHttpMethod(req) }
+    if let method = req.method { r.httpMethod = method.stringValue }
     if let headers = req.headers {
       // prefetchKey is an internal cache key, never sent on the server
       for h in headers where h.key.caseInsensitiveCompare("prefetchKey") != .orderedSame {
@@ -361,7 +338,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     }
     if let t = req.timeoutMs, t > 0 { r.timeoutInterval = TimeInterval(t) / 1000.0 }
     if req.credentials == .omit { r.httpShouldHandleCookies = false }
-    return (r, nil)
+    return r
   }
 
   private static func buildMultipartBody(_ parts: [NitroFormDataPart]) async throws -> (Data, String) {
@@ -394,7 +371,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
   }
 
   private static func readFileData(_ uri: String) async throws -> Data {
-    if uri.hasPrefix("http://") || uri.hasPrefix("https://") {
+    if isHttpURL(uri) {
       guard let url = URL(string: uri) else {
         throw NSError(domain: "NitroFetch", code: -4, userInfo: [NSLocalizedDescriptionKey: "Invalid URL: \(uri)"])
       }
@@ -405,7 +382,8 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
   }
 
   private static func isHttpURL(_ url: String) -> Bool {
-    return url.hasPrefix("http://") || url.hasPrefix("https://")
+    let prefix = url.prefix(8).lowercased()
+    return prefix.hasPrefix("http://") || prefix == "https://"
   }
 
   // Some files are % encoded we need to convert it to correct format
@@ -457,18 +435,6 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     )
   }
 
-  private static func detectCharset(from http: HTTPURLResponse) -> String.Encoding? {
-    if let ct = http.value(forHTTPHeaderField: "Content-Type")?.lowercased() {
-      if let range = ct.range(of: "charset=") {
-        let charset = String(ct[range.upperBound...]).trimmingCharacters(in: .whitespaces)
-        let mapped = CFStringConvertIANACharSetNameToEncoding(charset as CFString)
-        if mapped != kCFStringEncodingInvalidId {
-          return String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(mapped))
-        }
-      }
-    }
-    return nil
-  }
 }
 
 /// Delegate that prevents URLSession from following HTTP redirects.

@@ -42,6 +42,8 @@ Notes
 
 - Prefetch is best-effort; if native is unavailable, calls are ignored or fall back to JS fetch.
 - Responses served from prefetch add header `nitroPrefetched: true`.
+- When native is available, `await prefetch()` waits for completion and rejects on failure on both platforms. Automatic app-start replay still ignores individual request failures.
+- `prefetchCacheTtlMs` is a finite number of milliseconds (default 5000). Zero or negative values skip completed cached responses; an in-flight prefetch can still be joined.
 
 ## Why Prefetch Is Cool
 

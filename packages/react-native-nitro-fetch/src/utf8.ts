@@ -1,5 +1,5 @@
-let _TextEncoder: typeof TextEncoder | undefined;
-let _TextDecoder: typeof TextDecoder | undefined;
+let encoder: TextEncoder | undefined;
+let decoder: TextDecoder | undefined;
 
 const NITRO_TEXT_DECODER_PKG = 'react-native-nitro-text-decoder';
 
@@ -8,11 +8,9 @@ function loadOptionalTextCodec(): {
   TextDecoder?: typeof TextDecoder;
 } {
   try {
-    // Hide require from the bundler so the package stays truly optional.
-    // eslint-disable-next-line no-new-func
-    const dynamicRequire = new Function('mod', 'return require(mod);') as (
-      m: string
-    ) => unknown;
+    // Keep the dependency optional without runtime code generation. Apps
+    // using Metro should install global codecs explicitly when needed.
+    const dynamicRequire = require;
     return dynamicRequire(NITRO_TEXT_DECODER_PKG) as {
       TextEncoder?: typeof TextEncoder;
       TextDecoder?: typeof TextDecoder;
@@ -22,34 +20,33 @@ function loadOptionalTextCodec(): {
   }
 }
 
-if (typeof TextEncoder !== 'undefined') {
-  _TextEncoder = TextEncoder;
-} else {
-  _TextEncoder = loadOptionalTextCodec().TextEncoder;
-}
-
-if (typeof TextDecoder !== 'undefined') {
-  _TextDecoder = TextDecoder;
-} else {
-  _TextDecoder = loadOptionalTextCodec().TextDecoder;
-}
-
 export function stringToUTF8(str: string): Uint8Array {
-  if (!_TextEncoder) {
-    console.warn(
-      'stringToUTF8: TextEncoder not available. Install react-native-nitro-text-decoder.'
-    );
-    return new Uint8Array(0);
+  if (str.length === 0) return new Uint8Array(0);
+  if (!encoder) {
+    const Encoder =
+      globalThis.TextEncoder ?? loadOptionalTextCodec().TextEncoder;
+    if (!Encoder) {
+      throw new TypeError(
+        'TextEncoder is unavailable; install a UTF-8 codec polyfill.'
+      );
+    }
+    encoder = new Encoder();
   }
-  return new _TextEncoder().encode(str);
+  return encoder.encode(str);
 }
 
 export function utf8ToString(bytes: Uint8Array): string {
-  if (!_TextDecoder) {
-    console.warn(
-      'utf8ToString: TextDecoder not available. Install react-native-nitro-text-decoder.'
-    );
-    return '';
+  if (bytes.byteLength === 0) return '';
+  if (!decoder) {
+    const Decoder =
+      globalThis.TextDecoder ?? loadOptionalTextCodec().TextDecoder;
+    if (!Decoder) {
+      throw new TypeError(
+        'TextDecoder is unavailable; install a UTF-8 codec polyfill.'
+      );
+    }
+    decoder = new Decoder();
   }
-  return new _TextDecoder().decode(bytes);
+  // Non-streaming decode resets decoder state between independent bodies.
+  return decoder.decode(bytes);
 }

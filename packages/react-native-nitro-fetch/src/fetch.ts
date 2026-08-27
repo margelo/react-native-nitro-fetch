@@ -14,15 +14,41 @@ import {
 import { NativeStorage as NativeStorageSingleton } from './NitroInstances';
 import { NitroHeaders } from './Headers';
 import { NitroResponse } from './Response';
-import { NitroRequest as NitroRequestClass, rawBodyOf } from './Request';
+import {
+  NitroRequest as NitroRequestClass,
+  consumeRawBodyOf,
+  rawBodyOf,
+} from './Request';
 import type { RequestRedirect, RequestCache } from './Request';
+import type { UrlResponseInfo } from './NitroCronet.nitro';
 import { NetworkInspector } from './NetworkInspector';
 import { base64FromBytes } from './blob';
+import { readBlob } from './Body';
+import { platformFetch } from './platformFetch';
 
 const TEXT_CONTENT_TYPE = 'text/plain;charset=UTF-8';
 const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded;charset=UTF-8';
 // Browsers send no Content-Type for byte bodies, but Cronet rejects uploads without one.
 const BYTES_CONTENT_TYPE = 'application/octet-stream';
+
+function validatePrefetchTtl(value: number | undefined): number | undefined {
+  'worklet';
+  if (value !== undefined && !Number.isFinite(value)) {
+    throw new RangeError('prefetchCacheTtlMs must be a finite number.');
+  }
+  return value;
+}
+
+function validateRequestBody(method: string | undefined, body: unknown): void {
+  'worklet';
+  const normalizedMethod = method?.toUpperCase() ?? 'GET';
+  if (
+    (normalizedMethod === 'GET' || normalizedMethod === 'HEAD') &&
+    body != null
+  ) {
+    throw new TypeError('GET and HEAD requests cannot have a body.');
+  }
+}
 
 // A view spanning its whole buffer needs no copy.
 function viewToBuffer(view: ArrayBufferView): ArrayBuffer {
@@ -237,13 +263,16 @@ function buildNitroRequest(
   } else {
     // Standard Request object
     url = input.url;
-    method = input.method;
-    headersInit = input.headers as any;
+    method = init?.method ?? input.method;
+    headersInit = init?.headers ?? (input.headers as any);
     body = init?.body ?? null;
+    if (!init?.redirect) redirectOption = input.redirect ?? 'follow';
+    if (!init?.cache) cacheOption = input.cache;
     if (!init?.credentials) credentialsOption = (input as Request).credentials;
   }
 
   const headers = headersToPairs(headersInit) ?? [];
+  validateRequestBody(method, body);
   const normalized = normalizeBody(body);
   applyDefaultContentType(headers, normalized?.contentType);
 
@@ -252,10 +281,7 @@ function buildNitroRequest(
   // Determine followRedirects based on redirect option
   const followRedirects = redirectOption === 'follow';
 
-  const prefetchCacheTtlMs =
-    typeof init?.prefetchCacheTtlMs === 'number'
-      ? init.prefetchCacheTtlMs
-      : undefined;
+  const prefetchCacheTtlMs = validatePrefetchTtl(init?.prefetchCacheTtlMs);
 
   return {
     url,
@@ -386,21 +412,21 @@ export function buildNitroRequestPure(
     // Request object
     const req = input as Request;
     url = req.url;
-    method = req.method;
-    headersInit = req.headers;
+    method = init?.method ?? req.method;
+    headersInit = init?.headers ?? req.headers;
     // Clone body if needed – Request objects in RN typically allow direct access
     body = init?.body ?? null;
   }
 
   const headers = headersToPairsPure(headersInit) ?? [];
+  validateRequestBody(method, body);
   const normalized = normalizeBodyPure(body);
   applyDefaultContentType(headers, normalized?.contentType);
-  applyCacheHeaders(headers, init?.cache as RequestCache | undefined);
+  const inputRequest =
+    typeof input === 'string' || isUrlObject ? undefined : (input as Request);
+  applyCacheHeaders(headers, init?.cache ?? inputRequest?.cache);
 
-  const prefetchCacheTtlMs =
-    typeof init?.prefetchCacheTtlMs === 'number'
-      ? init.prefetchCacheTtlMs
-      : undefined;
+  const prefetchCacheTtlMs = validatePrefetchTtl(init?.prefetchCacheTtlMs);
 
   return {
     url,
@@ -408,8 +434,9 @@ export function buildNitroRequestPure(
     headers: headers.length > 0 ? headers : undefined,
     bodyString: normalized?.bodyString,
     bodyBytes: normalized?.bodyBytes,
-    followRedirects: true,
-    credentials: init?.credentials,
+    followRedirects:
+      (init?.redirect ?? inputRequest?.redirect ?? 'follow') === 'follow',
+    credentials: init?.credentials ?? inputRequest?.credentials,
     prefetchCacheTtlMs,
   };
 }
@@ -424,40 +451,64 @@ async function resolveRequestBody(
   input: RequestInfo | URL,
   init: RequestInit | undefined
 ): Promise<RequestInit | undefined> {
+  const request =
+    typeof input === 'object' && input !== null && 'url' in input
+      ? (input as Request)
+      : undefined;
+  const inputBody =
+    input instanceof NitroRequestClass
+      ? rawBodyOf(input)
+      : (request?.body ??
+        (request as { _bodyInit?: unknown } | undefined)?._bodyInit);
+  validateRequestBody(init?.method ?? request?.method, init?.body ?? inputBody);
   if (typeof input === 'string' || input instanceof URL) return init;
   if (input instanceof NitroRequestClass) {
-    const raw = rawBodyOf(input);
-    if (init?.body == null && raw != null)
+    if (init?.body != null) return init;
+    if (
+      typeof ReadableStream !== 'undefined' &&
+      rawBodyOf(input) instanceof ReadableStream
+    ) {
+      return {
+        ...(init ?? {}),
+        headers: init?.headers ?? (input.headers as any),
+        body: await input.arrayBuffer(),
+      };
+    }
+    const raw = consumeRawBodyOf(input);
+    if (raw != null) {
       return {
         ...(init ?? {}),
         headers: init?.headers ?? (input.headers as any),
         body: raw,
       };
+    }
     return init;
   }
   if (init?.body != null) return init;
   const req = input as Request;
+  if (req.bodyUsed)
+    throw new TypeError('Request body has already been consumed.');
   if (typeof req.clone !== 'function') return init;
   const method = (init?.method ?? req.method ?? 'GET').toUpperCase();
   if (method === 'GET' || method === 'HEAD') return init;
-  try {
-    // whatwg-fetch keeps the original BodyInit here; only bytes need the lossless read.
-    const raw = (req as { _bodyInit?: unknown })._bodyInit;
-    const isBinary =
-      (typeof Blob !== 'undefined' && raw instanceof Blob) ||
-      (typeof ArrayBuffer !== 'undefined' && raw instanceof ArrayBuffer) ||
-      ArrayBuffer.isView(raw);
-    if (isBinary && typeof req.arrayBuffer === 'function') {
-      const bytes = await req.clone().arrayBuffer();
-      if (bytes.byteLength === 0) return init;
-      return { ...(init ?? {}), body: bytes };
-    }
-    const text = await req.clone().text();
-    if (text.length === 0) return init;
-    return { ...(init ?? {}), body: text };
-  } catch {
-    return init;
+  // Read bytes when supported: a standard Request need not expose _bodyInit,
+  // and decoding an arbitrary binary body as text irreversibly changes it.
+  const raw = (req as { _bodyInit?: unknown })._bodyInit;
+  if (req.body === null || raw === null) return init;
+  if (isFormData(raw) && req instanceof Request) {
+    // RN's whatwg-fetch Request constructor transfers the opaque FormData
+    // body and marks its input consumed without trying to serialize it in JS.
+    const owned = new Request(req);
+    return {
+      ...(init ?? {}),
+      body: (owned as unknown as { _bodyInit: FormData })._bodyInit,
+    };
   }
+  if (typeof req.arrayBuffer === 'function') {
+    const bytes = await req.arrayBuffer();
+    return { ...(init ?? {}), body: bytes };
+  }
+  return { ...(init ?? {}), body: await req.text() };
 }
 
 async function resolveBlobBody(
@@ -466,12 +517,7 @@ async function resolveBlobBody(
   if (!init?.body) return init;
   if (typeof Blob !== 'undefined' && init.body instanceof Blob) {
     const blob = init.body as Blob;
-    const bytes = await new Promise<ArrayBuffer>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as ArrayBuffer);
-      reader.onerror = () => reject(reader.error);
-      reader.readAsArrayBuffer(blob);
-    });
+    const bytes = await readBlob(blob);
     // Auto-set Content-Type from Blob.type if not already provided
     let headers = init.headers;
     if (blob.type) {
@@ -516,7 +562,11 @@ function base64ToBytes(b64: string): Uint8Array {
   /* eslint-disable no-bitwise */
   const chars =
     'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  const clean = b64.replace(/[^A-Za-z0-9+/]/g, '');
+  let clean = b64.replace(/[\t\n\f\r ]/g, '');
+  if (clean.length % 4 === 0) clean = clean.replace(/[=]{1,2}$/, '');
+  if (clean.length % 4 === 1 || /[^A-Za-z0-9+/]/.test(clean)) {
+    throw new TypeError('Failed to fetch: invalid base64 data');
+  }
   const out = new Uint8Array(Math.floor((clean.length * 3) / 4));
   let p = 0;
   let buf = 0;
@@ -591,10 +641,19 @@ function decodeUtf8(bytes: Uint8Array): string | null {
 
 // Decode a data: URL into a synthetic 200 response, entirely in JS.
 function decodeDataUrl(url: string): NitroResponseNative {
+  // URL serialization performs UTF-8 percent-encoding. Decode percent escapes
+  // as bytes below, not decodeURIComponent (which rejects non-UTF-8 payloads).
+  const parsed = new URL(url);
+  parsed.hash = '';
+  url = parsed.href;
   const comma = url.indexOf(',');
   if (comma < 0) throw new TypeError('Failed to fetch: invalid data: URL');
   const meta = url.slice(5, comma); // strip leading "data:"
-  const rawData = url.slice(comma + 1);
+  const rawData = url
+    .slice(comma + 1)
+    .replace(/%([0-9a-f]{2})/gi, (_, hex: string) =>
+      String.fromCharCode(parseInt(hex, 16))
+    );
   const isBase64 = /;base64\s*$/i.test(meta);
   const mediaType =
     (isBase64 ? meta.replace(/;base64\s*$/i, '') : meta).trim() ||
@@ -611,11 +670,11 @@ function decodeDataUrl(url: string): NitroResponseNative {
     const decoded = decodeUtf8(bytes);
     if (decoded != null) bodyString = decoded;
   } else {
-    bodyString = decodeURIComponent(rawData);
-    length =
-      typeof TextEncoder !== 'undefined'
-        ? new TextEncoder().encode(bodyString).length
-        : bodyString.length;
+    const bytes = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; i++) bytes[i] = rawData.charCodeAt(i);
+    bodyBytes = bytes.buffer;
+    bodyString = decodeUtf8(bytes) ?? undefined;
+    length = bytes.byteLength;
   }
 
   return {
@@ -638,7 +697,7 @@ async function fetchLocalResource(
   req: NitroRequestNative
 ): Promise<NitroResponseNative> {
   const url = req.url;
-  if (url.startsWith('data:')) return decodeDataUrl(url);
+  if (url.slice(0, 5).toLowerCase() === 'data:') return decodeDataUrl(url);
   if (url.startsWith('blob:')) {
     throw new TypeError(
       'nitro-fetch cannot read blob: URLs (the React Native blob registry is not ' +
@@ -663,17 +722,11 @@ async function nitroFetchRaw(
     throw createAbortError();
   }
 
-  // Extract body from standard Request when init.body is absent (ky/undici pattern)
-  init = await resolveRequestBody(input, init);
-  // Resolve Blob body to string before passing to sync buildNitroRequest
-  init = await resolveBlobBody(init);
-
   const hasNative =
     typeof (NitroFetchHybrid as any)?.createClient === 'function';
   if (!hasNative) {
-    // Fallback path not supported for raw; use global fetch and synthesize minimal shape
-    // @ts-ignore: global fetch exists in RN
-    const res = await fetch(input as any, init);
+    // Let the platform consume standard Request inputs exactly once.
+    const res = await platformFetch(input, init);
     const url = (res as any).url ?? String(input);
     const bytes = await res.arrayBuffer();
     const headers: NitroHeader[] = [];
@@ -687,8 +740,13 @@ async function nitroFetchRaw(
       headers,
       bodyBytes: bytes,
       bodyString: undefined,
-    } as any as NitroResponseNative; // bleee
+    } as NitroResponseNative;
   }
+
+  init = await resolveRequestBody(input, init);
+  init = await resolveBlobBody(init);
+  // Preparation yields to JS; an abort here must not dispatch native work.
+  if (signal?.aborted) throw createAbortError();
 
   const req = buildNitroRequest(input, init);
 
@@ -718,22 +776,29 @@ async function nitroFetchRaw(
   if (!client || typeof (client as any).request !== 'function')
     throw new Error('NitroFetch client not available');
 
-  // Wire up the abort listener with { once: true } so it auto-removes
-  // after firing, avoiding a dangling reference to the client closure.
   let abortListener: (() => void) | undefined;
-  if (signal && requestId) {
-    abortListener = () => {
-      try {
-        client!.cancelRequest(requestId);
-      } catch {
-        // Client may already be torn down — swallow.
-      }
-    };
-    signal.addEventListener('abort', abortListener, { once: true });
-  }
-
   try {
-    const res: NitroResponseNative = await client.request(req);
+    const res: NitroResponseNative = await (signal && requestId
+      ? new Promise<NitroResponseNative>((resolve, reject) => {
+          abortListener = () => {
+            // A request may be joining a prefetch, or native cancellation may
+            // race completion. Reject immediately without waiting for native.
+            reject(createAbortError());
+            try {
+              client!.cancelRequest(requestId);
+            } catch {
+              /* already torn down */
+            }
+          };
+          signal.addEventListener('abort', abortListener, { once: true });
+          if (signal.aborted) {
+            abortListener();
+            return;
+          }
+          Promise.resolve(client!.request(req)).then(resolve, reject);
+        })
+      : client.request(req));
+    if (signal?.aborted) throw createAbortError();
     if (inspectorId) {
       NetworkInspector._recordEnd(
         inspectorId,
@@ -822,31 +887,64 @@ async function nitroStreamFetch(
       abortListener = undefined;
     };
 
-    let streamCancelled = false;
+    let terminal = false;
+    let streamBytesReceived = 0;
+    let responseInfo: UrlResponseInfo | undefined;
+    let request: ReturnType<typeof builder.build> | undefined;
+    const finishInspection = (info = responseInfo, error?: string) => {
+      if (inspectorId) {
+        NetworkInspector._recordEnd(
+          inspectorId,
+          info?.httpStatusCode ?? 0,
+          info?.httpStatusText ?? '',
+          info?.allHeadersAsList ?? [],
+          streamBytesReceived,
+          error
+        );
+      }
+    };
+    const cancelNative = () => {
+      try {
+        request?.cancel();
+      } catch {
+        // The request may already be torn down.
+      }
+    };
     const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
       start(controller) {
         streamController = controller;
       },
       cancel() {
-        streamCancelled = true;
+        if (terminal) return;
+        terminal = true;
         cleanupAbortListener();
-        try {
-          request.cancel();
-        } catch {
-          return;
-        }
+        finishInspection(undefined, 'The operation was aborted.');
+        cancelNative();
       },
     });
 
     let responseResolved = false;
-    let streamBytesReceived = 0;
+    let redirected = false;
 
-    builder.onResponseStarted((info) => {
-      if (responseResolved || signal?.aborted) return;
-      responseResolved = true;
+    const fail = (error: Error) => {
+      if (terminal) return;
+      terminal = true;
+      cleanupAbortListener();
+      finishInspection(undefined, error.message);
+      if (!responseResolved) rejectResponse(error);
+      streamController.error(error);
+      cancelNative();
+    };
+
+    const resolve = (info: UrlResponseInfo, wasRedirected: boolean) => {
+      responseInfo = info;
       const status = info.httpStatusCode;
       const responseHeaders = new NitroHeaders(
-        Object.entries(info.allHeaders).map(([key, value]) => ({ key, value }))
+        info.allHeadersAsList ??
+          Object.entries(info.allHeaders).map(([key, value]) => ({
+            key,
+            value,
+          }))
       );
       const response = new NitroResponse({
         url: info.url,
@@ -854,93 +952,96 @@ async function nitroStreamFetch(
         status,
         statusText: info.httpStatusText,
         headers: responseHeaders,
-        redirected: false,
+        redirected: wasRedirected,
         body: stream,
       });
+      responseResolved = true;
       resolveResponse(response as unknown as Response);
+    };
+
+    builder.onRedirectReceived((info) => {
+      if (terminal) return;
+      if (init?.redirect === 'error') {
+        fail(new TypeError('Redirect encountered with redirect mode "error".'));
+      } else if (init?.redirect === 'manual') {
+        try {
+          resolve(info, false);
+          terminal = true;
+          cleanupAbortListener();
+          finishInspection(info);
+          streamController.close();
+          cancelNative();
+        } catch (error) {
+          fail(error as Error);
+        }
+      } else {
+        try {
+          redirected = true;
+          request?.followRedirect();
+        } catch (error) {
+          fail(error as Error);
+        }
+      }
+    });
+
+    builder.onResponseStarted((info) => {
+      if (terminal || responseResolved) return;
       // Android/Cronet: kick off the first buffer read.
       // iOS/URLSession handles reading automatically so this is a no-op there.
-      request.read();
+      try {
+        resolve(info, redirected);
+        request?.read();
+      } catch (error) {
+        fail(error as Error);
+      }
     });
 
     builder.onReadCompleted((_info, byteBuffer, bytesRead) => {
       // A cancelled stream can still receive an in-flight native read.
-      if (streamCancelled || signal?.aborted) return;
-      const chunk = new Uint8Array(byteBuffer, 0, bytesRead).slice();
-      streamBytesReceived += bytesRead;
-      streamController.enqueue(chunk);
-      if (!request.isDone()) {
-        request.read();
+      if (terminal) return;
+      try {
+        const chunk = new Uint8Array(byteBuffer, 0, bytesRead).slice();
+        streamBytesReceived += bytesRead;
+        streamController.enqueue(chunk);
+        if (request && !request.isDone()) request.read();
+      } catch (error) {
+        fail(error as Error);
       }
     });
 
     builder.onSucceeded((_info) => {
+      if (terminal) return;
+      terminal = true;
       cleanupAbortListener();
-      if (streamCancelled) return;
       streamController.close();
-      if (inspectorId) {
-        const info = _info as any;
-        const status = info?.httpStatusCode ?? 0;
-        const hdrs = info?.allHeadersAsList ?? [];
-        NetworkInspector._recordEnd(
-          inspectorId,
-          status,
-          info?.httpStatusText ?? '',
-          hdrs,
-          streamBytesReceived
-        );
-      }
+      finishInspection(_info);
     });
 
     builder.onFailed((_info, error) => {
-      cleanupAbortListener();
       const err = signal?.aborted
         ? createAbortError()
         : new Error(error.message);
-      if (inspectorId) {
-        NetworkInspector._recordEnd(inspectorId, 0, '', [], 0, error.message);
-      }
-      if (!responseResolved) {
-        responseResolved = true;
-        rejectResponse(err);
-      } else {
-        streamController.error(err);
-      }
+      fail(err);
     });
 
     builder.onCanceled(() => {
-      cleanupAbortListener();
-      const err = createAbortError();
-      if (inspectorId) {
-        NetworkInspector._recordEnd(
-          inspectorId,
-          0,
-          '',
-          [],
-          0,
-          'Request canceled'
-        );
-      }
-      if (!responseResolved) {
-        responseResolved = true;
-        rejectResponse(err);
-      } else {
-        streamController.error(err);
-      }
+      fail(createAbortError());
     });
 
-    const request = builder.build();
-    if (signal) {
-      abortListener = () => {
-        try {
-          request.cancel();
-        } catch {
+    try {
+      request = builder.build();
+      if (signal) {
+        abortListener = () => fail(createAbortError());
+        signal.addEventListener('abort', abortListener, { once: true });
+        if (signal.aborted) {
+          abortListener();
           return;
         }
-      };
-      signal.addEventListener('abort', abortListener, { once: true });
+      }
+      request.start();
+    } catch (error) {
+      fail(error as Error);
     }
-    request.start();
   });
 }
 
@@ -961,28 +1062,35 @@ export async function nitroFetch(
      * Nothing arrives early.
      *
      * Not a free upgrade: the streaming transport is a separate native client.
-     * It does not consult the prefetch cache, always reports
-     * `response.redirected === false`, and ignores `redirect: 'error'`.
+     * It does not consult the prefetch cache. On iOS, body delivery is
+     * push-based and does not apply backpressure to URLSession.
      *
      * @default false
      */
     stream?: boolean;
     redirect?: RequestRedirect;
     cache?: RequestCache;
+    prefetchCacheTtlMs?: number;
   }
 ): Promise<Response> {
-  // Merge defaults from NitroRequestClass if input is one
-  if (input instanceof NitroRequestClass) {
+  // Both standard and Nitro Request inputs carry defaults, including a signal.
+  if (typeof input === 'object' && input !== null && 'url' in input) {
     init = {
       ...init,
-      signal: init?.signal ?? input.signal,
+      signal: init?.signal !== undefined ? init.signal : input.signal,
       redirect: (init?.redirect as RequestRedirect) ?? input.redirect,
       cache: (init?.cache as RequestCache) ?? input.cache,
+      credentials: init?.credentials ?? input.credentials,
     } as any;
   }
 
   // Streaming is http(s)-only; local URLs fall through to nitroFetchRaw (check runs only when streaming).
-  if ((init as any)?.stream === true && isHttpUrl(getUrlString(input))) {
+  if (
+    (init as any)?.stream === true &&
+    typeof NitroFetchHybrid?.createClient === 'function' &&
+    isHttpUrl(getUrlString(input))
+  ) {
+    if (init?.signal?.aborted) throw createAbortError();
     init = await resolveRequestBody(input, init);
     init = await resolveBlobBody(init);
     return nitroStreamFetch(input, init);
@@ -1015,7 +1123,7 @@ export async function nitroFetch(
 // Start a native prefetch. Requires a `prefetchKey` header on the request.
 export async function prefetch(
   input: RequestInfo | URL,
-  init?: RequestInit
+  init?: RequestInit & { prefetchKey?: string; prefetchCacheTtlMs?: number }
 ): Promise<void> {
   // If native implementation is not present yet, do nothing
   const hasNative =
@@ -1055,7 +1163,7 @@ const AUTOPREFETCH_QUEUE_KEY = 'nitrofetch_autoprefetch_queue';
 // Entries embed request headers (may hold credentials) — stored encrypted at rest.
 export async function prefetchOnAppStart(
   input: RequestInfo | URL,
-  init?: RequestInit & { prefetchKey?: string }
+  init?: RequestInit & { prefetchKey?: string; prefetchCacheTtlMs?: number }
 ): Promise<void> {
   // Resolve request and prefetchKey
   init = await resolveRequestBody(input, init);
