@@ -226,6 +226,7 @@ object NitroWebSocketAutoPrewarmer {
   // MARK: - Token refresh (synchronous, runs on background thread)
 
   private fun callTokenRefreshSync(config: JSONObject): Map<String, String>? {
+    var connection: HttpURLConnection? = null
     return try {
       val urlStr = config.optStringOrNull("url") ?: return null
       val method = config.optString("method", "POST")
@@ -234,6 +235,7 @@ object NitroWebSocketAutoPrewarmer {
       val responseType = config.optString("responseType", "json")
 
       val conn = URL(urlStr).openConnection() as HttpURLConnection
+      connection = conn
       conn.requestMethod = method
       conn.connectTimeout = 10_000
       conn.readTimeout = 10_000
@@ -249,13 +251,18 @@ object NitroWebSocketAutoPrewarmer {
       }
 
       val status = conn.responseCode
-      if (status !in 200..299) return null
+      if (status !in 200..299) {
+        conn.errorStream?.close()
+        return null
+      }
 
       val responseBody = conn.inputStream.use { it.bufferedReader(Charsets.UTF_8).readText() }
 
       parseTokenResponse(responseBody, responseType, config)
     } catch (_: Throwable) {
       null
+    } finally {
+      connection?.disconnect()
     }
   }
 
