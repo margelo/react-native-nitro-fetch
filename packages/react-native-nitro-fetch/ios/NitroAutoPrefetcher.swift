@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 @objc(NitroAutoPrefetcher)
 public final class NitroAutoPrefetcher: NSObject {
@@ -244,9 +245,9 @@ public final class NitroAutoPrefetcher: NSObject {
 
     // Merge: static headers first, token headers override, then prefetchKey
     var mergedHeaders: [String: String] = [:]
-    for (k, v) in headersDict { mergedHeaders[k] = String(describing: v) }
-    for (k, v) in tokens.headers { mergedHeaders[k] = v }
-    mergedHeaders["prefetchKey"] = prefetchKey
+    for (k, v) in headersDict { mergedHeaders[k.lowercased()] = String(describing: v) }
+    for (k, v) in tokens.headers { mergedHeaders[k.lowercased()] = v }
+    mergedHeaders["prefetchkey"] = prefetchKey
     let headers = mergedHeaders.map { NitroHeader(key: $0.key, value: $0.value) }
 
     let methodStr = entry["method"] as? String
@@ -371,12 +372,7 @@ public final class NitroAutoPrefetcher: NSObject {
         guard let header = comp["header"] as? String,
               let template = comp["template"] as? String,
               let paths = comp["paths"] as? [String: String] else { continue }
-        var built = template
-        for (ph, jsonPath) in paths {
-          let val = getNestedField(json, dotPath: jsonPath) ?? ""
-          built = built.replacingOccurrences(of: "{{\(ph)}}", with: val)
-        }
-        headers[header] = built
+        headers[header] = applyCompositeTemplate(template, paths: paths, json: json)
       }
     }
 
@@ -402,15 +398,39 @@ public final class NitroAutoPrefetcher: NSObject {
   }
 
   private static func getNestedField(_ obj: [String: Any], dotPath: String) -> String? {
-    let parts = dotPath.split(separator: ".").map(String.init)
+    let parts = dotPath.components(separatedBy: ".")
     var current: Any = obj
     for part in parts {
-      guard let dict = current as? [String: Any],
-            let next = dict[part] else { return nil }
-      current = next
+      if let dict = current as? [String: Any], let next = dict[part] {
+        current = next
+      } else if let array = current as? [Any], let index = Int(part),
+                index >= 0, index < array.count, String(index) == part {
+        current = array[index]
+      } else {
+        return nil
+      }
     }
+    if current is NSNull { return nil }
     if let s = current as? String { return s }
+    if let number = current as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() {
+      return number.boolValue ? "true" : "false"
+    }
     return String(describing: current)
+  }
+
+  private static let compositeTemplatePattern = try! NSRegularExpression(pattern: "\\{\\{([^{}]+)\\}\\}")
+
+  private static func applyCompositeTemplate(_ template: String, paths: [String: String], json: [String: Any]) -> String {
+    let source = template as NSString
+    let result = NSMutableString(string: template)
+    let matches = compositeTemplatePattern.matches(in: template, range: NSRange(location: 0, length: source.length))
+    // Match the original text once; replacements cannot become new placeholders.
+    for match in matches.reversed() {
+      let placeholder = source.substring(with: match.range(at: 1))
+      guard let path = paths[placeholder] else { continue }
+      result.replaceCharacters(in: match.range, with: getNestedField(json, dotPath: path) ?? "")
+    }
+    return result as String
   }
 
   private static func setNestedField(_ root: inout [String: Any], dotPath: String, value: String) {

@@ -212,10 +212,10 @@ object NitroWebSocketAutoPrewarmer {
       val headersObj = obj.optJSONObject("headers")
       if (headersObj != null) {
         headersObj.keys().forEachRemaining { k ->
-          merged[k] = headersObj.optString(k, "")
+          merged[k.lowercase()] = headersObj.optString(k, "")
         }
       }
-      tokenHeaders.forEach { (k, v) -> merged[k] = v }
+      tokenHeaders.forEach { (k, v) -> merged[k.lowercase()] = v }
 
       NitroLogger.d("NitroWS", "[TokenRefresh] Pre-warming $url with ${merged.size} header(s)")
       merged.forEach { (k, v) -> NitroLogger.d("NitroWS", "[TokenRefresh]   $k: $v") }
@@ -276,7 +276,8 @@ object NitroWebSocketAutoPrewarmer {
     }
 
     // JSON
-    val json = try { JSONObject(body) } catch (_: Throwable) { return result }
+    // Let the caller apply onFailure instead of caching an empty success.
+    val json = JSONObject(body)
 
     val mappings = config.optJSONArray("mappings")
     if (mappings != null) {
@@ -297,12 +298,7 @@ object NitroWebSocketAutoPrewarmer {
         val header = comp.optStringOrNull("header") ?: continue
         val template = comp.optStringOrNull("template") ?: continue
         val paths = comp.optJSONObject("paths") ?: continue
-        var built = template
-        paths.keys().forEachRemaining { ph ->
-          val val2 = getNestedField(json, paths.optString(ph, ""))
-          built = built.replace("{{$ph}}", val2 ?: "")
-        }
-        result[header] = built
+        result[header] = applyCompositeTemplate(template, paths, json)
       }
     }
 
@@ -313,9 +309,21 @@ object NitroWebSocketAutoPrewarmer {
     val parts = dotPath.split(".")
     var current: Any = obj
     for (part in parts) {
-      if (current !is JSONObject) return null
-      current = current.opt(part) ?: return null
+      current = when (val value = current) {
+        is JSONObject -> value.opt(part)
+        is JSONArray -> part.toIntOrNull()?.takeIf { it >= 0 && it.toString() == part }?.let { value.opt(it) }
+        else -> null
+      } ?: return null
     }
+    if (current === JSONObject.NULL) return null
     return current.toString()
   }
+
+  private val compositeTemplatePattern = Regex("\\{\\{([^{}]+)\\}\\}")
+
+  private fun applyCompositeTemplate(template: String, paths: JSONObject, json: JSONObject): String =
+    compositeTemplatePattern.replace(template) { match ->
+      val placeholder = match.groupValues[1]
+      if (paths.has(placeholder)) getNestedField(json, paths.optString(placeholder, "")) ?: "" else match.value
+    }
 }

@@ -44,6 +44,8 @@ registerTokenRefresh({
 
 Use **`mappings`** to copy fields from the JSON body into header names. Dot paths are supported (e.g., `data.token`):
 
+Nested arrays use zero-based numeric segments, such as `tokens.0.value`. Missing or JSON-null values are omitted; booleans become `true`/`false`. Malformed JSON follows `onFailure` on both platforms instead of being cached as a successful empty refresh. Header merging is case-insensitive: a refreshed `authorization` replaces stored `Authorization`, and the internal prefetch key overrides all casing variants.
+
 ```ts
 mappings: [
   {
@@ -57,6 +59,8 @@ mappings: [
 ### Composite headers
 
 Use **`compositeHeaders`** to build a header from a template and multiple JSON paths:
+
+Native composite templates insert values literally in one pass, including text that looks like another placeholder. Configured paths with missing/null values become empty strings; placeholders not listed in `paths` remain unchanged. Placeholder names may include hyphens. Web cold-start APIs remain documented no-ops.
 
 ```ts
 compositeHeaders: [

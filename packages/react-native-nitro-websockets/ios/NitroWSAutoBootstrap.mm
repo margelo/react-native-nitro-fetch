@@ -31,12 +31,44 @@ static NSString* NitroWSGetNestedField(NSDictionary *dict, NSString *dotPath) {
   NSArray<NSString *> *parts = [dotPath componentsSeparatedByString:@"."];
   id current = dict;
   for (NSString *part in parts) {
-    if (![current isKindOfClass:[NSDictionary class]]) return nil;
-    current = ((NSDictionary *)current)[part];
+    if ([current isKindOfClass:[NSDictionary class]]) {
+      current = ((NSDictionary *)current)[part];
+    } else if ([current isKindOfClass:[NSArray class]]) {
+      NSInteger index = part.integerValue;
+      if (index < 0 || (NSUInteger)index >= [current count] ||
+          ![[NSString stringWithFormat:@"%ld", (long)index] isEqualToString:part]) return nil;
+      current = ((NSArray *)current)[(NSUInteger)index];
+    } else {
+      return nil;
+    }
   }
-  if (current == nil) return nil;
+  if (current == nil || current == NSNull.null) return nil;
   if ([current isKindOfClass:[NSString class]]) return current;
+  if ([current isKindOfClass:[NSNumber class]] &&
+      CFGetTypeID((__bridge CFTypeRef)current) == CFBooleanGetTypeID()) {
+    return [current boolValue] ? @"true" : @"false";
+  }
   return [NSString stringWithFormat:@"%@", current];
+}
+
+static NSString* NitroWSApplyCompositeTemplate(NSString *templateString,
+                                              NSDictionary *paths,
+                                              NSDictionary *json) {
+  static NSRegularExpression *pattern;
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    pattern = [NSRegularExpression regularExpressionWithPattern:@"\\{\\{([^{}]+)\\}\\}" options:0 error:nil];
+  });
+  NSMutableString *result = [templateString mutableCopy];
+  NSArray<NSTextCheckingResult *> *matches = [pattern matchesInString:templateString options:0 range:NSMakeRange(0, templateString.length)];
+  for (NSTextCheckingResult *match in matches.reverseObjectEnumerator) {
+    NSString *placeholder = [templateString substringWithRange:[match rangeAtIndex:1]];
+    NSString *path = paths[placeholder];
+    if (![path isKindOfClass:[NSString class]]) continue;
+    NSString *value = NitroWSGetNestedField(json, path) ?: @"";
+    [result replaceCharactersInRange:match.range withString:value];
+  }
+  return result;
 }
 
 /// Synchronous token refresh using NSURLSession + semaphore.
@@ -134,16 +166,7 @@ static NSDictionary<NSString*, NSString*>* NitroWSCallTokenRefreshSync(NSDiction
       if (![header isKindOfClass:[NSString class]] ||
           ![templ isKindOfClass:[NSString class]] ||
           ![paths isKindOfClass:[NSDictionary class]]) continue;
-      NSMutableString *built = [templ mutableCopy];
-      [paths enumerateKeysAndObjectsUsingBlock:^(NSString *ph, NSString *jsonPath, BOOL *stop) {
-        if (![ph isKindOfClass:[NSString class]] || ![jsonPath isKindOfClass:[NSString class]]) return;
-        NSString *val = NitroWSGetNestedField(json, jsonPath) ?: @"";
-        [built replaceOccurrencesOfString:[NSString stringWithFormat:@"{{%@}}", ph]
-                               withString:val
-                                  options:0
-                                    range:NSMakeRange(0, built.length)];
-      }];
-      result[header] = [built copy];
+      result[header] = NitroWSApplyCompositeTemplate(templ, paths, json);
     }
   }
 
@@ -192,12 +215,12 @@ static void NitroWSRunPrewarmsWithTokenHeaders(NSArray *arr,
     if ([staticHeaders isKindOfClass:[NSDictionary class]]) {
       [staticHeaders enumerateKeysAndObjectsUsingBlock:^(id k, id v, BOOL *stop) {
         if ([k isKindOfClass:[NSString class]]) {
-          headers[[k UTF8String]] = [[NSString stringWithFormat:@"%@", v] UTF8String];
+          headers[[[k lowercaseString] UTF8String]] = [[NSString stringWithFormat:@"%@", v] UTF8String];
         }
       }];
     }
     [tokenHeaders enumerateKeysAndObjectsUsingBlock:^(NSString *k, NSString *v, BOOL *stop) {
-      headers[[k UTF8String]] = [v UTF8String];
+      headers[[k.lowercaseString UTF8String]] = [v UTF8String];
     }];
 
     NitroWSLog(@"[NitroWS] Pre-warming %@ with %zu header(s)", url, headers.size());

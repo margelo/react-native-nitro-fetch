@@ -226,10 +226,10 @@ object AutoPrefetcher {
     // Merge: static headers first, token headers override, then prefetchKey
     val mergedHeaders = mutableMapOf<String, String>()
     headersObj.keys().forEachRemaining { k ->
-      mergedHeaders[k] = headersObj.optString(k, "")
+      mergedHeaders[k.lowercase()] = headersObj.optString(k, "")
     }
-    tokens.headers.forEach { (k, v) -> mergedHeaders[k] = v }
-    mergedHeaders["prefetchKey"] = prefetchKey
+    tokens.headers.forEach { (k, v) -> mergedHeaders[k.lowercase()] = v }
+    mergedHeaders["prefetchkey"] = prefetchKey
     val headerObjs = mergedHeaders.map { (k, v) -> NitroHeader(k, v) }.toTypedArray()
 
     val methodStr = entry.optString("method", "").takeIf { it.isNotEmpty() }
@@ -389,9 +389,8 @@ object AutoPrefetcher {
     }
 
     // JSON
-    val json = try { JSONObject(body) } catch (_: Throwable) {
-      return TokenRefreshResult(headers, bodyFields, formFields)
-    }
+    // Let the caller apply onFailure instead of caching an empty success.
+    val json = JSONObject(body)
 
     collectMappings(json, config.optJSONArray("mappings"), "header", headers)
     collectMappings(json, config.optJSONArray("bodyMappings"), "bodyPath", bodyFields)
@@ -404,12 +403,7 @@ object AutoPrefetcher {
         val header = comp.optStringOrNull("header") ?: continue
         val template = comp.optStringOrNull("template") ?: continue
         val paths = comp.optJSONObject("paths") ?: continue
-        var built = template
-        paths.keys().forEachRemaining { ph ->
-          val val2 = getNestedField(json, paths.optString(ph, ""))
-          built = built.replace("{{$ph}}", val2 ?: "")
-        }
-        headers[header] = built
+        headers[header] = applyCompositeTemplate(template, paths, json)
       }
     }
 
@@ -438,11 +432,23 @@ object AutoPrefetcher {
     val parts = dotPath.split(".")
     var current: Any = obj
     for (part in parts) {
-      if (current !is JSONObject) return null
-      current = current.opt(part) ?: return null
+      current = when (val value = current) {
+        is JSONObject -> value.opt(part)
+        is JSONArray -> part.toIntOrNull()?.takeIf { it >= 0 && it.toString() == part }?.let { value.opt(it) }
+        else -> null
+      } ?: return null
     }
+    if (current === JSONObject.NULL) return null
     return current.toString()
   }
+
+  private val compositeTemplatePattern = Regex("\\{\\{([^{}]+)\\}\\}")
+
+  private fun applyCompositeTemplate(template: String, paths: JSONObject, json: JSONObject): String =
+    compositeTemplatePattern.replace(template) { match ->
+      val placeholder = match.groupValues[1]
+      if (paths.has(placeholder)) getNestedField(json, paths.optString(placeholder, "")) ?: "" else match.value
+    }
 
   private fun setNestedField(root: JSONObject, dotPath: String, value: String) {
     val parts = dotPath.split(".")
