@@ -68,7 +68,7 @@ export function getNestedField(
 }
 
 export function applyTemplate(template: string, value: string): string {
-  return template.replace(/\{\{value\}\}/g, value);
+  return template.replace(/\{\{value\}\}/g, () => value);
 }
 
 function applyCompositeTemplate(
