@@ -15,7 +15,7 @@ function shellEscape(str: string): string {
 export function generateCurl(options: CurlOptions): string {
   const parts: string[] = ['curl'];
 
-  if (options.method && options.method !== 'GET') {
+  if (options.method && (options.method !== 'GET' || options.body != null)) {
     parts.push('-X', shellEscape(options.method));
   }
 
@@ -26,19 +26,14 @@ export function generateCurl(options: CurlOptions): string {
     }
   }
 
-  if (options.body) {
-    const maxLen = 10_000;
-    const truncated =
-      options.body.length > maxLen
-        ? options.body.slice(0, maxLen) + '...[truncated]'
-        : options.body;
-    parts.push('-d', shellEscape(truncated));
+  if (options.body != null) {
+    parts.push('--data-raw', shellEscape(options.body));
   }
 
   if (options.verbose) parts.push('-v');
   if (options.compressed) parts.push('--compressed');
 
-  parts.push(shellEscape(options.url));
+  parts.push('--url', shellEscape(options.url));
 
   return parts.join(' ');
 }

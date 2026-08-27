@@ -21,7 +21,8 @@ NetworkInspector.enable();
 // Optionally configure limits
 NetworkInspector.enable({
   maxEntries: 500,      // ring-buffer size (default 500)
-  maxBodyCapture: 4096, // max bytes captured per body (default 4096)
+  maxBodyCapture: 4096, // max UTF-16 code units captured per body (default 4096)
+  maxMessagesPerSocket: 100, // retained messages per WebSocket (default 100)
 });
 
 // Stop recording
@@ -29,6 +30,8 @@ NetworkInspector.disable();
 ```
 
 Once enabled, **all `fetch()` calls** are automatically recorded. WebSocket tracking is also automatic if `react-native-nitro-websockets` is installed alongside `react-native-nitro-fetch`.
+
+Limits must be non-negative safe integers. Lowering `maxEntries` or `maxMessagesPerSocket` trims existing history immediately. Socket message/byte totals remain cumulative after old message details are discarded. Reducing `maxBodyCapture` affects future captures. Inspector-generated curl commands use the captured body and explicitly mark truncation; standalone `generateCurl` preserves the supplied body, including empty and long bodies.
 
 ### Reading entries
 

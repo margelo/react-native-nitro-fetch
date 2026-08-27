@@ -57,13 +57,30 @@ class NetworkInspectorImpl {
   private _entries: InspectorEntry[] = [];
   private _maxEntries: number = 500;
   private _maxBodyCapture: number = 4096;
+  private _maxMessagesPerSocket: number = 100;
   private _listeners: Set<NetworkEntryCallback> = new Set();
 
-  enable(options?: { maxEntries?: number; maxBodyCapture?: number }): void {
+  enable(options?: {
+    maxEntries?: number;
+    maxBodyCapture?: number;
+    maxMessagesPerSocket?: number;
+  }): void {
+    for (const [name, value] of Object.entries(options ?? {})) {
+      if (value != null && (!Number.isSafeInteger(value) || value < 0)) {
+        throw new RangeError(`${name} must be a non-negative safe integer.`);
+      }
+    }
     this._enabled = true;
     if (options?.maxEntries != null) this._maxEntries = options.maxEntries;
     if (options?.maxBodyCapture != null)
       this._maxBodyCapture = options.maxBodyCapture;
+    if (options?.maxMessagesPerSocket != null) {
+      this._maxMessagesPerSocket = options.maxMessagesPerSocket;
+      for (const entry of this._entries) {
+        if (entry.type === 'websocket') this._trimMessages(entry);
+      }
+    }
+    this._trimEntries();
   }
 
   disable(): void {
@@ -115,7 +132,16 @@ class NetworkInspectorImpl {
 
   private _trimEntries(): void {
     if (this._entries.length > this._maxEntries) {
-      this._entries.shift();
+      this._entries.splice(0, this._entries.length - this._maxEntries);
+    }
+  }
+
+  private _trimMessages(entry: WebSocketEntry): void {
+    if (entry.messages.length > this._maxMessagesPerSocket) {
+      entry.messages.splice(
+        0,
+        entry.messages.length - this._maxMessagesPerSocket
+      );
     }
   }
 
@@ -130,13 +156,14 @@ class NetworkInspectorImpl {
   ): void {
     if (!this._enabled) return;
     const bodySize = body ? body.length : 0;
+    const capturedBody = body?.slice(0, this._maxBodyCapture);
     const entry: NetworkEntry = {
       id,
       type: 'http',
       url,
       method,
       requestHeaders: headers.map((h) => ({ key: h.key, value: h.value })),
-      requestBody: body ? body.slice(0, this._maxBodyCapture) : undefined,
+      requestBody: capturedBody,
       requestBodySize: bodySize,
       status: 0,
       statusText: '',
@@ -145,7 +172,11 @@ class NetworkInspectorImpl {
       startTime: performance.now(),
       endTime: 0,
       duration: 0,
-      curl: generateCurl({ url, method, headers, body }),
+      curl:
+        generateCurl({ url, method, headers, body: capturedBody }) +
+        (bodySize > this._maxBodyCapture
+          ? ' # Request body truncated by maxBodyCapture; not a complete reproduction.'
+          : ''),
     };
     this._entries.push(entry);
     this._trimEntries();
@@ -240,6 +271,7 @@ class NetworkInspectorImpl {
       isBinary,
       timestamp: performance.now(),
     });
+    this._trimMessages(entry);
     if (direction === 'sent') {
       entry.messagesSent++;
       entry.bytesSent += size;
