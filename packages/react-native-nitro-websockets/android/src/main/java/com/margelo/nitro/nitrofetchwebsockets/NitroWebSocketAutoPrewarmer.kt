@@ -145,21 +145,19 @@ object NitroWebSocketAutoPrewarmer {
           try {
             val refreshConfig = JSONObject(refreshRaw)
             val onFailure = refreshConfig.optString("onFailure", "useStoredHeaders")
-            val refreshURL = refreshConfig.optString("url", "(unknown)")
-            NitroLogger.d("NitroWS", "[TokenRefresh] Calling refresh endpoint: $refreshURL")
+            NitroLogger.d("NitroWS", "[TokenRefresh] Calling refresh endpoint")
 
             val refreshed = callTokenRefreshSync(refreshConfig)
 
             val tokenHeaders: Map<String, String> = if (refreshed != null) {
               NitroLogger.d("NitroWS", "[TokenRefresh] ✅ Success — got ${refreshed.size} header(s)")
-              refreshed.forEach { (k, v) -> NitroLogger.d("NitroWS", "[TokenRefresh]   $k: $v") }
               // Cache fresh token headers for useStoredHeaders fallback on next cold start
               val cacheJson = JSONObject()
               refreshed.forEach { (k, v) -> cacheJson.put(k, v) }
               NitroWSSecureAtRest.putEncrypted(prefs, KEY_TOKEN_CACHE, cacheJson.toString())
               refreshed
             } else {
-              NitroLogger.d("NitroWS", "[TokenRefresh] ❌ Refresh failed — onFailure: $onFailure")
+              NitroLogger.d("NitroWS", "[TokenRefresh] ❌ Refresh failed")
               if (onFailure == "skip") {
                 NitroLogger.d("NitroWS", "[TokenRefresh] Skipping all prewarms")
                 return@Thread
@@ -197,7 +195,6 @@ object NitroWebSocketAutoPrewarmer {
     for (i in 0 until arr.length()) {
       val obj = arr.optJSONObject(i) ?: continue
       val url = obj.optStringOrNull("url") ?: continue
-      NitroLogger.d("NitroWS", "Pre-warming $url")
 
       val protocols = mutableListOf<String>()
       val protocolsArr = obj.optJSONArray("protocols")
@@ -217,8 +214,7 @@ object NitroWebSocketAutoPrewarmer {
       }
       tokenHeaders.forEach { (k, v) -> merged[k] = v }
 
-      NitroLogger.d("NitroWS", "[TokenRefresh] Pre-warming $url with ${merged.size} header(s)")
-      merged.forEach { (k, v) -> NitroLogger.d("NitroWS", "[TokenRefresh]   $k: $v") }
+      NitroLogger.d("NitroWS", "[TokenRefresh] Pre-warming with ${merged.size} header(s)")
       NitroWebSocketPrewarmer.preWarm(url, protocols, merged)
     }
   }

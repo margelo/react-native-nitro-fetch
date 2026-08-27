@@ -107,8 +107,7 @@ void NWWebSocketConnection::connect(
 #if defined(NITRO_WS_TRACING)
   os_signpost_id_t spid = os_signpost_id_generate(nitroWsLog());
   _signpostId = spid;
-  os_signpost_interval_begin(nitroWsLog(), spid, "NitroWS",
-                              "%{public}s", url.c_str());
+  os_signpost_interval_begin(nitroWsLog(), spid, "NitroWS", "connect");
 #endif
   _closeFired = false;
   _openFired = false;
@@ -514,7 +513,7 @@ void NWWebSocketConnection::fireError(const std::string& msg) {
 #if defined(NITRO_WS_TRACING)
   os_signpost_event_emit(nitroWsLog(),
     static_cast<os_signpost_id_t>(_signpostId),
-    "NitroWS", "error %{public}s", msg.c_str());
+    "NitroWS", "error");
 #endif
 
   OnError cb;

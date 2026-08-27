@@ -188,9 +188,8 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     #if NITROFETCH_TRACING
     let signpostID = OSSignpostID(log: fetchLog)
     let traceMethod = req.method?.stringValue ?? "GET"
-    let tracePath = URL(string: req.url)?.path ?? req.url
     os_signpost(.begin, log: fetchLog, name: "NitroFetch", signpostID: signpostID,
-                "%{public}s %{public}s", traceMethod, tracePath)
+                "%{public}s", traceMethod)
     #endif
 
     // DevTools/CDP reporting is gated on `#if DEBUG` so the entire block is

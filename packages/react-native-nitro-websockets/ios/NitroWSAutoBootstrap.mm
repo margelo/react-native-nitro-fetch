@@ -200,10 +200,7 @@ static void NitroWSRunPrewarmsWithTokenHeaders(NSArray *arr,
       headers[[k UTF8String]] = [v UTF8String];
     }];
 
-    NitroWSLog(@"[NitroWS] Pre-warming %@ with %zu header(s)", url, headers.size());
-    for (auto &kv : headers) {
-      NitroWSLog(@"[NitroWS]   %s: %s", kv.first.c_str(), kv.second.c_str());
-    }
+    NitroWSLog(@"[NitroWS] Pre-warming with %zu header(s)", headers.size());
     margelo::nitro::nitrofetchwebsockets::WebSocketPrewarmer::instance()
       .preConnect(urlStr, protocols, headers);
   }
@@ -247,15 +244,11 @@ static void NitroWSRunAutoPrewarm() {
           NSString *onFailure = refreshConfig[@"onFailure"];
           if (![onFailure isKindOfClass:[NSString class]]) onFailure = @"useStoredHeaders";
 
-          NSString *refreshURL = refreshConfig[@"url"];
-          NitroWSLog(@"[NitroWS][TokenRefresh] Calling refresh endpoint: %@", refreshURL);
+          NitroWSLog(@"[NitroWS][TokenRefresh] Calling refresh endpoint");
 
           NSDictionary *refreshed = NitroWSCallTokenRefreshSync(refreshConfig);
           if (refreshed) {
             NitroWSLog(@"[NitroWS][TokenRefresh] ✅ Success — got %lu header(s)", (unsigned long)refreshed.count);
-            [refreshed enumerateKeysAndObjectsUsingBlock:^(NSString *k, NSString *v, BOOL *stop) {
-              NitroWSLog(@"[NitroWS][TokenRefresh]   %@: %@", k, v);
-            }];
             // Cache fresh token headers
             NSData *cacheData = [NSJSONSerialization dataWithJSONObject:refreshed options:0 error:nil];
             if (cacheData) {
@@ -266,7 +259,7 @@ static void NitroWSRunAutoPrewarm() {
             }
             tokenHeaders = refreshed;
           } else {
-            NitroWSLog(@"[NitroWS][TokenRefresh] ❌ Refresh failed — onFailure: %@", onFailure);
+            NitroWSLog(@"[NitroWS][TokenRefresh] ❌ Refresh failed");
             if ([onFailure isEqualToString:@"skip"]) {
               NitroWSLog(@"[NitroWS][TokenRefresh] Skipping all prewarms");
               return;

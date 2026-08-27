@@ -97,8 +97,7 @@ object AutoPrefetcher {
       if (!refreshRaw.isNullOrEmpty()) {
         val refreshConfig = JSONObject(refreshRaw)
         val onFailure = refreshConfig.optString("onFailure", "useStoredHeaders")
-        val refreshURL = refreshConfig.optString("url", "(unknown)")
-        NitroLogger.d("NitroFetch", "[TokenRefresh] Calling refresh endpoint: $refreshURL")
+        NitroLogger.d("NitroFetch", "[TokenRefresh] Calling refresh endpoint")
 
         val refreshed = callTokenRefreshSync(refreshConfig)
 
@@ -108,12 +107,11 @@ object AutoPrefetcher {
             "[TokenRefresh] ✅ Success — got ${refreshed.headers.size} header(s), " +
               "${refreshed.bodyFields.size} body field(s), ${refreshed.formFields.size} form field(s)"
           )
-          logTokens(refreshed)
           // Cache fresh tokens for useStoredHeaders fallback on next cold start
           NitroFetchSecureAtRest.putEncrypted(prefs, KEY_TOKEN_CACHE, serializeCache(refreshed))
           refreshed
         } else {
-          NitroLogger.d("NitroFetch", "[TokenRefresh] ❌ Refresh failed — onFailure: $onFailure")
+          NitroLogger.d("NitroFetch", "[TokenRefresh] ❌ Refresh failed")
           if (onFailure == "skip") {
             NitroLogger.d("NitroFetch", "[TokenRefresh] Skipping all prefetches")
             return
@@ -145,8 +143,7 @@ object AutoPrefetcher {
       val url = o.optStringOrNull("url") ?: continue
       val prefetchKey = o.optStringOrNull("prefetchKey") ?: continue
 
-      NitroLogger.d("NitroFetch", "[TokenRefresh] Prefetching $url")
-      logTokens(tokens)
+      NitroLogger.d("NitroFetch", "[TokenRefresh] Starting prefetch")
 
       val req = buildNitroRequestFromEntry(o, tokens)
 
@@ -292,27 +289,6 @@ object AutoPrefetcher {
   }
 
   // MARK: - Token refresh (synchronous, runs on background thread)
-
-  private fun logTokens(tokens: TokenRefreshResult) {
-    if (tokens.headers.isNotEmpty()) {
-      NitroLogger.d("NitroFetch", "[TokenRefresh]   headers:")
-      tokens.headers.forEach { (k, v) ->
-        NitroLogger.d("NitroFetch", "[TokenRefresh]     $k: $v")
-      }
-    }
-    if (tokens.bodyFields.isNotEmpty()) {
-      NitroLogger.d("NitroFetch", "[TokenRefresh]   body fields:")
-      tokens.bodyFields.forEach { (k, v) ->
-        NitroLogger.d("NitroFetch", "[TokenRefresh]     $k: $v")
-      }
-    }
-    if (tokens.formFields.isNotEmpty()) {
-      NitroLogger.d("NitroFetch", "[TokenRefresh]   form fields:")
-      tokens.formFields.forEach { (k, v) ->
-        NitroLogger.d("NitroFetch", "[TokenRefresh]     $k: $v")
-      }
-    }
-  }
 
   private data class TokenRefreshResult(
     val headers: Map<String, String>,

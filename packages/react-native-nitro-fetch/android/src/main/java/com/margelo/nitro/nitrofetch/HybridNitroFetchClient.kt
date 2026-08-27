@@ -110,7 +110,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       val shouldFollowRedirects = req.followRedirects ?: true
       val omitCredentials = req.credentials == NitroRequestCredentials.OMIT
       val traceLabel = if (BuildConfig.NITRO_FETCH_TRACING) {
-        "NitroFetch ${req.method?.name ?: "GET"} ${Uri.parse(url).path ?: url}"
+        "NitroFetch ${req.method?.name ?: "GET"}"
       } else ""
       val traceCookie = if (BuildConfig.NITRO_FETCH_TRACING) url.hashCode() else 0
       if (BuildConfig.NITRO_FETCH_TRACING) {

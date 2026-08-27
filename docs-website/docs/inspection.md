@@ -30,6 +30,8 @@ NetworkInspector.disable();
 
 Once enabled, **all `fetch()` calls** are automatically recorded. WebSocket tracking is also automatic if `react-native-nitro-websockets` is installed alongside `react-native-nitro-fetch`.
 
+The inspector and attached React Native DevTools intentionally expose request URLs, headers and captured bodies. Treat exported diagnostics as sensitive. Automatic bootstrap logs and native trace labels contain metadata rather than token values, URL paths, or WebSocket error strings; this does not redact the explicitly enabled inspector.
+
 ### Reading entries
 
 ```ts
@@ -249,9 +251,9 @@ Then rebuild your app. The env vars inject compile-time flags (`NITROFETCH_TRACI
 
 When `NitroFetch_enableTracing=true` (Android) or `NITROFETCH_TRACING=1` (iOS) is set:
 
-- **Android**: Each `fetch()` call emits an **async section** via `android.os.Trace.beginAsyncSection` / `endAsyncSection`. The label is `"NitroFetch <METHOD> <path>"` (e.g., `NitroFetch GET /api/users`). The section spans from request start to response completion (including success, failure, and cancellation).
+- **Android**: Each `fetch()` call emits an **async section** via `android.os.Trace.beginAsyncSection` / `endAsyncSection`. The label is `"NitroFetch <METHOD>"` (e.g., `NitroFetch GET`). The section spans from request start to response completion (including success, failure, and cancellation).
 
-- **iOS**: Each `fetch()` call emits an **`os_signpost` interval** under subsystem `com.margelo.nitrofetch`, category `network`, name `"NitroFetch"`. The begin event includes `"<METHOD> <path>"` and the end event includes `"status=<code> bytes=<count>"`.
+- **iOS**: Each `fetch()` call emits an **`os_signpost` interval** under subsystem `com.margelo.nitrofetch`, category `network`, name `"NitroFetch"`. The begin event includes `"<METHOD>"` and the end event includes `"status=<code> bytes=<count>"`.
 
 #### WebSocket
 
@@ -279,7 +281,7 @@ When `NitroFetchWebsockets_enableTracing=true` (Android) or `NITRO_WS_TRACING=1`
 
 7. Click **"Start recording"**, use your app (make fetch requests, open WebSocket connections), then click **"Stop"**.
 
-8. In the trace viewer, look for your app's process. HTTP traces appear as async slices labeled `NitroFetch GET /path`, `NitroFetch POST /path`, etc. WebSocket traces appear as sync slices labeled `NitroWS connect <url>`, `NitroWS established`, `NitroWS send text`, `NitroWS receive`, etc.
+8. In the trace viewer, look for your app's process. HTTP traces appear as async slices labeled `NitroFetch GET`, `NitroFetch POST`, etc. WebSocket traces appear as sync slices labeled `NitroWS connect`, `NitroWS established`, `NitroWS send text`, `NitroWS receive`, etc.
 
 #### Option 2: Command-line with config file
 
@@ -335,9 +337,9 @@ Open the resulting `.perfetto-trace` file at [ui.perfetto.dev](https://ui.perfet
    | `com.margelo.nitrofetch` | `network` | HTTP fetch requests |
    | `com.margelo.nitro.websockets` | `NitroWS` | WebSocket lifecycle |
 
-   - **HTTP fetch**: Appears as **intervals** (begin/end pair) under name `"NitroFetch"`. The begin annotation shows the method and path (e.g., `GET /api/users`), the end annotation shows `status=200 bytes=1234`.
-   - **WebSocket connect**: Appears as an **interval** from `connect` (begin, annotated with the URL) to `connected` (end). This measures the handshake duration.
-   - **WebSocket send/receive/close/error**: Appear as **point events** under name `"NitroWS"` with details like `send text 42 bytes`, `receive text`, `close code=1000 clean=1`, `error <message>`.
+   - **HTTP fetch**: Appears as **intervals** (begin/end pair) under name `"NitroFetch"`. The begin annotation shows the method (e.g., `GET`), the end annotation shows `status=200 bytes=1234`.
+   - **WebSocket connect**: Appears as an **interval** from `connect` to `connected`. This measures the handshake duration without recording the URL.
+   - **WebSocket send/receive/close/error**: Appear as **point events** under name `"NitroWS"` with details like `send text 42 bytes`, `receive text`, `close code=1000 clean=1`, `error`.
 
 ### Trace events reference
 
@@ -345,8 +347,8 @@ Open the resulting `.perfetto-trace` file at [ui.perfetto.dev](https://ui.perfet
 
 | Event | Android | iOS |
 |-------|---------|-----|
-| Request start | `Trace.beginAsyncSection("NitroFetch GET /path", cookie)` | `os_signpost(.begin, "NitroFetch", "GET /path")` |
-| Request end (success) | `Trace.endAsyncSection("NitroFetch GET /path", cookie)` | `os_signpost(.end, "NitroFetch", "status=200 bytes=N")` |
+| Request start | `Trace.beginAsyncSection("NitroFetch GET", cookie)` | `os_signpost(.begin, "NitroFetch", "GET")` |
+| Request end (success) | `Trace.endAsyncSection("NitroFetch GET", cookie)` | `os_signpost(.end, "NitroFetch", "status=200 bytes=N")` |
 | Request end (failure) | `Trace.endAsyncSection(...)` | `os_signpost(.end, ...)` |
 | Request end (cancelled) | `Trace.endAsyncSection(...)` | `os_signpost(.end, ...)` |
 
@@ -354,13 +356,13 @@ Open the resulting `.perfetto-trace` file at [ui.perfetto.dev](https://ui.perfet
 
 | Event | Android (`ATrace`) | iOS (`os_signpost`) |
 |-------|-------------------|---------------------|
-| Connect start | `ATrace_beginSection("NitroWS connect wss://...")` | interval begin: `"NitroWS"` with URL |
+| Connect start | `ATrace_beginSection("NitroWS connect")` | interval begin: `"NitroWS"` `"connect"` |
 | Connected | `ATrace_beginSection("NitroWS established")` | interval end: `"NitroWS"` `"connected"` |
 | Send text | `ATrace_beginSection("NitroWS send text")` | event: `"send text <N> bytes"` |
 | Send binary | `ATrace_beginSection("NitroWS send binary")` | event: `"send binary <N> bytes"` |
 | Receive | `ATrace_beginSection("NitroWS receive")` | event: `"receive text"` or `"receive binary"` |
 | Close | `ATrace_beginSection("NitroWS close")` | event: `"close code=<N> clean=<0\|1>"` |
-| Error | `ATrace_beginSection("NitroWS error")` | event: `"error <message>"` |
+| Error | `ATrace_beginSection("NitroWS error")` | event: `"error"` |
 
 :::note
 On Android, WebSocket events use synchronous `ATrace_beginSection` / `ATrace_endSection` pairs (not async sections) because `ATrace_beginAsyncSection` requires API 29+ while the library supports API 24+. HTTP fetch uses the Java `android.os.Trace.beginAsyncSection` API which is available on all supported API levels.

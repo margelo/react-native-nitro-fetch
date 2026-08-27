@@ -150,19 +150,17 @@ public final class NitroAutoPrefetcher: NSObject {
          let refreshData = refreshRaw.data(using: .utf8),
          let refreshObj = try? JSONSerialization.jsonObject(with: refreshData) as? [String: Any] {
         let onFailure = refreshObj["onFailure"] as? String ?? "useStoredHeaders"
-        let refreshURL = refreshObj["url"] as? String ?? "(unknown)"
-        NitroLogger.log("[NitroFetch][TokenRefresh] Calling refresh endpoint: \(refreshURL)")
+        NitroLogger.log("[NitroFetch][TokenRefresh] Calling refresh endpoint")
         let refreshed = try? await callTokenRefresh(config: refreshObj)
         if let refreshed = refreshed {
           NitroLogger.log("[NitroFetch][TokenRefresh] ✅ Success — got \(refreshed.headers.count) header(s), \(refreshed.bodyFields.count) body field(s), \(refreshed.formFields.count) form field(s)")
-          logTokens(refreshed)
           // Cache fresh tokens for useStoredHeaders fallback on next cold start
           if let cacheStr = serializeCache(refreshed) {
             NitroFetchSecureAtRest.setEncrypted(cacheStr, forKey: tokenCacheKey, defaults: userDefaults)
           }
           tokens = refreshed
         } else {
-          NitroLogger.log("[NitroFetch][TokenRefresh] ❌ Refresh failed — onFailure: \(onFailure)")
+          NitroLogger.log("[NitroFetch][TokenRefresh] ❌ Refresh failed")
           if onFailure == "skip" {
             NitroLogger.log("[NitroFetch][TokenRefresh] Skipping all prefetches")
             return
@@ -187,8 +185,7 @@ public final class NitroAutoPrefetcher: NSObject {
       guard let url = obj["url"] as? String, !url.isEmpty else { continue }
       guard let prefetchKey = obj["prefetchKey"] as? String, !prefetchKey.isEmpty else { continue }
 
-      NitroLogger.log("[NitroFetch][TokenRefresh] Prefetching \(url)")
-      logTokens(tokens)
+      NitroLogger.log("[NitroFetch][TokenRefresh] Starting prefetch")
 
       let req = buildNitroRequest(from: obj, tokens: tokens)
       Task {
@@ -286,21 +283,6 @@ public final class NitroAutoPrefetcher: NSObject {
   }
 
   // MARK: - Token refresh
-
-  private static func logTokens(_ tokens: TokenRefreshResult) {
-    if !tokens.headers.isEmpty {
-      NitroLogger.log("[NitroFetch][TokenRefresh]   headers:")
-      for (k, v) in tokens.headers { NitroLogger.log("[NitroFetch][TokenRefresh]     \(k): \(v)") }
-    }
-    if !tokens.bodyFields.isEmpty {
-      NitroLogger.log("[NitroFetch][TokenRefresh]   body fields:")
-      for (k, v) in tokens.bodyFields { NitroLogger.log("[NitroFetch][TokenRefresh]     \(k): \(v)") }
-    }
-    if !tokens.formFields.isEmpty {
-      NitroLogger.log("[NitroFetch][TokenRefresh]   form fields:")
-      for (k, v) in tokens.formFields { NitroLogger.log("[NitroFetch][TokenRefresh]     \(k): \(v)") }
-    }
-  }
 
   struct TokenRefreshResult {
     var headers: [String: String]

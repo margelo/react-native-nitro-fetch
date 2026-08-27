@@ -142,7 +142,7 @@ void WebSocketConnection::connect(
   _negotiatedProtocol.clear();
 
 #if defined(NITRO_WS_TRACING)
-  ATrace_beginSection(("NitroWS connect " + url).c_str());
+  ATrace_beginSection("NitroWS connect");
 #endif
 
   ParsedUrl parsed;
