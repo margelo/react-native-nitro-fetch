@@ -44,3 +44,5 @@ const res = await fetch('https://httpbin.org/post', {
 :::note
 The `FormData` API follows the standard browser interface. File objects use the React Native convention with `uri`, `type`, and `name` fields.
 :::
+
+Native multipart serialization escapes quotes and line breaks in field names and filenames. Field names and string values normalize line breaks to CRLF; file bytes are unchanged. Repeated fields retain their order. File MIME types containing CR or LF reject the request instead of creating malformed multipart headers. Uploads are still buffered in memory; these encoding rules do not add streaming file uploads.

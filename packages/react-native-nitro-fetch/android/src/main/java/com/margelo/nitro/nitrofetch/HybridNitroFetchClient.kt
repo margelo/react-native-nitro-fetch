@@ -361,19 +361,23 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
 
       for (part in parts) {
         out.write("--$boundary\r\n".toByteArray())
+        val name = escapeMultipartParameter(normalizeMultipartLineBreaks(part.name))
 
         val fileUri = part.fileUri
         if (fileUri != null) {
-          val fileName = part.fileName ?: "file"
+          val fileName = escapeMultipartParameter(part.fileName ?: "file")
           val mimeType = part.mimeType ?: "application/octet-stream"
-          out.write("Content-Disposition: form-data; name=\"${part.name}\"; filename=\"$fileName\"\r\n".toByteArray())
+          require(!mimeType.contains('\r') && !mimeType.contains('\n')) {
+            "Multipart MIME type must not contain line breaks"
+          }
+          out.write("Content-Disposition: form-data; name=\"$name\"; filename=\"$fileName\"\r\n".toByteArray())
           out.write("Content-Type: $mimeType\r\n\r\n".toByteArray())
 
           val fileData = readFileBytes(fileUri)
           out.write(fileData)
         } else {
-          val value = part.value ?: ""
-          out.write("Content-Disposition: form-data; name=\"${part.name}\"\r\n\r\n".toByteArray())
+          val value = normalizeMultipartLineBreaks(part.value ?: "")
+          out.write("Content-Disposition: form-data; name=\"$name\"\r\n\r\n".toByteArray())
           out.write(value.toByteArray(Charsets.UTF_8))
         }
 
@@ -382,6 +386,14 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
 
       out.write("--$boundary--\r\n".toByteArray())
       return Pair(out.toByteArray(), "multipart/form-data; boundary=$boundary")
+    }
+
+    private fun normalizeMultipartLineBreaks(value: String): String {
+      return value.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
+    }
+
+    private fun escapeMultipartParameter(value: String): String {
+      return value.replace("\r", "%0D").replace("\n", "%0A").replace("\"", "%22")
     }
 
     private fun readFileBytes(uri: String): ByteArray {
