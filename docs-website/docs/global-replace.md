@@ -74,3 +74,115 @@ export const api = axios.create({
   },
 });
 ```
+
+## TanStack Query (React Query)
+
+If you installed the globals above, nothing to configure — every `queryFn` that calls `fetch()` already runs on Nitro.
+
+To keep it explicit instead, import Nitro's `fetch` and use it inside `queryFn`. Forward the `signal` React Query hands you so cancelled queries also cancel the native request:
+
+```ts
+import { useQuery } from '@tanstack/react-query';
+import { fetch as nitroFetch } from 'react-native-nitro-fetch';
+
+export function useUser(id: string) {
+  return useQuery({
+    queryKey: ['user', id],
+    queryFn: async ({ signal }) => {
+      const res = await nitroFetch(`https://api.example.com/users/${id}`, {
+        signal,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+  });
+}
+```
+
+A shared wrapper keeps the boilerplate in one place:
+
+```ts
+import { QueryClient } from '@tanstack/react-query';
+import { fetch as nitroFetch } from 'react-native-nitro-fetch';
+
+const BASE_URL = 'https://api.example.com';
+
+export async function nitroQueryFn({
+  queryKey,
+  signal,
+}: {
+  queryKey: readonly unknown[];
+  signal: AbortSignal;
+}) {
+  const res = await nitroFetch(`${BASE_URL}/${queryKey.join('/')}`, { signal });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+export const queryClient = new QueryClient({
+  defaultOptions: { queries: { queryFn: nitroQueryFn } },
+});
+```
+
+:::tip
+Pair this with [prefetch](./prefetch.md) to serve the first render from a cold-start warm request — enqueue it on app start and pass the same `prefetchKey` from the `queryFn`:
+
+```ts
+import { prefetchOnAppStart } from 'react-native-nitro-fetch';
+
+await prefetchOnAppStart('https://api.example.com/users/me', {
+  prefetchKey: 'me',
+});
+
+useQuery({
+  queryKey: ['user', 'me'],
+  queryFn: async ({ signal }) => {
+    const res = await nitroFetch('https://api.example.com/users/me', {
+      headers: { prefetchKey: 'me' },
+      signal,
+    });
+    return res.json();
+  },
+});
+```
+
+:::
+
+## RTK Query
+
+If you installed the globals above, `fetchBaseQuery` picks up Nitro automatically — no `fetchFn` needed.
+
+Otherwise pass `fetchFn`. `fetchBaseQuery` builds a `Request` object and calls `fetchFn(request)` with **no** second argument, so lift `signal` off the request — that is what carries `AbortController` cancellation and `fetchBaseQuery`'s own `timeout` option down to the native client:
+
+```ts
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { fetch as nitroFetch } from 'react-native-nitro-fetch';
+
+export const api = createApi({
+  reducerPath: 'api',
+  baseQuery: fetchBaseQuery({
+    baseUrl: 'https://api.example.com',
+    timeout: 10_000,
+    prepareHeaders: (headers, { getState }) => {
+      const token = (getState() as RootState).auth.token;
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      return headers;
+    },
+    fetchFn: (input, init) =>
+      nitroFetch(input, {
+        ...init,
+        signal: init?.signal ?? (input as Request).signal,
+      }),
+  }),
+  endpoints: (build) => ({
+    getUser: build.query<User, string>({ query: (id) => `/users/${id}` }),
+    createUser: build.mutation<User, Partial<User>>({
+      query: (body) => ({ url: '/users', method: 'POST', body }),
+    }),
+  }),
+});
+
+export const { useGetUserQuery, useCreateUserMutation } = api;
+```
+
+Method, headers, and body all travel on the `Request` object, so nothing else needs forwarding.
