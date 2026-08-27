@@ -1,31 +1,34 @@
-import { withMainApplication } from '@expo/config-plugins';
+import { withMainApplication, type ConfigPlugin } from '@expo/config-plugins';
 
-const withAndroidAutoPrefetch = (config: any) => {
-  return withMainApplication(config, (config) => {
-    let content = config.modResults.contents;
+const withAndroidAutoPrefetch: ConfigPlugin = (config) => {
+  return withMainApplication(config, (mod) => {
+    let content = mod.modResults.contents;
+    const isJava = mod.modResults.language === 'java';
 
     // Add import for AutoPrefetcher
     if (
       !content.includes('import com.margelo.nitro.nitrofetch.AutoPrefetcher')
     ) {
       content = content.replace(
-        /import android.app.Application/g,
-        `import android.app.Application
-import com.margelo.nitro.nitrofetch.AutoPrefetcher`
+        /^(\s*package\s+[^\r\n]+)$/m,
+        `$1\n\nimport com.margelo.nitro.nitrofetch.AutoPrefetcher${
+          isJava ? ';' : ''
+        }`
       );
     }
 
     // Add prefetchOnStart call in onCreate before loadReactNative
-    if (!content.includes('AutoPrefetcher.prefetchOnStart')) {
+    if (!/AutoPrefetcher(?:\.INSTANCE)?\.prefetchOnStart/.test(content)) {
       content = content.replace(
-        /super\.onCreate\(\)/,
-        `super.onCreate()
-    try { AutoPrefetcher.prefetchOnStart(this) } catch (_: Throwable) {}`
+        /super\.onCreate\(\);?/,
+        isJava
+          ? 'super.onCreate();\n    try { AutoPrefetcher.INSTANCE.prefetchOnStart(this); } catch (Throwable ignored) {}'
+          : 'super.onCreate()\n    try { AutoPrefetcher.prefetchOnStart(this) } catch (_: Throwable) {}'
       );
     }
 
-    config.modResults.contents = content;
-    return config;
+    mod.modResults.contents = content;
+    return mod;
   });
 };
 
