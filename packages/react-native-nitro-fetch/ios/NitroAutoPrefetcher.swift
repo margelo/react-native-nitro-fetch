@@ -3,6 +3,7 @@ import Foundation
 @objc(NitroAutoPrefetcher)
 public final class NitroAutoPrefetcher: NSObject {
   private static var initialized = false
+  private static var tokenRefreshTask: Task<TokenRefreshResult?, Never>?
   // Serializes queue reads/writes and keeps Keychain work off the launch thread.
   private static let workQueue = DispatchQueue(label: "com.margelo.nitrofetch.autoprefetch")
   private static let queueKey = "nitrofetch_autoprefetch_queue"
@@ -115,10 +116,19 @@ public final class NitroAutoPrefetcher: NSObject {
       }
 
       if initialized {
-        // Late path — apply cached tokens + kick immediate prefetch
-        let tokens = deserializeCache(
-          NitroFetchSecureAtRest.decryptedString(forKey: tokenCacheKey, defaults: userDefaults))
-        startPrefetches([entry], tokens: tokens)
+        // Share the startup refresh, including its skip/fallback decision.
+        let refreshTask = tokenRefreshTask
+        Task {
+          let tokens: TokenRefreshResult
+          if let refreshTask = refreshTask {
+            guard let refreshed = await refreshTask.value else { return }
+            tokens = refreshed
+          } else {
+            tokens = deserializeCache(
+              NitroFetchSecureAtRest.decryptedString(forKey: tokenCacheKey, defaults: userDefaults))
+          }
+          startPrefetches([entry], tokens: tokens)
+        }
       }
     }
   }
@@ -142,7 +152,7 @@ public final class NitroAutoPrefetcher: NSObject {
   }
 
   private static func runTokenRefreshAndPrefetch(arr: [Any], refreshRaw: String?, userDefaults: UserDefaults) {
-    Task {
+    tokenRefreshTask = Task {
       // Resolve tokens (may require a network call)
       let tokens: TokenRefreshResult
       if let refreshRaw = refreshRaw,
@@ -165,7 +175,7 @@ public final class NitroAutoPrefetcher: NSObject {
           NitroLogger.log("[NitroFetch][TokenRefresh] ❌ Refresh failed — onFailure: \(onFailure)")
           if onFailure == "skip" {
             NitroLogger.log("[NitroFetch][TokenRefresh] Skipping all prefetches")
-            return
+            return nil
           }
           let cached = deserializeCache(
             NitroFetchSecureAtRest.decryptedString(forKey: tokenCacheKey, defaults: userDefaults))
@@ -177,6 +187,7 @@ public final class NitroAutoPrefetcher: NSObject {
       }
 
       startPrefetches(arr, tokens: tokens)
+      return tokens
     }
   }
 
