@@ -32,6 +32,7 @@ export default defineConfig([
     ignores: [
       '**/node_modules/**',
       '**/lib/**',
+      '**/expo/plugins/dist/**',
       '**/thirdparty/**',
       '**/nitrogen/**',
       '**/build/**',
