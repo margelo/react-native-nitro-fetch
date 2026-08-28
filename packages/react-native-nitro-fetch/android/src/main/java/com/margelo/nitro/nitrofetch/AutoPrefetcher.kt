@@ -111,7 +111,7 @@ object AutoPrefetcher {
           NitroFetchSecureAtRest.putEncrypted(prefs, KEY_TOKEN_CACHE, serializeCache(refreshed))
           refreshed
         } else {
-          NitroLogger.d("NitroFetch", "[TokenRefresh] ❌ Refresh failed")
+          NitroLogger.d("NitroFetch", "[TokenRefresh] ❌ Refresh failed — onFailure: $onFailure")
           if (onFailure == "skip") {
             NitroLogger.d("NitroFetch", "[TokenRefresh] Skipping all prefetches")
             return
