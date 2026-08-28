@@ -160,7 +160,7 @@ public final class NitroAutoPrefetcher: NSObject {
           }
           tokens = refreshed
         } else {
-          NitroLogger.log("[NitroFetch][TokenRefresh] ❌ Refresh failed")
+          NitroLogger.log("[NitroFetch][TokenRefresh] ❌ Refresh failed — onFailure: \(onFailure)")
           if onFailure == "skip" {
             NitroLogger.log("[NitroFetch][TokenRefresh] Skipping all prefetches")
             return
