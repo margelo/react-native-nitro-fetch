@@ -157,7 +157,7 @@ object NitroWebSocketAutoPrewarmer {
               NitroWSSecureAtRest.putEncrypted(prefs, KEY_TOKEN_CACHE, cacheJson.toString())
               refreshed
             } else {
-              NitroLogger.d("NitroWS", "[TokenRefresh] ❌ Refresh failed")
+              NitroLogger.d("NitroWS", "[TokenRefresh] ❌ Refresh failed — onFailure: $onFailure")
               if (onFailure == "skip") {
                 NitroLogger.d("NitroWS", "[TokenRefresh] Skipping all prewarms")
                 return@Thread
