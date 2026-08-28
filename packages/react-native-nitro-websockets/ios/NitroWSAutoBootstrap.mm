@@ -259,7 +259,7 @@ static void NitroWSRunAutoPrewarm() {
             }
             tokenHeaders = refreshed;
           } else {
-            NitroWSLog(@"[NitroWS][TokenRefresh] ❌ Refresh failed");
+            NitroWSLog(@"[NitroWS][TokenRefresh] ❌ Refresh failed — onFailure: %@", onFailure);
             if ([onFailure isEqualToString:@"skip"]) {
               NitroWSLog(@"[NitroWS][TokenRefresh] Skipping all prewarms");
               return;
