@@ -1,4 +1,5 @@
-import 'web-streams-polyfill/polyfill'
+// Concrete path so Metro resolves it even with unstable_enablePackageExports: false (#103).
+import 'web-streams-polyfill/dist/polyfill.js'
 import { NitroModules } from 'react-native-nitro-modules'
 import type {
   NitroTextDecoder,
