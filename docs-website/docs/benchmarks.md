@@ -29,4 +29,8 @@ Example 10-run head-to-head (14 public endpoints, alternating order, stall-corre
 
 Numbers are device-, network-, and time-specific. **Try it yourself** in the example app → the **Benchmark V2** screen (or the **Benchmark** section in the tab navigator), on a release build.
 
+## Worklet JSON parsing
+
+In a release build on a Samsung F14, repeatedly parsing a ~1 MB JSON payload produced 263–303 ms JS-thread timer gaps on the JS thread, compared with 24–29 ms using `nitroFetchOnWorklet()`. Total wall time was similar—the benefit is a responsive JS thread rather than a guaranteed faster request.
+
 If you have any concerns about the benchmark methodology, please [open an issue](https://github.com/margelo/react-native-nitro-fetch/issues).

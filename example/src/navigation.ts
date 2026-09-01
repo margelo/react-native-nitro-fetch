@@ -13,6 +13,7 @@ export type RootStackParamList = {
   DevToolsDemoScreen: undefined;
   TokenRefreshScreen: undefined;
   TextDecoderBenchmarkScreen: undefined;
+  WorkletJsonBenchmarkScreen: undefined;
 };
 
 export type MainTabParamList = {
