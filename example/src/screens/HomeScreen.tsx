@@ -90,6 +90,14 @@ const EXAMPLES = [
     icon: '🧪',
   },
   {
+    id: 'worklet-json-benchmark',
+    title: 'Worklet JSON Benchmark',
+    description:
+      'Parse ~1MB JSON on the JS thread vs nitroFetchOnWorklet — watch the JS-thread stall difference.',
+    screen: 'WorkletJsonBenchmarkScreen' as const,
+    icon: '🧵',
+  },
+  {
     id: 'textdecoder-benchmark',
     title: 'TextDecoder Benchmark',
     description:

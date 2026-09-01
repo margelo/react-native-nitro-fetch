@@ -62,6 +62,10 @@ const data = await nitroFetchOnWorklet(
 );
 ```
 
+## Performance
+
+In a release build on a Samsung F14, repeatedly parsing a ~1 MB JSON payload produced 263–303 ms JS-thread timer gaps on the JS thread, compared with 24–29 ms using `nitroFetchOnWorklet()`. Total wall time was similar—the benefit is a responsive JS thread rather than a guaranteed faster request.
+
 ## Options
 
 | Option | Default | Description |
