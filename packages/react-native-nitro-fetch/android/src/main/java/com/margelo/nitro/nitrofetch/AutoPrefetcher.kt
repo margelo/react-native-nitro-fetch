@@ -325,6 +325,7 @@ object AutoPrefetcher {
   }
 
   private fun callTokenRefreshSync(config: JSONObject): TokenRefreshResult? {
+    var connection: HttpURLConnection? = null
     return try {
       val urlStr = config.optStringOrNull("url") ?: return null
       val method = config.optString("method", "POST")
@@ -333,6 +334,7 @@ object AutoPrefetcher {
       val responseType = config.optString("responseType", "json")
 
       val conn = URL(urlStr).openConnection() as HttpURLConnection
+      connection = conn
       conn.requestMethod = method
       conn.connectTimeout = 10_000
       conn.readTimeout = 10_000
@@ -355,6 +357,7 @@ object AutoPrefetcher {
       val status = conn.responseCode
       if (status !in 200..299) {
         NitroLogger.d("NitroFetch", "[TokenRefresh] Refresh endpoint returned HTTP $status")
+        conn.errorStream?.close()
         return null
       }
 
@@ -365,6 +368,8 @@ object AutoPrefetcher {
       parseTokenResponse(responseBody, responseType, config)
     } catch (_: Throwable) {
       null
+    } finally {
+      connection?.disconnect()
     }
   }
 
