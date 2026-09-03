@@ -234,6 +234,62 @@ describe('NitroFetch - Request Body Types', () => {
     const body = await res.json();
     expect(Object.keys(body.files).length).toBeGreaterThan(0);
   });
+
+  // Native multipart parameter encoding (WHATWG multipart/form-data algorithm).
+  it('FormData field name with a quote is percent-encoded', async () => {
+    const fd = new FormData();
+    fd.append('we"ird', 'v');
+    const res = await nitroFetch(`${BASE}/post`, { method: 'POST', body: fd });
+    const body = await res.json();
+    expect(body.form['we%22ird']).toBe('v');
+  });
+
+  it('FormData field name with a line break is normalized then escaped', async () => {
+    const fd = new FormData();
+    fd.append('a\nb', 'v');
+    const res = await nitroFetch(`${BASE}/post`, { method: 'POST', body: fd });
+    const body = await res.json();
+    expect(body.form['a%0D%0Ab']).toBe('v');
+  });
+
+  it('FormData string value line breaks are normalized to CRLF', async () => {
+    const fd = new FormData();
+    fd.append('multiline', 'line1\nline2');
+    const res = await nitroFetch(`${BASE}/post`, { method: 'POST', body: fd });
+    const body = await res.json();
+    expect(body.form.multiline).toBe('line1\r\nline2');
+  });
+
+  // The server percent-decodes filename (but not name), so an escaped filename
+  // round-trips; an unescaped quote truncates it at the quote instead.
+  it('FormData filename with a quote survives the round trip', async () => {
+    const fd = new FormData();
+    fd.append('photo', {
+      uri: image,
+      type: 'image/jpeg',
+      name: 'na"me.jpg',
+    } as any);
+    const res = await nitroFetch(`${BASE}/post`, { method: 'POST', body: fd });
+    const body = await res.json();
+    expect(body.fileNames.photo).toBe('na"me.jpg');
+  });
+
+  it('FormData file MIME type with a line break rejects', async () => {
+    const fd = new FormData();
+    fd.append('photo', {
+      uri: image,
+      type: 'image/jpeg\r\nX-Injected: 1',
+      name: 'test.jpg',
+    } as any);
+    let threw = false;
+    try {
+      await nitroFetch(`${BASE}/post`, { method: 'POST', body: fd });
+    } catch (e: any) {
+      threw = true;
+      expect(e.message).toContain('line breaks');
+    }
+    expect(threw).toBe(true);
+  });
 });
 
 describe('NitroFetch - Response Headers', () => {
