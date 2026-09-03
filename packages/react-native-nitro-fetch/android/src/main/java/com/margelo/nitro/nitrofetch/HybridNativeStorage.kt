@@ -7,6 +7,8 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.NitroModules
+import java.io.File
+import java.io.RandomAccessFile
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -24,28 +26,42 @@ internal object NitroFetchSecureAtRest {
   private const val GCM_IV_LENGTH = 12
   private const val GCM_TAG_BITS = 128
   const val ENC_PREFIX = "nfc1:"
+  @Volatile private var keyLockFile: File? = null
+
+  fun initialize(context: Context) {
+    keyLockFile = File(context.applicationContext.noBackupFilesDir, "$KEYSTORE_ALIAS.lock")
+  }
 
   private fun keyStore(): KeyStore =
     KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
-  private fun getOrCreateSecretKey(): javax.crypto.SecretKey {
+  // The optional WebSocket package uses this same interned alias monitor.
+  // The file lock also covers secondary application processes.
+  private fun getOrCreateSecretKey(): javax.crypto.SecretKey = synchronized(KEYSTORE_ALIAS.intern()) {
     val ks = keyStore()
-    if (ks.containsAlias(KEYSTORE_ALIAS)) {
-      return (ks.getEntry(KEYSTORE_ALIAS, null) as KeyStore.SecretKeyEntry).secretKey
+    (ks.getEntry(KEYSTORE_ALIAS, null) as KeyStore.SecretKeyEntry?)?.let {
+      return@synchronized it.secretKey
     }
-    val keyGenerator =
-      KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
-    val spec =
-      KeyGenParameterSpec.Builder(
-        KEYSTORE_ALIAS,
-        KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-      )
-        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-        .setKeySize(256)
-        .build()
-    keyGenerator.init(spec)
-    return keyGenerator.generateKey()
+    RandomAccessFile(checkNotNull(keyLockFile), "rw").use { file ->
+      file.channel.lock().use {
+        // Another process may have installed the master while we waited.
+        (keyStore().getEntry(KEYSTORE_ALIAS, null) as KeyStore.SecretKeyEntry?)?.let {
+          return@synchronized it.secretKey
+        }
+        val keyGenerator =
+          KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
+        val spec = KeyGenParameterSpec.Builder(
+          KEYSTORE_ALIAS,
+          KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+        )
+          .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+          .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+          .setKeySize(256)
+          .build()
+        keyGenerator.init(spec)
+        keyGenerator.generateKey()
+      }
+    }
   }
 
   private fun encrypt(plaintext: String): String {
@@ -117,6 +133,7 @@ class HybridNativeStorage : HybridNativeStorageSpec() {
       val context =
         NitroModules.applicationContext
           ?: throw Error("Cannot get Android Context - No Context available!")
+      NitroFetchSecureAtRest.initialize(context)
       context.getSharedPreferences(NitroFetchSecureAtRest.PREFS_NAME, Context.MODE_PRIVATE)
     }
 
