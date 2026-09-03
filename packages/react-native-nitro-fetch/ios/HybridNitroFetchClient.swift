@@ -371,18 +371,23 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
 
     for part in parts {
       body.append("--\(boundary)\(crlf)".data(using: .utf8)!)
+      let name = escapeMultipartParameter(normalizeMultipartLineBreaks(part.name))
 
       if let fileUri = part.fileUri {
-        let fileName = part.fileName ?? "file"
+        let fileName = escapeMultipartParameter(part.fileName ?? "file")
         let mimeType = part.mimeType ?? "application/octet-stream"
-        body.append("Content-Disposition: form-data; name=\"\(part.name)\"; filename=\"\(fileName)\"\(crlf)".data(using: .utf8)!)
+        guard !mimeType.contains("\r"), !mimeType.contains("\n") else {
+          throw NSError(domain: "NitroFetch", code: -5,
+                        userInfo: [NSLocalizedDescriptionKey: "Multipart MIME type must not contain line breaks"])
+        }
+        body.append("Content-Disposition: form-data; name=\"\(name)\"; filename=\"\(fileName)\"\(crlf)".data(using: .utf8)!)
         body.append("Content-Type: \(mimeType)\(crlf)\(crlf)".data(using: .utf8)!)
 
         let fileData = try await readFileData(fileUri)
         body.append(fileData)
       } else {
-        let value = part.value ?? ""
-        body.append("Content-Disposition: form-data; name=\"\(part.name)\"\(crlf)\(crlf)".data(using: .utf8)!)
+        let value = normalizeMultipartLineBreaks(part.value ?? "")
+        body.append("Content-Disposition: form-data; name=\"\(name)\"\(crlf)\(crlf)".data(using: .utf8)!)
         body.append(value.data(using: .utf8)!)
       }
 
@@ -391,6 +396,18 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
 
     body.append("--\(boundary)--\(crlf)".data(using: .utf8)!)
     return (body, "multipart/form-data; boundary=\(boundary)")
+  }
+
+  private static func normalizeMultipartLineBreaks(_ value: String) -> String {
+    return value.replacingOccurrences(of: "\r\n", with: "\n")
+      .replacingOccurrences(of: "\r", with: "\n")
+      .replacingOccurrences(of: "\n", with: "\r\n")
+  }
+
+  private static func escapeMultipartParameter(_ value: String) -> String {
+    return value.replacingOccurrences(of: "\r", with: "%0D")
+      .replacingOccurrences(of: "\n", with: "%0A")
+      .replacingOccurrences(of: "\"", with: "%22")
   }
 
   private static func readFileData(_ uri: String) async throws -> Data {
