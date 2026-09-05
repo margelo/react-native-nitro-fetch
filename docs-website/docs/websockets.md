@@ -51,7 +51,7 @@ const ws = new NitroWebSocket(
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `readyState` | `'CONNECTING' \| 'OPEN' \| 'CLOSING' \| 'CLOSED'` | Current connection state |
+| `readyState` | `0 \| 1 \| 2 \| 3` | Current connection state |
 | `url` | `string` | The WebSocket URL |
 | `protocol` | `string` | Negotiated subprotocol |
 | `bufferedAmount` | `number` | Bytes queued for sending |
