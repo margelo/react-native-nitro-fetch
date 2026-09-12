@@ -238,7 +238,7 @@ If you don't register a refresh config, the bootstrap reuses whatever headers we
 
 ## Pointers
 
-- Source: [`packages/react-native-nitro-fetch/src/fetch.ts`](../../../packages/react-native-nitro-fetch/src/fetch.ts), search for `prefetch`
+- Source: [`packages/react-native-nitro-fetch/src/fetch-core/prefetch.ts`](../../../packages/react-native-nitro-fetch/src/fetch-core/prefetch.ts)
 - Android bootstrap: [`packages/react-native-nitro-fetch/android/src/main/java/com/margelo/nitro/nitrofetch/AutoPrefetcher.kt`](../../../packages/react-native-nitro-fetch/android/src/main/java/com/margelo/nitro/nitrofetch/AutoPrefetcher.kt)
 - iOS bootstrap: [`packages/react-native-nitro-fetch/ios/NitroBootstrap.mm`](../../../packages/react-native-nitro-fetch/ios/NitroBootstrap.mm)
 - End-to-end example: [`example/src/screens/PrefetchScreen.tsx`](../../../example/src/screens/PrefetchScreen.tsx)

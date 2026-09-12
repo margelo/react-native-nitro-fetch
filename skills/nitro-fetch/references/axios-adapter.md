@@ -205,6 +205,6 @@ export const api = axios.create({
 
 ## Pointers
 
-- Public `fetch` export: `packages/react-native-nitro-fetch/src/fetch.ts`
+- Public `fetch` export: `packages/react-native-nitro-fetch/src/fetch-core/fetch.ts`
 - Spec-compliant `Headers` / `Response` / `Request`: `packages/react-native-nitro-fetch/src/Headers.ts`, `Response.ts`, `Request.ts`
 - Related: [`network-inspector.md`](./network-inspector.md)
