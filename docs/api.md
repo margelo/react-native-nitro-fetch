@@ -6,6 +6,7 @@
 - Accepts `Headers`, array pairs, or plain object for `init.headers`.
 - Body supports: `string`, `URLSearchParams`, `FormData`, and `Blob`.
 - Returns a spec-compliant `Response` with `text()`, `json()`, `arrayBuffer()`, `blob()`, `bytes()`, `clone()`, a `body` stream, and `headers`.
+- `init.timeoutMs` sets the request timeout in milliseconds. Applied on iOS (`URLRequest.timeoutInterval`, default 60s); the Android Cronet client has no per-request timeout, so pair an `AbortController` with a timer there.
 
 Example
 
