@@ -520,7 +520,9 @@ describe('NitroFetch - AbortController', () => {
 });
 
 describe('NitroFetch - timeoutMs', () => {
-  // Cronet has no per-request timeout, so only iOS applies timeoutMs natively.
+  // iOS reports NSURLErrorTimedOut; on Android the library cancels the Cronet request.
+  const timeoutError =
+    Platform.OS === 'ios' ? /NSURLErrorDomain Code=-1001/ : /timed out/;
   const expectTimeout = async (run: () => Promise<unknown>) => {
     const t0 = Date.now();
     let error: any;
@@ -531,20 +533,18 @@ describe('NitroFetch - timeoutMs', () => {
     }
     const elapsed = Date.now() - t0;
     expect(error).toBeDefined();
-    expect(String(error?.message)).toMatch(/NSURLErrorDomain Code=-1001/);
+    expect(String(error?.message)).toMatch(timeoutError);
     expect(elapsed).toBeGreaterThanOrEqual(1500);
     expect(elapsed).toBeLessThan(5000);
   };
 
   it('rejects a request slower than the timeout', async () => {
-    if (Platform.OS !== 'ios') return;
     await expectTimeout(() =>
       nitroFetch(`${BASE}/delay/6`, { timeoutMs: 2000 } as any)
     );
   });
 
   it('applies the timeout on the worklet runtime', async () => {
-    if (Platform.OS !== 'ios') return;
     await expectTimeout(() =>
       nitroFetchOnWorklet(
         `${BASE}/delay/6`,
