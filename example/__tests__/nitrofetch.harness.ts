@@ -7,6 +7,7 @@ import {
   removeFromAutoPrefetch,
   __readAutoPrefetchQueue,
 } from 'react-native-nitro-fetch';
+import { Platform } from 'react-native';
 import { getRuntimeKind, RuntimeKind } from 'react-native-worklets';
 import { BASE } from '../test-utils/server';
 
@@ -515,6 +516,64 @@ describe('NitroFetch - AbortController', () => {
     const res = await nitroFetch(`${BASE}/get`);
     expect(res.status).toBe(200);
     expect(res.ok).toBe(true);
+  });
+});
+
+describe('NitroFetch - timeoutMs', () => {
+  // iOS reports NSURLErrorTimedOut; on Android the library cancels the Cronet request.
+  const timeoutError =
+    Platform.OS === 'ios' ? /NSURLErrorDomain Code=-1001/ : /timed out/;
+  const expectTimeout = async (run: () => Promise<unknown>) => {
+    const t0 = Date.now();
+    let error: any;
+    try {
+      await run();
+    } catch (e) {
+      error = e;
+    }
+    const elapsed = Date.now() - t0;
+    expect(error).toBeDefined();
+    expect(String(error?.message)).toMatch(timeoutError);
+    expect(elapsed).toBeGreaterThanOrEqual(1500);
+    expect(elapsed).toBeLessThan(5000);
+  };
+
+  it('rejects a request slower than the timeout', async () => {
+    await expectTimeout(() =>
+      nitroFetch(`${BASE}/delay/6`, { timeoutMs: 2000 } as any)
+    );
+  });
+
+  it('applies the timeout on the worklet runtime', async () => {
+    await expectTimeout(() =>
+      nitroFetchOnWorklet(
+        `${BASE}/delay/6`,
+        { timeoutMs: 2000 } as any,
+        (payload) => {
+          'worklet';
+          return payload.status;
+        }
+      )
+    );
+  });
+
+  it('lets a request finish when the timeout is longer than the response', async () => {
+    const res = await nitroFetch(`${BASE}/delay/1`, { timeoutMs: 5000 } as any);
+    expect(res.status).toBe(200);
+  });
+
+  it('prefetchOnAppStart persists timeoutMs into the queue', async () => {
+    const KEY = 'pf-timeout-persisted';
+    await prefetchOnAppStart(`${BASE}/get`, {
+      prefetchKey: KEY,
+      timeoutMs: 12_345,
+    } as any);
+    const entry = __readAutoPrefetchQueue().find(
+      (e: any) => e?.prefetchKey === KEY
+    );
+    expect(entry).toBeDefined();
+    expect(entry!.timeoutMs).toBe(12_345);
+    await removeFromAutoPrefetch(KEY);
   });
 });
 

@@ -57,6 +57,70 @@ private fun ByteArray.toArrayBuffer(): ArrayBuffer {
   return ab
 }
 
+/**
+ * Idle timeout for one Cronet request. It matches URLRequest.timeoutInterval on iOS: the
+ * request fails after [timeoutMs] without a callback from Cronet, and the timer restarts
+ * whenever data arrives. Cronet has no per-request timeout, so this cancels the request
+ * and reports the cancel as a failure.
+ */
+private class IdleTimeoutCallback(
+  private val inner: UrlRequest.Callback,
+  private val timeoutMs: Long
+) : UrlRequest.Callback() {
+  @Volatile private var timedOut = false
+  private var task: java.util.concurrent.ScheduledFuture<*>? = null
+
+  fun arm(request: UrlRequest) {
+    task?.cancel(false)
+    task = scheduler.schedule({
+      timedOut = true
+      request.cancel()
+    }, timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+  }
+
+  override fun onRedirectReceived(request: UrlRequest, info: UrlResponseInfo, newLocationUrl: String) {
+    arm(request)
+    inner.onRedirectReceived(request, info, newLocationUrl)
+  }
+
+  override fun onResponseStarted(request: UrlRequest, info: UrlResponseInfo) {
+    arm(request)
+    inner.onResponseStarted(request, info)
+  }
+
+  override fun onReadCompleted(request: UrlRequest, info: UrlResponseInfo, byteBuffer: ByteBuffer) {
+    arm(request)
+    inner.onReadCompleted(request, info, byteBuffer)
+  }
+
+  override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) {
+    task?.cancel(false)
+    inner.onSucceeded(request, info)
+  }
+
+  override fun onFailed(request: UrlRequest, info: UrlResponseInfo?, error: CronetException) {
+    task?.cancel(false)
+    inner.onFailed(request, info, error)
+  }
+
+  override fun onCanceled(request: UrlRequest, info: UrlResponseInfo?) {
+    task?.cancel(false)
+    if (timedOut) {
+      inner.onFailed(request, info, RequestTimedOutException())
+    } else {
+      inner.onCanceled(request, info)
+    }
+  }
+
+  private class RequestTimedOutException : CronetException("The request timed out.", null)
+
+  companion object {
+    private val scheduler = java.util.concurrent.ScheduledThreadPoolExecutor(1) { r ->
+      Thread(r, "NitroFetch-timeout").apply { isDaemon = true }
+    }.apply { removeOnCancelPolicy = true }
+  }
+}
+
 @DoNotStrip
 class HybridNitroFetchClient(private val engine: CronetEngine, private val executor: Executor) : HybridNitroFetchClientSpec() {
   
@@ -276,7 +340,9 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         }
       }
 
-      val builder = engine.newUrlRequestBuilder(url, callback, executor)
+      val timeoutCallback = req.timeoutMs?.toLong()?.takeIf { it > 0 }
+        ?.let { IdleTimeoutCallback(callback, it) }
+      val builder = engine.newUrlRequestBuilder(url, timeoutCallback ?: callback, executor)
       val method = req.method?.name ?: "GET"
       builder.setHttpMethod(method)
       // prefetchKey is an internal cache key, never sent on the server
@@ -320,6 +386,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           encoded
         )
       }
+      timeoutCallback?.arm(request)
       request.start()
       return request
     }
