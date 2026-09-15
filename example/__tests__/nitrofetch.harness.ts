@@ -499,27 +499,6 @@ describe('NitroFetch - AbortController', () => {
     expect(elapsed).toBeLessThan(5000);
   });
 
-  it('timeoutMs rejects a request slower than the timeout', async () => {
-    // Cronet has no per-request timeout, so only iOS honors timeoutMs
-    if (Platform.OS !== 'ios') return;
-    const t0 = Date.now();
-    let threw = false;
-    try {
-      await nitroFetch(`${BASE}/delay/6`, { timeoutMs: 2000 } as any);
-    } catch {
-      threw = true;
-    }
-    const elapsed = Date.now() - t0;
-    expect(threw).toBe(true);
-    expect(elapsed).toBeGreaterThanOrEqual(1500);
-    expect(elapsed).toBeLessThan(5000);
-  });
-
-  it('timeoutMs longer than the response lets the request finish', async () => {
-    const res = await nitroFetch(`${BASE}/delay/1`, { timeoutMs: 5000 } as any);
-    expect(res.status).toBe(200);
-  });
-
   it('abort after native has finished still rejects', async () => {
     expect(await abortAfterNativeDone()).toBe('AbortError');
   });
@@ -537,6 +516,64 @@ describe('NitroFetch - AbortController', () => {
     const res = await nitroFetch(`${BASE}/get`);
     expect(res.status).toBe(200);
     expect(res.ok).toBe(true);
+  });
+});
+
+describe('NitroFetch - timeoutMs', () => {
+  // Cronet has no per-request timeout, so only iOS applies timeoutMs natively.
+  const expectTimeout = async (run: () => Promise<unknown>) => {
+    const t0 = Date.now();
+    let error: any;
+    try {
+      await run();
+    } catch (e) {
+      error = e;
+    }
+    const elapsed = Date.now() - t0;
+    expect(error).toBeDefined();
+    expect(String(error?.message)).toMatch(/NSURLErrorDomain Code=-1001/);
+    expect(elapsed).toBeGreaterThanOrEqual(1500);
+    expect(elapsed).toBeLessThan(5000);
+  };
+
+  it('rejects a request slower than the timeout', async () => {
+    if (Platform.OS !== 'ios') return;
+    await expectTimeout(() =>
+      nitroFetch(`${BASE}/delay/6`, { timeoutMs: 2000 } as any)
+    );
+  });
+
+  it('applies the timeout on the worklet runtime', async () => {
+    if (Platform.OS !== 'ios') return;
+    await expectTimeout(() =>
+      nitroFetchOnWorklet(
+        `${BASE}/delay/6`,
+        { timeoutMs: 2000 } as any,
+        (payload) => {
+          'worklet';
+          return payload.status;
+        }
+      )
+    );
+  });
+
+  it('lets a request finish when the timeout is longer than the response', async () => {
+    const res = await nitroFetch(`${BASE}/delay/1`, { timeoutMs: 5000 } as any);
+    expect(res.status).toBe(200);
+  });
+
+  it('prefetchOnAppStart persists timeoutMs into the queue', async () => {
+    const KEY = 'pf-timeout-persisted';
+    await prefetchOnAppStart(`${BASE}/get`, {
+      prefetchKey: KEY,
+      timeoutMs: 12_345,
+    } as any);
+    const entry = __readAutoPrefetchQueue().find(
+      (e: any) => e?.prefetchKey === KEY
+    );
+    expect(entry).toBeDefined();
+    expect(entry!.timeoutMs).toBe(12_345);
+    await removeFromAutoPrefetch(KEY);
   });
 });
 
