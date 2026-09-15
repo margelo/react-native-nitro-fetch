@@ -7,6 +7,7 @@ import {
   removeFromAutoPrefetch,
   __readAutoPrefetchQueue,
 } from 'react-native-nitro-fetch';
+import { Platform } from 'react-native';
 import { getRuntimeKind, RuntimeKind } from 'react-native-worklets';
 import { BASE } from '../test-utils/server';
 
@@ -496,6 +497,27 @@ describe('NitroFetch - AbortController', () => {
     expect(threw).toBe(true);
     // Should cancel well before the 20s delay completes
     expect(elapsed).toBeLessThan(5000);
+  });
+
+  it('timeoutMs rejects a request slower than the timeout', async () => {
+    // Cronet has no per-request timeout, so only iOS honors timeoutMs
+    if (Platform.OS !== 'ios') return;
+    const t0 = Date.now();
+    let threw = false;
+    try {
+      await nitroFetch(`${BASE}/delay/6`, { timeoutMs: 2000 } as any);
+    } catch {
+      threw = true;
+    }
+    const elapsed = Date.now() - t0;
+    expect(threw).toBe(true);
+    expect(elapsed).toBeGreaterThanOrEqual(1500);
+    expect(elapsed).toBeLessThan(5000);
+  });
+
+  it('timeoutMs longer than the response lets the request finish', async () => {
+    const res = await nitroFetch(`${BASE}/delay/1`, { timeoutMs: 5000 } as any);
+    expect(res.status).toBe(200);
   });
 
   it('abort after native has finished still rejects', async () => {
