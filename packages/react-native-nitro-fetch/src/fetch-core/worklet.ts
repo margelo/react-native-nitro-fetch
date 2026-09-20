@@ -28,7 +28,7 @@ function ensureWorkletRuntime(name = 'nitro-fetch'): any | undefined {
 
 export async function nitroFetchOnWorklet<T>(
   input: RequestInfo | URL,
-  init: RequestInit | undefined,
+  init: (RequestInit & { timeoutMs?: number }) | undefined,
   mapWorklet: NitroWorkletMapper<T>,
   options?: { preferBytes?: boolean; runtimeName?: string }
 ): Promise<T> {

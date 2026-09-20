@@ -15,6 +15,7 @@ export function buildNitroRequest(
     redirect?: RequestRedirect;
     cache?: RequestCache;
     prefetchCacheTtlMs?: number;
+    timeoutMs?: number;
   }
 ): NitroRequestNative {
   'worklet';
@@ -64,6 +65,8 @@ export function buildNitroRequest(
     typeof init?.prefetchCacheTtlMs === 'number'
       ? init.prefetchCacheTtlMs
       : undefined;
+  const timeoutMs =
+    typeof init?.timeoutMs === 'number' ? init.timeoutMs : undefined;
 
   return {
     url,
@@ -75,13 +78,14 @@ export function buildNitroRequest(
     followRedirects,
     credentials: credentialsOption,
     prefetchCacheTtlMs,
+    timeoutMs,
   };
 }
 
 // Pure JS version of buildNitroRequest that doesnt use anything that breaks worklets
 export function buildNitroRequestPure(
   input: RequestInfo | URL,
-  init?: RequestInit & { prefetchCacheTtlMs?: number }
+  init?: RequestInit & { prefetchCacheTtlMs?: number; timeoutMs?: number }
 ): NitroRequestNative {
   'worklet';
   let url: string;
@@ -119,6 +123,8 @@ export function buildNitroRequestPure(
     typeof init?.prefetchCacheTtlMs === 'number'
       ? init.prefetchCacheTtlMs
       : undefined;
+  const timeoutMs =
+    typeof init?.timeoutMs === 'number' ? init.timeoutMs : undefined;
 
   return {
     url,
@@ -129,5 +135,6 @@ export function buildNitroRequestPure(
     followRedirects: true,
     credentials: init?.credentials,
     prefetchCacheTtlMs,
+    timeoutMs,
   };
 }

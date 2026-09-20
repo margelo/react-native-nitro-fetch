@@ -7,7 +7,7 @@ import { buildNitroRequest } from './request';
 // Start a native prefetch. Requires a `prefetchKey` header on the request.
 export async function prefetch(
   input: RequestInfo | URL,
-  init?: RequestInit
+  init?: RequestInit & { timeoutMs?: number }
 ): Promise<void> {
   // If native implementation is not present yet, do nothing
   const hasNative =
@@ -47,7 +47,7 @@ const AUTOPREFETCH_QUEUE_KEY = 'nitrofetch_autoprefetch_queue';
 // Entries embed request headers (may hold credentials) — stored encrypted at rest.
 export async function prefetchOnAppStart(
   input: RequestInfo | URL,
-  init?: RequestInit & { prefetchKey?: string }
+  init?: RequestInit & { prefetchKey?: string; timeoutMs?: number }
 ): Promise<void> {
   // Resolve request and prefetchKey
   init = await resolveRequestBody(input, init);

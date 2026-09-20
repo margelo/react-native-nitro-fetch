@@ -42,5 +42,5 @@ await removeAllFromAutoprefetch();
 Notes
 
 - The library prefers the "Native" Cronet provider when available and logs the provider/version during initialization.
-- Cancellation (via `AbortController`) and streaming (via `{ stream: true }`) are supported. For request timeouts, pair an `AbortController` with a timer.
+- Cancellation (via `AbortController`) and streaming (via `{ stream: true }`) are supported. Pass `timeoutMs` for a per-request idle timeout; streaming requests (`stream: true`) need an `AbortController` with a timer instead.
 

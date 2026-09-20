@@ -11,7 +11,7 @@
   - The library logs available Cronet providers and prefers the "Native" provider. Check Android logs for provider name/version during init.
 
 - Streaming / cancellation
-  - Both are supported. Pass `{ stream: true }` to get a `ReadableStream` body, and use `AbortController` to cancel. For request timeouts, pair an `AbortController` with a timer.
+  - Both are supported. Pass `{ stream: true }` to get a `ReadableStream` body, and use `AbortController` to cancel. Pass `timeoutMs` for a per-request idle timeout; streaming requests (`stream: true`) need an `AbortController` with a timer instead.
 
 - WebSockets
   - Supported via the companion package `react-native-nitro-websockets` (install `react-native-nitro-text-decoder` alongside it).
