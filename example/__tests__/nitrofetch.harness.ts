@@ -540,25 +540,21 @@ describe('NitroFetch - timeoutMs', () => {
 
   it('rejects a request slower than the timeout', async () => {
     await expectTimeout(() =>
-      nitroFetch(`${BASE}/delay/6`, { timeoutMs: 2000 } as any)
+      nitroFetch(`${BASE}/delay/6`, { timeoutMs: 2000 })
     );
   });
 
   it('applies the timeout on the worklet runtime', async () => {
     await expectTimeout(() =>
-      nitroFetchOnWorklet(
-        `${BASE}/delay/6`,
-        { timeoutMs: 2000 } as any,
-        (payload) => {
-          'worklet';
-          return payload.status;
-        }
-      )
+      nitroFetchOnWorklet(`${BASE}/delay/6`, { timeoutMs: 2000 }, (payload) => {
+        'worklet';
+        return payload.status;
+      })
     );
   });
 
   it('lets a request finish when the timeout is longer than the response', async () => {
-    const res = await nitroFetch(`${BASE}/delay/1`, { timeoutMs: 5000 } as any);
+    const res = await nitroFetch(`${BASE}/delay/1`, { timeoutMs: 5000 });
     expect(res.status).toBe(200);
   });
 
@@ -567,7 +563,7 @@ describe('NitroFetch - timeoutMs', () => {
     await prefetchOnAppStart(`${BASE}/get`, {
       prefetchKey: KEY,
       timeoutMs: 12_345,
-    } as any);
+    });
     const entry = __readAutoPrefetchQueue().find(
       (e: any) => e?.prefetchKey === KEY
     );

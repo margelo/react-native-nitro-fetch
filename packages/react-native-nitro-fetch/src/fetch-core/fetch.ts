@@ -31,6 +31,7 @@ export async function nitroFetch(
     stream?: boolean;
     redirect?: RequestRedirect;
     cache?: RequestCache;
+    timeoutMs?: number;
   }
 ): Promise<Response> {
   // Merge defaults from NitroRequestClass if input is one

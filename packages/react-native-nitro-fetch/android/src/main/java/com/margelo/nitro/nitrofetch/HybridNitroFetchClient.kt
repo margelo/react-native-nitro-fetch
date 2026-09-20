@@ -68,7 +68,7 @@ private class IdleTimeoutCallback(
   private val timeoutMs: Long
 ) : UrlRequest.Callback() {
   @Volatile private var timedOut = false
-  private var task: java.util.concurrent.ScheduledFuture<*>? = null
+  @Volatile private var task: java.util.concurrent.ScheduledFuture<*>? = null
 
   fun arm(request: UrlRequest) {
     task?.cancel(false)
