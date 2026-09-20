@@ -38,10 +38,10 @@ export function WebSocketScreen() {
   // Derive initial state from the live socket so navigation back shows the
   // correct status without re-connecting.
   const [connected, setConnected] = React.useState(
-    () => _ws?.readyState === 'OPEN'
+    () => _ws?.readyState === NitroWebSocket.OPEN
   );
   const [connecting, setConnecting] = React.useState(
-    () => _ws?.readyState === 'CONNECTING'
+    () => _ws?.readyState === NitroWebSocket.CONNECTING
   );
   const [logs, setLogs] = React.useState<LogEntry[]>([]);
   const [input, setInput] = React.useState('Hello, WebSocket!');
