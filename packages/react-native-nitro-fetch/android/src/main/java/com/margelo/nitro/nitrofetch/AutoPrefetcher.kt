@@ -2,6 +2,7 @@ package com.margelo.nitro.nitrofetch
 
 import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -12,6 +13,10 @@ import java.util.concurrent.Executors
 
 object AutoPrefetcher {
   @Volatile private var initialized = false
+  // Startup token-refresh outcome, resolved at most once per process. Once
+  // resolved, null tokens mean the refresh failed with onFailure=skip.
+  @Volatile private var tokenRefreshResolved = false
+  @Volatile private var tokenRefreshTokens: TokenRefreshResult? = null
   // Serializes queue reads/writes and keeps Keystore work off the caller (main) thread.
   private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "NitroAutoPrefetch") }
   private const val KEY_QUEUE = "nitrofetch_autoprefetch_queue"
@@ -67,10 +72,14 @@ object AutoPrefetcher {
         NitroFetchSecureAtRest.putEncrypted(prefs, KEY_QUEUE, next.toString())
 
         if (initialized) {
-          // late path — kick a single immediate prefetch with cached tokens
-          val tokens = deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
-          val single = JSONArray().apply { put(entry) }
-          startPrefetches(single, tokens)
+          // late path — share the startup refresh, including its skip decision
+          val tokens = lateRegistrationTokens(prefs)
+          if (tokens != null) {
+            val single = JSONArray().apply { put(entry) }
+            startPrefetches(single, tokens)
+          } else {
+            NitroLogger.d("NitroFetch", "[TokenRefresh] Skipping late prefetch $prefetchKey")
+          }
         }
       } catch (_: Throwable) {
         // best-effort
@@ -95,39 +104,7 @@ object AutoPrefetcher {
       val refreshRaw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_REFRESH)
 
       if (!refreshRaw.isNullOrEmpty()) {
-        val refreshConfig = JSONObject(refreshRaw)
-        val onFailure = refreshConfig.optString("onFailure", "useStoredHeaders")
-        val refreshURL = refreshConfig.optString("url", "(unknown)")
-        NitroLogger.d("NitroFetch", "[TokenRefresh] Calling refresh endpoint: $refreshURL")
-
-        val refreshed = callTokenRefreshSync(refreshConfig)
-
-        val tokens: TokenRefreshResult = if (refreshed != null) {
-          NitroLogger.d(
-            "NitroFetch",
-            "[TokenRefresh] ✅ Success — got ${refreshed.headers.size} header(s), " +
-              "${refreshed.bodyFields.size} body field(s), ${refreshed.formFields.size} form field(s)"
-          )
-          logTokens(refreshed)
-          // Cache fresh tokens for useStoredHeaders fallback on next cold start
-          NitroFetchSecureAtRest.putEncrypted(prefs, KEY_TOKEN_CACHE, serializeCache(refreshed))
-          refreshed
-        } else {
-          NitroLogger.d("NitroFetch", "[TokenRefresh] ❌ Refresh failed — onFailure: $onFailure")
-          if (onFailure == "skip") {
-            NitroLogger.d("NitroFetch", "[TokenRefresh] Skipping all prefetches")
-            return
-          }
-          // Use last cached tokens (or empty if none cached yet)
-          val cached = deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
-          NitroLogger.d(
-            "NitroFetch",
-            "[TokenRefresh] Using cached tokens (${cached.headers.size} header(s), " +
-              "${cached.bodyFields.size} body field(s), ${cached.formFields.size} form field(s))"
-          )
-          cached
-        }
-
+        val tokens = resolveTokenRefresh(prefs, refreshRaw) ?: return
         NitroLogger.d("NitroFetch", "[TokenRefresh] Injecting tokens into ${arr.length()} prefetch URL(s)")
         startPrefetches(arr, tokens)
       } else {
@@ -137,6 +114,75 @@ object AutoPrefetcher {
     } catch (_: Throwable) {
       // ignore – prefetch-on-start is best-effort, never crash the app
     }
+  }
+
+  /**
+   * Tokens a late registration should send with, or null when the startup
+   * refresh failed with onFailure=skip. Runs the refresh here only when an
+   * empty startup queue meant it never ran, so cold start pays nothing extra.
+   */
+  private fun lateRegistrationTokens(prefs: SharedPreferences): TokenRefreshResult? {
+    if (tokenRefreshResolved) return tokenRefreshTokens
+    val refreshRaw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_REFRESH)
+    if (refreshRaw.isNullOrEmpty()) {
+      return deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
+    }
+    return resolveTokenRefresh(prefs, refreshRaw)
+  }
+
+  /** Runs the token refresh once per process. Null means onFailure=skip. */
+  private fun resolveTokenRefresh(
+    prefs: SharedPreferences,
+    refreshRaw: String,
+  ): TokenRefreshResult? {
+    if (tokenRefreshResolved) return tokenRefreshTokens
+
+    val refreshConfig = try { JSONObject(refreshRaw) } catch (_: Throwable) { null }
+    if (refreshConfig == null) {
+      tokenRefreshResolved = true
+      tokenRefreshTokens = TokenRefreshResult.EMPTY
+      return TokenRefreshResult.EMPTY
+    }
+    val onFailure = refreshConfig.optString("onFailure", "useStoredHeaders")
+    val refreshURL = refreshConfig.optString("url", "(unknown)")
+    NitroLogger.d("NitroFetch", "[TokenRefresh] Calling refresh endpoint: $refreshURL")
+
+    val refreshed = callTokenRefreshSync(refreshConfig)
+
+    val tokens: TokenRefreshResult? = if (refreshed != null) {
+      NitroLogger.d(
+        "NitroFetch",
+        "[TokenRefresh] ✅ Success — got ${refreshed.headers.size} header(s), " +
+          "${refreshed.bodyFields.size} body field(s), ${refreshed.formFields.size} form field(s)"
+      )
+      logTokens(refreshed)
+      // Cache fresh tokens for useStoredHeaders fallback on next cold start
+      try {
+        NitroFetchSecureAtRest.putEncrypted(prefs, KEY_TOKEN_CACHE, serializeCache(refreshed))
+      } catch (_: Throwable) {
+        // best-effort cache write
+      }
+      refreshed
+    } else {
+      NitroLogger.d("NitroFetch", "[TokenRefresh] ❌ Refresh failed — onFailure: $onFailure")
+      if (onFailure == "skip") {
+        NitroLogger.d("NitroFetch", "[TokenRefresh] Skipping all prefetches")
+        null
+      } else {
+        // Use last cached tokens (or empty if none cached yet)
+        val cached = deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
+        NitroLogger.d(
+          "NitroFetch",
+          "[TokenRefresh] Using cached tokens (${cached.headers.size} header(s), " +
+            "${cached.bodyFields.size} body field(s), ${cached.formFields.size} form field(s))"
+        )
+        cached
+      }
+    }
+
+    tokenRefreshResolved = true
+    tokenRefreshTokens = tokens
+    return tokens
   }
 
   private fun startPrefetches(arr: JSONArray, tokens: TokenRefreshResult) {
