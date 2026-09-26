@@ -10,6 +10,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.io.File
+import java.io.RandomAccessFile
 import java.security.KeyStore
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -27,28 +29,40 @@ private object NitroWSSecureAtRest {
   private const val GCM_IV_LENGTH = 12
   private const val GCM_TAG_BITS = 128
   const val ENC_PREFIX = "nfc1:"
+  @Volatile private var keyLockFile: File? = null
+
+  fun initialize(context: Context) {
+    keyLockFile = File(context.applicationContext.noBackupFilesDir, "$KEYSTORE_ALIAS.lock")
+  }
 
   private fun keyStore(): KeyStore =
     KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
 
-  private fun getOrCreateSecretKey(): javax.crypto.SecretKey {
+  // Match nitro-fetch's monitor without requiring that optional package.
+  private fun getOrCreateSecretKey(): javax.crypto.SecretKey = synchronized(KEYSTORE_ALIAS.intern()) {
     val ks = keyStore()
-    if (ks.containsAlias(KEYSTORE_ALIAS)) {
-      return (ks.getEntry(KEYSTORE_ALIAS, null) as KeyStore.SecretKeyEntry).secretKey
+    (ks.getEntry(KEYSTORE_ALIAS, null) as KeyStore.SecretKeyEntry?)?.let {
+      return@synchronized it.secretKey
     }
-    val keyGenerator =
-      KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
-    val spec =
-      KeyGenParameterSpec.Builder(
-        KEYSTORE_ALIAS,
-        KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-      )
-        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-        .setKeySize(256)
-        .build()
-    keyGenerator.init(spec)
-    return keyGenerator.generateKey()
+    RandomAccessFile(checkNotNull(keyLockFile), "rw").use { file ->
+      file.channel.lock().use {
+        (keyStore().getEntry(KEYSTORE_ALIAS, null) as KeyStore.SecretKeyEntry?)?.let {
+          return@synchronized it.secretKey
+        }
+        val keyGenerator =
+          KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
+        val spec = KeyGenParameterSpec.Builder(
+          KEYSTORE_ALIAS,
+          KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+        )
+          .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+          .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+          .setKeySize(256)
+          .build()
+        keyGenerator.init(spec)
+        keyGenerator.generateKey()
+      }
+    }
   }
 
   private fun encrypt(plaintext: String): String {
@@ -132,6 +146,7 @@ object NitroWebSocketAutoPrewarmer {
     if (initialized) return
     initialized = true
     try {
+      NitroWSSecureAtRest.initialize(app)
       val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
       val raw = prefs.getString(KEY_QUEUE, null) ?: return
       val arr = JSONArray(raw)
