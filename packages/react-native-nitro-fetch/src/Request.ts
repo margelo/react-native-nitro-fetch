@@ -1,6 +1,7 @@
 import { NitroHeaders } from './Headers';
 import { stringToUTF8, utf8ToString } from './utf8';
 import { bytesToBlob } from './blob';
+import { parseFormData } from './Response';
 
 export type RequestRedirect = 'follow' | 'error' | 'manual';
 export type RequestCache =
@@ -220,8 +221,8 @@ export class NitroRequest {
     return new NitroRequest(this);
   }
 
-  async formData(): Promise<never> {
-    throw new TypeError('formData() is not supported in NitroRequest');
+  async formData(): Promise<FormData> {
+    return parseFormData(await this.text(), this.headers.get('content-type'));
   }
 }
 
