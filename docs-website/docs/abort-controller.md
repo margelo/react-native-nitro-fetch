@@ -29,6 +29,8 @@ try {
 }
 ```
 
+If the signal has a `reason` (from `controller.abort(reason)` or `AbortSignal.timeout()`), the request rejects with that reason instead of an `AbortError`, and a streamed body errors with it too. React Native versions whose `AbortController` has no `reason` support always get an `AbortError`.
+
 ## Pre-aborted signals
 
 Pre-aborted signals are also supported — the request will throw immediately without making a network call:
