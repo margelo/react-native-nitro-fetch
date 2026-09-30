@@ -18,7 +18,23 @@ const blockJsThread = (ms: number) => {
   while (Date.now() < until) {}
 };
 
-const abortAfterNativeDone = async (init?: Record<string, unknown>) => {
+const abortWith = (controller: AbortController, reason?: unknown) => {
+  if (reason !== undefined) {
+    Object.defineProperty(controller.signal, 'reason', { value: reason });
+  }
+  controller.abort();
+};
+
+const timeoutReason = () => {
+  const reason = new Error('signal timed out');
+  reason.name = 'TimeoutError';
+  return reason;
+};
+
+const abortAfterNativeDone = async (
+  init?: Record<string, unknown>,
+  reason?: unknown
+) => {
   const controller = new AbortController();
   const pending = (nitroFetch as any)(`${BASE}/delay/1`, {
     ...init,
@@ -26,7 +42,7 @@ const abortAfterNativeDone = async (init?: Record<string, unknown>) => {
   });
   await new Promise((r) => setTimeout(r, 100));
   blockJsThread(2000);
-  controller.abort();
+  abortWith(controller, reason);
   return Promise.race([
     pending.then(
       () => 'resolved',
@@ -503,6 +519,38 @@ describe('NitroFetch - AbortController', () => {
     expect(await abortAfterNativeDone()).toBe('AbortError');
   });
 
+  it('pre-aborted signal rejects with signal.reason', async () => {
+    const controller = new AbortController();
+    const reason = timeoutReason();
+    abortWith(controller, reason);
+    let error: unknown;
+    try {
+      await nitroFetch(`${BASE}/get`, { signal: controller.signal });
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBe(reason);
+  });
+
+  it('abort mid-flight rejects with signal.reason', async () => {
+    const controller = new AbortController();
+    const reason = timeoutReason();
+    setTimeout(() => abortWith(controller, reason), 100);
+    let error: unknown;
+    try {
+      await nitroFetch(`${BASE}/delay/20`, { signal: controller.signal });
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBe(reason);
+  });
+
+  it('abort after native has finished rejects with signal.reason', async () => {
+    expect(await abortAfterNativeDone(undefined, timeoutReason())).toBe(
+      'TimeoutError'
+    );
+  });
+
   it('normal fetch with signal (not aborted) succeeds', async () => {
     const controller = new AbortController();
     const res = await nitroFetch(`${BASE}/get`, {
@@ -675,6 +723,41 @@ describe('NitroFetch - Streaming', () => {
 
   it('abort after native has finished settles instead of hanging', async () => {
     expect(await abortAfterNativeDone({ stream: true })).toBe('AbortError');
+  });
+
+  it('pre-aborted streamed request rejects with signal.reason', async () => {
+    const controller = new AbortController();
+    const reason = timeoutReason();
+    abortWith(controller, reason);
+    let error: unknown;
+    try {
+      await (nitroFetch as any)(`${BASE}/drip?duration=0&numbytes=1&delay=0`, {
+        stream: true,
+        signal: controller.signal,
+      });
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBe(reason);
+  });
+
+  it('aborting mid-stream rejects the next read with signal.reason', async () => {
+    const controller = new AbortController();
+    const res = (await (nitroFetch as any)(
+      `${BASE}/drip?duration=5&numbytes=5&delay=0`,
+      { stream: true, signal: controller.signal }
+    )) as any;
+    const reader = res.body.getReader();
+    await reader.read();
+    const reason = timeoutReason();
+    abortWith(controller, reason);
+    let error: unknown;
+    try {
+      await reader.read();
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBe(reason);
   });
 
   it('abort after the body has finished natively errors the reader', async () => {

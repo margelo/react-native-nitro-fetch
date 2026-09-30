@@ -18,7 +18,7 @@ export async function nitroStreamFetch(
 ): Promise<Response> {
   const signal = init?.signal as AbortSignal | undefined | null;
   if (signal?.aborted) {
-    throw createAbortError();
+    throw createAbortError(signal);
   }
 
   const url = getUrlString(input);
@@ -101,7 +101,7 @@ export async function nitroStreamFetch(
           'Request aborted'
         );
       }
-      const err = createAbortError();
+      const err = createAbortError(signal);
       if (!responseResolved) {
         responseResolved = true;
         rejectResponse(err);
