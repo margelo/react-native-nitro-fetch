@@ -50,6 +50,10 @@ abstract class HybridUrlRequestBuilderSpec: HybridObject() {
   @Keep
   abstract fun disableCookies(): Unit
   
+  @DoNotStrip
+  @Keep
+  abstract fun setPriority(priority: NitroRequestPriority): Unit
+  
   abstract fun onSucceeded(callback: (info: UrlResponseInfo) -> Unit): Unit
   
   @DoNotStrip

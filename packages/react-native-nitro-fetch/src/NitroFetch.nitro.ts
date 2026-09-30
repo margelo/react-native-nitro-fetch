@@ -12,6 +12,8 @@ export type NitroRequestMethod =
 
 export type NitroRequestCredentials = 'include' | 'omit' | 'same-origin';
 
+export type NitroRequestPriority = 'high' | 'low';
+
 export interface NitroHeader {
   key: string;
   value: string;
@@ -41,6 +43,7 @@ export interface NitroRequest {
   timeoutMs?: number;
   followRedirects?: boolean; // default true
   credentials?: NitroRequestCredentials; // default 'same-origin'; 'omit' skips cookie jar read/write
+  priority?: NitroRequestPriority;
   // Max age (ms) a prefetch cache entry is considered fresh at read time.
   // Default 5000 when omitted. <= 0 disables cache hits.
   prefetchCacheTtlMs?: number;

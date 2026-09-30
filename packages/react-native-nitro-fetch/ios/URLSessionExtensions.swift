@@ -34,3 +34,12 @@ extension Error {
     return RequestException(message: localizedDescription)
   }
 }
+
+extension NitroRequestPriority {
+  var taskPriority: Float {
+    switch self {
+    case .high: return URLSessionTask.highPriority
+    case .low: return URLSessionTask.lowPriority
+    }
+  }
+}

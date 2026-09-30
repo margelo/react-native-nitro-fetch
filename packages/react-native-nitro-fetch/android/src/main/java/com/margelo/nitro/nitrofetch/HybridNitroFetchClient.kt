@@ -345,6 +345,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       val builder = engine.newUrlRequestBuilder(url, timeoutCallback ?: callback, executor)
       val method = req.method?.name ?: "GET"
       builder.setHttpMethod(method)
+      req.priority?.let { builder.setPriority(it.cronetPriority) }
       // prefetchKey is an internal cache key, never sent on the server
       req.headers?.forEach { (k, v) ->
         if (k.equals("prefetchKey", ignoreCase = true)) return@forEach

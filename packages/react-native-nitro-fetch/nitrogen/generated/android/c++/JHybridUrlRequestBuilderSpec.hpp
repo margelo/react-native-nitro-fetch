@@ -59,6 +59,7 @@ namespace margelo::nitro::nitrofetch {
     void setUploadBody(const std::variant<std::shared_ptr<ArrayBuffer>, std::string>& body) override;
     void disableCache() override;
     void disableCookies() override;
+    void setPriority(NitroRequestPriority priority) override;
     void onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) override;
     void onFailed(const std::function<void(const std::optional<UrlResponseInfo>& /* info */, const RequestException& /* error */)>& callback) override;
     void onCanceled(const std::function<void(const std::optional<UrlResponseInfo>& /* info */)>& callback) override;

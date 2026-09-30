@@ -4,6 +4,7 @@ import { bytesToBlob } from './blob';
 import { parseFormData } from './Response';
 
 export type RequestRedirect = 'follow' | 'error' | 'manual';
+export type RequestPriority = 'high' | 'low' | 'auto';
 export type RequestCache =
   | 'default'
   | 'no-store'

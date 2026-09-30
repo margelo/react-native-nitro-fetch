@@ -12,7 +12,11 @@ export type {
   NitroRequestNativeType as NitroRequest,
   NitroResponseNativeType as NitroResponse,
 } from './fetch-core';
-export type { RequestRedirect, RequestCache } from './fetch-core';
+export type {
+  RequestRedirect,
+  RequestCache,
+  RequestPriority,
+} from './fetch-core';
 export { NitroHeaders as Headers } from './Headers';
 export { NitroResponse as Response } from './Response';
 export { NitroRequest as Request } from './Request';

@@ -50,6 +50,9 @@ data class NitroRequest(
   val credentials: NitroRequestCredentials?,
   @DoNotStrip
   @Keep
+  val priority: NitroRequestPriority?,
+  @DoNotStrip
+  @Keep
   val prefetchCacheTtlMs: Double?,
   @DoNotStrip
   @Keep
@@ -70,6 +73,7 @@ data class NitroRequest(
       && Objects.deepEquals(this.timeoutMs, other.timeoutMs)
       && Objects.deepEquals(this.followRedirects, other.followRedirects)
       && Objects.deepEquals(this.credentials, other.credentials)
+      && Objects.deepEquals(this.priority, other.priority)
       && Objects.deepEquals(this.prefetchCacheTtlMs, other.prefetchCacheTtlMs)
       && Objects.deepEquals(this.requestId, other.requestId)
   }
@@ -86,6 +90,7 @@ data class NitroRequest(
       timeoutMs,
       followRedirects,
       credentials,
+      priority,
       prefetchCacheTtlMs,
       requestId
     ).contentDeepHashCode()
@@ -99,8 +104,8 @@ data class NitroRequest(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(url: String, method: NitroRequestMethod?, headers: Array<NitroHeader>?, bodyString: String?, bodyBytes: ArrayBuffer?, bodyBytesBase64: String?, bodyFormData: Array<NitroFormDataPart>?, timeoutMs: Double?, followRedirects: Boolean?, credentials: NitroRequestCredentials?, prefetchCacheTtlMs: Double?, requestId: String?): NitroRequest {
-      return NitroRequest(url, method, headers, bodyString, bodyBytes, bodyBytesBase64, bodyFormData, timeoutMs, followRedirects, credentials, prefetchCacheTtlMs, requestId)
+    private fun fromCpp(url: String, method: NitroRequestMethod?, headers: Array<NitroHeader>?, bodyString: String?, bodyBytes: ArrayBuffer?, bodyBytesBase64: String?, bodyFormData: Array<NitroFormDataPart>?, timeoutMs: Double?, followRedirects: Boolean?, credentials: NitroRequestCredentials?, priority: NitroRequestPriority?, prefetchCacheTtlMs: Double?, requestId: String?): NitroRequest {
+      return NitroRequest(url, method, headers, bodyString, bodyBytes, bodyBytesBase64, bodyFormData, timeoutMs, followRedirects, credentials, priority, prefetchCacheTtlMs, requestId)
     }
   }
 }

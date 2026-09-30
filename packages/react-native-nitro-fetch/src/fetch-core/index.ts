@@ -20,4 +20,8 @@ export type {
 export { NitroHeaders } from '../Headers';
 export { NitroResponse } from '../Response';
 export { NitroRequest as NitroRequestClass } from '../Request';
-export type { RequestRedirect, RequestCache } from '../Request';
+export type {
+  RequestRedirect,
+  RequestCache,
+  RequestPriority,
+} from '../Request';

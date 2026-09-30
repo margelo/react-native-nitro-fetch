@@ -1,4 +1,5 @@
 import { NativeStorage as NativeStorageSingleton } from '../NitroInstances';
+import type { RequestPriority } from '../Request';
 import { base64FromBytes } from '../blob';
 import { NitroFetchHybrid, ensureClient } from './client';
 import { resolveRequestBody, resolveBlobBody } from './body';
@@ -7,7 +8,7 @@ import { buildNitroRequest } from './request';
 // Start a native prefetch. Requires a `prefetchKey` header on the request.
 export async function prefetch(
   input: RequestInfo | URL,
-  init?: RequestInit & { timeoutMs?: number }
+  init?: RequestInit & { timeoutMs?: number; priority?: RequestPriority }
 ): Promise<void> {
   // If native implementation is not present yet, do nothing
   const hasNative =
@@ -47,7 +48,11 @@ const AUTOPREFETCH_QUEUE_KEY = 'nitrofetch_autoprefetch_queue';
 // Entries embed request headers (may hold credentials) — stored encrypted at rest.
 export async function prefetchOnAppStart(
   input: RequestInfo | URL,
-  init?: RequestInit & { prefetchKey?: string; timeoutMs?: number }
+  init?: RequestInit & {
+    prefetchKey?: string;
+    timeoutMs?: number;
+    priority?: RequestPriority;
+  }
 ): Promise<void> {
   // Resolve request and prefetchKey
   init = await resolveRequestBody(input, init);
@@ -85,6 +90,7 @@ export async function prefetchOnAppStart(
   if (req.bodyFormData && req.bodyFormData.length > 0)
     entry.bodyFormData = req.bodyFormData;
   if (typeof req.timeoutMs === 'number') entry.timeoutMs = req.timeoutMs;
+  if (req.priority) entry.priority = req.priority;
   if (req.followRedirects === false) entry.followRedirects = false;
   if (req.credentials && req.credentials !== 'same-origin')
     entry.credentials = req.credentials;

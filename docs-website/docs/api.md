@@ -14,6 +14,7 @@ Drop-in replacement for the global `fetch`.
 - Body supports: `string`, `URLSearchParams`, `FormData`, and `Blob`
 - Returns a spec-compliant `Response` with `text()`, `json()`, `arrayBuffer()`, `blob()`, `bytes()`, `formData()`, `clone()`, a `body` stream, and `headers`
 - `formData()` parses `application/x-www-form-urlencoded` bodies only; other types, including `multipart/form-data`, reject with a `TypeError`
+- `init.priority` (`'high'`, `'low'` or `'auto'`) sets the network priority of plain, streamed, worklet and prefetch requests. On Android it sets the Cronet request priority, which orders requests waiting for a connection. On iOS it sets `URLSessionTask.priority` (iOS 16+ for non-streamed requests), which URLSession treats as a hint. `'auto'` keeps the default
 
 ```ts
 import { fetch } from 'react-native-nitro-fetch';

@@ -183,7 +183,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
 
     let (urlRequest, finalURL) = try await buildURLRequest(req, bodyData: bodyData)
     let shouldFollowRedirects = req.followRedirects ?? true
-    let delegate: URLSessionTaskDelegate? = shouldFollowRedirects ? nil : NoRedirectDelegate()
+    let delegate = NitroTaskDelegate.make(followRedirects: shouldFollowRedirects, priority: req.priority)
 
     #if NITROFETCH_TRACING
     let signpostID = OSSignpostID(log: fetchLog)
@@ -302,7 +302,10 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     Task.detached {
       do {
         let (urlRequest, finalURL) = try await buildURLRequest(req, bodyData: bodyData)
-        let (data, response) = try await session.data(for: urlRequest)
+        let (data, response) = try await session.data(
+          for: urlRequest,
+          delegate: NitroTaskDelegate.make(followRedirects: true, priority: req.priority)
+        )
         guard let http = response as? HTTPURLResponse else {
           throw NSError(domain: "NitroFetch", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
         }
@@ -471,9 +474,25 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
   }
 }
 
-/// Delegate that prevents URLSession from following HTTP redirects.
-/// When the completion handler receives `nil`, the 3xx response is returned as-is.
-final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate {
+final class NitroTaskDelegate: NSObject, URLSessionTaskDelegate {
+  private let followRedirects: Bool
+  private let priority: Float?
+
+  private init(followRedirects: Bool, priority: Float?) {
+    self.followRedirects = followRedirects
+    self.priority = priority
+  }
+
+  static func make(followRedirects: Bool, priority: NitroRequestPriority?) -> NitroTaskDelegate? {
+    if followRedirects && priority == nil { return nil }
+    return NitroTaskDelegate(followRedirects: followRedirects, priority: priority?.taskPriority)
+  }
+
+  @available(iOS 16.0, tvOS 16.0, *)
+  func urlSession(_ session: URLSession, didCreateTask task: URLSessionTask) {
+    if let priority = priority { task.priority = priority }
+  }
+
   func urlSession(
     _ session: URLSession,
     task: URLSessionTask,
@@ -481,6 +500,6 @@ final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate {
     newRequest request: URLRequest,
     completionHandler: @escaping @Sendable (URLRequest?) -> Void
   ) {
-    completionHandler(nil)
+    completionHandler(followRedirects ? request : nil)
   }
 }

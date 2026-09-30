@@ -67,6 +67,10 @@ export function buildNitroRequest(
       : undefined;
   const timeoutMs =
     typeof init?.timeoutMs === 'number' ? init.timeoutMs : undefined;
+  const priority =
+    init?.priority === 'high' || init?.priority === 'low'
+      ? init.priority
+      : undefined;
 
   return {
     url,
@@ -79,6 +83,7 @@ export function buildNitroRequest(
     credentials: credentialsOption,
     prefetchCacheTtlMs,
     timeoutMs,
+    priority,
   };
 }
 
@@ -125,6 +130,10 @@ export function buildNitroRequestPure(
       : undefined;
   const timeoutMs =
     typeof init?.timeoutMs === 'number' ? init.timeoutMs : undefined;
+  const priority =
+    init?.priority === 'high' || init?.priority === 'low'
+      ? init.priority
+      : undefined;
 
   return {
     url,
@@ -136,5 +145,6 @@ export function buildNitroRequestPure(
     credentials: init?.credentials,
     prefetchCacheTtlMs,
     timeoutMs,
+    priority,
   };
 }
