@@ -34,6 +34,39 @@ function isNitroResponseInit(arg: any): arg is NitroResponseInit {
   );
 }
 
+function decodeFormComponent(value: string): string {
+  const spaced = value.replace(/\+/g, ' ');
+  try {
+    return decodeURIComponent(spaced);
+  } catch {
+    return spaced;
+  }
+}
+
+export function parseFormData(
+  text: string,
+  contentType: string | null
+): FormData {
+  if (
+    contentType?.split(';')[0]?.trim().toLowerCase() !==
+    'application/x-www-form-urlencoded'
+  ) {
+    throw new TypeError(
+      'formData() only supports application/x-www-form-urlencoded bodies'
+    );
+  }
+  const form = new FormData();
+  for (const pair of text.split('&')) {
+    if (!pair) continue;
+    const eq = pair.indexOf('=');
+    form.append(
+      decodeFormComponent(eq < 0 ? pair : pair.slice(0, eq)),
+      decodeFormComponent(eq < 0 ? '' : pair.slice(eq + 1))
+    );
+  }
+  return form;
+}
+
 export class NitroResponse {
   readonly url: string;
   readonly ok: boolean;
@@ -287,8 +320,8 @@ export class NitroResponse {
     });
   }
 
-  async formData(): Promise<never> {
-    throw new TypeError('formData() is not supported in NitroResponse');
+  async formData(): Promise<FormData> {
+    return parseFormData(await this.text(), this.headers.get('content-type'));
   }
 
   // --- Static methods ---

@@ -5,7 +5,8 @@
 - Drop-in replacement for the global `fetch`.
 - Accepts `Headers`, array pairs, or plain object for `init.headers`.
 - Body supports: `string`, `URLSearchParams`, `FormData`, and `Blob`.
-- Returns a spec-compliant `Response` with `text()`, `json()`, `arrayBuffer()`, `blob()`, `bytes()`, `clone()`, a `body` stream, and `headers`.
+- Returns a spec-compliant `Response` with `text()`, `json()`, `arrayBuffer()`, `blob()`, `bytes()`, `formData()`, `clone()`, a `body` stream, and `headers`.
+- `formData()` parses `application/x-www-form-urlencoded` bodies only; other types, including `multipart/form-data`, reject with a `TypeError`.
 - Aborting through `init.signal` rejects with `signal.reason` when the signal has one (for example a `TimeoutError` from `AbortSignal.timeout()`), otherwise with an `AbortError`.
 - `init.timeoutMs` fails the request after that many milliseconds without receiving data. The timer restarts whenever data arrives, so a response that keeps sending bytes can run past `timeoutMs`. On iOS it sets `URLRequest.timeoutInterval` (default 60s). On Android the library runs the timer and cancels the Cronet request, and requests have no per-request timeout unless you pass one. The option does nothing with `stream: true`; use an `AbortController` with a timer there.
 

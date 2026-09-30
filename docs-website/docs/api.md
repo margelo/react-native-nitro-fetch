@@ -12,7 +12,8 @@ Drop-in replacement for the global `fetch`.
 
 - Accepts `Headers`, array pairs, or plain object for `init.headers`
 - Body supports: `string`, `URLSearchParams`, `FormData`, and `Blob`
-- Returns a spec-compliant `Response` with `text()`, `json()`, `arrayBuffer()`, `blob()`, `bytes()`, `clone()`, a `body` stream, and `headers`
+- Returns a spec-compliant `Response` with `text()`, `json()`, `arrayBuffer()`, `blob()`, `bytes()`, `formData()`, `clone()`, a `body` stream, and `headers`
+- `formData()` parses `application/x-www-form-urlencoded` bodies only; other types, including `multipart/form-data`, reject with a `TypeError`
 
 ```ts
 import { fetch } from 'react-native-nitro-fetch';
