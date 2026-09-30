@@ -621,6 +621,160 @@ describe('NitroFetch - timeoutMs', () => {
   });
 });
 
+describe('NitroFetch - priority', () => {
+  const run = Date.now();
+  let seq = 0;
+  const unique = (path: string) => `${BASE}${path}?run=${run}&seq=${seq++}`;
+  const plain = (url: string) => nitroFetch(url);
+  const streamed = (url: string, priority?: 'high' | 'low' | 'auto') =>
+    (nitroFetch as any)(url, { stream: true, priority });
+  const itSchedules = Platform.OS === 'android' ? it : it.skip;
+  const settleOrder = async (
+    block: (url: string) => Promise<unknown>,
+    first: () => Promise<unknown>,
+    second: () => Promise<unknown>
+  ) => {
+    const blockers = [
+      block(unique('/delay/1')),
+      ...Array.from({ length: 5 }, () => block(unique('/delay/2'))),
+    ];
+    await new Promise((r) => setTimeout(r, 300));
+    const order: string[] = [];
+    await Promise.all([
+      first().then(() => order.push('first')),
+      second().then(() => order.push('second')),
+      ...blockers,
+    ]);
+    return order;
+  };
+
+  it('completes plain, worklet and streamed requests with every priority', async () => {
+    for (const priority of ['high', 'low', 'auto'] as const) {
+      const res = await nitroFetch(unique('/get'), { priority });
+      expect(res.status).toBe(200);
+      const status = await nitroFetchOnWorklet(
+        unique('/get'),
+        { priority },
+        (payload) => {
+          'worklet';
+          return payload.status;
+        }
+      );
+      expect(status).toBe(200);
+      const stream = await streamed(unique('/get'), priority);
+      expect(stream.status).toBe(200);
+      expect((await stream.text()).length).toBeGreaterThan(0);
+    }
+    const unknown = await nitroFetch(unique('/get'), {
+      priority: 'urgent' as any,
+    });
+    expect(unknown.status).toBe(200);
+  });
+
+  it('serves a prefetch made with a priority from the prefetch cache', async () => {
+    const url = unique('/get');
+    const key = `pf-priority-${run}`;
+    await prefetch(url, { headers: { prefetchKey: key }, priority: 'low' });
+    const res = await nitroFetch(url, { headers: { prefetchKey: key } });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('nitroPrefetched')).toBe('true');
+  });
+
+  itSchedules('high jumps ahead of an earlier default request', async () => {
+    const order = await settleOrder(
+      plain,
+      () => nitroFetch(unique('/get')),
+      () => nitroFetch(unique('/get'), { priority: 'high' })
+    );
+    expect(order).toEqual(['second', 'first']);
+  });
+
+  itSchedules(
+    'a default request jumps ahead of an earlier low one',
+    async () => {
+      const order = await settleOrder(
+        plain,
+        () => nitroFetch(unique('/get'), { priority: 'low' }),
+        () => nitroFetch(unique('/get'))
+      );
+      expect(order).toEqual(['second', 'first']);
+    }
+  );
+
+  itSchedules('auto and unknown values keep request order', async () => {
+    const order = await settleOrder(
+      plain,
+      () => nitroFetch(unique('/get'), { priority: 'urgent' as any }),
+      () => nitroFetch(unique('/get'), { priority: 'auto' })
+    );
+    expect(order).toEqual(['first', 'second']);
+  });
+
+  itSchedules('applies priority on the worklet runtime', async () => {
+    const order = await settleOrder(
+      plain,
+      () => nitroFetch(unique('/get')),
+      () =>
+        nitroFetchOnWorklet(unique('/get'), { priority: 'high' }, (payload) => {
+          'worklet';
+          return payload.status;
+        })
+    );
+    expect(order).toEqual(['second', 'first']);
+  });
+
+  itSchedules('applies priority to prefetch', async () => {
+    const key = `pf-priority-order-${run}`;
+    const url = unique('/get');
+    const order = await settleOrder(
+      plain,
+      () => nitroFetch(unique('/get')),
+      async () => {
+        await prefetch(url, {
+          headers: { prefetchKey: key },
+          priority: 'high',
+        });
+        await nitroFetch(url, { headers: { prefetchKey: key } });
+      }
+    );
+    expect(order).toEqual(['second', 'first']);
+  });
+
+  itSchedules('applies priority to streamed requests', async () => {
+    const order = await settleOrder(
+      (url) => streamed(url),
+      () => streamed(unique('/get')),
+      () => streamed(unique('/get'), 'high')
+    );
+    expect(order).toEqual(['second', 'first']);
+  });
+
+  it('prefetchOnAppStart persists high and low but not auto', async () => {
+    await prefetchOnAppStart(unique('/get'), {
+      prefetchKey: 'pf-priority-high',
+      priority: 'high',
+    });
+    await prefetchOnAppStart(unique('/get'), {
+      prefetchKey: 'pf-priority-low',
+      priority: 'low',
+    });
+    await prefetchOnAppStart(unique('/get'), {
+      prefetchKey: 'pf-priority-auto',
+      priority: 'auto',
+    });
+    const queue = __readAutoPrefetchQueue();
+    const find = (key: string) =>
+      queue.find((e: any) => e?.prefetchKey === key);
+    expect(find('pf-priority-high')?.priority).toBe('high');
+    expect(find('pf-priority-low')?.priority).toBe('low');
+    expect(find('pf-priority-auto')).toBeDefined();
+    expect(find('pf-priority-auto')?.priority).toBeUndefined();
+    await removeFromAutoPrefetch('pf-priority-high');
+    await removeFromAutoPrefetch('pf-priority-low');
+    await removeFromAutoPrefetch('pf-priority-auto');
+  });
+});
+
 describe('NitroFetch - nitroFetchOnWorklet', () => {
   const url = `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(
     ['bitcoin'].join(',')

@@ -249,6 +249,11 @@ object AutoPrefetcher {
     val followRedirects = entry
       .takeIf { it.has("followRedirects") && !it.isNull("followRedirects") }
       ?.optBoolean("followRedirects")
+    val priority = when (entry?.optString("priority", "")) {
+      "high" -> NitroRequestPriority.HIGH
+      "low" -> NitroRequestPriority.LOW
+      else -> null
+    }
     val credentials = when (entry?.optString("credentials", "")) {
       "omit" -> NitroRequestCredentials.OMIT
       "include" -> NitroRequestCredentials.INCLUDE
@@ -286,6 +291,7 @@ object AutoPrefetcher {
       timeoutMs = timeoutMs,
       followRedirects = followRedirects,
       credentials = credentials,
+      priority = priority,
       prefetchCacheTtlMs = prefetchCacheTtlMs,
       requestId = null
     )

@@ -91,6 +91,10 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     self.urlRequest.httpShouldHandleCookies = false
   }
 
+  func setPriority(priority: NitroRequestPriority) throws {
+    self.priority = priority.taskPriority
+  }
+
   func build() throws -> any HybridUrlRequestSpec {
     let delegate = URLSessionDelegateAdapter(
       onRedirectReceived: onRedirectReceivedCallback,

@@ -1,3 +1,4 @@
+import type { NitroRequestPriority } from './NitroFetch.nitro';
 import type { HybridObject } from 'react-native-nitro-modules';
 
 export interface HttpHeader {
@@ -42,6 +43,7 @@ export interface UrlRequestBuilder extends HybridObject<{
   setUploadBody(body: ArrayBuffer | string): void;
   disableCache(): void;
   disableCookies(): void;
+  setPriority(priority: NitroRequestPriority): void;
   onSucceeded(callback: (info: UrlResponseInfo) => void): void;
   onFailed(
     callback: (

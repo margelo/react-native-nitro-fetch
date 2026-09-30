@@ -9,6 +9,8 @@
 
 // Forward declaration of `HybridUrlRequestSpec` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
+// Forward declaration of `NitroRequestPriority` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { enum class NitroRequestPriority; }
 // Forward declaration of `UrlResponseInfo` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 // Forward declaration of `HttpHeader` to properly resolve imports.
@@ -24,6 +26,8 @@ namespace margelo::nitro::nitrofetch { struct RequestException; }
 #include <variant>
 #include "JVariant_ArrayBuffer_String.hpp"
 #include <NitroModules/JArrayBuffer.hpp>
+#include "NitroRequestPriority.hpp"
+#include "JNitroRequestPriority.hpp"
 #include "UrlResponseInfo.hpp"
 #include <functional>
 #include "JFunc_void_UrlResponseInfo.hpp"
@@ -93,6 +97,10 @@ namespace margelo::nitro::nitrofetch {
   void JHybridUrlRequestBuilderSpec::disableCookies() {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("disableCookies");
     method(_javaPart);
+  }
+  void JHybridUrlRequestBuilderSpec::setPriority(NitroRequestPriority priority) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JNitroRequestPriority> /* priority */)>("setPriority");
+    method(_javaPart, JNitroRequestPriority::fromCpp(priority));
   }
   void JHybridUrlRequestBuilderSpec::onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo::javaobject> /* callback */)>("onSucceeded_cxx");

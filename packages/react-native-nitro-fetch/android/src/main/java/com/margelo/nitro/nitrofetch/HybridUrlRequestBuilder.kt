@@ -208,6 +208,10 @@ class HybridUrlRequestBuilder(
   override fun disableCookies() {
   }
 
+  override fun setPriority(priority: NitroRequestPriority) {
+    builder.setPriority(priority.cronetPriority)
+  }
+
   override fun onSucceeded(callback: (info: UrlResponseInfo) -> Unit) {
     this.onSucceededCallback = callback
   }

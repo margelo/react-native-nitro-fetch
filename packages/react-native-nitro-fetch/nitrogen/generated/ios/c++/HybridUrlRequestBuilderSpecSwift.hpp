@@ -14,6 +14,8 @@ namespace NitroFetch { class HybridUrlRequestBuilderSpec_cxx; }
 
 // Forward declaration of `ArrayBufferHolder` to properly resolve imports.
 namespace NitroModules { class ArrayBufferHolder; }
+// Forward declaration of `NitroRequestPriority` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { enum class NitroRequestPriority; }
 // Forward declaration of `UrlResponseInfo` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 // Forward declaration of `HttpHeader` to properly resolve imports.
@@ -27,6 +29,7 @@ namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
 #include <NitroModules/ArrayBuffer.hpp>
 #include <variant>
 #include <NitroModules/ArrayBufferHolder.hpp>
+#include "NitroRequestPriority.hpp"
 #include "UrlResponseInfo.hpp"
 #include <functional>
 #include <unordered_map>
@@ -113,6 +116,12 @@ namespace margelo::nitro::nitrofetch {
     }
     inline void disableCookies() override {
       auto __result = _swiftPart.disableCookies();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline void setPriority(NitroRequestPriority priority) override {
+      auto __result = _swiftPart.setPriority(static_cast<int>(priority));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

@@ -29,3 +29,9 @@ fun CronetUrlResponseInfo.toNitro(): UrlResponseInfo {
 fun CronetNativeException.toNitro(): RequestException {
   return RequestException(message = message ?: "Unknown Cronet error")
 }
+
+val NitroRequestPriority.cronetPriority: Int
+  get() = when (this) {
+    NitroRequestPriority.HIGH -> org.chromium.net.UrlRequest.Builder.REQUEST_PRIORITY_HIGHEST
+    NitroRequestPriority.LOW -> org.chromium.net.UrlRequest.Builder.REQUEST_PRIORITY_LOW
+  }

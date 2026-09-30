@@ -13,6 +13,8 @@
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
 
+// Forward declaration of `NitroRequestPriority` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { enum class NitroRequestPriority; }
 // Forward declaration of `UrlResponseInfo` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 // Forward declaration of `RequestException` to properly resolve imports.
@@ -23,6 +25,7 @@ namespace margelo::nitro::nitrofetch { class HybridUrlRequestSpec; }
 #include <string>
 #include <NitroModules/ArrayBuffer.hpp>
 #include <variant>
+#include "NitroRequestPriority.hpp"
 #include "UrlResponseInfo.hpp"
 #include <functional>
 #include <optional>
@@ -66,6 +69,7 @@ namespace margelo::nitro::nitrofetch {
       virtual void setUploadBody(const std::variant<std::shared_ptr<ArrayBuffer>, std::string>& body) = 0;
       virtual void disableCache() = 0;
       virtual void disableCookies() = 0;
+      virtual void setPriority(NitroRequestPriority priority) = 0;
       virtual void onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) = 0;
       virtual void onFailed(const std::function<void(const std::optional<UrlResponseInfo>& /* info */, const RequestException& /* error */)>& callback) = 0;
       virtual void onCanceled(const std::function<void(const std::optional<UrlResponseInfo>& /* info */)>& callback) = 0;

@@ -45,6 +45,8 @@ export async function nitroStreamFetch(
   const builder = NitroCronetSingleton.newUrlRequestBuilder(url);
   builder.setHttpMethod(method);
   if (init?.credentials === 'omit') builder.disableCookies();
+  if (init?.priority === 'high' || init?.priority === 'low')
+    builder.setPriority(init.priority);
   // prefetchKey is an internal cache key, never sent on the server
   headers.forEach((h) => {
     if (h.key.toLowerCase() === 'prefetchkey') return;

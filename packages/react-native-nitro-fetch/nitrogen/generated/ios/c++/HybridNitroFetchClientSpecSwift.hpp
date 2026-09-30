@@ -26,6 +26,8 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
 namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 // Forward declaration of `NitroRequestCredentials` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { enum class NitroRequestCredentials; }
+// Forward declaration of `NitroRequestPriority` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { enum class NitroRequestPriority; }
 
 #include "NitroResponse.hpp"
 #include <NitroModules/Promise.hpp>
@@ -39,6 +41,7 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestCredentials; }
 #include "NitroRequestMethod.hpp"
 #include "NitroFormDataPart.hpp"
 #include "NitroRequestCredentials.hpp"
+#include "NitroRequestPriority.hpp"
 
 #include "NitroFetch-Swift-Cxx-Umbrella.hpp"
 

@@ -8,6 +8,7 @@
 - Returns a spec-compliant `Response` with `text()`, `json()`, `arrayBuffer()`, `blob()`, `bytes()`, `formData()`, `clone()`, a `body` stream, and `headers`.
 - `formData()` parses `application/x-www-form-urlencoded` bodies only; other types, including `multipart/form-data`, reject with a `TypeError`.
 - Aborting through `init.signal` rejects with `signal.reason` when the signal has one (for example a `TimeoutError` from `AbortSignal.timeout()`), otherwise with an `AbortError`.
+- `init.priority` (`'high'`, `'low'` or `'auto'`) sets the network priority of plain, streamed, worklet and prefetch requests. On Android it sets the Cronet request priority, which orders requests waiting for a connection. On iOS it sets `URLSessionTask.priority` (iOS 16+ for non-streamed requests), which URLSession treats as a hint. `'auto'` keeps the default.
 - `init.timeoutMs` fails the request after that many milliseconds without receiving data. The timer restarts whenever data arrives, so a response that keeps sending bytes can run past `timeoutMs`. On iOS it sets `URLRequest.timeoutInterval` (default 60s). On Android the library runs the timer and cancels the Cronet request, and requests have no per-request timeout unless you pass one. The option does nothing with `stream: true`; use an `AbortController` with a timer there.
 
 Example

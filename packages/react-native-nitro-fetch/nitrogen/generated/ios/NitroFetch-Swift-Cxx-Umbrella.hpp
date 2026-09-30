@@ -30,6 +30,8 @@ namespace margelo::nitro::nitrofetch { struct NitroHeader; }
 namespace margelo::nitro::nitrofetch { enum class NitroRequestCredentials; }
 // Forward declaration of `NitroRequestMethod` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { enum class NitroRequestMethod; }
+// Forward declaration of `NitroRequestPriority` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { enum class NitroRequestPriority; }
 // Forward declaration of `NitroRequest` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroRequest; }
 // Forward declaration of `NitroResponse` to properly resolve imports.
@@ -52,6 +54,7 @@ namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 #include "NitroRequest.hpp"
 #include "NitroRequestCredentials.hpp"
 #include "NitroRequestMethod.hpp"
+#include "NitroRequestPriority.hpp"
 #include "NitroResponse.hpp"
 #include "RequestException.hpp"
 #include "UrlResponseInfo.hpp"

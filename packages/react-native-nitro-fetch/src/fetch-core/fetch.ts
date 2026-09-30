@@ -1,6 +1,10 @@
 import { NitroResponse } from '../Response';
 import { NitroRequest as NitroRequestClass } from '../Request';
-import type { RequestRedirect, RequestCache } from '../Request';
+import type {
+  RequestRedirect,
+  RequestCache,
+  RequestPriority,
+} from '../Request';
 import { resolveRequestBody, resolveBlobBody } from './body';
 import { isHttpUrl, getUrlString } from './url';
 import { nitroFetchRaw } from './raw';
@@ -32,6 +36,7 @@ export async function nitroFetch(
     redirect?: RequestRedirect;
     cache?: RequestCache;
     timeoutMs?: number;
+    priority?: RequestPriority;
   }
 ): Promise<Response> {
   // Merge defaults from NitroRequestClass if input is one

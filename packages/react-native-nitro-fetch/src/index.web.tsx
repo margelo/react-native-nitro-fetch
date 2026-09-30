@@ -8,7 +8,7 @@ import type { RequestRedirect, RequestCache } from './Request';
 export { NitroHeaders as Headers } from './Headers';
 export { NitroResponse as Response } from './Response';
 export { NitroRequest as Request } from './Request';
-export type { RequestRedirect, RequestCache } from './Request';
+export type { RequestRedirect, RequestCache, RequestPriority } from './Request';
 
 export { NetworkInspector } from './NetworkInspector';
 export type {
