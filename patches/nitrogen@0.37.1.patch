@@ -1,0 +1,46 @@
+diff --git a/lib/syntax/swift/SwiftCxxBridgedType.js b/lib/syntax/swift/SwiftCxxBridgedType.js
+index 9ad571e6b79050e5c0fdbe340605859f100a3aa5..07010b4ce0d780c98a5bf6d0cd24252036aeac4a 100644
+--- a/lib/syntax/swift/SwiftCxxBridgedType.js
++++ b/lib/syntax/swift/SwiftCxxBridgedType.js
+@@ -466,11 +466,25 @@ export class SwiftCxxBridgedType {
+             }
+             case 'array': {
+                 const array = getTypeAs(this.type, ArrayType);
++                const bridge = this.getBridgeOrThrow();
+                 const wrapping = new SwiftCxxBridgedType(array.itemType, true);
++                const swiftArrayType = array.getCode('swift');
++                const getFunc = `bridge.get_${bridge.specializationName}`;
+                 switch (language) {
+                     case 'swift':
+-                        // We have to iterate the element one by one to create a resulting Array (mapped)
+-                        return `${cppParameterName}.map({ __item in ${wrapping.parseFromCppToSwift('__item', 'swift')} })`.trim();
++                        // Use index-based loop with bridge helper instead of .map() or for-in to work around
++                        // Swift compiler bug where C++ vector types lose Sequence/.map conformance (https://github.com/swiftlang/swift/issues/76949)
++                        return `
++            { () -> ${swiftArrayType} in
++              var __array = ${swiftArrayType}()
++              let __count = ${cppParameterName}.size()
++              __array.reserveCapacity(Int(__count))
++              for __i in 0..<__count {
++                let __item = ${getFunc}(${cppParameterName}, __i)
++                __array.append(${wrapping.parseFromCppToSwift('__item', 'swift')})
++              }
++              return __array
++            }()`.trim();
+                     default:
+                         return cppParameterName;
+                 }
+diff --git a/lib/syntax/swift/SwiftCxxTypeHelper.js b/lib/syntax/swift/SwiftCxxTypeHelper.js
+index 6d12c0cb607c058dc45be5ed4460e6c627f90256..0f7ab4a938d9d54116ff75336e9ed2ed07566b2b 100644
+--- a/lib/syntax/swift/SwiftCxxTypeHelper.js
++++ b/lib/syntax/swift/SwiftCxxTypeHelper.js
+@@ -241,6 +241,9 @@ inline ${actualType} create_${name}(size_t size) noexcept {
+   ${actualType} vector;
+   vector.reserve(size);
+   return vector;
++}
++inline ${type.itemType.getCode('c++')} get_${name}(const ${actualType}& vector, size_t index) noexcept {
++  return vector[index];
+ }`.trim();
+     return {
+         cxxType: actualType,

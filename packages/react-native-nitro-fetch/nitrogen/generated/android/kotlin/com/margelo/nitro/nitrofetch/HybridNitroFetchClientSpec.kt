@@ -10,6 +10,7 @@ package com.margelo.nitro.nitrofetch
 import androidx.annotation.Keep
 import com.facebook.jni.HybridData
 import com.facebook.proguard.annotations.DoNotStrip
+import dalvik.annotation.optimization.FastNative
 import com.margelo.nitro.core.Promise
 import com.margelo.nitro.core.HybridObject
 
@@ -55,6 +56,7 @@ abstract class HybridNitroFetchClientSpec: HybridObject() {
   @Keep
   protected open class CxxPart(javaPart: HybridNitroFetchClientSpec): HybridObject.CxxPart(javaPart) {
     // C++ JHybridNitroFetchClientSpec::CxxPart::initHybrid(...)
+    @FastNative
     external override fun initHybrid(): HybridData
   }
   override fun createCxxPart(): CxxPart {

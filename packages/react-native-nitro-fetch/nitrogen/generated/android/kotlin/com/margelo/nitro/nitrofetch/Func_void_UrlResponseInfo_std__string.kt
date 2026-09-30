@@ -10,7 +10,6 @@ package com.margelo.nitro.nitrofetch
 import androidx.annotation.Keep
 import com.facebook.jni.HybridData
 import com.facebook.proguard.annotations.DoNotStrip
-import dalvik.annotation.optimization.FastNative
 
 
 /**
@@ -59,7 +58,6 @@ class Func_void_UrlResponseInfo_std__string_cxx: Func_void_UrlResponseInfo_std__
   override fun invoke(info: UrlResponseInfo, newLocationUrl: String): Unit
     = invoke_cxx(info,newLocationUrl)
 
-  @FastNative
   private external fun invoke_cxx(info: UrlResponseInfo, newLocationUrl: String): Unit
 }
 

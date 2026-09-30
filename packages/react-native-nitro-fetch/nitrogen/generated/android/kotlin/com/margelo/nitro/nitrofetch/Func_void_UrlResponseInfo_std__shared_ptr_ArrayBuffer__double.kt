@@ -10,7 +10,6 @@ package com.margelo.nitro.nitrofetch
 import androidx.annotation.Keep
 import com.facebook.jni.HybridData
 import com.facebook.proguard.annotations.DoNotStrip
-import dalvik.annotation.optimization.FastNative
 import com.margelo.nitro.core.ArrayBuffer
 
 /**
@@ -59,7 +58,6 @@ class Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double_cxx: Func_vo
   override fun invoke(info: UrlResponseInfo, byteBuffer: ArrayBuffer, bytesRead: Double): Unit
     = invoke_cxx(info,byteBuffer,bytesRead)
 
-  @FastNative
   private external fun invoke_cxx(info: UrlResponseInfo, byteBuffer: ArrayBuffer, bytesRead: Double): Unit
 }
 
