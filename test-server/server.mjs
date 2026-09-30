@@ -126,6 +126,11 @@ app.all('/token/text', (_req, res) =>
   res.set('Content-Type', 'text/plain').send('plain-token-xyz')
 );
 app.all('/token/fail', (_req, res) => res.status(500).json({ error: 'boom' }));
+app.all('/form', (_req, res) =>
+  res
+    .type('application/x-www-form-urlencoded')
+    .send('access_token=tok_abc123&scope=read+write&note=a%26b%3Dc')
+);
 
 app.use('/cookies', (req, _res, next) => {
   // eslint-disable-next-line no-console

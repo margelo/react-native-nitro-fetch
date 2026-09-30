@@ -779,3 +779,72 @@ describe('Response - binary body', () => {
     }
   });
 });
+
+describe('Response - formData()', () => {
+  it('parses a urlencoded network response', async () => {
+    const res = await nitroFetch(`${BASE}/form`);
+    const form = await res.formData();
+    expect(form.getAll('access_token')).toEqual(['tok_abc123']);
+    expect(form.getAll('scope')).toEqual(['read write']);
+    expect(form.getAll('note')).toEqual(['a&b=c']);
+    expect(res.bodyUsed).toBe(true);
+  });
+
+  it('keeps repeated keys, empty values, and bare names', async () => {
+    const res = new Response('a=1&a=2&b=&c&&d=x%2By', {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    const form = await res.formData();
+    expect(form.getAll('a')).toEqual(['1', '2']);
+    expect(form.getAll('b')).toEqual(['']);
+    expect(form.getAll('c')).toEqual(['']);
+    expect(form.getAll('d')).toEqual(['x+y']);
+  });
+
+  it('leaves malformed percent escapes as-is', async () => {
+    const res = new Response('pct=100%&bad=%zz', {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    const form = await res.formData();
+    expect(form.getAll('pct')).toEqual(['100%']);
+    expect(form.getAll('bad')).toEqual(['%zz']);
+  });
+
+  it('parses a URLSearchParams body', async () => {
+    const params = new URLSearchParams();
+    params.append('q', 'two words');
+    const form = await new Response(params).formData();
+    expect(form.getAll('q')).toEqual(['two words']);
+  });
+
+  it('rejects non-urlencoded bodies with a TypeError', async () => {
+    for (const type of [
+      'application/json',
+      'multipart/form-data; boundary=x',
+    ]) {
+      const res = new Response('a=1', { headers: { 'Content-Type': type } });
+      let err: unknown;
+      try {
+        await res.formData();
+      } catch (e) {
+        err = e;
+      }
+      expect(err instanceof TypeError).toBe(true);
+      expect(res.bodyUsed).toBe(true);
+    }
+  });
+});
+
+describe('Request - formData()', () => {
+  it('parses a urlencoded body', async () => {
+    const req = new Request('https://example.com', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'user=alice&msg=hi+there',
+    });
+    const form = await req.formData();
+    expect(form.getAll('user')).toEqual(['alice']);
+    expect(form.getAll('msg')).toEqual(['hi there']);
+    expect(req.bodyUsed).toBe(true);
+  });
+});

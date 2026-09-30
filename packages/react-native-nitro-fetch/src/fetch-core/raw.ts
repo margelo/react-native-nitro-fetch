@@ -18,7 +18,7 @@ export async function nitroFetchRaw(
 
   // Fast-abort: reject synchronously before any bridge work.
   if (signal?.aborted) {
-    throw createAbortError();
+    throw createAbortError(signal);
   }
 
   // Extract body from standard Request when init.body is absent (ky/undici pattern)
@@ -92,7 +92,7 @@ export async function nitroFetchRaw(
 
   try {
     const res: NitroResponseNative = await client.request(req);
-    if (signal?.aborted) throw createAbortError();
+    if (signal?.aborted) throw createAbortError(signal);
     if (inspectorId) {
       NetworkInspector._recordEnd(
         inspectorId,
@@ -112,7 +112,7 @@ export async function nitroFetchRaw(
     // If the signal was aborted (either before or during the request),
     // surface a spec-compliant AbortError regardless of what native threw.
     if (signal?.aborted) {
-      throw createAbortError();
+      throw createAbortError(signal);
     }
     throw e;
   } finally {
