@@ -8,6 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
   TouchableOpacity,
+  type ScrollViewInstance,
 } from 'react-native';
 import {
   NitroWebSocket,
@@ -45,7 +46,7 @@ export function WebSocketScreen() {
   );
   const [logs, setLogs] = React.useState<LogEntry[]>([]);
   const [input, setInput] = React.useState('Hello, WebSocket!');
-  const scrollRef = React.useRef<ScrollView>(null);
+  const scrollRef = React.useRef<ScrollViewInstance>(null);
 
   // Re-attach callbacks whenever the screen mounts so state updates reach
   // this component instance (e.g. after navigating away and back).
