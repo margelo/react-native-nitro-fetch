@@ -37,7 +37,7 @@ object FetchCache {
   fun getResultIfFresh(key: String, maxAgeMs: Long): NitroResponse? {
     val entry = results.remove(key) ?: return null
     val age = System.currentTimeMillis() - entry.timestampMs
-    return if (age <= maxAgeMs) entry.response else null
+    return if (maxAgeMs > 0 && age <= maxAgeMs) entry.response else null
   }
 
   /**
@@ -47,7 +47,7 @@ object FetchCache {
   fun hasFreshResult(key: String, maxAgeMs: Long): Boolean {
     val entry = results[key] ?: return false
     val age = System.currentTimeMillis() - entry.timestampMs
-    return age <= maxAgeMs
+    return maxAgeMs > 0 && age <= maxAgeMs
   }
 
   fun clear() {
