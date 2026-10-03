@@ -47,12 +47,14 @@ final class FetchCache {
     callbacks.forEach { $0(result) }
   }
 
-  static func getResultIfFresh(_ key: String, maxAgeMs: Int64) -> NitroResponse? {
+  // maxAgeMs stays a Double: converting a NaN, infinite or out-of-range TTL to
+  // Int64 traps. A TTL <= 0 (or NaN) disables cache hits.
+  static func getResultIfFresh(_ key: String, maxAgeMs: Double) -> NitroResponse? {
     lock.lock()
     defer { lock.unlock() }
     guard let entry = results[key] else { return nil }
     let age = Int64(Date().timeIntervalSince1970 * 1000) - entry.timestampMs
-    if age <= maxAgeMs { return entry.response }
+    if maxAgeMs > 0 && Double(age) <= maxAgeMs { return entry.response }
     results.removeValue(forKey: key)
     return nil
   }

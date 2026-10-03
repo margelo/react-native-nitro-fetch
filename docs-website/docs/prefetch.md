@@ -166,7 +166,7 @@ NitroAutoPrefetcher.registerPrefetch(
 ```
 
 :::note
-Omitting `prefetchCacheTtlMs` preserves the historical 5-second behavior. A value `<= 0` disables cache hits for that key (any positive age fails the `age <= maxAgeMs` check). A long TTL widens the "stale-after-deploy" window — bump the `prefetchKey` on backend schema changes regardless of TTL.
+Omitting `prefetchCacheTtlMs` preserves the historical 5-second behavior. A value `<= 0` disables cache hits for that key. A long TTL widens the "stale-after-deploy" window — bump the `prefetchKey` on backend schema changes regardless of TTL.
 :::
 
 ## Why Prefetch Is Cool
