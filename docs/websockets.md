@@ -42,8 +42,9 @@ const ws = new NitroWebSocket(url: string, protocols?: string | string[], header
 
 ### Properties
 
-- `readyState` — `'CONNECTING' | 'OPEN' | 'CLOSING' | 'CLOSED'`
+- `readyState` — `0 | 1 | 2 | 3`
 - `url`, `protocol`, `bufferedAmount`, `extensions`
+- Static and instance constants: `CONNECTING`, `OPEN`, `CLOSING`, `CLOSED`
 
 ### Methods
 
