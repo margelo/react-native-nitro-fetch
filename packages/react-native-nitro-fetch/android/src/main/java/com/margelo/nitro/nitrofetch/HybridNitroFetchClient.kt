@@ -182,6 +182,8 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
   }
 
   companion object {
+    private val directExecutor = Executor(Runnable::run)
+
     @JvmStatic
     fun fetch(
       req: NitroRequest,
@@ -230,6 +232,11 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         !BuildConfig.NITRO_FETCH_DISABLE_DEVTOOLS_REPORTING &&
         DevToolsReporter.isDebuggingEnabled()
       val devToolsRequestId = if (devToolsEnabled) (req.requestId ?: UUID.randomUUID().toString()) else ""
+      val inline = !devToolsEnabled
+      val callbackExecutor = if (inline) directExecutor else executor
+      fun complete(block: () -> Unit) {
+        if (inline) executor.execute(block) else block()
+      }
       val callback = object : UrlRequest.Callback() {
         private val buffer = ByteBuffer.allocateDirect(64 * 1024)
         private val out = java.io.ByteArrayOutputStream()
@@ -239,7 +246,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         private var devToolsBytes = 0
         private var devToolsTextual = false
 
-        override fun onRedirectReceived(request: UrlRequest, info: UrlResponseInfo, newLocationUrl: String) {
+        override fun onRedirectReceived(request: UrlRequest, info: UrlResponseInfo, newLocationUrl: String) = complete {
           if (shouldFollowRedirects) {
             // Apply Set-Cookie in-memory; flush once in onSucceeded (avoid flush per hop).
             if (!omitCredentials &&
@@ -306,7 +313,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           request.read(byteBuffer)
         }
 
-        override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) {
+        override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) = complete {
           if (BuildConfig.NITRO_FETCH_TRACING) {
             Trace.endAsyncSection(traceLabel, traceCookie)
           }
@@ -357,7 +364,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           }
         }
 
-        override fun onFailed(request: UrlRequest, info: UrlResponseInfo?, error: CronetException) {
+        override fun onFailed(request: UrlRequest, info: UrlResponseInfo?, error: CronetException) = complete {
           if (BuildConfig.NITRO_FETCH_TRACING) {
             Trace.endAsyncSection(traceLabel, traceCookie)
           }
@@ -367,7 +374,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           onFail(RuntimeException("Cronet failed: ${error.message}", error))
         }
 
-        override fun onCanceled(request: UrlRequest, info: UrlResponseInfo?) {
+        override fun onCanceled(request: UrlRequest, info: UrlResponseInfo?) = complete {
           if (BuildConfig.NITRO_FETCH_TRACING) {
             Trace.endAsyncSection(traceLabel, traceCookie)
           }
@@ -382,7 +389,8 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
 
       val timeoutCallback = req.timeoutMs?.toLong()?.takeIf { it > 0 }
         ?.let { IdleTimeoutCallback(callback, it) }
-      val builder = engine.newUrlRequestBuilder(url, timeoutCallback ?: callback, executor)
+      val builder = engine.newUrlRequestBuilder(url, timeoutCallback ?: callback, callbackExecutor)
+      if (inline) builder.allowDirectExecutor()
       val method = req.method?.name ?: "GET"
       builder.setHttpMethod(method)
       req.priority?.let { builder.setPriority(it.cronetPriority) }
@@ -404,12 +412,12 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         val (multipartBody, contentType) = buildMultipartBody(formParts)
         builder.addHeader("Content-Type", contentType)
         val provider = createUploadProvider(multipartBody)
-        builder.setUploadDataProvider(provider, executor)
+        builder.setUploadDataProvider(provider, callbackExecutor)
       } else {
         val body = uploadBytes(req)
         if (body != null) {
           val provider = createUploadProvider(body)
-          builder.setUploadDataProvider(provider, executor)
+          builder.setUploadDataProvider(provider, callbackExecutor)
         }
       }
 
