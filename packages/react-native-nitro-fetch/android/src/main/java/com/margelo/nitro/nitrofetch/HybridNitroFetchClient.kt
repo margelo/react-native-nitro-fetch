@@ -41,6 +41,8 @@ private val utf8StrictDecoder = ThreadLocal.withInitial {
     .onUnmappableCharacter(CodingErrorAction.REPORT)
 }
 
+private val charsetParam = Regex("charset=([A-Za-z0-9_\\-:.]+)", RegexOption.IGNORE_CASE)
+
 private fun strictDecoderFor(charset: Charset): CharsetDecoder =
   if (charset == Charsets.UTF_8) {
     utf8StrictDecoder.get()
@@ -293,7 +295,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
             val contentType = info.allHeaders["Content-Type"] ?: info.allHeaders["content-type"]
             val charset = run {
               val ct = contentType ?: ""
-              val m = Regex("charset=([A-Za-z0-9_\\-:.]+)", RegexOption.IGNORE_CASE).find(ct.toString())
+              val m = charsetParam.find(ct.toString())
               try {
                 if (m != null) java.nio.charset.Charset.forName(m.groupValues[1]) else Charsets.UTF_8
               } catch (_: Throwable) {
