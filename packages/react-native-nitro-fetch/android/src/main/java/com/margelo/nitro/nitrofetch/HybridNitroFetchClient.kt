@@ -15,7 +15,6 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
-import java.nio.charset.CharsetDecoder
 import java.nio.charset.CodingErrorAction
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -30,27 +29,68 @@ fun ByteBuffer.toByteArray(): ByteArray {
   return arr
 }
 
-// Strict UTF-8 decoder reused per-thread. Decoding response bodies is on the hot
-// path for every request; allocating a fresh decoder each time is wasteful, and
-// CharsetDecoder is not thread-safe — a ThreadLocal gives us both. REPORT (rather
-// than the default REPLACE) makes invalid UTF-8 throw, which is how we detect a
-// binary body instead of silently corrupting it with U+FFFD replacement chars.
-private val utf8StrictDecoder = ThreadLocal.withInitial {
-  Charsets.UTF_8.newDecoder()
-    .onMalformedInput(CodingErrorAction.REPORT)
-    .onUnmappableCharacter(CodingErrorAction.REPORT)
-}
-
 private val charsetParam = Regex("charset=([A-Za-z0-9_\\-:.]+)", RegexOption.IGNORE_CASE)
 
-private fun strictDecoderFor(charset: Charset): CharsetDecoder =
-  if (charset == Charsets.UTF_8) {
-    utf8StrictDecoder.get()
-  } else {
-    charset.newDecoder()
+private fun decodeText(bytes: ByteArray, length: Int, charset: Charset): String? {
+  if (charset != Charsets.UTF_8) {
+    return charset.newDecoder()
       .onMalformedInput(CodingErrorAction.REPORT)
       .onUnmappableCharacter(CodingErrorAction.REPORT)
+      .decode(ByteBuffer.wrap(bytes, 0, length))
+      .toString()
   }
+  val ascii = asciiPrefixLength(bytes, 0, length)
+  if (ascii == length) return String(bytes, 0, length, Charsets.ISO_8859_1)
+  return if (isWellFormedUtf8(bytes, ascii, length)) String(bytes, 0, length, Charsets.UTF_8) else null
+}
+
+private fun asciiPrefixLength(bytes: ByteArray, from: Int, length: Int): Int {
+  var i = from
+  val end = length - 8
+  while (i <= end) {
+    if ((bytes[i].toInt() or bytes[i + 1].toInt() or bytes[i + 2].toInt() or bytes[i + 3].toInt() or
+        bytes[i + 4].toInt() or bytes[i + 5].toInt() or bytes[i + 6].toInt() or bytes[i + 7].toInt()) < 0
+    ) break
+    i += 8
+  }
+  while (i < length && bytes[i] >= 0) i++
+  return i
+}
+
+private fun isWellFormedUtf8(bytes: ByteArray, from: Int, length: Int): Boolean {
+  var i = from
+  while (i < length) {
+    val b0 = bytes[i].toInt() and 0xFF
+    if (b0 < 0x80) {
+      i = asciiPrefixLength(bytes, i + 1, length)
+      continue
+    }
+    val trailing = when (b0) {
+      in 0xC2..0xDF -> 1
+      in 0xE0..0xEF -> 2
+      in 0xF0..0xF4 -> 3
+      else -> return false
+    }
+    if (i + trailing >= length) return false
+    val b1 = bytes[i + 1].toInt() and 0xFF
+    val min = when (b0) {
+      0xE0 -> 0xA0
+      0xF0 -> 0x90
+      else -> 0x80
+    }
+    val max = when (b0) {
+      0xED -> 0x9F
+      0xF4 -> 0x8F
+      else -> 0xBF
+    }
+    if (b1 < min || b1 > max) return false
+    for (k in 2..trailing) {
+      if ((bytes[i + k].toInt() and 0xC0) != 0x80) return false
+    }
+    i += trailing + 1
+  }
+  return true
+}
 
 // Wrap raw bytes into a Nitro ArrayBuffer for zero-base64 bridging to JS.
 private fun ByteArray.toArrayBuffer(length: Int = size): ArrayBuffer {
@@ -339,7 +379,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
             // Strict-decode the body as text. If it fails the response is binary,
             // so we bridge the raw bytes as an ArrayBuffer instead — no base64.
             val bodyStr: String? = try {
-              strictDecoderFor(charset).decode(ByteBuffer.wrap(bytes, 0, length)).toString()
+              decodeText(bytes, length, charset)
             } catch (_: Throwable) { null }
             val bodyBytesAb: ArrayBuffer? = if (bodyStr == null && length > 0)
               bytes.toArrayBuffer(length)
@@ -535,7 +575,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       val bytes = readFileBytes(req.url)
       val mime = guessMime(req.url)
       val bodyStr: String? = try {
-        strictDecoderFor(Charsets.UTF_8).decode(ByteBuffer.wrap(bytes)).toString()
+        decodeText(bytes, bytes.size, Charsets.UTF_8)
       } catch (_: Throwable) { null }
       val bodyBytesAb: ArrayBuffer? = if (bodyStr == null && bytes.isNotEmpty())
         bytes.toArrayBuffer()
