@@ -42,9 +42,57 @@ std::shared_ptr<ArrayBuffer> copyPayloadToArrayBuffer(const uint8_t* data, size_
   return std::make_shared<NativeArrayBuffer>(raw, len, [raw]() { delete[] raw; });
 }
 
+constexpr size_t kMaxDirectTextBytes = 512;
+
+bool isWellFormedUtf8(const uint8_t* s, size_t len) {
+  size_t i = 0;
+  while (i < len) {
+    while (i + 8 <= len) {
+      uint64_t chunk;
+      std::memcpy(&chunk, s + i, 8);
+      if (chunk & 0x8080808080808080ULL) break;
+      i += 8;
+    }
+    if (i >= len) break;
+    const uint8_t c = s[i];
+    if (c < 0x80) {
+      i++;
+      continue;
+    }
+    size_t trailing;
+    uint8_t min = 0x80;
+    uint8_t max = 0xBF;
+    if (c >= 0xC2 && c <= 0xDF) {
+      trailing = 1;
+    } else if (c >= 0xE0 && c <= 0xEF) {
+      trailing = 2;
+      if (c == 0xE0) min = 0xA0;
+      if (c == 0xED) max = 0x9F;
+    } else if (c >= 0xF0 && c <= 0xF4) {
+      trailing = 3;
+      if (c == 0xF0) min = 0x90;
+      if (c == 0xF4) max = 0x8F;
+    } else {
+      return false;
+    }
+    if (i + trailing >= len) return false;
+    if (s[i + 1] < min || s[i + 1] > max) return false;
+    for (size_t k = 2; k <= trailing; k++) {
+      if ((s[i + k] & 0xC0) != 0x80) return false;
+    }
+    i += trailing + 1;
+  }
+  return true;
+}
+
 WebSocketConnectionBase::OnMessage makeHybridMessageBridge(
-    std::function<void(const HybridWebSocketMessageEvent&)> cb) {
-  return [cb = std::move(cb)](const uint8_t* data, size_t len, bool isBinary) {
+    std::function<void(const HybridWebSocketMessageEvent&)> cb,
+    std::optional<std::function<void(const std::string&)>> onText) {
+  return [cb = std::move(cb), onText = std::move(onText)](const uint8_t* data, size_t len, bool isBinary) {
+    if (!isBinary && onText && len <= kMaxDirectTextBytes && isWellFormedUtf8(data, len)) {
+      (*onText)(std::string(reinterpret_cast<const char*>(data), len));
+      return;
+    }
     cb(HybridWebSocketMessageEvent{ copyPayloadToArrayBuffer(data, len), isBinary });
   };
 }
@@ -111,8 +159,20 @@ std::optional<std::function<void(const HybridWebSocketMessageEvent&)>> HybridWeb
 void HybridWebSocket::setOnMessage(
     const std::optional<std::function<void(const HybridWebSocketMessageEvent&)>>& cb) {
   _onMessage = cb;
-  if (cb) {
-    _conn->setOnMessage(makeHybridMessageBridge(*cb));
+  bindMessages();
+}
+
+std::optional<std::function<void(const std::string&)>> HybridWebSocket::getOnTextMessage() {
+  return _onTextMessage;
+}
+void HybridWebSocket::setOnTextMessage(const std::optional<std::function<void(const std::string&)>>& cb) {
+  _onTextMessage = cb;
+  bindMessages();
+}
+
+void HybridWebSocket::bindMessages() {
+  if (_onMessage) {
+    _conn->setOnMessage(makeHybridMessageBridge(*_onMessage, _onTextMessage));
   } else {
     _conn->setOnMessage({});
   }
@@ -183,12 +243,7 @@ void HybridWebSocket::bindCallbacks() {
   _conn->setOnOpen(onOpen ? [onOpen = *onOpen]() { onOpen(); }
                            : WebSocketConnectionBase::OnOpen{});
 
-  auto onMsg = _onMessage;
-  if (onMsg) {
-    _conn->setOnMessage(makeHybridMessageBridge(*onMsg));
-  } else {
-    _conn->setOnMessage({});
-  }
+  bindMessages();
 
   auto onClose = _onClose;
   if (onClose) {
