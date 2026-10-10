@@ -191,7 +191,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         DevToolsReporter.isDebuggingEnabled()
       val devToolsRequestId = if (devToolsEnabled) (req.requestId ?: UUID.randomUUID().toString()) else ""
       val callback = object : UrlRequest.Callback() {
-        private val buffer = ByteBuffer.allocateDirect(16 * 1024)
+        private val buffer = ByteBuffer.allocateDirect(64 * 1024)
         private val out = java.io.ByteArrayOutputStream()
         private var redirectStopped = false
         /** True if a redirect response applied at least one `Set-Cookie` (in memory, not yet flushed). */
