@@ -34,6 +34,20 @@ try {
   _inspector = require('react-native-nitro-fetch').NetworkInspector
 } catch {}
 
+function utf8ByteLength(text: string): number {
+  let bytes = 0
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i)
+    if (c < 0x80) bytes += 1
+    else if (c < 0x800) bytes += 2
+    else if (c >= 0xd800 && c <= 0xdbff) {
+      bytes += 4
+      i++
+    } else bytes += 3
+  }
+  return bytes
+}
+
 function generateWsId(): string {
   return 'ws-' + String(Date.now()) + '-' + String(Math.random()).slice(2, 8)
 }
@@ -107,9 +121,25 @@ export class NitroWebSocket {
   set onmessage(fn: ((e: WebSocketMessageEvent) => void) | null) {
     if (fn == null) {
       this._ws.onMessage = undefined
+      this._ws.onTextMessage = undefined
       return
     }
     const inspectorId = this._inspectorId
+    this._ws.onTextMessage = (text: string) => {
+      if (inspectorId && _inspector?.isEnabled()) {
+        _inspector._recordWsMessage(
+          inspectorId,
+          'received',
+          text,
+          utf8ByteLength(text),
+          false
+        )
+      }
+      fn({
+        data: text,
+        isBinary: false,
+      })
+    }
     this._ws.onMessage = (native: HybridWebSocketMessageEvent) => {
       if (native.isBinary) {
         const size = native.data.byteLength

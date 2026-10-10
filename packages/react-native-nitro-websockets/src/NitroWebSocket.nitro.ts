@@ -33,6 +33,7 @@ export interface HybridWebSocket extends HybridObject<{
   sendBinary(data: ArrayBuffer): void
   onOpen: (() => void) | undefined
   onMessage: ((event: HybridWebSocketMessageEvent) => void) | undefined
+  onTextMessage: ((data: string) => void) | undefined
   onClose: ((event: WebSocketCloseEvent) => void) | undefined
   onError: ((error: string) => void) | undefined
 }
