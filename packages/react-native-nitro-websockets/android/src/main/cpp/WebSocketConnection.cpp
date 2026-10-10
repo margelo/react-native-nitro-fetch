@@ -385,6 +385,7 @@ void WebSocketConnection::handleReceiveFragment(lws* wsi, const void* in, size_t
   if (isFirst) {
     _rxBuf.clear();
     _rxBinary = isBinary;
+    _rxBuf.reserve(std::min(len + lws_remaining_packet_payload(wsi), kMaxMessageSize));
   }
 
   // Max message size guard — close with 1009 (Message Too Big)
