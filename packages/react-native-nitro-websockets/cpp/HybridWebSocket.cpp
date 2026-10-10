@@ -85,15 +85,23 @@ bool isWellFormedUtf8(const uint8_t* s, size_t len) {
   return true;
 }
 
+std::shared_ptr<ArrayBuffer> payloadToArrayBuffer(const uint8_t* data, size_t len, std::vector<uint8_t>* owned) {
+  if (len == 0 || owned == nullptr) {
+    return copyPayloadToArrayBuffer(data, len);
+  }
+  auto holder = std::make_shared<std::vector<uint8_t>>(std::move(*owned));
+  return std::make_shared<NativeArrayBuffer>(holder->data(), holder->size(), [holder]() {});
+}
+
 WebSocketConnectionBase::OnMessage makeHybridMessageBridge(
     std::function<void(const HybridWebSocketMessageEvent&)> cb,
     std::optional<std::function<void(const std::string&)>> onText) {
-  return [cb = std::move(cb), onText = std::move(onText)](const uint8_t* data, size_t len, bool isBinary) {
+  return [cb = std::move(cb), onText = std::move(onText)](const uint8_t* data, size_t len, bool isBinary, std::vector<uint8_t>* owned) {
     if (!isBinary && onText && len <= kMaxDirectTextBytes && isWellFormedUtf8(data, len)) {
       (*onText)(std::string(reinterpret_cast<const char*>(data), len));
       return;
     }
-    cb(HybridWebSocketMessageEvent{ copyPayloadToArrayBuffer(data, len), isBinary });
+    cb(HybridWebSocketMessageEvent{ payloadToArrayBuffer(data, len, owned), isBinary });
   };
 }
 

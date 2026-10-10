@@ -304,7 +304,7 @@ void WebSocketConnection::setOnMessage(OnMessage cb) {
       buf = std::move(self->_msgBuffer);
     }
     for (auto& m : buf) {
-      self->_onMessage(m.data.data(), m.data.size(), m.isBinary);
+      self->_onMessage(m.data.data(), m.data.size(), m.isBinary, &m.data);
     }
   });
 }
@@ -353,12 +353,13 @@ void WebSocketConnection::handleEstablished(lws* wsi) {
 #endif
 }
 
-void WebSocketConnection::handleReceive(const void* in, size_t len, bool isBinary) {
+void WebSocketConnection::handleReceive(const void* in, size_t len, bool isBinary, std::vector<uint8_t>* owned) {
   if (_onMessage) {
-    _onMessage(static_cast<const uint8_t*>(in), len, isBinary);
+    _onMessage(static_cast<const uint8_t*>(in), len, isBinary, owned);
   } else {
-    std::vector<uint8_t> copy(static_cast<const uint8_t*>(in),
-                               static_cast<const uint8_t*>(in) + len);
+    std::vector<uint8_t> copy = owned != nullptr
+      ? std::move(*owned)
+      : std::vector<uint8_t>(static_cast<const uint8_t*>(in), static_cast<const uint8_t*>(in) + len);
     std::lock_guard<std::mutex> lock(_msgMu);
     _msgBuffer.push_back({ std::move(copy), isBinary });
   }
@@ -374,7 +375,7 @@ void WebSocketConnection::handleReceiveFragment(lws* wsi, const void* in, size_t
 
   // Fast path: single-frame message (most common case)
   if (isFirst && isFinal) {
-    handleReceive(in, len, isBinary);
+    handleReceive(in, len, isBinary, nullptr);
 #if defined(NITRO_WS_TRACING)
     ATrace_endSection();
 #endif
@@ -400,7 +401,7 @@ void WebSocketConnection::handleReceiveFragment(lws* wsi, const void* in, size_t
   _rxBuf.insert(_rxBuf.end(), data, data + len);
 
   if (isFinal) {
-    handleReceive(_rxBuf.data(), _rxBuf.size(), _rxBinary);
+    handleReceive(_rxBuf.data(), _rxBuf.size(), _rxBinary, &_rxBuf);
     _rxBuf.clear();
     _rxBuf.shrink_to_fit();
   }
