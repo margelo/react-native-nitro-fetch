@@ -8,6 +8,7 @@
 #include "LwsContext.hpp"
 #include "CaBundle.hpp"
 
+#include <fbjni/fbjni.h>
 #include <libwebsockets.h>
 #include <stdexcept>
 #include <string>
@@ -46,7 +47,10 @@ LwsContext::LwsContext() {
     throw std::runtime_error("Failed to create lws_context");
   }
 
-  _serviceThread = std::thread([this]() { loop(); });
+  _serviceThread = std::thread([this]() {
+    facebook::jni::ThreadScope scope;
+    loop();
+  });
 }
 
 LwsContext::~LwsContext() {
