@@ -2360,7 +2360,7 @@ SPEC CHECKSUMS:
   glog: 3cf7cb46f743c4bc758ae3e6d9c15bd1b4cfd6d4
   hermes-engine: 6a00d96909f1648698fe5419972fe3c9e628755e
   NitroFetch: 35e64455fbe3d8af0f19765dddd37355add15699
-  NitroFetchWebsockets: 095f8bdbbe2e88958e69f798fb6a1b2d40a56018
+  NitroFetchWebsockets: 52f88fac65b01e57fcb982e0e78324fcb7a7d6c3
   NitroModules: c32f969b7c536e0b6b401a9dfdb35bb4eba071ef
   NitroTextDecoder: eff8546cd18856bc7615eba9f353a6daebce0c10
   RCT-Folly: 82921e585c0400eda46fac1068297aa9dfb035e4

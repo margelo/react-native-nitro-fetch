@@ -7,6 +7,7 @@
 
 #import <Foundation/Foundation.h>
 #include "NWWebSocketConnection.hpp"
+#include "NWStreamWebSocketConnection.hpp"
 
 #include <cstring>
 
@@ -538,6 +539,11 @@ void NWWebSocketConnection::fireError(const std::string& msg) {
 // ── Factory ──────────────────────────────────────────────────────────────
 
 std::shared_ptr<WebSocketConnectionBase> createNWConnection() {
+  static const bool useNetworkFramework = [] {
+    id value = [[NSBundle mainBundle] objectForInfoDictionaryKey:@"NitroWebSocketsUseNetworkFramework"];
+    return value == nil || [value boolValue];
+  }();
+  if (useNetworkFramework) return createNWStreamConnection();
   return std::make_shared<NWWebSocketConnection>();
 }
 

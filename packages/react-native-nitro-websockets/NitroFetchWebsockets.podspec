@@ -50,6 +50,9 @@ Pod::Spec.new do |s|
   end
   s.pod_target_xcconfig = current_xcconfig.merge(merged_xcconfig)
 
+  s.frameworks = 'Network', 'CFNetwork'
+  s.libraries = 'z'
+
   s.dependency 'React-jsi'
   s.dependency 'React-callinvoker'
   install_modules_dependencies(s)

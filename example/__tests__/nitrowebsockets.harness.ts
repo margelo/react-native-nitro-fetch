@@ -469,6 +469,28 @@ describe('NitroWebSocket - close during handshake', () => {
   });
 });
 
+describe('NitroWebSocket - Closing handshake', () => {
+  it('fires onclose when the server never answers close()', async () => {
+    const ws = await new Promise<NitroWebSocket>((resolve, reject) => {
+      const socket = new NitroWebSocket(WS_PAUSED_URL);
+      socket.onopen = () => resolve(socket);
+      socket.onerror = (err) => reject(new Error(`Connection error: ${err}`));
+    });
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error('No onclose 9 s after close()')),
+        9_000
+      );
+      ws.onclose = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      ws.close(1000, 'bye');
+    });
+    expect(ws.readyState).toBe('CLOSED');
+  });
+});
+
 describe('NitroWebSocket - Handshake headers', () => {
   function handshake(
     protocols?: string[],
