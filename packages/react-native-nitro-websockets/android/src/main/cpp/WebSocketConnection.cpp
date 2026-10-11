@@ -89,6 +89,23 @@ static std::string resolveLocation(const std::string& base, const std::string& r
   return origin + path.substr(0, path.rfind('/') + 1) + ref;
 }
 
+static bool equalsIgnoreCase(const std::string& a, const std::string& b) {
+  return a.size() == b.size() &&
+         std::equal(a.begin(), a.end(), b.begin(), [](unsigned char x, unsigned char y) {
+           return std::tolower(x) == std::tolower(y);
+         });
+}
+
+static bool isSameOrigin(const std::string& a, const std::string& b) {
+  try {
+    const ParsedUrl from = parseUrl(a);
+    const ParsedUrl to = parseUrl(b);
+    return from.isWss == to.isWss && from.port == to.port && equalsIgnoreCase(from.host, to.host);
+  } catch (const std::exception&) {
+    return false;
+  }
+}
+
 int nitroWsCallback(lws* wsi, enum lws_callback_reasons reason,
                     void* /*user*/, void* in, size_t len) {
   auto* conn = static_cast<WebSocketConnection*>(lws_wsi_user(wsi));
@@ -557,6 +574,15 @@ void WebSocketConnection::handleRedirect(const std::string& location) {
     if (_pendingConnect) {
       protocols = _pendingConnect->protocols;
       headers   = _pendingConnect->headers;
+    }
+  }
+  if (!isSameOrigin(_url, url)) {
+    for (auto it = headers.begin(); it != headers.end();) {
+      if (equalsIgnoreCase(it->first, "Authorization")) {
+        it = headers.erase(it);
+      } else {
+        ++it;
+      }
     }
   }
 
