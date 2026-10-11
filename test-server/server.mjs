@@ -262,6 +262,13 @@ server.on('upgrade', (req, socket, head) => {
     socket.on('error', () => {});
     return;
   }
+  if (url.pathname === '/ws/redirect') {
+    const hops = Number(url.searchParams.get('n')) || 1;
+    const to = url.searchParams.get('to') ?? '/';
+    const location = hops > 1 ? `/ws/redirect?n=${hops - 1}&to=${encodeURIComponent(to)}` : to;
+    socket.end(`HTTP/1.1 302 Found\r\nLocation: ${location}\r\nContent-Length: 0\r\n\r\n`);
+    return;
+  }
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
 });
 
@@ -273,6 +280,8 @@ wss.on('connection', (ws, req) => {
 
   if (url.pathname === '/ws/headers') {
     ws.send(JSON.stringify(req.headers));
+  } else if (url.pathname === '/ws/url' || url.pathname === '/') {
+    ws.send(req.url);
   } else if (url.pathname === '/ws/close') {
     const code = Number(url.searchParams.get('code')) || 1011;
     const reason = url.searchParams.get('reason') ?? 'server shutdown';

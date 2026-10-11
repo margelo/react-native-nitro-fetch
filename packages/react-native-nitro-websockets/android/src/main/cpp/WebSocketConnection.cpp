@@ -151,8 +151,8 @@ int nitroWsCallback(lws* wsi, enum lws_callback_reasons reason,
     }
 
     case LWS_CALLBACK_CLIENT_HTTP_REDIRECT: {
-      if (conn && in && len > 0) {
-        std::string location(static_cast<const char*>(in), len);
+      if (conn && in) {
+        std::string location(static_cast<const char*>(in));
         conn->handleRedirect(location);
       }
       return -1;
