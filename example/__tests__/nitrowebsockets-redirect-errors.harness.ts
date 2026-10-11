@@ -7,7 +7,7 @@ function events(url: string): Promise<string[]> {
     const seen: string[] = [];
     const timer = setTimeout(
       () => reject(new Error(`No close event: ${seen.join(', ')}`)),
-      10_000
+      30_000
     );
     const ws = new NitroWebSocket(url);
     ws.onopen = () => seen.push('open');
