@@ -217,6 +217,247 @@ describe('NitroWebSocket - Binary Messages', () => {
   });
 });
 
+describe('NitroWebSocket - Bursts', () => {
+  function receive(
+    count: number,
+    onEach?: (e: WebSocketMessageEvent, i: number) => void
+  ): Promise<WebSocketMessageEvent[]> {
+    return new Promise<WebSocketMessageEvent[]>((resolve, reject) => {
+      const all: WebSocketMessageEvent[] = [];
+      const timer = setTimeout(
+        () => reject(new Error(`Received ${all.length} of ${count} messages`)),
+        10_000
+      );
+      const ws = new NitroWebSocket(`${WS_BASE}/ws/burst?count=${count}`);
+      ws.onmessage = (e) => {
+        onEach?.(e, all.length);
+        all.push(e);
+        if (all.length === count) {
+          clearTimeout(timer);
+          ws.close();
+          resolve(all);
+        }
+      };
+      ws.onerror = (err) => {
+        clearTimeout(timer);
+        reject(new Error(`Connection error: ${err}`));
+      };
+    });
+  }
+
+  function indexOf(e: WebSocketMessageEvent): number {
+    if (e.isBinary) {
+      const bytes = new Uint8Array(e.binaryData!);
+      return bytes[0]! + bytes[1]! * 256;
+    }
+    return Number(
+      e.data.startsWith('m') ? e.data.slice(1) : e.data.split('é')[1]
+    );
+  }
+
+  function untilClose(url: string): Promise<Array<number | string>> {
+    return new Promise<Array<number | string>>((resolve, reject) => {
+      const events: Array<number | string> = [];
+      const timer = setTimeout(
+        () => reject(new Error(`No close after ${events.length} events`)),
+        10_000
+      );
+      const ws = new NitroWebSocket(url);
+      ws.onmessage = (e) => events.push(indexOf(e));
+      ws.onerror = () => events.push('error');
+      ws.onclose = (e) => {
+        clearTimeout(timer);
+        events.push(`close ${e.code}`);
+        resolve(events);
+      };
+    });
+  }
+
+  const indices = (n: number) => Array.from({ length: n }, (_, i) => i);
+
+  it('delivers a burst of text, UTF-8 and binary messages intact and in order', async () => {
+    const received = await receive(300);
+    received.forEach((e, i) => {
+      if (i % 3 === 0) {
+        expect(e.isBinary).toBe(false);
+        expect(e.data).toBe(`m${i}`);
+      } else if (i % 3 === 1) {
+        expect(e.isBinary).toBe(false);
+        expect(e.data).toBe(`é${i}`.repeat(i % 7 === 1 ? 200 : 1));
+      } else {
+        expect(e.isBinary).toBe(true);
+        expect(Array.from(new Uint8Array(e.binaryData!))).toEqual([
+          i % 256,
+          Math.floor(i / 256),
+        ]);
+      }
+    });
+  });
+
+  it('runs the microtasks a handler queues before the next message', async () => {
+    const order: string[] = [];
+    await receive(60, (_e, i) => {
+      order.push(`message ${i}`);
+      Promise.resolve().then(() => order.push(`microtask ${i}`));
+    });
+    await new Promise<void>((resolve) => setTimeout(() => resolve(), 50));
+    const expected: string[] = [];
+    for (let i = 0; i < 60; i++)
+      expected.push(`message ${i}`, `microtask ${i}`);
+    expect(order).toEqual(expected);
+  });
+
+  it('fires close after every message the server sent before closing', async () => {
+    const events = await untilClose(`${WS_BASE}/ws/burst?count=300&end=close`);
+    expect(events).toEqual([...indices(300), 'close 4000']);
+  });
+
+  it('fires close after every message when the server drops the connection', async () => {
+    const events = await untilClose(`${WS_BASE}/ws/burst?count=300&end=drop`);
+    expect(events.slice(0, 300)).toEqual(indices(300));
+    expect(events[events.length - 1]).toBe('close 1006');
+  });
+
+  it('keeps delivering a burst after onmessage throws', async () => {
+    const thrown: string[] = [];
+    const previous = ErrorUtils.getGlobalHandler();
+    ErrorUtils.setGlobalHandler((error) => thrown.push(error.message));
+    try {
+      const ws = new NitroWebSocket(`${WS_BASE}/ws/burst?count=300&end=close`);
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
+      const events = await new Promise<Array<number | string>>(
+        (resolve, reject) => {
+          const seen: Array<number | string> = [];
+          const timer = setTimeout(
+            () => reject(new Error(`No close after ${seen.length} events`)),
+            10_000
+          );
+          ws.onmessage = (e) => {
+            const i = indexOf(e);
+            seen.push(i);
+            if (i === 10) throw new Error('onmessage failed');
+          };
+          ws.onclose = (e) => {
+            clearTimeout(timer);
+            seen.push(`close ${e.code}`);
+            resolve(seen);
+          };
+        }
+      );
+      expect(events).toEqual([...indices(300), 'close 4000']);
+      expect(thrown).toEqual(['onmessage failed']);
+    } finally {
+      ErrorUtils.setGlobalHandler(previous);
+    }
+  });
+
+  it('keeps arrival order when onmessage is replaced while messages are queued', async () => {
+    const seen: Array<number | string> = [];
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`Received ${seen.length} messages`)),
+        10_000
+      );
+      const ws = new NitroWebSocket(`${WS_BASE}/ws/burst?count=300`);
+      const record = (e: WebSocketMessageEvent) => {
+        if (e.data !== 'echo') {
+          seen.push(indexOf(e));
+          return;
+        }
+        seen.push('echo');
+        clearTimeout(timer);
+        ws.close();
+        resolve();
+      };
+      ws.onmessage = (e) => {
+        record(e);
+        if (seen.length === 1) {
+          ws.onmessage = record;
+          ws.send('echo');
+        }
+      };
+    });
+    expect(seen).toEqual([...indices(300), 'echo']);
+  });
+});
+
+describe('NitroWebSocket - Text decoding', () => {
+  function collect(
+    url: string,
+    count: number,
+    send: string[] = []
+  ): Promise<WebSocketMessageEvent[]> {
+    return new Promise<WebSocketMessageEvent[]>((resolve, reject) => {
+      const all: WebSocketMessageEvent[] = [];
+      const timer = setTimeout(
+        () => reject(new Error(`Received ${all.length} of ${count} messages`)),
+        10_000
+      );
+      const ws = new NitroWebSocket(url);
+      ws.onopen = () => send.forEach((text) => ws.send(text));
+      ws.onmessage = (e) => {
+        all.push(e);
+        if (all.length === count) {
+          clearTimeout(timer);
+          ws.close();
+          resolve(all);
+        }
+      };
+      ws.onerror = (err) => {
+        clearTimeout(timer);
+        reject(new Error(`Connection error: ${err}`));
+      };
+    });
+  }
+
+  const itAndroid = Platform.OS === 'android' ? it : it.skip;
+
+  it('echoes text across the direct string and decoder size limits', async () => {
+    const texts = [
+      '',
+      '\u{1F600}',
+      '\u{1F600}'.repeat(128),
+      '\u{1F600}'.repeat(129),
+      'é'.repeat(256),
+      'é'.repeat(300),
+      'a'.repeat(511),
+      'a'.repeat(512),
+      'a'.repeat(513),
+      'a'.repeat(16383),
+      'a'.repeat(16384),
+      'a'.repeat(16385),
+      'a'.repeat(100_000),
+    ];
+    const received = await collect(`${WS_BASE}/ws/echo`, texts.length, texts);
+    expect(received.map((e) => e.isBinary)).toEqual(texts.map(() => false));
+    received.forEach((e, i) => {
+      expect(e.data.length).toBe(texts[i]!.length);
+      expect(e.data === texts[i]).toBe(true);
+    });
+  });
+
+  itAndroid(
+    'decodes invalid UTF-8 in short text messages with replacement characters',
+    async () => {
+      const cases: Array<[string, string]> = [
+        ['61ff62', 'a\uFFFDb'],
+        ['eda080', '\uFFFD\uFFFD\uFFFD'],
+        ['c0af', '\uFFFD\uFFFD'],
+        ['e3817a', '\uFFFDz'],
+        ['f4908080', '\uFFFD\uFFFD\uFFFD\uFFFD'],
+      ];
+      const query = cases.map(([hex]) => `hex=${hex}`).join('&');
+      const received = await collect(
+        `${WS_BASE}/ws/text?${query}`,
+        cases.length
+      );
+      expect(received.map((e) => e.data)).toEqual(
+        cases.map(([, text]) => text)
+      );
+    }
+  );
+});
+
 // ─── Close ────────────────────────────────────────────────────────────────────
 
 describe('NitroWebSocket - Close', () => {
@@ -431,6 +672,13 @@ describe('NitroWebSocket - Handshake headers', () => {
     });
     expect(headers['x-nitro-test']).toBe('handshake');
     expect(headers['sec-websocket-protocol']).toBe(undefined);
+    await closeAndWait(ws);
+  });
+
+  it('sends a 6 KB custom header intact', async () => {
+    const value = 'a'.repeat(6000);
+    const { ws, headers } = await handshake(undefined, { 'x-big': value });
+    expect(headers['x-big'] === value).toBe(true);
     await closeAndWait(ws);
   });
 

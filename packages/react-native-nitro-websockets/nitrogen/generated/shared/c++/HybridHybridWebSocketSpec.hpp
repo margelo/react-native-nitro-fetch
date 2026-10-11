@@ -25,6 +25,7 @@ namespace margelo::nitro::nitrofetchwebsockets { struct WebSocketCloseEvent; }
 #include <functional>
 #include <optional>
 #include "HybridWebSocketMessageEvent.hpp"
+#include "WebSocketMessageQueue.hpp"
 #include "WebSocketCloseEvent.hpp"
 #include <vector>
 #include <unordered_map>
@@ -66,6 +67,8 @@ namespace margelo::nitro::nitrofetchwebsockets {
       virtual void setOnOpen(const std::optional<std::function<void()>>& onOpen) = 0;
       virtual std::optional<std::function<void(const HybridWebSocketMessageEvent& /* event */)>> getOnMessage() = 0;
       virtual void setOnMessage(const std::optional<std::function<void(const HybridWebSocketMessageEvent& /* event */)>>& onMessage) = 0;
+      virtual std::optional<std::function<void(WebSocketMessageQueue /* queue */)>> getOnQueuedMessage() = 0;
+      virtual void setOnQueuedMessage(const std::optional<std::function<void(WebSocketMessageQueue /* queue */)>>& onQueuedMessage) = 0;
       virtual std::optional<std::function<void(const WebSocketCloseEvent& /* event */)>> getOnClose() = 0;
       virtual void setOnClose(const std::optional<std::function<void(const WebSocketCloseEvent& /* event */)>>& onClose) = 0;
       virtual std::optional<std::function<void(const std::string& /* error */)>> getOnError() = 0;

@@ -34,6 +34,7 @@ LwsContext::LwsContext() {
   info.port     = CONTEXT_PORT_NO_LISTEN;
   info.protocols = protocols;
   info.max_http_header_data = 32 * 1024;
+  info.pt_serv_buf_size = 65536;
   info.options  = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
   info.gid      = -1;
   info.uid      = -1;

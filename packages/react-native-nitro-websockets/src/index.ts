@@ -34,6 +34,20 @@ try {
   _inspector = require('react-native-nitro-fetch').NetworkInspector
 } catch {}
 
+function utf8ByteLength(text: string): number {
+  let bytes = 0
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i)
+    if (c < 0x80) bytes += 1
+    else if (c < 0x800) bytes += 2
+    else if (c >= 0xd800 && c <= 0xdbff) {
+      bytes += 4
+      i++
+    } else bytes += 3
+  }
+  return bytes
+}
+
 function generateWsId(): string {
   return 'ws-' + String(Date.now()) + '-' + String(Math.random()).slice(2, 8)
 }
@@ -155,13 +169,27 @@ export class NitroWebSocket {
   }
   private _bindMessage(fn: ((e: WebSocketMessageEvent) => void) | null) {
     if (fn == null) {
-      this._ws.onMessage = undefined
+      this._ws.onQueuedMessage = undefined
       return
     }
     const inspectorId = this._inspectorId
-    this._ws.onMessage = (native: HybridWebSocketMessageEvent) => {
-      if (native.isBinary) {
-        const size = native.data.byteLength
+    const deliver = (item: string | HybridWebSocketMessageEvent) => {
+      if (typeof item === 'string') {
+        if (inspectorId && _inspector?.isEnabled()) {
+          _inspector._recordWsMessage(
+            inspectorId,
+            'received',
+            item,
+            utf8ByteLength(item),
+            false
+          )
+        }
+        fn({
+          data: item,
+          isBinary: false,
+        })
+      } else if (item.isBinary) {
+        const size = item.data.byteLength
         if (inspectorId && _inspector?.isEnabled()) {
           _inspector._recordWsMessage(
             inspectorId,
@@ -174,10 +202,10 @@ export class NitroWebSocket {
         fn({
           data: '',
           isBinary: true,
-          binaryData: native.data,
+          binaryData: item.data,
         })
       } else {
-        const buf = native.data
+        const buf = item.data
         const text =
           buf.byteLength === 0 ? '' : utf8Decoder.decode(buf, { stream: false })
         const size = buf.byteLength
@@ -195,6 +223,10 @@ export class NitroWebSocket {
           isBinary: false,
         })
       }
+    }
+    this._ws.onQueuedMessage = (queue) => {
+      const item = queue[0]
+      if (item !== undefined) deliver(item)
     }
   }
   private _bindClose(fn: ((e: NitroWSCloseEvent) => void) | null) {

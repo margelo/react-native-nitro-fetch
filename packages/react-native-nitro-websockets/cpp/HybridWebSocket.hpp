@@ -34,6 +34,9 @@ public:
   std::optional<std::function<void(const HybridWebSocketMessageEvent&)>> getOnMessage() override;
   void setOnMessage(const std::optional<std::function<void(const HybridWebSocketMessageEvent&)>>& cb) override;
 
+  std::optional<std::function<void(WebSocketMessageQueue)>> getOnQueuedMessage() override;
+  void setOnQueuedMessage(const std::optional<std::function<void(WebSocketMessageQueue)>>& cb) override;
+
   std::optional<std::function<void(const WebSocketCloseEvent&)>> getOnClose() override;
   void setOnClose(const std::optional<std::function<void(const WebSocketCloseEvent&)>>& cb) override;
 
@@ -54,11 +57,17 @@ public:
 
 private:
   void bindCallbacks();
+  void bindOpen();
+  void bindMessages();
+  void bindError();
+  void bindClose();
 
   std::shared_ptr<WebSocketConnectionBase> _conn;
+  WebSocketMessageQueue _events;
   bool _connected = false;
   std::optional<std::function<void()>> _onOpen;
   std::optional<std::function<void(const HybridWebSocketMessageEvent&)>> _onMessage;
+  std::optional<std::function<void(WebSocketMessageQueue)>> _onQueuedMessage;
   std::optional<std::function<void(const WebSocketCloseEvent&)>> _onClose;
   std::optional<std::function<void(const std::string&)>> _onError;
 };

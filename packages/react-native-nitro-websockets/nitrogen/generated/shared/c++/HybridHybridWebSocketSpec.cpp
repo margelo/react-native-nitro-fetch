@@ -23,6 +23,8 @@ namespace margelo::nitro::nitrofetchwebsockets {
       prototype.registerHybridSetter("onOpen", &HybridHybridWebSocketSpec::setOnOpen);
       prototype.registerHybridGetter("onMessage", &HybridHybridWebSocketSpec::getOnMessage);
       prototype.registerHybridSetter("onMessage", &HybridHybridWebSocketSpec::setOnMessage);
+      prototype.registerHybridGetter("onQueuedMessage", &HybridHybridWebSocketSpec::getOnQueuedMessage);
+      prototype.registerHybridSetter("onQueuedMessage", &HybridHybridWebSocketSpec::setOnQueuedMessage);
       prototype.registerHybridGetter("onClose", &HybridHybridWebSocketSpec::getOnClose);
       prototype.registerHybridSetter("onClose", &HybridHybridWebSocketSpec::setOnClose);
       prototype.registerHybridGetter("onError", &HybridHybridWebSocketSpec::getOnError);

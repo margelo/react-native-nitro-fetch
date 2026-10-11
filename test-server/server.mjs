@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 import express from 'express';
 import multer from 'multer';
 import { WebSocketServer } from 'ws';
+import { acceptRawWebSocket } from './raw-ws.mjs';
 
 const PORT = Number(process.env.PORT) || 9876;
 const upload = multer({ storage: multer.memoryStorage() });
@@ -254,10 +255,22 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 //   /ws/stall                               -> accepts the upgrade, never sends 101
 const wss = new WebSocketServer({ noServer: true });
 
+const burstMessage = (i) => {
+  if (i % 3 === 0) return [false, `m${i}`];
+  if (i % 3 === 1) return [false, `\u00e9${i}`.repeat(i % 7 === 1 ? 200 : 1)];
+  return [true, Buffer.from([i % 256, Math.floor(i / 256)])];
+};
+
 // /ws/stall holds the TCP connection open without completing the handshake, so
 // the client stays in CONNECTING. Everything else goes to the ws server.
 server.on('upgrade', (req, socket, head) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
+  if (url.pathname === '/ws/text') {
+    const send = acceptRawWebSocket(req, socket);
+    for (const hex of url.searchParams.getAll('hex')) send(1, Buffer.from(hex, 'hex'));
+    socket.on('data', () => socket.end());
+    return;
+  }
   if (url.pathname === '/ws/stall') {
     socket.on('error', () => {});
     return;
@@ -267,6 +280,16 @@ server.on('upgrade', (req, socket, head) => {
     const to = url.searchParams.get('to') ?? '/';
     const location = hops > 1 ? `/ws/redirect?n=${hops - 1}&to=${encodeURIComponent(to)}` : to;
     socket.end(`HTTP/1.1 302 Found\r\nLocation: ${location}\r\nContent-Length: 0\r\n\r\n`);
+    return;
+  }
+  if (url.pathname === '/ws/burst' && url.searchParams.get('end') === 'drop') {
+    const send = acceptRawWebSocket(req, socket);
+    const count = Number(url.searchParams.get('count')) || 100;
+    for (let i = 0; i < count; i++) {
+      const [binary, data] = burstMessage(i);
+      send(binary ? 2 : 1, binary ? data : Buffer.from(data));
+    }
+    socket.end();
     return;
   }
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
@@ -288,5 +311,12 @@ wss.on('connection', (ws, req) => {
     setTimeout(() => ws.close(code, reason), delay);
   } else if (url.pathname === '/ws/kill') {
     setTimeout(() => ws.terminate(), delay);
+  } else if (url.pathname === '/ws/burst') {
+    const count = Number(url.searchParams.get('count')) || 100;
+    for (let i = 0; i < count; i++) {
+      const [binary, data] = burstMessage(i);
+      ws.send(data, { binary });
+    }
+    if (url.searchParams.get('end') === 'close') ws.close(4000, 'done');
   }
 });

@@ -7,6 +7,7 @@
 
 #include "HybridWebSocket.hpp"
 #include "WebSocketPrewarmer.hpp"
+#include "Utf8.hpp"
 
 #if defined(__APPLE__)
 namespace margelo::nitro::nitrofetchwebsockets {
@@ -18,7 +19,9 @@ namespace margelo::nitro::nitrofetchwebsockets {
 
 #include <NitroModules/ArrayBuffer.hpp>
 #include <cstring>
+#include <limits>
 #include <memory>
+#include <vector>
 
 namespace margelo::nitro::nitrofetchwebsockets {
 
@@ -51,9 +54,37 @@ std::shared_ptr<ArrayBuffer> payloadToArrayBuffer(const uint8_t* data, size_t le
 }
 
 WebSocketConnectionBase::OnMessage makeHybridMessageBridge(
-    std::function<void(const HybridWebSocketMessageEvent&)> cb) {
-  return [cb = std::move(cb)](const uint8_t* data, size_t len, bool isBinary, std::vector<uint8_t>* owned) {
-    cb(HybridWebSocketMessageEvent{ payloadToArrayBuffer(data, len, owned), isBinary });
+    WebSocketMessageQueue queue, std::function<void(const HybridWebSocketMessageEvent&)> cb) {
+  return [queue, cb = std::move(cb)](const uint8_t* data, size_t len, bool isBinary, std::vector<uint8_t>* owned) {
+    queue.push([cb, event = HybridWebSocketMessageEvent{ payloadToArrayBuffer(data, len, owned), isBinary }]() {
+      cb(event);
+    });
+  };
+}
+
+constexpr size_t kMaxDirectTextBytes = 512;
+#if defined(__APPLE__)
+constexpr size_t kMaxDirectAsciiBytes = 16 * 1024;
+#else
+constexpr size_t kMaxDirectAsciiBytes = std::numeric_limits<size_t>::max();
+#endif
+
+std::vector<uint8_t> payloadToBytes(const uint8_t* data, size_t len, std::vector<uint8_t>* owned) {
+  if (owned != nullptr) return std::move(*owned);
+  return std::vector<uint8_t>(data, data + len);
+}
+
+WebSocketConnectionBase::OnMessage makeQueueBridge(WebSocketMessageQueue queue,
+                                                   std::function<void(WebSocketMessageQueue)> onMessage) {
+  auto deliver = std::make_shared<WebSocketMessageQueue::Deliver>(std::move(onMessage));
+  return [queue, deliver](const uint8_t* data, size_t len, bool isBinary, std::vector<uint8_t>* owned) {
+    const size_t ascii = isBinary || len > kMaxDirectAsciiBytes ? 0 : asciiPrefixLength(data, len);
+    if (!isBinary && len <= kMaxDirectAsciiBytes &&
+        (ascii == len || (len <= kMaxDirectTextBytes && isWellFormedUtf8(data + ascii, len - ascii)))) {
+      queue.push(WebSocketMessageQueue::Text{ payloadToBytes(data, len, owned), ascii == len }, deliver);
+    } else {
+      queue.push(HybridWebSocketMessageEvent{ payloadToArrayBuffer(data, len, owned), isBinary }, deliver);
+    }
   };
 }
 
@@ -110,7 +141,15 @@ std::optional<std::function<void()>> HybridWebSocket::getOnOpen() {
 }
 void HybridWebSocket::setOnOpen(const std::optional<std::function<void()>>& cb) {
   _onOpen = cb;
-  _conn->setOnOpen(cb ? [cb = *cb]() { cb(); } : WebSocketConnectionBase::OnOpen{});
+  bindOpen();
+}
+
+void HybridWebSocket::bindOpen() {
+  if (!_onOpen) {
+    _conn->setOnOpen({});
+    return;
+  }
+  _conn->setOnOpen([events = _events, cb = *_onOpen]() { events.push([cb]() { cb(); }); });
 }
 
 std::optional<std::function<void(const HybridWebSocketMessageEvent&)>> HybridWebSocket::getOnMessage() {
@@ -119,8 +158,22 @@ std::optional<std::function<void(const HybridWebSocketMessageEvent&)>> HybridWeb
 void HybridWebSocket::setOnMessage(
     const std::optional<std::function<void(const HybridWebSocketMessageEvent&)>>& cb) {
   _onMessage = cb;
-  if (cb) {
-    _conn->setOnMessage(makeHybridMessageBridge(*cb));
+  bindMessages();
+}
+
+std::optional<std::function<void(WebSocketMessageQueue)>> HybridWebSocket::getOnQueuedMessage() {
+  return _onQueuedMessage;
+}
+void HybridWebSocket::setOnQueuedMessage(const std::optional<std::function<void(WebSocketMessageQueue)>>& cb) {
+  _onQueuedMessage = cb;
+  bindMessages();
+}
+
+void HybridWebSocket::bindMessages() {
+  if (_onQueuedMessage) {
+    _conn->setOnMessage(makeQueueBridge(_events, *_onQueuedMessage));
+  } else if (_onMessage) {
+    _conn->setOnMessage(makeHybridMessageBridge(_events, *_onMessage));
   } else {
     _conn->setOnMessage({});
   }
@@ -132,13 +185,17 @@ std::optional<std::function<void(const WebSocketCloseEvent&)>> HybridWebSocket::
 void HybridWebSocket::setOnClose(
     const std::optional<std::function<void(const WebSocketCloseEvent&)>>& cb) {
   _onClose = cb;
-  if (cb) {
-    _conn->setOnClose([cb = *cb](int code, const std::string& reason, bool wasClean) {
-      cb(WebSocketCloseEvent{ static_cast<double>(code), reason, wasClean });
-    });
-  } else {
+  bindClose();
+}
+
+void HybridWebSocket::bindClose() {
+  if (!_onClose) {
     _conn->setOnClose({});
+    return;
   }
+  _conn->setOnClose([events = _events, cb = *_onClose](int code, const std::string& reason, bool wasClean) {
+    events.push([cb, event = WebSocketCloseEvent{ static_cast<double>(code), reason, wasClean }]() { cb(event); });
+  });
 }
 
 std::optional<std::function<void(const std::string&)>> HybridWebSocket::getOnError() {
@@ -146,8 +203,17 @@ std::optional<std::function<void(const std::string&)>> HybridWebSocket::getOnErr
 }
 void HybridWebSocket::setOnError(const std::optional<std::function<void(const std::string&)>>& cb) {
   _onError = cb;
-  _conn->setOnError(cb ? [cb = *cb](const std::string& msg) { cb(msg); }
-                       : WebSocketConnectionBase::OnError{});
+  bindError();
+}
+
+void HybridWebSocket::bindError() {
+  if (!_onError) {
+    _conn->setOnError({});
+    return;
+  }
+  _conn->setOnError([events = _events, cb = *_onError](const std::string& msg) {
+    events.push([cb, msg]() { cb(msg); });
+  });
 }
 
 
@@ -187,30 +253,10 @@ void HybridWebSocket::sendBinary(const std::shared_ptr<ArrayBuffer>& data) {
 
 
 void HybridWebSocket::bindCallbacks() {
-
-  auto onOpen = _onOpen;
-  _conn->setOnOpen(onOpen ? [onOpen = *onOpen]() { onOpen(); }
-                           : WebSocketConnectionBase::OnOpen{});
-
-  auto onMsg = _onMessage;
-  if (onMsg) {
-    _conn->setOnMessage(makeHybridMessageBridge(*onMsg));
-  } else {
-    _conn->setOnMessage({});
-  }
-
-  auto onError = _onError;
-  _conn->setOnError(onError ? [onError = *onError](const std::string& msg) { onError(msg); }
-                             : WebSocketConnectionBase::OnError{});
-
-  auto onClose = _onClose;
-  if (onClose) {
-    _conn->setOnClose([onClose = *onClose](int code, const std::string& reason, bool wasClean) {
-      onClose(WebSocketCloseEvent{ static_cast<double>(code), reason, wasClean });
-    });
-  } else {
-    _conn->setOnClose({});
-  }
+  bindOpen();
+  bindMessages();
+  bindError();
+  bindClose();
 }
 
 } // namespace margelo::nitro::nitrofetchwebsockets
