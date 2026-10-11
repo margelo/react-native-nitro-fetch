@@ -7,6 +7,8 @@
 
 #include "WebSocketPrewarmer.hpp"
 
+#include <utility>
+
 #if defined(__APPLE__)
 namespace margelo::nitro::nitrofetchwebsockets {
   std::shared_ptr<WebSocketConnectionBase> createNWConnection();
@@ -42,8 +44,12 @@ void WebSocketPrewarmer::preConnect(
   auto conn = createPlatformConnection();
   conn->connect(url, protocols, headers);
 
-  std::lock_guard<std::mutex> lock(_mu);
-  _entries[url] = std::move(conn);
+  std::shared_ptr<WebSocketConnectionBase> replaced;
+  {
+    std::lock_guard<std::mutex> lock(_mu);
+    replaced = std::exchange(_entries[url], std::move(conn));
+  }
+  if (replaced) replaced->close(1001, "");
 }
 
 std::shared_ptr<WebSocketConnectionBase> WebSocketPrewarmer::tryGet(const std::string& url) {
