@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'react-native-harness';
+import { Platform } from 'react-native';
 import { NitroWebSocket } from 'react-native-nitro-websockets';
 import type {
   WebSocketMessageEvent,
@@ -455,5 +456,47 @@ describe('NitroWebSocket - Error Handling', () => {
       'error for invalid host'
     );
     expect(settled).toBe(true);
+  });
+});
+
+describe('NitroWebSocket - Redirects', () => {
+  function firstMessage(
+    url: string
+  ): Promise<{ ws: NitroWebSocket; data: string }> {
+    return withTimeout(
+      new Promise<{ ws: NitroWebSocket; data: string }>((resolve, reject) => {
+        const ws = new NitroWebSocket(url);
+        ws.onmessage = (e) => resolve({ ws, data: e.data });
+        ws.onerror = (err) => reject(new Error(`Connection error: ${err}`));
+      }),
+      5_000,
+      'redirected connection'
+    );
+  }
+
+  function redirectTo(location: string): string {
+    return `${WS_BASE}/ws/redirect?to=${encodeURIComponent(location)}`;
+  }
+
+  it('follows a Location longer than 308 bytes', async () => {
+    const target = `/ws/url?q=${'a'.repeat(400)}`;
+    const { ws, data } = await firstMessage(redirectTo(target));
+    expect(data).toBe(target);
+    await closeAndWait(ws);
+  });
+
+  it('follows a short relative Location', async () => {
+    const { ws, data } = await firstMessage(redirectTo('/ws/url'));
+    expect(data).toBe('/ws/url');
+    if (Platform.OS === 'android') {
+      expect(ws.url).toBe(`${WS_BASE}/ws/url`);
+    }
+    await closeAndWait(ws);
+  });
+
+  it('follows an absolute Location without a path', async () => {
+    const { ws, data } = await firstMessage(redirectTo(WS_BASE));
+    expect(data).toBe('/');
+    await closeAndWait(ws);
   });
 });
