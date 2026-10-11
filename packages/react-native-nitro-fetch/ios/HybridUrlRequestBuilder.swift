@@ -28,13 +28,13 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     url: String,
     session: URLSession,
     executor: DispatchQueue
-  ) {
+  ) throws {
     self.url = url
     self.session = session
     self.executor = executor
 
     guard let urlObj = URL(string: url) else {
-      fatalError("Invalid URL: \(url)")
+      throw NSError(domain: "NitroFetch", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid URL: \(url)"])
     }
     self.urlRequest = URLRequest(url: urlObj)
   }
