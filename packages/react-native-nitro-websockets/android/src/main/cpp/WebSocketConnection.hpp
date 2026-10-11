@@ -110,6 +110,7 @@ private:
 
   std::vector<uint8_t> _rxBuf;
   bool _rxBinary = false;
+  bool _rxDiscard = false;
 
   // LWS_CALLBACK_CLIENT_CLOSED carries no code/reason, so remember who closed
   // and why. Neither set => transport dropped without a handshake (1006).
