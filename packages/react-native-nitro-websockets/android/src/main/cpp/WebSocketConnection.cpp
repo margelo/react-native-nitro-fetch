@@ -26,36 +26,87 @@ struct ParsedUrl {
   int port;
   std::string path;
   bool isWss;
+  std::string hostHeader;
 };
+
+static std::string percentEncodeTarget(const std::string& target) {
+  static const char kHex[] = "0123456789ABCDEF";
+  std::string out;
+  out.reserve(target.size());
+  bool inQuery = false;
+  for (unsigned char c : target) {
+    if (c == '?' && !inQuery) {
+      inQuery = true;
+      out += '?';
+      continue;
+    }
+    const bool encode = c <= 0x20 || c >= 0x7F || c == '"' || c == '<' || c == '>' ||
+                        (inQuery ? c == '\'' : (c == '`' || c == '{' || c == '}'));
+    if (encode) {
+      out += '%';
+      out += kHex[c >> 4];
+      out += kHex[c & 0xF];
+    } else {
+      out += static_cast<char>(c);
+    }
+  }
+  return out;
+}
 
 static ParsedUrl parseUrl(const std::string& url) {
   ParsedUrl r;
-  r.port  = 0;
-  r.isWss = false;
-
-  std::string rest;
-  if (url.rfind("wss://", 0) == 0) {
+  const size_t schemeEnd = url.find("://");
+  std::string scheme = schemeEnd == std::string::npos ? std::string() : url.substr(0, schemeEnd);
+  std::transform(scheme.begin(), scheme.end(), scheme.begin(),
+                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  if (scheme == "wss" || scheme == "https") {
     r.isWss = true;
-    rest    = url.substr(6);
     r.port  = 443;
-  } else if (url.rfind("ws://", 0) == 0) {
-    rest   = url.substr(5);
-    r.port = 80;
+  } else if (scheme == "ws" || scheme == "http") {
+    r.isWss = false;
+    r.port  = 80;
   } else {
     throw std::invalid_argument("Unsupported WebSocket URL scheme: " + url);
   }
+  const int defaultPort = r.port;
 
-  auto pathStart = rest.find('/');
-  std::string hostPort = (pathStart == std::string::npos) ? rest : rest.substr(0, pathStart);
-  r.path = (pathStart == std::string::npos) ? "/" : rest.substr(pathStart);
+  const size_t authorityStart = schemeEnd + 3;
+  const size_t authorityEnd = url.find_first_of("/?#", authorityStart);
+  std::string authority = url.substr(authorityStart, authorityEnd == std::string::npos
+    ? std::string::npos : authorityEnd - authorityStart);
+  const size_t at = authority.rfind('@');
+  if (at != std::string::npos) authority = authority.substr(at + 1);
 
-  auto colonPos = hostPort.find(':');
-  if (colonPos != std::string::npos) {
-    r.host = hostPort.substr(0, colonPos);
-    r.port = std::stoi(hostPort.substr(colonPos + 1));
-  } else {
-    r.host = hostPort;
+  if (!authority.empty() && authority[0] == '[') {
+    throw std::invalid_argument("IPv6 addresses are not supported: " + url);
   }
+  const size_t colon = authority.rfind(':');
+  r.host = authority.substr(0, colon);
+  const std::string port = colon == std::string::npos ? std::string() : authority.substr(colon + 1);
+  if (r.host.empty() || r.host.find(':') != std::string::npos) {
+    throw std::invalid_argument("Invalid WebSocket URL: " + url);
+  }
+  if (!port.empty()) {
+    if (port.find_first_not_of("0123456789") != std::string::npos) {
+      throw std::invalid_argument("Invalid WebSocket URL: " + url);
+    }
+    int value = 0;
+    for (char c : port) {
+      value = value * 10 + (c - '0');
+      if (value > 65535) throw std::invalid_argument("Invalid WebSocket URL: " + url);
+    }
+    if (value == 0) throw std::invalid_argument("Invalid WebSocket URL: " + url);
+    r.port = value;
+  }
+
+  std::string target = authorityEnd == std::string::npos ? std::string() : url.substr(authorityEnd);
+  const size_t fragment = target.find('#');
+  if (fragment != std::string::npos) target.resize(fragment);
+  r.path = percentEncodeTarget(target);
+  if (r.path.empty() || r.path[0] != '/') r.path = "/" + r.path;
+
+  r.hostHeader = r.host;
+  if (r.port != defaultPort) r.hostHeader += ":" + std::to_string(r.port);
   return r;
 }
 
@@ -231,8 +282,9 @@ void WebSocketConnection::startConnect(
   auto path        = parsed.path;
   auto protoStr    = protocolStr;
   auto isWss       = parsed.isWss;
+  auto hostHeader  = parsed.hostHeader;
 
-  LwsContext::instance().schedule([self, host, port, path, protoStr, isWss]() {
+  LwsContext::instance().schedule([self, host, port, path, protoStr, isWss, hostHeader]() {
     self->_selfRef = self;
     if (self->_state.load() != State::CONNECTING) {
       self->_selfRef.reset();
@@ -246,7 +298,7 @@ void WebSocketConnection::startConnect(
     i.address      = host.c_str();
     i.port         = port;
     i.path         = path.c_str();
-    i.host         = host.c_str();
+    i.host         = hostHeader.c_str();
     i.protocol     = protoStr.empty() ? nullptr : protoStr.c_str();
     i.local_protocol_name = "nitro-ws";
     i.userdata     = self.get();

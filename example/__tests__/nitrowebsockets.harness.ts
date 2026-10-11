@@ -433,6 +433,24 @@ describe('NitroWebSocket - Handshake headers', () => {
     expect(headers['sec-websocket-protocol']).toBe(undefined);
     await closeAndWait(ws);
   });
+
+  it('sends a non-default port in Host and encodes a space in the URL', async () => {
+    const { ws, headers } = await withTimeout(
+      new Promise<{ ws: NitroWebSocket; headers: Record<string, string> }>(
+        (resolve, reject) => {
+          const socket = new NitroWebSocket(`${WS_BASE}/ws/headers?q=a b`);
+          socket.onmessage = (e) =>
+            resolve({ ws: socket, headers: JSON.parse(e.data) });
+          socket.onerror = (err) =>
+            reject(new Error(`Connection error: ${err}`));
+        }
+      ),
+      5_000,
+      'handshake with a space in the URL'
+    );
+    expect(headers.host).toBe(WS_BASE.replace('ws://', ''));
+    await closeAndWait(ws);
+  });
 });
 
 // ─── Error Handling ───────────────────────────────────────────────────────────
