@@ -43,7 +43,7 @@ std::shared_ptr<ArrayBuffer> copyPayloadToArrayBuffer(const uint8_t* data, size_
 }
 
 std::shared_ptr<ArrayBuffer> payloadToArrayBuffer(const uint8_t* data, size_t len, std::vector<uint8_t>* owned) {
-  if (len == 0 || owned == nullptr) {
+  if (len == 0 || owned == nullptr || owned->capacity() - owned->size() > owned->size() / 8) {
     return copyPayloadToArrayBuffer(data, len);
   }
   auto holder = std::make_shared<std::vector<uint8_t>>(std::move(*owned));

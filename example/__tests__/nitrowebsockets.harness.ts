@@ -306,6 +306,49 @@ describe('NitroWebSocket - Server-initiated close', () => {
   });
 });
 
+describe('NitroWebSocket - Fragmented messages', () => {
+  function firstMessage(url: string): Promise<WebSocketMessageEvent> {
+    return new Promise<WebSocketMessageEvent>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('No message')), 10_000);
+      const ws = new NitroWebSocket(url);
+      ws.onmessage = (e) => {
+        clearTimeout(timer);
+        ws.close();
+        resolve(e);
+      };
+      ws.onerror = (err) => {
+        clearTimeout(timer);
+        reject(new Error(`Connection error: ${err}`));
+      };
+    });
+  }
+
+  function firstMismatch(bytes: Uint8Array): number {
+    for (let i = 0; i < bytes.length; i++) {
+      if (bytes[i] !== i % 251) return i;
+    }
+    return -1;
+  }
+
+  for (const [frames, size] of [
+    [5, 65536],
+    [3, 300000],
+    [40, 1000],
+    [4, 65536],
+    [1, 300000],
+  ] as const) {
+    it(`delivers ${frames} x ${size} B frames as one message`, async () => {
+      const e = await firstMessage(
+        `${WS_BASE}/ws/fragments?frames=${frames}&size=${size}`
+      );
+      expect(e.isBinary).toBe(true);
+      const bytes = new Uint8Array(e.binaryData!);
+      expect(bytes.length).toBe(frames * size);
+      expect(firstMismatch(bytes)).toBe(-1);
+    });
+  }
+});
+
 // ─── close() during the handshake (issue #163) ───────────────────────────────
 // /ws/stall accepts the TCP connection but never sends its 101, so the socket
 // is guaranteed to still be CONNECTING when close() lands. On Android this used
