@@ -29,6 +29,21 @@ fun ByteBuffer.toByteArray(): ByteArray {
   return arr
 }
 
+private val charsetParam = Regex("charset=([A-Za-z0-9_\\-:.]+)", RegexOption.IGNORE_CASE)
+private val charsetsByContentType = ConcurrentHashMap<String, Charset>()
+
+private fun charsetOf(contentType: String): Charset {
+  charsetsByContentType[contentType]?.let { return it }
+  val m = charsetParam.find(contentType)
+  val charset = try {
+    if (m != null) Charset.forName(m.groupValues[1]) else Charsets.UTF_8
+  } catch (_: Throwable) {
+    Charsets.UTF_8
+  }
+  if (charsetsByContentType.size < 64) charsetsByContentType[contentType] = charset
+  return charset
+}
+
 private fun decodeText(bytes: ByteArray, length: Int, charset: Charset): String? {
   if (charset != Charsets.UTF_8) {
     return charset.newDecoder()
@@ -324,15 +339,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
             val status = info.httpStatusCode
             val bytes = out.toByteArray()
             val contentType = info.allHeaders["Content-Type"] ?: info.allHeaders["content-type"]
-            val charset = run {
-              val ct = contentType ?: ""
-              val m = Regex("charset=([A-Za-z0-9_\\-:.]+)", RegexOption.IGNORE_CASE).find(ct.toString())
-              try {
-                if (m != null) java.nio.charset.Charset.forName(m.groupValues[1]) else Charsets.UTF_8
-              } catch (_: Throwable) {
-                Charsets.UTF_8
-              }
-            }
+            val charset = charsetOf((contentType ?: "").toString())
             // Strict-decode the body as text. If it fails the response is binary,
             // so we bridge the raw bytes as an ArrayBuffer instead — no base64.
             val bodyStr: String? = try {
