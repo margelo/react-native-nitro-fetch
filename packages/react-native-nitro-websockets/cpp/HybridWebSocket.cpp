@@ -94,14 +94,19 @@ std::shared_ptr<ArrayBuffer> payloadToArrayBuffer(const uint8_t* data, size_t le
 }
 
 WebSocketConnectionBase::OnMessage makeHybridMessageBridge(
-    std::function<void(const HybridWebSocketMessageEvent&)> cb,
-    std::optional<std::function<void(const std::string&)>> onText) {
-  return [cb = std::move(cb), onText = std::move(onText)](const uint8_t* data, size_t len, bool isBinary, std::vector<uint8_t>* owned) {
-    if (!isBinary && onText && len <= kMaxDirectTextBytes && isWellFormedUtf8(data, len)) {
-      (*onText)(std::string(reinterpret_cast<const char*>(data), len));
-      return;
-    }
+    std::function<void(const HybridWebSocketMessageEvent&)> cb) {
+  return [cb = std::move(cb)](const uint8_t* data, size_t len, bool isBinary, std::vector<uint8_t>* owned) {
     cb(HybridWebSocketMessageEvent{ payloadToArrayBuffer(data, len, owned), isBinary });
+  };
+}
+
+WebSocketConnectionBase::OnMessage makeBatchBridge(std::function<void(WebSocketMessageQueue)> onBatch) {
+  WebSocketMessageQueue queue;
+  return [onBatch = std::move(onBatch), queue](const uint8_t* data, size_t len, bool isBinary, std::vector<uint8_t>* owned) {
+    std::optional<WebSocketMessageQueue> batch = !isBinary && len <= kMaxDirectTextBytes && isWellFormedUtf8(data, len)
+      ? queue.push(std::string(reinterpret_cast<const char*>(data), len))
+      : queue.push(HybridWebSocketMessageEvent{ payloadToArrayBuffer(data, len, owned), isBinary });
+    if (batch) onBatch(std::move(*batch));
   };
 }
 
@@ -170,17 +175,19 @@ void HybridWebSocket::setOnMessage(
   bindMessages();
 }
 
-std::optional<std::function<void(const std::string&)>> HybridWebSocket::getOnTextMessage() {
-  return _onTextMessage;
+std::optional<std::function<void(WebSocketMessageQueue)>> HybridWebSocket::getOnMessageBatch() {
+  return _onMessageBatch;
 }
-void HybridWebSocket::setOnTextMessage(const std::optional<std::function<void(const std::string&)>>& cb) {
-  _onTextMessage = cb;
+void HybridWebSocket::setOnMessageBatch(const std::optional<std::function<void(WebSocketMessageQueue)>>& cb) {
+  _onMessageBatch = cb;
   bindMessages();
 }
 
 void HybridWebSocket::bindMessages() {
-  if (_onMessage) {
-    _conn->setOnMessage(makeHybridMessageBridge(*_onMessage, _onTextMessage));
+  if (_onMessageBatch) {
+    _conn->setOnMessage(makeBatchBridge(*_onMessageBatch));
+  } else if (_onMessage) {
+    _conn->setOnMessage(makeHybridMessageBridge(*_onMessage));
   } else {
     _conn->setOnMessage({});
   }

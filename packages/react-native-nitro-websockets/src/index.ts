@@ -120,29 +120,27 @@ export class NitroWebSocket {
   }
   set onmessage(fn: ((e: WebSocketMessageEvent) => void) | null) {
     if (fn == null) {
-      this._ws.onMessage = undefined
-      this._ws.onTextMessage = undefined
+      this._ws.onMessageBatch = undefined
       return
     }
     const inspectorId = this._inspectorId
-    this._ws.onTextMessage = (text: string) => {
-      if (inspectorId && _inspector?.isEnabled()) {
-        _inspector._recordWsMessage(
-          inspectorId,
-          'received',
-          text,
-          utf8ByteLength(text),
-          false
-        )
-      }
-      fn({
-        data: text,
-        isBinary: false,
-      })
-    }
-    this._ws.onMessage = (native: HybridWebSocketMessageEvent) => {
-      if (native.isBinary) {
-        const size = native.data.byteLength
+    const deliver = (item: string | HybridWebSocketMessageEvent) => {
+      if (typeof item === 'string') {
+        if (inspectorId && _inspector?.isEnabled()) {
+          _inspector._recordWsMessage(
+            inspectorId,
+            'received',
+            item,
+            utf8ByteLength(item),
+            false
+          )
+        }
+        fn({
+          data: item,
+          isBinary: false,
+        })
+      } else if (item.isBinary) {
+        const size = item.data.byteLength
         if (inspectorId && _inspector?.isEnabled()) {
           _inspector._recordWsMessage(
             inspectorId,
@@ -155,10 +153,10 @@ export class NitroWebSocket {
         fn({
           data: '',
           isBinary: true,
-          binaryData: native.data,
+          binaryData: item.data,
         })
       } else {
-        const buf = native.data
+        const buf = item.data
         const text =
           buf.byteLength === 0 ? '' : utf8Decoder.decode(buf, { stream: false })
         const size = buf.byteLength
@@ -176,6 +174,21 @@ export class NitroWebSocket {
           isBinary: false,
         })
       }
+    }
+    this._ws.onMessageBatch = (items) => {
+      let failed = false
+      let error: unknown
+      for (let i = 0; i < items.length; i++) {
+        try {
+          deliver(items[i]!)
+        } catch (e) {
+          if (!failed) {
+            failed = true
+            error = e
+          }
+        }
+      }
+      if (failed) throw error
     }
   }
   set onclose(fn: ((e: NitroWSCloseEvent) => void) | null) {
