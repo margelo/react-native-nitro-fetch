@@ -9,6 +9,7 @@
 #include "LwsContext.hpp"
 
 #include <libwebsockets.h>
+#include <cctype>
 #include <cstring>
 #include <stdexcept>
 #include <algorithm>
@@ -59,6 +60,34 @@ static ParsedUrl parseUrl(const std::string& url) {
 }
 
 
+
+static bool hasScheme(const std::string& ref) {
+  const size_t colon = ref.find(':');
+  if (colon == 0 || colon == std::string::npos || colon > ref.find_first_of("/?#")) return false;
+  if (!std::isalpha(static_cast<unsigned char>(ref[0]))) return false;
+  for (size_t i = 1; i < colon; ++i) {
+    const unsigned char c = static_cast<unsigned char>(ref[i]);
+    if (!std::isalnum(c) && c != '+' && c != '-' && c != '.') return false;
+  }
+  return true;
+}
+
+static std::string resolveLocation(const std::string& base, const std::string& ref) {
+  if (hasScheme(ref)) return ref;
+  const size_t schemeEnd = base.find("://");
+  if (schemeEnd == std::string::npos) return ref;
+  if (ref.rfind("//", 0) == 0) return base.substr(0, schemeEnd + 1) + ref;
+  const size_t authorityEnd = base.find_first_of("/?#", schemeEnd + 3);
+  const std::string origin = base.substr(0, authorityEnd);
+  if (!ref.empty() && ref[0] == '/') return origin + ref;
+  std::string path = authorityEnd == std::string::npos
+    ? "/"
+    : base.substr(authorityEnd, base.find_first_of("?#", authorityEnd) - authorityEnd);
+  if (path.empty() || path[0] != '/') path = "/" + path;
+  if (ref.empty() || ref[0] == '#') return origin + path;
+  if (ref[0] == '?') return origin + path + ref;
+  return origin + path.substr(0, path.rfind('/') + 1) + ref;
+}
 
 int nitroWsCallback(lws* wsi, enum lws_callback_reasons reason,
                     void* /*user*/, void* in, size_t len) {
@@ -494,7 +523,7 @@ void WebSocketConnection::handleRedirect(const std::string& location) {
   _wsi   = nullptr;
   _state = State::CONNECTING;
 
-  std::string url = location;
+  std::string url = resolveLocation(_url, location);
   if      (url.rfind("https://", 0) == 0) url = "wss://" + url.substr(8);
   else if (url.rfind("http://",  0) == 0) url = "ws://"  + url.substr(7);
 
