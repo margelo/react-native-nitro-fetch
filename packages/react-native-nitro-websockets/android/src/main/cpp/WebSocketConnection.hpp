@@ -79,7 +79,7 @@ private:
   std::atomic<bool> _closeFired{false};
   std::atomic<bool> _isRedirecting{false};
   std::atomic<int>  _redirectCount{0};
-  static constexpr int kMaxRedirects = 5;
+  static constexpr int kMaxRedirects = 20;
   static constexpr size_t kMaxMessageSize = 16 * 1024 * 1024; // 16 MB
 
   struct BufferedMessage { std::vector<uint8_t> data; bool isBinary; };
