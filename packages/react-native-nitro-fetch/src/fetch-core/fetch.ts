@@ -10,6 +10,8 @@ import { isHttpUrl, getUrlString } from './url';
 import { nitroFetchRaw } from './raw';
 import { nitroStreamFetch } from './stream';
 
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
 export async function nitroFetch(
   input: RequestInfo | URL,
   init?: RequestInit & {
@@ -61,7 +63,11 @@ export async function nitroFetch(
   const res = await nitroFetchRaw(input, init);
 
   // Handle redirect: "error" — if we got a 3xx back (followRedirects was false), throw
-  if (redirectOption === 'error' && res.status >= 300 && res.status < 400) {
+  if (
+    redirectOption === 'error' &&
+    REDIRECT_STATUSES.has(res.status) &&
+    res.headers.some((h) => h.key.toLowerCase() === 'location')
+  ) {
     throw new TypeError(
       `redirect mode is "error": redirected request to "${res.url}"`
     );

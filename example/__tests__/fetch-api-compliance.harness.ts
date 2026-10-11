@@ -437,6 +437,20 @@ describe('Fetch - redirect option', () => {
     expect(threw).toBe(true);
   });
 
+  it('"error" returns a 304 Not Modified', async () => {
+    const res = await nitroFetch(`${BASE}/status/304`, {
+      redirect: 'error',
+    } as any);
+    expect(res.status).toBe(304);
+  });
+
+  it('"error" returns a 3xx without a Location header', async () => {
+    const res = await nitroFetch(`${BASE}/status/302`, {
+      redirect: 'error',
+    } as any);
+    expect(res.status).toBe(302);
+  });
+
   it('"manual" returns 3xx response with Location header', async () => {
     const res = await nitroFetch(`${BASE}/redirect/1`, {
       redirect: 'manual',
