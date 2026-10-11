@@ -75,32 +75,40 @@ private fun isWellFormedUtf8(bytes: ByteArray, from: Int, length: Int): Boolean 
   while (i < length) {
     val b0 = bytes[i].toInt() and 0xFF
     if (b0 < 0x80) {
-      i = asciiPrefixLength(bytes, i + 1, length)
+      i++
+      if (i < length && bytes[i] >= 0) i = asciiPrefixLength(bytes, i + 1, length)
       continue
     }
-    val trailing = when (b0) {
-      in 0xC2..0xDF -> 1
-      in 0xE0..0xEF -> 2
-      in 0xF0..0xF4 -> 3
-      else -> return false
+    if (b0 < 0xE0) {
+      if (b0 < 0xC2 || i + 1 >= length || (bytes[i + 1].toInt() and 0xC0) != 0x80) return false
+      i += 2
+      continue
     }
-    if (i + trailing >= length) return false
+    if (b0 < 0xF0) {
+      if (i + 2 >= length) return false
+      val b1 = bytes[i + 1].toInt() and 0xFF
+      if ((bytes[i + 2].toInt() and 0xC0) != 0x80) return false
+      if (b0 == 0xE0) {
+        if (b1 < 0xA0 || b1 > 0xBF) return false
+      } else if (b0 == 0xED) {
+        if (b1 < 0x80 || b1 > 0x9F) return false
+      } else if ((b1 and 0xC0) != 0x80) {
+        return false
+      }
+      i += 3
+      continue
+    }
+    if (b0 > 0xF4 || i + 3 >= length) return false
     val b1 = bytes[i + 1].toInt() and 0xFF
-    val min = when (b0) {
-      0xE0 -> 0xA0
-      0xF0 -> 0x90
-      else -> 0x80
+    if (b0 == 0xF0) {
+      if (b1 < 0x90 || b1 > 0xBF) return false
+    } else if (b0 == 0xF4) {
+      if (b1 < 0x80 || b1 > 0x8F) return false
+    } else if ((b1 and 0xC0) != 0x80) {
+      return false
     }
-    val max = when (b0) {
-      0xED -> 0x9F
-      0xF4 -> 0x8F
-      else -> 0xBF
-    }
-    if (b1 < min || b1 > max) return false
-    for (k in 2..trailing) {
-      if ((bytes[i + k].toInt() and 0xC0) != 0x80) return false
-    }
-    i += trailing + 1
+    if ((bytes[i + 2].toInt() and 0xC0) != 0x80 || (bytes[i + 3].toInt() and 0xC0) != 0x80) return false
+    i += 4
   }
   return true
 }
