@@ -56,6 +56,7 @@ private:
   void bindCallbacks();
 
   std::shared_ptr<WebSocketConnectionBase> _conn;
+  bool _connected = false;
   std::optional<std::function<void()>> _onOpen;
   std::optional<std::function<void(const HybridWebSocketMessageEvent&)>> _onMessage;
   std::optional<std::function<void(const WebSocketCloseEvent&)>> _onClose;
