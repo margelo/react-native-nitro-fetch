@@ -229,6 +229,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
 
   companion object {
     private val directExecutor = Executor(Runnable::run)
+    private const val INLINE_COMPLETION_MAX_BYTES = 32 * 1024
 
     @JvmStatic
     fun fetch(
@@ -284,6 +285,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       fun complete(block: () -> Unit) {
         if (inline) executor.execute(block) else block()
       }
+      val cookieSync = !omitCredentials && NitroCookieSync.isCookieSyncEnabled()
       val callback = object : UrlRequest.Callback() {
         private val buffer = ByteBuffer.allocateDirect(64 * 1024)
         private var body = ResponseBody(0)
@@ -361,7 +363,11 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           request.read(byteBuffer)
         }
 
-        override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) = complete {
+        override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) {
+          if (inline && !cookieSync && body.size <= INLINE_COMPLETION_MAX_BYTES) succeed(info) else complete { succeed(info) }
+        }
+
+        private fun succeed(info: UrlResponseInfo) {
           if (BuildConfig.NITRO_FETCH_TRACING) {
             Trace.endAsyncSection(traceLabel, traceCookie)
           }
