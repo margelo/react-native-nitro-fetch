@@ -106,10 +106,46 @@ private fun isWellFormedUtf8(bytes: ByteArray, from: Int, length: Int): Boolean 
 }
 
 // Wrap raw bytes into a Nitro ArrayBuffer for zero-base64 bridging to JS.
-private fun ByteArray.toArrayBuffer(): ArrayBuffer {
-  val ab = ArrayBuffer.allocate(this.size)
-  ab.getBuffer(false).put(this)
+private fun ByteArray.toArrayBuffer(length: Int = size): ArrayBuffer {
+  val ab = ArrayBuffer.allocate(length)
+  ab.getBuffer(false).put(this, 0, length)
   return ab
+}
+
+private class ResponseBody(capacity: Int) {
+  var bytes = ByteArray(capacity)
+    private set
+  var size = 0
+    private set
+
+  fun append(src: ByteBuffer) {
+    val n = src.remaining()
+    val needed = size.toLong() + n
+    if (needed > bytes.size) {
+      if (needed > MAX_ARRAY_SIZE) throw OutOfMemoryError("Response body too large")
+      bytes = bytes.copyOf(maxOf(needed, minOf(bytes.size * 2L, MAX_ARRAY_SIZE.toLong())).toInt())
+    }
+    src.get(bytes, size, n)
+    size += n
+  }
+
+  companion object {
+    private const val MAX_PRESIZE = 1024 * 1024
+    private const val MAX_ARRAY_SIZE = Int.MAX_VALUE - 8
+
+    fun forResponse(info: UrlResponseInfo, isHead: Boolean): ResponseBody {
+      val status = info.httpStatusCode
+      if (isHead || status == 204 || status == 205 || status == 304) return ResponseBody(0)
+      for (header in info.allHeadersAsList) {
+        if (header.key.equals("Content-Length", ignoreCase = true)) {
+          val declared = header.value.trim().toLongOrNull()
+          if (declared != null && declared >= 0) return ResponseBody(minOf(declared, MAX_PRESIZE.toLong()).toInt())
+          break
+        }
+      }
+      return ResponseBody(0)
+    }
+  }
 }
 
 /**
@@ -228,6 +264,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       val url = req.url
       val shouldFollowRedirects = req.followRedirects ?: true
       val omitCredentials = req.credentials == NitroRequestCredentials.OMIT
+      val isHead = req.method == NitroRequestMethod.HEAD
       val traceLabel = if (BuildConfig.NITRO_FETCH_TRACING) {
         "NitroFetch ${req.method?.name ?: "GET"} ${Uri.parse(url).path ?: url}"
       } else ""
@@ -247,7 +284,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       val devToolsRequestId = if (devToolsEnabled) (req.requestId ?: UUID.randomUUID().toString()) else ""
       val callback = object : UrlRequest.Callback() {
         private val buffer = ByteBuffer.allocateDirect(64 * 1024)
-        private val out = java.io.ByteArrayOutputStream()
+        private var body = ResponseBody(0)
         private var redirectStopped = false
         /** True if a redirect response applied at least one `Set-Cookie` (in memory, not yet flushed). */
         private var setCookieAppliedOnRedirect = false
@@ -301,20 +338,21 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
               -1L
             )
           }
+          body = ResponseBody.forResponse(info, isHead)
           buffer.clear()
           request.read(buffer)
         }
 
         override fun onReadCompleted(request: UrlRequest, info: UrlResponseInfo, byteBuffer: ByteBuffer) {
           byteBuffer.flip()
-          val bytes = ByteArray(byteBuffer.remaining())
-          byteBuffer.get(bytes)
-          out.write(bytes)
+          val start = body.size
+          body.append(byteBuffer)
           if (devToolsEnabled) {
-            devToolsBytes += bytes.size
-            DevToolsReporter.reportDataReceived(devToolsRequestId, bytes.size)
+            val read = body.size - start
+            devToolsBytes += read
+            DevToolsReporter.reportDataReceived(devToolsRequestId, read)
             if (devToolsTextual) {
-              DevToolsReporter.storeResponseBodyIncremental(devToolsRequestId, String(bytes, Charsets.UTF_8))
+              DevToolsReporter.storeResponseBodyIncremental(devToolsRequestId, String(body.bytes, start, read, Charsets.UTF_8))
             }
           }
           byteBuffer.clear()
@@ -337,16 +375,17 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
             val headersArr: Array<NitroHeader> =
               info.allHeadersAsList.map { NitroHeader(it.key, it.value) }.toTypedArray()
             val status = info.httpStatusCode
-            val bytes = out.toByteArray()
+            val bytes = body.bytes
+            val length = body.size
             val contentType = info.allHeaders["Content-Type"] ?: info.allHeaders["content-type"]
             val charset = charsetOf((contentType ?: "").toString())
             // Strict-decode the body as text. If it fails the response is binary,
             // so we bridge the raw bytes as an ArrayBuffer instead — no base64.
             val bodyStr: String? = try {
-              decodeText(bytes, bytes.size, charset)
+              decodeText(bytes, length, charset)
             } catch (_: Throwable) { null }
-            val bodyBytesAb: ArrayBuffer? = if (bodyStr == null && bytes.isNotEmpty())
-              bytes.toArrayBuffer()
+            val bodyBytesAb: ArrayBuffer? = if (bodyStr == null && length > 0)
+              bytes.toArrayBuffer(length)
             else null
             val res = NitroResponse(
               url = info.url,
