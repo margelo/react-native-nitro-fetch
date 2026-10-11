@@ -58,6 +58,9 @@ public:
   std::shared_ptr<WebSocketConnection> takeSelfRef() { return std::move(_selfRef); }
 
 private:
+  void startConnect(const std::string& url,
+                    const std::vector<std::string>& protocols,
+                    const std::unordered_map<std::string, std::string>& headers);
   void requestWrite();
   void fireClose(int code, const std::string& reason, bool wasClean);
   void fireError(const std::string& msg);
@@ -84,6 +87,7 @@ private:
   std::atomic<bool> _closeFired{false};
   std::atomic<bool> _isRedirecting{false};
   std::atomic<int>  _redirectCount{0};
+  std::string _redirectError;
   static constexpr int kMaxRedirects = 20;
   static constexpr size_t kMaxMessageSize = 16 * 1024 * 1024; // 16 MB
 
