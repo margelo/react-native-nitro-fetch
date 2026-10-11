@@ -12,12 +12,6 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
   private var _lock = os_unfair_lock()
   private var activeTasks: [String: Task<Void, Never>] = [:]
 
-  private func storeTask(_ task: Task<Void, Never>, forKey key: String) {
-    os_unfair_lock_lock(&_lock)
-    activeTasks[key] = task
-    os_unfair_lock_unlock(&_lock)
-  }
-
   private func removeTask(forKey key: String) {
     os_unfair_lock_lock(&_lock)
     activeTasks.removeValue(forKey: key)
@@ -62,6 +56,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     let requestId = req.requestId
     let bodyData = HybridNitroFetchClient.uploadData(from: req)
 
+    os_unfair_lock_lock(&_lock)
     let task = Task { [weak self] in
       defer {
         if let rid = requestId {
@@ -75,10 +70,10 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
         promise.reject(withError: error)
       }
     }
-
     if let rid = requestId {
-      storeTask(task, forKey: rid)
+      activeTasks[rid] = task
     }
+    os_unfair_lock_unlock(&_lock)
     return promise
   }
   
