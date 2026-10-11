@@ -195,12 +195,9 @@ void NWWebSocketConnection::connect(
     {
       std::lock_guard<std::mutex> lock(conn->_cbMu);
       cb = conn->_onOpen;
+      if (!cb) conn->_openFired.store(true, std::memory_order_release);
     }
-    if (cb) {
-      cb();
-    } else {
-      conn->_openFired.store(true, std::memory_order_release);
-    }
+    if (cb) cb();
 
     conn->scheduleReceive();
   };
@@ -377,12 +374,6 @@ void NWWebSocketConnection::scheduleReceive() {
         return;
       }
 
-      OnMessage onMsg;
-      {
-        std::lock_guard<std::mutex> lock(conn->_cbMu);
-        onMsg = conn->_onMessage;
-      }
-
 #if defined(NITRO_WS_TRACING)
       os_signpost_event_emit(nitroWsLog(),
         static_cast<os_signpost_id_t>(conn->_signpostId),
@@ -398,31 +389,15 @@ void NWWebSocketConnection::scheduleReceive() {
             conn->scheduleReceive();
             return;
           }
-          const auto* bytes = static_cast<const uint8_t*>(utf8.bytes);
-          size_t len = utf8.length;
-
-          if (onMsg) {
-            onMsg(bytes, len, false, nullptr);
-          } else {
-            std::vector<uint8_t> copy(bytes, bytes + len);
-            std::lock_guard<std::mutex> lock(conn->_msgMu);
-            conn->_msgBuffer.push_back({std::move(copy), false});
-          }
+          conn->deliverMessage(
+            static_cast<const uint8_t*>(utf8.bytes), utf8.length, false);
           break;
         }
 
         case NSURLSessionWebSocketMessageTypeData: {
-          const auto* bytes =
-            static_cast<const uint8_t*>(message.data.bytes);
-          size_t len = message.data.length;
-
-          if (onMsg) {
-            onMsg(bytes, len, true, nullptr);
-          } else {
-            std::vector<uint8_t> copy(bytes, bytes + len);
-            std::lock_guard<std::mutex> lock(conn->_msgMu);
-            conn->_msgBuffer.push_back({std::move(copy), true});
-          }
+          conn->deliverMessage(
+            static_cast<const uint8_t*>(message.data.bytes),
+            message.data.length, true);
           break;
         }
       }
@@ -447,21 +422,23 @@ void NWWebSocketConnection::setOnOpen(OnOpen cb) {
 }
 
 void NWWebSocketConnection::setOnMessage(OnMessage cb) {
+  std::lock_guard<std::mutex> lock(_msgMu);
+  _onMessage = std::move(cb);
+  if (!_onMessage) return;
   std::deque<BufferedMessage> replay;
-  OnMessage onMsg;
-  {
-    std::lock_guard<std::mutex> lock(_cbMu);
-    _onMessage = std::move(cb);
-    onMsg = _onMessage;
+  replay.swap(_msgBuffer);
+  for (auto& m : replay) {
+    _onMessage(m.data.data(), m.data.size(), m.isBinary, &m.data);
   }
-  if (onMsg) {
-    {
-      std::lock_guard<std::mutex> lock(_msgMu);
-      replay = std::move(_msgBuffer);
-    }
-    for (auto& m : replay) {
-      onMsg(m.data.data(), m.data.size(), m.isBinary, &m.data);
-    }
+}
+
+void NWWebSocketConnection::deliverMessage(
+    const uint8_t* data, size_t len, bool isBinary) {
+  std::lock_guard<std::mutex> lock(_msgMu);
+  if (_onMessage) {
+    _onMessage(data, len, isBinary, nullptr);
+  } else {
+    _msgBuffer.push_back({std::vector<uint8_t>(data, data + len), isBinary});
   }
 }
 

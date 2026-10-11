@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'react-native-harness';
 import { Platform } from 'react-native';
-import { NitroWebSocket } from 'react-native-nitro-websockets';
+import { NitroWebSocket, createWebSocket } from 'react-native-nitro-websockets';
+import { TextDecoder } from 'react-native-nitro-text-decoder';
 import type {
   WebSocketMessageEvent,
   WebSocketCloseEvent,
@@ -474,6 +475,40 @@ describe('NitroWebSocket - Error Handling', () => {
       'error for invalid host'
     );
     expect(settled).toBe(true);
+  });
+});
+
+describe('NitroWebSocket - Late handlers', () => {
+  const decoder = new TextDecoder();
+
+  function messageIndex(isBinary: boolean, data: ArrayBuffer): number {
+    const bytes = new Uint8Array(data);
+    if (isBinary) return bytes[0]! + bytes[1]! * 256;
+    const text = decoder.decode(bytes);
+    return Number(text.startsWith('m') ? text.slice(1) : text.split('é')[1]);
+  }
+
+  const indices = (n: number) => Array.from({ length: n }, (_, i) => i);
+
+  it('delivers every message once and in order', async () => {
+    for (let round = 0; round < 20; round++) {
+      const ws = createWebSocket();
+      ws.connect(`${WS_BASE}/ws/burst?count=300&end=close`, [], {});
+      await new Promise<void>((resolve) => setTimeout(resolve, round % 6));
+      const seen: number[] = [];
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error(`Round ${round}: ${seen.length} messages`)),
+          10_000
+        );
+        ws.onMessage = (e) => seen.push(messageIndex(e.isBinary, e.data));
+        ws.onClose = () => {
+          clearTimeout(timer);
+          resolve();
+        };
+      });
+      expect(seen).toEqual(indices(300));
+    }
   });
 });
 

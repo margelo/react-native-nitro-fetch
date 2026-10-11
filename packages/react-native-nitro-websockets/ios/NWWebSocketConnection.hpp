@@ -77,6 +77,7 @@ private:
   std::string _localCloseReason;
 
   void scheduleReceive();
+  void deliverMessage(const uint8_t* data, size_t len, bool isBinary);
   void fireClose(int code, const std::string& reason, bool wasClean);
   void fireError(const std::string& msg);
 
