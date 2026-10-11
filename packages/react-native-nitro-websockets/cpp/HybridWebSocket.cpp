@@ -150,18 +150,19 @@ void HybridWebSocket::connect(
     const std::unordered_map<std::string, std::string>& headers) {
 
   auto existing = WebSocketPrewarmer::instance().tryGet(url);
-  if (existing) {
+  const bool adopted = existing != nullptr;
+  if (adopted || _connected) {
     _conn->setOnOpen(nullptr);
     _conn->setOnMessage(nullptr);
     _conn->setOnClose(nullptr);
     _conn->setOnError(nullptr);
+    if (_connected) _conn->close(1001, "");
 
-    _conn = std::move(existing);
+    _conn = adopted ? std::move(existing) : createConnection();
     bindCallbacks();
-    return;
   }
-
-  _conn->connect(url, protocols, headers);
+  _connected = true;
+  if (!adopted) _conn->connect(url, protocols, headers);
 }
 
 void HybridWebSocket::close(double code, const std::string& reason) {
