@@ -161,6 +161,10 @@ app.all('/status/:code', (req, res) => {
   res.status(Number.isFinite(code) ? code : 200).end();
 });
 
+app.get('/charset/:value', (req, res) => {
+  res.set('Content-Type', `text/plain; charset=${req.params.value}`).send(Buffer.from('café crème', 'latin1'));
+});
+
 app.all('/redirect/:n', (req, res) => {
   const n = parseInt(req.params.n, 10) || 1;
   res.status(302).set('Location', n > 1 ? `/redirect/${n - 1}` : '/get').end();
