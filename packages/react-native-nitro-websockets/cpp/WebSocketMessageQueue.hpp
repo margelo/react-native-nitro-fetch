@@ -3,6 +3,7 @@
 #include "HybridWebSocketMessageEvent.hpp"
 
 #include <NitroModules/JSIConverter.hpp>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -14,7 +15,11 @@ namespace margelo::nitro::nitrofetchwebsockets {
 
 class WebSocketMessageQueue {
 public:
-  using Item = std::variant<std::string, HybridWebSocketMessageEvent>;
+  struct Text {
+    std::vector<uint8_t> bytes;
+    bool ascii;
+  };
+  using Item = std::variant<Text, HybridWebSocketMessageEvent>;
 
   WebSocketMessageQueue() : _state(std::make_shared<State>()) {}
   explicit WebSocketMessageQueue(std::vector<Item>&& items) : WebSocketMessageQueue() {
@@ -67,16 +72,39 @@ namespace margelo::nitro {
 
 template <>
 struct JSIConverter<nitrofetchwebsockets::WebSocketMessageQueue> final {
-  using Items = std::vector<nitrofetchwebsockets::WebSocketMessageQueue::Item>;
+  using Queue = nitrofetchwebsockets::WebSocketMessageQueue;
+  using Event = nitrofetchwebsockets::HybridWebSocketMessageEvent;
+  using Values = std::vector<std::variant<std::string, Event>>;
 
-  static inline nitrofetchwebsockets::WebSocketMessageQueue fromJSI(jsi::Runtime& runtime, const jsi::Value& arg) {
-    return nitrofetchwebsockets::WebSocketMessageQueue(JSIConverter<Items>::fromJSI(runtime, arg));
+  static inline Queue fromJSI(jsi::Runtime& runtime, const jsi::Value& arg) {
+    Values values = JSIConverter<Values>::fromJSI(runtime, arg);
+    std::vector<Queue::Item> items;
+    items.reserve(values.size());
+    for (auto& value : values) {
+      if (auto* text = std::get_if<std::string>(&value)) {
+        items.emplace_back(Queue::Text{ std::vector<uint8_t>(text->begin(), text->end()), false });
+      } else {
+        items.emplace_back(std::get<Event>(std::move(value)));
+      }
+    }
+    return Queue(std::move(items));
   }
-  static inline jsi::Value toJSI(jsi::Runtime& runtime, const nitrofetchwebsockets::WebSocketMessageQueue& queue) {
-    return JSIConverter<Items>::toJSI(runtime, queue.drain());
+  static inline jsi::Value toJSI(jsi::Runtime& runtime, const Queue& queue) {
+    std::vector<Queue::Item> items = queue.drain();
+    jsi::Array array(runtime, items.size());
+    for (size_t i = 0; i < items.size(); i++) {
+      if (auto* text = std::get_if<Queue::Text>(&items[i])) {
+        array.setValueAtIndex(runtime, i,
+                              text->ascii ? jsi::String::createFromAscii(runtime, reinterpret_cast<const char*>(text->bytes.data()), text->bytes.size())
+                                          : jsi::String::createFromUtf8(runtime, text->bytes.data(), text->bytes.size()));
+      } else {
+        array.setValueAtIndex(runtime, i, JSIConverter<Event>::toJSI(runtime, std::get<Event>(items[i])));
+      }
+    }
+    return array;
   }
   static inline bool canConvert(jsi::Runtime& runtime, const jsi::Value& value) {
-    return JSIConverter<Items>::canConvert(runtime, value);
+    return JSIConverter<Values>::canConvert(runtime, value);
   }
 };
 

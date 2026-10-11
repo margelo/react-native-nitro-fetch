@@ -44,6 +44,18 @@ std::shared_ptr<ArrayBuffer> copyPayloadToArrayBuffer(const uint8_t* data, size_
 
 constexpr size_t kMaxDirectTextBytes = 512;
 
+size_t asciiPrefixLength(const uint8_t* s, size_t len) {
+  size_t i = 0;
+  while (i + 8 <= len) {
+    uint64_t chunk;
+    std::memcpy(&chunk, s + i, 8);
+    if (chunk & 0x8080808080808080ULL) break;
+    i += 8;
+  }
+  while (i < len && s[i] < 0x80) i++;
+  return i;
+}
+
 bool isWellFormedUtf8(const uint8_t* s, size_t len) {
   size_t i = 0;
   while (i < len) {
@@ -100,12 +112,21 @@ WebSocketConnectionBase::OnMessage makeHybridMessageBridge(
   };
 }
 
+std::vector<uint8_t> payloadToBytes(const uint8_t* data, size_t len, std::vector<uint8_t>* owned) {
+  if (owned != nullptr) return std::move(*owned);
+  return std::vector<uint8_t>(data, data + len);
+}
+
 WebSocketConnectionBase::OnMessage makeBatchBridge(std::function<void(WebSocketMessageQueue)> onBatch) {
   WebSocketMessageQueue queue;
   return [onBatch = std::move(onBatch), queue](const uint8_t* data, size_t len, bool isBinary, std::vector<uint8_t>* owned) {
-    std::optional<WebSocketMessageQueue> batch = !isBinary && len <= kMaxDirectTextBytes && isWellFormedUtf8(data, len)
-      ? queue.push(std::string(reinterpret_cast<const char*>(data), len))
-      : queue.push(HybridWebSocketMessageEvent{ payloadToArrayBuffer(data, len, owned), isBinary });
+    std::optional<WebSocketMessageQueue> batch;
+    size_t ascii = isBinary ? 0 : asciiPrefixLength(data, len);
+    if (!isBinary && (ascii == len || (len <= kMaxDirectTextBytes && isWellFormedUtf8(data + ascii, len - ascii)))) {
+      batch = queue.push(WebSocketMessageQueue::Text{ payloadToBytes(data, len, owned), ascii == len });
+    } else {
+      batch = queue.push(HybridWebSocketMessageEvent{ payloadToArrayBuffer(data, len, owned), isBinary });
+    }
     if (batch) onBatch(std::move(*batch));
   };
 }
