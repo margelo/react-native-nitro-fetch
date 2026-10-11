@@ -8,6 +8,7 @@
 //   - Android emulator -> http://10.0.2.2:9876
 //   - iOS simulator    -> http://127.0.0.1:9876
 import { randomUUID } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import express from 'express';
 import multer from 'multer';
 import { WebSocketServer } from 'ws';
@@ -178,6 +179,26 @@ app.get('/bytes/:n', (req, res) => {
   const buf = Buffer.allocUnsafe(n);
   for (let i = 0; i < n; i++) buf[i] = i % 256;
   res.set('Content-Type', 'application/octet-stream').send(buf);
+});
+
+app.get('/text', (req, res) => {
+  const phrase = String(req.query.phrase ?? '');
+  const repeat = Math.max(0, parseInt(req.query.repeat ?? '1', 10) || 0);
+  const charset = String(req.query.charset ?? 'utf-8');
+  const latin1 = /^"?iso-8859-1"?$/i.test(charset);
+  let body = Buffer.from(phrase.repeat(repeat), latin1 ? 'latin1' : 'utf8');
+  if (req.query.invalid) body = Buffer.concat([body, Buffer.from(String(req.query.invalid), 'hex')]);
+  res.set('Content-Type', `text/plain; charset=${charset}`).set('Cache-Control', 'no-store');
+  if (req.query.gzip) return res.set('Content-Encoding', 'gzip').send(gzipSync(body));
+  if (req.query.chunked) {
+    for (let i = 0; i < body.length; i += 16384) res.write(body.subarray(i, i + 16384));
+    return res.end();
+  }
+  res.send(body);
+});
+
+app.get('/not-modified', (_req, res) => {
+  res.status(304).set('Content-Length', '1000000').end();
 });
 
 app.get('/stream/:n', (req, res) => {
