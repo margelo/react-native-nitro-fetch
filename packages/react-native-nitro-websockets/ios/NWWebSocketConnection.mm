@@ -116,6 +116,11 @@ void NWWebSocketConnection::connect(
   _peerCloseReason.clear();
   _localCloseCode = 0;
   _localCloseReason.clear();
+  {
+    std::lock_guard<std::mutex> lock(_cbMu);
+    _errorPending.reset();
+    _closePending.reset();
+  }
 
   if (_impl->task) {
     [_impl->task cancel];
@@ -130,6 +135,7 @@ void NWWebSocketConnection::connect(
   NSURL* nsURL = [NSURL URLWithString:nsUrlStr];
   if (!nsURL) {
     fireError("Invalid WebSocket URL: " + url);
+    fireClose(1006, "", false);
     return;
   }
 
@@ -460,13 +466,33 @@ void NWWebSocketConnection::setOnMessage(OnMessage cb) {
 }
 
 void NWWebSocketConnection::setOnClose(OnClose cb) {
-  std::lock_guard<std::mutex> lock(_cbMu);
-  _onClose = std::move(cb);
+  OnClose toFire;
+  std::optional<PendingClose> pending;
+  {
+    std::lock_guard<std::mutex> lock(_cbMu);
+    _onClose = std::move(cb);
+    if (_onClose && _closePending) {
+      toFire = _onClose;
+      pending = std::move(_closePending);
+      _closePending.reset();
+    }
+  }
+  if (toFire) toFire(pending->code, pending->reason, pending->wasClean);
 }
 
 void NWWebSocketConnection::setOnError(OnError cb) {
-  std::lock_guard<std::mutex> lock(_cbMu);
-  _onError = std::move(cb);
+  OnError toFire;
+  std::optional<std::string> pending;
+  {
+    std::lock_guard<std::mutex> lock(_cbMu);
+    _onError = std::move(cb);
+    if (_onError && _errorPending) {
+      toFire = _onError;
+      pending = std::move(_errorPending);
+      _errorPending.reset();
+    }
+  }
+  if (toFire) toFire(*pending);
 }
 
 
@@ -504,6 +530,7 @@ void NWWebSocketConnection::fireClose(
   {
     std::lock_guard<std::mutex> lock(_cbMu);
     cb = _onClose;
+    if (!cb) _closePending = PendingClose{ code, reason, wasClean };
   }
   if (cb) cb(code, reason, wasClean);
 }
@@ -521,6 +548,7 @@ void NWWebSocketConnection::fireError(const std::string& msg) {
   {
     std::lock_guard<std::mutex> lock(_cbMu);
     cb = _onError;
+    if (!cb) _errorPending = msg;
   }
   if (cb) cb(msg);
 }

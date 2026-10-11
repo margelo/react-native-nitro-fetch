@@ -6,6 +6,7 @@
 
 #include <deque>
 #include <mutex>
+#include <optional>
 #include <atomic>
 #include <memory>
 
@@ -56,6 +57,10 @@ private:
 
   std::atomic<bool> _openFired{false};
   std::atomic<bool> _closeFired{false};
+
+  struct PendingClose { int code; std::string reason; bool wasClean; };
+  std::optional<std::string> _errorPending;
+  std::optional<PendingClose> _closePending;
 
   struct BufferedMessage { std::vector<uint8_t> data; bool isBinary; };
   std::deque<BufferedMessage> _msgBuffer;

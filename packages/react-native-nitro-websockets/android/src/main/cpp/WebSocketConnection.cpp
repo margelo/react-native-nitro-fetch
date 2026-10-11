@@ -153,7 +153,7 @@ void WebSocketConnection::connect(
     _state = State::CLOSED;
     auto self = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
     LwsContext::instance().schedule([self, what]() {
-      if (self->_onError) self->_onError(what);
+      self->fireError(what);
       self->fireClose(1006, "", false);
     });
     return;
@@ -196,7 +196,7 @@ void WebSocketConnection::connect(
     lws* wsi = lws_client_connect_via_info(&i);
     if (wsi == nullptr) {
       self->_selfRef.reset();
-      if (self->_onError) self->_onError("lws_client_connect_via_info returned null");
+      self->fireError("lws_client_connect_via_info returned null");
       self->fireClose(1006, "", false);
     } else {
       self->_wsi = wsi;
@@ -313,6 +313,11 @@ void WebSocketConnection::setOnClose(OnClose cb) {
   auto self = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
   LwsContext::instance().schedule([self, cb = std::move(cb)]() mutable {
     self->_onClose = std::move(cb);
+    if (self->_onClose && self->_closePending) {
+      PendingClose pending = std::move(*self->_closePending);
+      self->_closePending.reset();
+      self->_onClose(pending.code, pending.reason, pending.wasClean);
+    }
   });
 }
 
@@ -320,6 +325,11 @@ void WebSocketConnection::setOnError(OnError cb) {
   auto self = std::static_pointer_cast<WebSocketConnection>(shared_from_this());
   LwsContext::instance().schedule([self, cb = std::move(cb)]() mutable {
     self->_onError = std::move(cb);
+    if (self->_onError && self->_errorPending) {
+      std::string pending = std::move(*self->_errorPending);
+      self->_errorPending.reset();
+      self->_onError(pending);
+    }
   });
 }
 
@@ -448,7 +458,19 @@ void WebSocketConnection::handlePeerClose(const void* in, size_t len) {
 void WebSocketConnection::fireClose(int code, const std::string& reason, bool wasClean) {
   if (_closeFired.exchange(true)) return;
   _state = State::CLOSED;
-  if (_onClose) _onClose(code, reason, wasClean);
+  if (_onClose) {
+    _onClose(code, reason, wasClean);
+  } else {
+    _closePending = PendingClose{ code, reason, wasClean };
+  }
+}
+
+void WebSocketConnection::fireError(const std::string& msg) {
+  if (_onError) {
+    _onError(msg);
+  } else {
+    _errorPending = msg;
+  }
 }
 
 void WebSocketConnection::handleClose() {
@@ -477,7 +499,7 @@ void WebSocketConnection::handleError(const char* msg) {
 #endif
   _state = State::CLOSED;
   _wsi   = nullptr;
-  if (_onError) _onError(msg ? std::string(msg) : "WebSocket error");
+  fireError(msg ? std::string(msg) : "WebSocket error");
   fireClose(1006, "", false);
 #if defined(NITRO_WS_TRACING)
   ATrace_endSection();

@@ -190,6 +190,10 @@ void HybridWebSocket::bindCallbacks() {
     _conn->setOnMessage({});
   }
 
+  auto onError = _onError;
+  _conn->setOnError(onError ? [onError = *onError](const std::string& msg) { onError(msg); }
+                             : WebSocketConnectionBase::OnError{});
+
   auto onClose = _onClose;
   if (onClose) {
     _conn->setOnClose([onClose = *onClose](int code, const std::string& reason, bool wasClean) {
@@ -198,10 +202,6 @@ void HybridWebSocket::bindCallbacks() {
   } else {
     _conn->setOnClose({});
   }
-
-  auto onError = _onError;
-  _conn->setOnError(onError ? [onError = *onError](const std::string& msg) { onError(msg); }
-                             : WebSocketConnectionBase::OnError{});
 }
 
 } // namespace margelo::nitro::nitrofetchwebsockets

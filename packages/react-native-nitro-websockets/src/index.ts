@@ -38,6 +38,13 @@ function generateWsId(): string {
   return 'ws-' + String(Date.now()) + '-' + String(Math.random()).slice(2, 8)
 }
 
+type Handlers = {
+  onopen: (() => void) | null
+  onmessage: ((e: WebSocketMessageEvent) => void) | null
+  onerror: ((error: string) => void) | null
+  onclose: ((e: NitroWSCloseEvent) => void) | null
+}
+
 /**
  * Browser-compatible WebSocket wrapper backed by a Nitro HybridObject
  * using libwebsockets + mbedTLS under the hood.
@@ -45,6 +52,14 @@ function generateWsId(): string {
 export class NitroWebSocket {
   private _ws: HybridWebSocket
   private _inspectorId: string | undefined
+  private _handlers: Handlers = {
+    onopen: null,
+    onmessage: null,
+    onerror: null,
+    onclose: null,
+  }
+  private _bound: Handlers = { ...this._handlers }
+  private _bindScheduled = false
 
   constructor(
     url: string,
@@ -92,6 +107,40 @@ export class NitroWebSocket {
   }
 
   set onopen(fn: (() => void) | null) {
+    this._handlers.onopen = fn
+    this._scheduleBind()
+  }
+  set onmessage(fn: ((e: WebSocketMessageEvent) => void) | null) {
+    this._handlers.onmessage = fn
+    this._scheduleBind()
+  }
+  set onerror(fn: ((error: string) => void) | null) {
+    this._handlers.onerror = fn
+    this._scheduleBind()
+  }
+  set onclose(fn: ((e: NitroWSCloseEvent) => void) | null) {
+    this._handlers.onclose = fn
+    this._scheduleBind()
+  }
+
+  private _scheduleBind() {
+    if (this._bindScheduled) return
+    this._bindScheduled = true
+    queueMicrotask(() => {
+      this._bindScheduled = false
+      const handlers = this._handlers
+      const bound = this._bound
+      if (handlers.onopen !== bound.onopen) this._bindOpen(handlers.onopen)
+      if (handlers.onmessage !== bound.onmessage) {
+        this._bindMessage(handlers.onmessage)
+      }
+      if (handlers.onerror !== bound.onerror) this._bindError(handlers.onerror)
+      if (handlers.onclose !== bound.onclose) this._bindClose(handlers.onclose)
+      this._bound = { ...handlers }
+    })
+  }
+
+  private _bindOpen(fn: (() => void) | null) {
     if (fn == null) {
       this._ws.onOpen = undefined
       return
@@ -104,7 +153,7 @@ export class NitroWebSocket {
       fn()
     }
   }
-  set onmessage(fn: ((e: WebSocketMessageEvent) => void) | null) {
+  private _bindMessage(fn: ((e: WebSocketMessageEvent) => void) | null) {
     if (fn == null) {
       this._ws.onMessage = undefined
       return
@@ -148,7 +197,7 @@ export class NitroWebSocket {
       }
     }
   }
-  set onclose(fn: ((e: NitroWSCloseEvent) => void) | null) {
+  private _bindClose(fn: ((e: NitroWSCloseEvent) => void) | null) {
     if (fn == null) {
       this._ws.onClose = undefined
       return
@@ -161,7 +210,7 @@ export class NitroWebSocket {
       fn(e)
     }
   }
-  set onerror(fn: ((error: string) => void) | null) {
+  private _bindError(fn: ((error: string) => void) | null) {
     if (fn == null) {
       this._ws.onError = undefined
       return

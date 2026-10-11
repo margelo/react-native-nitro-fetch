@@ -60,6 +60,7 @@ public:
 private:
   void requestWrite();
   void fireClose(int code, const std::string& reason, bool wasClean);
+  void fireError(const std::string& msg);
 
   // Held while a wsi points at us, so lws can never call into a freed object.
   std::shared_ptr<WebSocketConnection> _selfRef;
@@ -74,6 +75,10 @@ private:
   OnMessage _onMessage;
   OnClose   _onClose;
   OnError   _onError;
+
+  struct PendingClose { int code; std::string reason; bool wasClean; };
+  std::optional<std::string> _errorPending;
+  std::optional<PendingClose> _closePending;
 
   std::atomic<bool> _openFired{false};
   std::atomic<bool> _closeFired{false};
