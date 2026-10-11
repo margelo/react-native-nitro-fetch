@@ -46,7 +46,7 @@ public:
   // lws callback handlers (internal, not part of the base interface)
   void handleFilterPreEstablish(lws* wsi);
   void handleEstablished(lws* wsi);
-  void handleReceive(const void* in, size_t len, bool isBinary);
+  void handleReceive(const void* in, size_t len, bool isBinary, std::vector<uint8_t>* owned);
   void handleReceiveFragment(lws* wsi, const void* in, size_t len);
   int  handleWriteable(lws* wsi);
   void handleClose();

@@ -402,7 +402,7 @@ void NWWebSocketConnection::scheduleReceive() {
           size_t len = utf8.length;
 
           if (onMsg) {
-            onMsg(bytes, len, false);
+            onMsg(bytes, len, false, nullptr);
           } else {
             std::vector<uint8_t> copy(bytes, bytes + len);
             std::lock_guard<std::mutex> lock(conn->_msgMu);
@@ -417,7 +417,7 @@ void NWWebSocketConnection::scheduleReceive() {
           size_t len = message.data.length;
 
           if (onMsg) {
-            onMsg(bytes, len, true);
+            onMsg(bytes, len, true, nullptr);
           } else {
             std::vector<uint8_t> copy(bytes, bytes + len);
             std::lock_guard<std::mutex> lock(conn->_msgMu);
@@ -460,7 +460,7 @@ void NWWebSocketConnection::setOnMessage(OnMessage cb) {
       replay = std::move(_msgBuffer);
     }
     for (auto& m : replay) {
-      onMsg(m.data.data(), m.data.size(), m.isBinary);
+      onMsg(m.data.data(), m.data.size(), m.isBinary, &m.data);
     }
   }
 }

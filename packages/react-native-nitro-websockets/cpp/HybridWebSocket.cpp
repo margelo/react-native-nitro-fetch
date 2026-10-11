@@ -42,10 +42,18 @@ std::shared_ptr<ArrayBuffer> copyPayloadToArrayBuffer(const uint8_t* data, size_
   return std::make_shared<NativeArrayBuffer>(raw, len, [raw]() { delete[] raw; });
 }
 
+std::shared_ptr<ArrayBuffer> payloadToArrayBuffer(const uint8_t* data, size_t len, std::vector<uint8_t>* owned) {
+  if (len == 0 || owned == nullptr) {
+    return copyPayloadToArrayBuffer(data, len);
+  }
+  auto holder = std::make_shared<std::vector<uint8_t>>(std::move(*owned));
+  return std::make_shared<NativeArrayBuffer>(holder->data(), holder->size(), [holder]() {});
+}
+
 WebSocketConnectionBase::OnMessage makeHybridMessageBridge(
     std::function<void(const HybridWebSocketMessageEvent&)> cb) {
-  return [cb = std::move(cb)](const uint8_t* data, size_t len, bool isBinary) {
-    cb(HybridWebSocketMessageEvent{ copyPayloadToArrayBuffer(data, len), isBinary });
+  return [cb = std::move(cb)](const uint8_t* data, size_t len, bool isBinary, std::vector<uint8_t>* owned) {
+    cb(HybridWebSocketMessageEvent{ payloadToArrayBuffer(data, len, owned), isBinary });
   };
 }
 

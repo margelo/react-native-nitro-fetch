@@ -21,7 +21,7 @@ public:
   enum class State { CONNECTING = 0, OPEN = 1, CLOSING = 2, CLOSED = 3 };
 
   using OnOpen    = std::function<void()>;
-  using OnMessage = std::function<void(const uint8_t* data, size_t len, bool isBinary)>;
+  using OnMessage = std::function<void(const uint8_t* data, size_t len, bool isBinary, std::vector<uint8_t>* owned)>;
   using OnClose   = std::function<void(int code, const std::string& reason, bool wasClean)>;
   using OnError   = std::function<void(const std::string& msg)>;
 
