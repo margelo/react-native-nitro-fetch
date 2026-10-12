@@ -43,6 +43,8 @@ class HybridUrlRequestBuilder(
   private var uploadBodyLength: Long = 0L
 
   init {
+    if (hostHasWhitespace(url)) throw invalidUrlException(url)
+
     // Allocate ONE reusable owning buffer for all reads (64KB)
     val reusableBuffer = ArrayBuffer.allocate(65536)
     byteBuffer = reusableBuffer.getBuffer(false)
@@ -129,7 +131,7 @@ class HybridUrlRequestBuilder(
         }
         onFailedCallback?.let { callback ->
           val nitroInfo = info?.toNitro()
-          val nitroError = error.toNitro()
+          val nitroError = error.toNitro(url)
           callback(nitroInfo, nitroError)
         }
       }

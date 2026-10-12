@@ -256,6 +256,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           onSuccess(makeLocalFileResponse(req))
           return null
         }
+        if (hostHasWhitespace(req.url)) throw invalidUrlException(req.url)
         val engine = HybridNitroFetch.getEngine()
         val executor = HybridNitroFetch.ioExecutor
         startCronet(engine, executor, req, onSuccess, onFail)
@@ -426,7 +427,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           if (devToolsEnabled) {
             DevToolsReporter.reportRequestFailed(devToolsRequestId, false)
           }
-          onFail(RuntimeException("Cronet failed: ${error.message}", error))
+          onFail(if (error.isInvalidUrl) invalidUrlException(url) else RuntimeException("Cronet failed: ${error.message}", error))
         }
 
         override fun onCanceled(request: UrlRequest, info: UrlResponseInfo?) = complete {
