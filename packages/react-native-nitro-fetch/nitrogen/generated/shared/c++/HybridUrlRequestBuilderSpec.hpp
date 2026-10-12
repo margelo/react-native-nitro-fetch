@@ -70,6 +70,7 @@ namespace margelo::nitro::nitrofetch {
       virtual void disableCache() = 0;
       virtual void disableCookies() = 0;
       virtual void setPriority(NitroRequestPriority priority) = 0;
+      virtual std::shared_ptr<ArrayBuffer> enableNativeBuffer(double capacity) = 0;
       virtual void onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) = 0;
       virtual void onFailed(const std::function<void(const std::optional<UrlResponseInfo>& /* info */, const RequestException& /* error */)>& callback) = 0;
       virtual void onCanceled(const std::function<void(const std::optional<UrlResponseInfo>& /* info */)>& callback) = 0;

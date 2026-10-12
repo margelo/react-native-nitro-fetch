@@ -18,14 +18,14 @@ namespace margelo::nitro::nitrofetch { struct HttpHeader; }
 // Forward declaration of `RequestException` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct RequestException; }
 
+#include <NitroModules/ArrayBuffer.hpp>
+#include <NitroModules/JArrayBuffer.hpp>
 #include <memory>
 #include "HybridUrlRequestSpec.hpp"
 #include "JHybridUrlRequestSpec.hpp"
 #include <string>
-#include <NitroModules/ArrayBuffer.hpp>
 #include <variant>
 #include "JVariant_ArrayBuffer_String.hpp"
-#include <NitroModules/JArrayBuffer.hpp>
 #include "NitroRequestPriority.hpp"
 #include "JNitroRequestPriority.hpp"
 #include "UrlResponseInfo.hpp"
@@ -101,6 +101,11 @@ namespace margelo::nitro::nitrofetch {
   void JHybridUrlRequestBuilderSpec::setPriority(NitroRequestPriority priority) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JNitroRequestPriority> /* priority */)>("setPriority");
     method(_javaPart, JNitroRequestPriority::fromCpp(priority));
+  }
+  std::shared_ptr<ArrayBuffer> JHybridUrlRequestBuilderSpec::enableNativeBuffer(double capacity) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JArrayBuffer::javaobject>(double /* capacity */)>("enableNativeBuffer");
+    auto __result = method(_javaPart, capacity);
+    return __result->cthis()->getArrayBuffer();
   }
   void JHybridUrlRequestBuilderSpec::onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo::javaobject> /* callback */)>("onSucceeded_cxx");

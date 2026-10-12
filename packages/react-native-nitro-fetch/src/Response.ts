@@ -22,6 +22,7 @@ export interface NitroResponseInit {
   bodyString?: string;
   body?: ReadableStream<Uint8Array<ArrayBuffer>>;
   type?: ResponseType;
+  nativeBuffer?: ArrayBuffer;
 }
 
 function isNitroResponseInit(arg: any): arg is NitroResponseInit {
@@ -75,6 +76,7 @@ export class NitroResponse {
   readonly redirected: boolean;
   readonly headers: NitroHeaders;
   readonly type: ResponseType;
+  readonly nativeBuffer?: ArrayBuffer;
 
   private _bodyBytes: ArrayBuffer | undefined;
   private _bodyString: string | undefined;
@@ -96,6 +98,7 @@ export class NitroResponse {
       this.statusText = nitroInit.statusText;
       this.redirected = nitroInit.redirected;
       this.type = nitroInit.type ?? 'basic';
+      this.nativeBuffer = nitroInit.nativeBuffer;
 
       if (nitroInit.headers instanceof NitroHeaders) {
         this.headers = nitroInit.headers;
