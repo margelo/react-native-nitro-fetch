@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { NitroWebSocket, createWebSocket } from 'react-native-nitro-websockets';
 import { TextDecoder } from 'react-native-nitro-text-decoder';
 import type {
+  HybridWebSocket,
   WebSocketMessageEvent,
   WebSocketCloseEvent,
 } from 'react-native-nitro-websockets';
@@ -630,6 +631,78 @@ describe('NitroWebSocket - Late handlers', () => {
   });
 });
 
+describe('HybridWebSocket - connect() again', () => {
+  const ECHO = `${WS_BASE}/ws/echo`;
+
+  function record(ws: HybridWebSocket) {
+    const events: string[] = [];
+    let waiter: { prefix: string; resolve: () => void } | null = null;
+    const push = (event: string) => {
+      events.push(event);
+      if (waiter && event.startsWith(waiter.prefix)) {
+        const { resolve } = waiter;
+        waiter = null;
+        resolve();
+      }
+    };
+    ws.onOpen = () => push('open');
+    ws.onError = () => push('error');
+    ws.onClose = (e) => push(`close ${e.code}`);
+    const next = (prefix: string) =>
+      new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error(`No ${prefix} event: ${events.join(', ')}`)),
+          5_000
+        );
+        waiter = {
+          prefix,
+          resolve: () => {
+            clearTimeout(timer);
+            resolve();
+          },
+        };
+      });
+    return { events, next };
+  }
+
+  const sleep = (ms: number) =>
+    new Promise<void>((resolve) => setTimeout(() => resolve(), ms));
+
+  it('replaces an open connection without events from the old one', async () => {
+    const ws = createWebSocket();
+    const { events, next } = record(ws);
+    let opened = next('open');
+    ws.connect(ECHO, [], {});
+    await opened;
+    opened = next('open');
+    ws.connect(ECHO, [], {});
+    await opened;
+    await sleep(300);
+    const closed = next('close');
+    ws.close(1000, '');
+    await closed;
+    expect(events).toEqual(['open', 'open', 'close 1000']);
+  });
+
+  it('opens and closes again after a close', async () => {
+    const ws = createWebSocket();
+    const { events, next } = record(ws);
+    let step = next('open');
+    ws.connect(ECHO, [], {});
+    await step;
+    step = next('close');
+    ws.close(1000, '');
+    await step;
+    step = next('open');
+    ws.connect(ECHO, [], {});
+    await step;
+    step = next('close');
+    ws.close(1000, '');
+    await step;
+    expect(events).toEqual(['open', 'close 1000', 'open', 'close 1000']);
+  });
+});
+
 describe('NitroWebSocket - Redirects', () => {
   function firstMessage(
     url: string
@@ -669,5 +742,37 @@ describe('NitroWebSocket - Redirects', () => {
     const { ws, data } = await firstMessage(redirectTo(WS_BASE));
     expect(data).toBe('/');
     await closeAndWait(ws);
+  });
+});
+
+describe('NitroWebSocket - Redirects that are not followed', () => {
+  function events(url: string): Promise<string[]> {
+    return new Promise<string[]>((resolve, reject) => {
+      const seen: string[] = [];
+      const timer = setTimeout(
+        () => reject(new Error(`No close event: ${seen.join(', ')}`)),
+        30_000
+      );
+      const ws = new NitroWebSocket(url);
+      ws.onopen = () => seen.push('open');
+      ws.onerror = () => seen.push('error');
+      ws.onclose = (e) => {
+        seen.push(`close ${e.code}`);
+        clearTimeout(timer);
+        setTimeout(() => resolve(seen), 500);
+      };
+    });
+  }
+
+  it('reports one error and one close after too many redirects', async () => {
+    const seen = await events(`${WS_BASE}/ws/redirect?n=25&to=%2F`);
+    expect(seen).toEqual(['error', 'close 1006']);
+  });
+
+  it('reports one error and one close for a non-WebSocket Location', async () => {
+    const seen = await events(
+      `${WS_BASE}/ws/redirect?to=${encodeURIComponent('ftp://127.0.0.1/x')}`
+    );
+    expect(seen).toEqual(['error', 'close 1006']);
   });
 });
