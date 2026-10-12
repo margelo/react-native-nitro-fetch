@@ -260,6 +260,27 @@ describe('NitroWebSocket - Close', () => {
     );
     expect(count).toBe(1);
   });
+
+  it('close() fires onclose when the server stops reading', async () => {
+    const ws = await withTimeout(
+      new Promise<NitroWebSocket>((resolve, reject) => {
+        const socket = new NitroWebSocket(WS_PAUSED_URL);
+        socket.onopen = () => resolve(socket);
+        socket.onerror = (err) => reject(new Error(`Connection error: ${err}`));
+      })
+    );
+    const chunk = new ArrayBuffer(64 * 1024);
+    for (let i = 0; i < 512; i++) ws.send(chunk);
+    await withTimeout(
+      new Promise<WebSocketCloseEvent>((resolve) => {
+        ws.onclose = resolve;
+        ws.close(1000, 'bye');
+      }),
+      30_000,
+      'close() against a server that stopped reading'
+    );
+    expect(ws.readyState).toBe('CLOSED');
+  });
 });
 
 // ─── Server-initiated close (issue #137) ─────────────────────────────────────
