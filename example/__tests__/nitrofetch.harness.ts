@@ -977,21 +977,31 @@ describe('NitroFetch - Streaming', () => {
     expect(threw).toBe(true);
   });
 
-  // iOS: URL(string:) returns nil for these, which used to hit a fatalError.
-  (Platform.OS === 'ios' ? it : it.skip)(
-    'streamed request with a URL Foundation cannot parse rejects instead of crashing',
-    async () => {
+  it('request with an unparseable URL rejects with Invalid URL', async () => {
+    for (const stream of [false, true]) {
       for (const url of ['https://exa mple.com', 'https://[']) {
         let error: any;
         try {
-          await (nitroFetch as any)(url, { stream: true });
+          await (nitroFetch as any)(url, stream ? { stream: true } : {});
         } catch (e) {
           error = e;
         }
         expect(String(error?.message)).toContain(`Invalid URL: ${url}`);
       }
     }
-  );
+  });
+
+  it('request with a space in the path or query succeeds', async () => {
+    for (const stream of [false, true]) {
+      for (const url of [`${BASE}/anything/a b`, `${BASE}/get?q=a b`]) {
+        const res = await (nitroFetch as any)(
+          url,
+          stream ? { stream: true } : {}
+        );
+        expect(res.status).toBe(200);
+      }
+    }
+  });
 
   it('aborting after the first /drip chunk rejects the next read with AbortError', async () => {
     const controller = new AbortController();
