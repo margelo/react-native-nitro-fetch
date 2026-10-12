@@ -213,7 +213,12 @@ int nitroWsCallback(lws* wsi, enum lws_callback_reasons reason,
       if (conn) {
         auto** p   = static_cast<uint8_t**>(in);
         uint8_t* end = *p + len;
-        conn->handleAppendHandshakeHeader(p, end, wsi);
+        if (!conn->handleAppendHandshakeHeader(p, end, wsi)) {
+          lws_set_wsi_user(wsi, nullptr);
+          auto keepAlive = conn->takeSelfRef();
+          conn->handleError(nullptr);
+          return -1;
+        }
       }
       break;
     }
@@ -615,8 +620,8 @@ void WebSocketConnection::handleError(const char* msg) {
 #endif
   _state = State::CLOSED;
   _wsi   = nullptr;
-  if (!_redirectError.empty()) {
-    fireError(_redirectError);
+  if (!_failureMessage.empty()) {
+    fireError(_failureMessage);
   } else {
     fireError(msg ? std::string(msg) : "WebSocket error");
   }
@@ -628,11 +633,11 @@ void WebSocketConnection::handleError(const char* msg) {
 
 void WebSocketConnection::handleRedirect(const std::string& location) {
   if (_state.load() != State::CONNECTING) {
-    _redirectError = "closed before established";
+    _failureMessage = "closed before established";
     return;
   }
   if (_redirectCount.fetch_add(1) >= kMaxRedirects) {
-    _redirectError = "too many redirects";
+    _failureMessage = "too many redirects";
     return;
   }
 
@@ -642,7 +647,7 @@ void WebSocketConnection::handleRedirect(const std::string& location) {
   try {
     parseUrl(url);
   } catch (const std::exception& e) {
-    _redirectError = e.what();
+    _failureMessage = e.what();
     return;
   }
 
@@ -671,7 +676,7 @@ void WebSocketConnection::handleRedirect(const std::string& location) {
   startConnect(url, protocols, headers);
 }
 
-void WebSocketConnection::handleAppendHandshakeHeader(uint8_t** p, uint8_t* end, lws* wsi) {
+bool WebSocketConnection::handleAppendHandshakeHeader(uint8_t** p, uint8_t* end, lws* wsi) {
   std::unordered_map<std::string, std::string> headers;
   {
     std::lock_guard<std::mutex> lock(_pendingConnectMu);
@@ -682,9 +687,11 @@ void WebSocketConnection::handleAppendHandshakeHeader(uint8_t** p, uint8_t* end,
           reinterpret_cast<const uint8_t*>(key.c_str()),
           reinterpret_cast<const uint8_t*>(val.c_str()),
           static_cast<int>(val.size()), p, end) != 0) {
-      break;
+      _failureMessage = "WebSocket handshake headers are too large";
+      return false;
     }
   }
+  return true;
 }
 
 } // namespace margelo::nitro::nitrofetchwebsockets

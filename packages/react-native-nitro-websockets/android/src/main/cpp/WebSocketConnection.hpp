@@ -52,7 +52,7 @@ public:
   void handleClose();
   void handlePeerClose(const void* in, size_t len);
   void handleError(const char* msg);
-  void handleAppendHandshakeHeader(uint8_t** p, uint8_t* end, lws* wsi);
+  bool handleAppendHandshakeHeader(uint8_t** p, uint8_t* end, lws* wsi);
   void handleRedirect(const std::string& location);
   bool consumeRedirectFlag() { return _isRedirecting.exchange(false); }
   std::shared_ptr<WebSocketConnection> takeSelfRef() { return std::move(_selfRef); }
@@ -87,7 +87,7 @@ private:
   std::atomic<bool> _closeFired{false};
   std::atomic<bool> _isRedirecting{false};
   std::atomic<int>  _redirectCount{0};
-  std::string _redirectError;
+  std::string _failureMessage;
   static constexpr int kMaxRedirects = 20;
   static constexpr size_t kMaxMessageSize = 16 * 1024 * 1024; // 16 MB
 
