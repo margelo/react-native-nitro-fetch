@@ -30,7 +30,7 @@ fun ByteBuffer.toByteArray(): ByteArray {
   return arr
 }
 
-private val charsetParam = Regex("charset=([A-Za-z0-9_\\-:.]+)", RegexOption.IGNORE_CASE)
+private val charsetParam = Regex("charset=\"?([A-Za-z0-9_\\-:.]+)", RegexOption.IGNORE_CASE)
 private val charsetsByContentType = ConcurrentHashMap<String, Charset>()
 
 private fun charsetOf(contentType: String): Charset {

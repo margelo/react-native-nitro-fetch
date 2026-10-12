@@ -185,6 +185,17 @@ describe('NitroFetch - Basic GET', () => {
   });
 });
 
+describe('NitroFetch - Response charset', () => {
+  for (const value of ['iso-8859-1', 'ISO-8859-1', '"iso-8859-1"']) {
+    it(`decodes a body declared as charset=${value}`, async () => {
+      const res = await nitroFetch(
+        `${BASE}/charset/${encodeURIComponent(value)}`
+      );
+      expect(await res.text()).toBe('café crème');
+    });
+  }
+});
+
 describe('NitroFetch - HTTP Methods', () => {
   it('POST JSON body → json().json.x === 1', async () => {
     const res = await nitroFetch(`${BASE}/post`, {
