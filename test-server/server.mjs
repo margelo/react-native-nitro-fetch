@@ -295,6 +295,18 @@ server.on('upgrade', (req, socket, head) => {
     socket.on('error', () => {});
     return;
   }
+  if (url.pathname === '/ws/fragments') {
+    const frames = Number(url.searchParams.get('frames')) || 5;
+    const size = Number(url.searchParams.get('size')) || 65536;
+    const send = acceptRawWebSocket(req, socket);
+    for (let f = 0; f < frames; f++) {
+      const payload = Buffer.alloc(size);
+      for (let i = 0; i < size; i++) payload[i] = (f * size + i) % 251;
+      send(f === 0 ? 2 : 0, payload, f === frames - 1);
+    }
+    socket.on('data', () => socket.end());
+    return;
+  }
   if (url.pathname === '/ws/redirect') {
     const hops = Number(url.searchParams.get('n')) || 1;
     const to = url.searchParams.get('to') ?? '/';
