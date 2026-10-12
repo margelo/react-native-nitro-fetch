@@ -19,6 +19,7 @@ import java.nio.charset.CodingErrorAction
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
+import java.util.concurrent.atomic.AtomicBoolean
 
 fun ByteBuffer.toByteArray(): ByteArray {
   // duplicate to avoid modifying the original buffer's position
@@ -681,13 +682,16 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       }
     }
     val requestId = req.requestId
+    val finished = AtomicBoolean(false)
     val urlRequest = fetch(
       req,
       onSuccess = { res ->
+        finished.set(true)
         if (requestId != null) activeRequests.remove(requestId)
         promise.resolve(res)
       },
       onFail = { err ->
+        finished.set(true)
         if (requestId != null) activeRequests.remove(requestId)
         promise.reject(err)
       }
@@ -696,6 +700,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
     // catch block checks signal.aborted and throws AbortError anyway.
     if (requestId != null && urlRequest != null) {
       activeRequests[requestId] = urlRequest
+      if (finished.get()) activeRequests.remove(requestId, urlRequest)
     }
     return promise
   }
