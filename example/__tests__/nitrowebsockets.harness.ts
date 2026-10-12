@@ -451,6 +451,21 @@ describe('NitroWebSocket - Handshake headers', () => {
     expect(headers.host).toBe(WS_BASE.replace('ws://', ''));
     await closeAndWait(ws);
   });
+
+  it('fails promptly when custom headers are too large to send', async () => {
+    const closeEvent = await withTimeout(
+      new Promise<WebSocketCloseEvent>((resolve) => {
+        const ws = new NitroWebSocket(`${WS_BASE}/ws/headers`, undefined, {
+          'x-big': 'a'.repeat(70_000),
+        });
+        ws.onclose = resolve;
+      }),
+      5_000,
+      'handshake with oversized headers'
+    );
+    expect(closeEvent.code).toBe(1006);
+    expect(closeEvent.wasClean).toBe(false);
+  });
 });
 
 // ─── Error Handling ───────────────────────────────────────────────────────────
