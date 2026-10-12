@@ -1,4 +1,8 @@
-import { type HybridObject, NitroModules } from 'react-native-nitro-modules'
+import {
+  type CustomType,
+  type HybridObject,
+  NitroModules,
+} from 'react-native-nitro-modules'
 
 export type WebSocketReadyState = 'CONNECTING' | 'OPEN' | 'CLOSING' | 'CLOSED'
 
@@ -6,6 +10,12 @@ export interface HybridWebSocketMessageEvent {
   data: ArrayBuffer
   isBinary: boolean
 }
+
+export type WebSocketMessageQueue = CustomType<
+  (string | HybridWebSocketMessageEvent)[],
+  'WebSocketMessageQueue',
+  { include: 'WebSocketMessageQueue.hpp' }
+>
 
 export interface WebSocketCloseEvent {
   code: number
@@ -33,6 +43,7 @@ export interface HybridWebSocket extends HybridObject<{
   sendBinary(data: ArrayBuffer): void
   onOpen: (() => void) | undefined
   onMessage: ((event: HybridWebSocketMessageEvent) => void) | undefined
+  onQueuedMessage: ((queue: WebSocketMessageQueue) => void) | undefined
   onClose: ((event: WebSocketCloseEvent) => void) | undefined
   onError: ((error: string) => void) | undefined
 }
