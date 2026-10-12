@@ -341,6 +341,7 @@ void WebSocketConnection::close(int code, const std::string& reason) {
                      static_cast<lws_close_status>(closeCode),
                      reinterpret_cast<unsigned char*>(const_cast<char*>(reason.c_str())),
                      reason.size());
+    lws_set_timeout(self->_wsi, PENDING_TIMEOUT_CLOSE_SEND, 5);
     lws_callback_on_writable(self->_wsi);
   });
 }
@@ -540,7 +541,9 @@ int WebSocketConnection::handleWriteable(lws* wsi) {
   {
     std::lock_guard<std::mutex> lock(_writeMu);
     if (_writeQueue.empty()) {
-      return (_state == State::CLOSING) ? -1 : 0;
+      if (_state != State::CLOSING) return 0;
+      _closeFrameSent = true;
+      return -1;
     }
     msg = std::move(_writeQueue.front());
     _writeQueue.pop_front();
@@ -559,6 +562,7 @@ int WebSocketConnection::handleWriteable(lws* wsi) {
       lws_callback_on_writable(wsi);
     }
   }
+  if (_state == State::CLOSING) lws_set_timeout(wsi, PENDING_TIMEOUT_CLOSE_SEND, 5);
   return 0;
 }
 
@@ -596,7 +600,7 @@ void WebSocketConnection::handleClose() {
   _wsi = nullptr;
   if (_peerCloseCode > 0) {
     fireClose(_peerCloseCode, _peerCloseReason, true);
-  } else if (_localCloseCode > 0) {
+  } else if (_localCloseCode > 0 && _closeFrameSent) {
     fireClose(_localCloseCode, _localCloseReason, true);
   } else {
     // Transport dropped without a close handshake.

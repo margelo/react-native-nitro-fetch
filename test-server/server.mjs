@@ -10,6 +10,7 @@
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 import multer from 'multer';
+import { listenPausedWebSocket } from './paused-ws.mjs';
 import { WebSocketServer } from 'ws';
 
 const PORT = Number(process.env.PORT) || 9876;
@@ -290,3 +291,5 @@ wss.on('connection', (ws, req) => {
     setTimeout(() => ws.terminate(), delay);
   }
 });
+
+listenPausedWebSocket(PORT + 1);

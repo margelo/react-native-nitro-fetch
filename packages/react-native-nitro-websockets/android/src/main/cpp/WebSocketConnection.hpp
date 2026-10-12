@@ -122,6 +122,7 @@ private:
   std::string _peerCloseReason;
   int _localCloseCode = 0;
   std::string _localCloseReason;
+  bool _closeFrameSent = false;
 };
 
 } // namespace margelo::nitro::nitrofetchwebsockets
