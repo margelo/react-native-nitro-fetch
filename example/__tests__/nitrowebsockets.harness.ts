@@ -6,7 +6,7 @@ import type {
   WebSocketMessageEvent,
   WebSocketCloseEvent,
 } from 'react-native-nitro-websockets';
-import { WS_BASE } from '../test-utils/server';
+import { WS_BASE, WS_PAUSED_URL } from '../test-utils/server';
 
 const ECHO_URL = 'wss://echo.websocket.org';
 const TIMEOUT_MS = 10_000;
@@ -227,6 +227,23 @@ describe('NitroWebSocket - Close', () => {
     expect(closeEvent.code).toBe(1000);
     expect(closeEvent.wasClean).toBe(true);
     expect(ws.readyState).toBe('CLOSED');
+  });
+
+  it('close() with sends in flight fires no onerror', async () => {
+    const ws = await withTimeout(
+      new Promise<NitroWebSocket>((resolve, reject) => {
+        const socket = new NitroWebSocket(WS_PAUSED_URL);
+        socket.onopen = () => resolve(socket);
+        socket.onerror = (err) => reject(new Error(`Connection error: ${err}`));
+      })
+    );
+    const errors: string[] = [];
+    ws.onerror = (err) => errors.push(err);
+    const chunk = new ArrayBuffer(64 * 1024);
+    for (let i = 0; i < 512; i++) ws.send(chunk);
+    ws.close(1000, 'bye');
+    await new Promise<void>((resolve) => setTimeout(resolve, 1000));
+    expect(errors).toEqual([]);
   });
 
   it('onclose callback fires exactly once', async () => {

@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import express from 'express';
 import multer from 'multer';
+import { listenPausedWebSocket } from './paused-ws.mjs';
 import { WebSocketServer } from 'ws';
 import { acceptRawWebSocket } from './raw-ws.mjs';
 
@@ -339,3 +340,5 @@ wss.on('connection', (ws, req) => {
     if (url.searchParams.get('end') === 'close') ws.close(4000, 'done');
   }
 });
+
+listenPausedWebSocket(PORT + 1);

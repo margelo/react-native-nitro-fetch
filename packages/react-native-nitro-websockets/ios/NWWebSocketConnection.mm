@@ -178,7 +178,11 @@ void NWWebSocketConnection::connect(
     if (!strong) return;
     auto* conn = static_cast<NWWebSocketConnection*>(strong.get());
 
-    conn->_state.store(State::OPEN, std::memory_order_release);
+    State connecting = State::CONNECTING;
+    if (!conn->_state.compare_exchange_strong(
+          connecting, State::OPEN, std::memory_order_acq_rel)) {
+      return;
+    }
 
 #if defined(NITRO_WS_TRACING)
     os_signpost_interval_end(nitroWsLog(),
@@ -224,8 +228,7 @@ void NWWebSocketConnection::connect(
     if (!strong) return;
     auto* conn = static_cast<NWWebSocketConnection*>(strong.get());
 
-    State prev = conn->_state.load(std::memory_order_acquire);
-    if (prev == State::CLOSED) return;
+    if (conn->_closeFired.load(std::memory_order_acquire)) return;
 
     if (conn->_peerCloseCode > 0) {
       conn->fireClose(conn->_peerCloseCode, conn->_peerCloseReason, true);
@@ -311,7 +314,7 @@ void NWWebSocketConnection::send(const std::string& data) {
     auto* conn = static_cast<NWWebSocketConnection*>(strong.get());
 
     conn->_bufferedAmount.fetch_sub(len, std::memory_order_relaxed);
-    if (error) {
+    if (error && conn->_state.load(std::memory_order_acquire) == State::OPEN) {
       conn->fireError(
         [[error localizedDescription] UTF8String] ?: "Send failed");
     }
@@ -343,7 +346,7 @@ void NWWebSocketConnection::sendBinary(const uint8_t* data, size_t len) {
     auto* conn = static_cast<NWWebSocketConnection*>(strong.get());
 
     conn->_bufferedAmount.fetch_sub(len, std::memory_order_relaxed);
-    if (error) {
+    if (error && conn->_state.load(std::memory_order_acquire) == State::OPEN) {
       conn->fireError(
         [[error localizedDescription] UTF8String] ?: "Send binary failed");
     }
@@ -513,6 +516,7 @@ void NWWebSocketConnection::fireClose(
 }
 
 void NWWebSocketConnection::fireError(const std::string& msg) {
+  if (_closeFired.load(std::memory_order_acquire)) return;
   _state.store(State::CLOSED, std::memory_order_release);
 
 #if defined(NITRO_WS_TRACING)
