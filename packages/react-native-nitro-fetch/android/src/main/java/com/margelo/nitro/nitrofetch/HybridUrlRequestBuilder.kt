@@ -41,7 +41,6 @@ class HybridUrlRequestBuilder(
   private val requestHeaders: LinkedHashMap<String, String> = LinkedHashMap()
   private var uploadBodyString: String = ""
   private var uploadBodyLength: Long = 0L
-  private var nativeBuffer: NitroTextStreamBuffer? = null
 
   init {
     if (hostHasWhitespace(url)) throw invalidUrlException(url)
@@ -84,7 +83,6 @@ class HybridUrlRequestBuilder(
           val nitroInfo = info.toNitro()
           callback(nitroInfo)
         }
-        nativeBuffer?.let { request.read(it.data) }
       }
 
       override fun onReadCompleted(
@@ -92,15 +90,6 @@ class HybridUrlRequestBuilder(
         info: CronetUrlResponseInfo,
         receivedBuffer: ByteBuffer
       ) {
-        nativeBuffer?.let { native ->
-          if (receivedBuffer === native.data) {
-            native.commit()
-          } else if (receivedBuffer.position() > 0) {
-            native.setStatus(NitroTextStreamBuffer.STATUS_OVERFLOW)
-          }
-          request.read(if (native.data.hasRemaining()) native.data else byteBuffer.apply { clear() })
-          return
-        }
         val bytesRead = receivedBuffer.position()
         if (devToolsEnabled && bytesRead > 0) {
           devToolsBytes += bytesRead
@@ -123,7 +112,6 @@ class HybridUrlRequestBuilder(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo
       ) {
-        nativeBuffer?.setStatus(NitroTextStreamBuffer.STATUS_DONE)
         if (devToolsEnabled) {
           DevToolsReporter.reportResponseEnd(devToolsRequestId, devToolsBytes.toLong())
         }
@@ -138,7 +126,6 @@ class HybridUrlRequestBuilder(
         info: CronetUrlResponseInfo?,
         error: CronetNativeException
       ) {
-        nativeBuffer?.setStatus(NitroTextStreamBuffer.STATUS_ERROR)
         if (devToolsEnabled) {
           DevToolsReporter.reportRequestFailed(devToolsRequestId, false)
         }
@@ -153,7 +140,6 @@ class HybridUrlRequestBuilder(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo?
       ) {
-        nativeBuffer?.setStatus(NitroTextStreamBuffer.STATUS_CANCELLED)
         if (devToolsEnabled) {
           DevToolsReporter.reportRequestFailed(devToolsRequestId, true)
         }
@@ -226,13 +212,6 @@ class HybridUrlRequestBuilder(
 
   override fun setPriority(priority: NitroRequestPriority) {
     builder.setPriority(priority.cronetPriority)
-  }
-
-  override fun enableNativeBuffer(capacity: Double): ArrayBuffer {
-    if (!(capacity >= 1 && capacity <= NitroTextStreamBuffer.MAX_CAPACITY)) {
-      throw IllegalArgumentException("Invalid native buffer capacity: $capacity")
-    }
-    return NitroTextStreamBuffer(capacity.toInt()).also { nativeBuffer = it }.arrayBuffer
   }
 
   override fun onSucceeded(callback: (info: UrlResponseInfo) -> Unit) {

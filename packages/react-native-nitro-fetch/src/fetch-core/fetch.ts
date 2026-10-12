@@ -35,12 +35,6 @@ export async function nitroFetch(
      * @default false
      */
     stream?: boolean;
-    /**
-     * With `stream: true`: write the body into a native buffer exposed as
-     * `response.nativeBuffer` (a 64-byte TSB1 header, then the data) instead
-     * of `response.body`. `true` reserves 16 MB.
-     */
-    nativeBuffer?: boolean | { capacity?: number };
     redirect?: RequestRedirect;
     cache?: RequestCache;
     timeoutMs?: number;

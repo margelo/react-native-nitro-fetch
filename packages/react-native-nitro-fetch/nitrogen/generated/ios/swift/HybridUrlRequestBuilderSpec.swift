@@ -19,7 +19,6 @@ public protocol HybridUrlRequestBuilderSpec_protocol: HybridObject {
   func disableCache() throws -> Void
   func disableCookies() throws -> Void
   func setPriority(priority: NitroRequestPriority) throws -> Void
-  func enableNativeBuffer(capacity: Double) throws -> ArrayBuffer
   func onSucceeded(callback: @escaping (_ info: UrlResponseInfo) -> Void) throws -> Void
   func onFailed(callback: @escaping (_ info: UrlResponseInfo?, _ error: RequestException) -> Void) throws -> Void
   func onCanceled(callback: @escaping (_ info: UrlResponseInfo?) -> Void) throws -> Void

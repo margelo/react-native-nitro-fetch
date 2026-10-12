@@ -126,14 +126,6 @@ namespace margelo::nitro::nitrofetch {
         std::rethrow_exception(__result.error());
       }
     }
-    inline std::shared_ptr<ArrayBuffer> enableNativeBuffer(double capacity) override {
-      auto __result = _swiftPart.enableNativeBuffer(std::forward<decltype(capacity)>(capacity));
-      if (__result.hasError()) [[unlikely]] {
-        std::rethrow_exception(__result.error());
-      }
-      auto __value = std::move(__result.value());
-      return __value;
-    }
     inline void onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) override {
       auto __result = _swiftPart.onSucceeded(callback);
       if (__result.hasError()) [[unlikely]] {

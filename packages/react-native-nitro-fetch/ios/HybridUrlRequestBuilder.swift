@@ -16,7 +16,6 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
 
   private var urlRequest: URLRequest
   private var priority: Float = 0.5
-  private var nativeBuffer: ArrayBuffer?
   private let devToolsRequestId: String = {
     #if DEBUG
     return UUID().uuidString
@@ -96,16 +95,6 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     self.priority = priority.taskPriority
   }
 
-  func enableNativeBuffer(capacity: Double) throws -> ArrayBuffer {
-    guard capacity >= 1, capacity <= Double(Int32.max - TSB_HEADER_SIZE) else {
-      throw RuntimeError.error(withMessage: "Invalid native buffer capacity: \(capacity)")
-    }
-    let buffer = ArrayBuffer.allocate(size: Int(TSB_HEADER_SIZE) + Int(capacity))
-    tsb_init(buffer.data, UInt64(capacity))
-    nativeBuffer = buffer
-    return buffer
-  }
-
   func build() throws -> any HybridUrlRequestSpec {
     let delegate = URLSessionDelegateAdapter(
       onRedirectReceived: onRedirectReceivedCallback,
@@ -116,8 +105,7 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
       onCanceled: onCanceledCallback,
       executor: executor,
       hybridRequest: nil,
-      devToolsRequestId: devToolsRequestId,
-      nativeBuffer: nativeBuffer
+      devToolsRequestId: devToolsRequestId
     )
 
     let task: URLSessionDataTask = session.dataTask(with: urlRequest)
@@ -157,7 +145,6 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
   private let devToolsRequestId: String
   private var devToolsBytes: Int = 0
   private var devToolsTextual: Bool = false
-  private let nativeBuffer: ArrayBuffer?
 
   init(
     onRedirectReceived: ((_ info: UrlResponseInfo, _ newLocationUrl: String) -> Void)?,
@@ -168,8 +155,7 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
     onCanceled: ((_ info: UrlResponseInfo?) -> Void)?,
     executor: DispatchQueue,
     hybridRequest: HybridUrlRequest?,
-    devToolsRequestId: String,
-    nativeBuffer: ArrayBuffer?
+    devToolsRequestId: String
   ) {
     self.onRedirectReceived = onRedirectReceived
     self.onResponseStarted = onResponseStarted
@@ -180,7 +166,6 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
     self.executor = executor
     self.hybridRequest = hybridRequest
     self.devToolsRequestId = devToolsRequestId
-    self.nativeBuffer = nativeBuffer
     super.init()
   }
 
@@ -207,10 +192,6 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
     task: URLSessionTask,
     didCompleteWithError error: Error?
   ) {
-    if let buffer = nativeBuffer {
-      let cancelled = (error as NSError?)?.code == NSURLErrorCancelled
-      tsb_set_status(buffer.data, error == nil ? TSB_STATUS_DONE : cancelled ? TSB_STATUS_CANCELLED : TSB_STATUS_ERROR)
-    }
     executor.sync { [weak self] in
       guard let self = self else { return }
       self.hybridRequest?.markDone()
@@ -298,10 +279,6 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
     dataTask: URLSessionDataTask,
     didReceive data: Data
   ) {
-    if let buffer = nativeBuffer {
-      data.withUnsafeBytes { tsb_append(buffer.data, $0.baseAddress, UInt64($0.count)) }
-      return
-    }
     if let callback = self.onReadCompleted {
       executor.sync { [weak self] in
         guard let self = self, let response = self.response else { return }

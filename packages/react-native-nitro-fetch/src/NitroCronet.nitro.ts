@@ -44,7 +44,6 @@ export interface UrlRequestBuilder extends HybridObject<{
   disableCache(): void;
   disableCookies(): void;
   setPriority(priority: NitroRequestPriority): void;
-  enableNativeBuffer(capacity: number): ArrayBuffer;
   onSucceeded(callback: (info: UrlResponseInfo) => void): void;
   onFailed(
     callback: (

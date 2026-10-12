@@ -24,7 +24,6 @@ Pod::Spec.new do |s|
   s.dependency 'React-callinvoker'
   
   s.public_header_files = [
-    "ios/NitroTextStreamBuffer.h",
     "ios/NitroDevToolsReporter.h",
     "ios/NitroAutoPrefetcher.h",
   ]
