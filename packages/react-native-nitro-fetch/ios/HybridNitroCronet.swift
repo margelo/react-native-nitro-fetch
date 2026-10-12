@@ -18,7 +18,7 @@ class HybridNitroCronet: HybridNitroCronetSpec {
   )
 
   func newUrlRequestBuilder(url: String) throws -> any HybridUrlRequestBuilderSpec {
-    return HybridUrlRequestBuilder(
+    return try HybridUrlRequestBuilder(
       url: url,
       session: HybridNitroCronet.session,
       executor: HybridNitroCronet.executorQueue
