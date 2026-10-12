@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'react-native-harness';
 import {
   fetch as nitroFetch,
+  NitroFetch,
   nitroFetchOnWorklet,
   prefetch,
   prefetchOnAppStart,
@@ -327,6 +328,121 @@ describe('NitroFetch - Response Headers', () => {
       count++;
     });
     expect(count).toBeGreaterThan(0);
+  });
+});
+
+describe('NitroFetch - Response bodies', () => {
+  const MIXED = 'Zürich 日本語 данные 😀 ';
+  const CJK = '日本語のテキストを読む。';
+
+  const textUrl = (phrase: string, repeat: number, query = '') =>
+    `${BASE}/text?phrase=${encodeURIComponent(phrase)}&repeat=${repeat}${query}`;
+
+  const firstDifference = (a: string, b: string) => {
+    const n = Math.min(a.length, b.length);
+    for (let i = 0; i < n; i++) {
+      if (a.charCodeAt(i) !== b.charCodeAt(i)) return i;
+    }
+    return a.length === b.length ? -1 : n;
+  };
+
+  const firstByteMismatch = (
+    bytes: Uint8Array,
+    expected: (i: number) => number
+  ) => {
+    for (let i = 0; i < bytes.length; i++) {
+      if (bytes[i] !== expected(i)) return i;
+    }
+    return -1;
+  };
+
+  it('HEAD with a Content-Length has an empty body', async () => {
+    const res = await nitroFetch(`${BASE}/bytes/1000000`, { method: 'HEAD' });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-length')).toBe('1000000');
+    expect((await res.arrayBuffer()).byteLength).toBe(0);
+  });
+
+  it('304 with a Content-Length has an empty body', async () => {
+    const res = await nitroFetch(`${BASE}/not-modified`);
+    expect(res.status).toBe(304);
+    expect(res.headers.get('content-length')).toBe('1000000');
+    expect((await res.arrayBuffer()).byteLength).toBe(0);
+  });
+
+  it('reads a gzip body much larger than its Content-Length', async () => {
+    const res = await nitroFetch(textUrl(MIXED, 20000, '&gzip=1'));
+    expect(res.headers.get('content-encoding')).toBe('gzip');
+    expect(firstDifference(await res.text(), MIXED.repeat(20000))).toBe(-1);
+  });
+
+  it('reads a chunked body without a Content-Length', async () => {
+    const res = await nitroFetch(textUrl(MIXED, 20000, '&chunked=1'));
+    expect(res.headers.get('content-length')).toBe(null);
+    expect(firstDifference(await res.text(), MIXED.repeat(20000))).toBe(-1);
+  });
+
+  it('reads a body larger than 1 MB byte-exact', async () => {
+    const n = 3 * 1024 * 1024 + 7;
+    const res = await nitroFetch(`${BASE}/bytes/${n}`);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    expect(bytes.length).toBe(n);
+    expect(firstByteMismatch(bytes, (i) => i % 256)).toBe(-1);
+  });
+
+  it('decodes CJK text natively', async () => {
+    const expected = CJK.repeat(20000);
+    const raw = await NitroFetch.createClient().request({
+      url: textUrl(CJK, 20000),
+    });
+    expect(raw.bodyBytes).toBe(undefined);
+    expect(firstDifference(raw.bodyString ?? '', expected)).toBe(-1);
+    const res = await nitroFetch(textUrl(CJK, 20000));
+    expect(firstDifference(await res.text(), expected)).toBe(-1);
+  });
+
+  it('hands invalid UTF-8 to JS as exact bytes', async () => {
+    for (const tail of [
+      'eda080',
+      'c0af',
+      '80',
+      'e381',
+      'e38141',
+      'f4908080',
+      'f5808080',
+    ]) {
+      const url = textUrl('abc', 1000, `&invalid=${tail}`);
+      const tailBytes = tail.match(/../g)!.map((h) => parseInt(h, 16));
+      const expected = (i: number) =>
+        i < 3000 ? 97 + (i % 3) : tailBytes[i - 3000]!;
+      const raw = await NitroFetch.createClient().request({ url });
+      expect(raw.bodyString).toBe(undefined);
+      const rawBytes = new Uint8Array(raw.bodyBytes!);
+      expect(rawBytes.length).toBe(3000 + tailBytes.length);
+      expect(firstByteMismatch(rawBytes, expected)).toBe(-1);
+      const res = await nitroFetch(url);
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      expect(bytes.length).toBe(3000 + tailBytes.length);
+      expect(firstByteMismatch(bytes, expected)).toBe(-1);
+    }
+  });
+
+  it('decodes text in the charset the Content-Type declares', async () => {
+    const phrase = 'café crème brûlée ';
+    const res = await nitroFetch(textUrl(phrase, 100, '&charset=iso-8859-1'));
+    expect(await res.text()).toBe(phrase.repeat(100));
+  });
+
+  it('completes 50 concurrent requests with their own bodies', async () => {
+    const results = await Promise.all(
+      Array.from({ length: 50 }, async (_, i) => {
+        const phrase = `r${i};`;
+        const repeat = 1 + ((i * 7919) % 40000);
+        const res = await nitroFetch(textUrl(phrase, repeat));
+        return firstDifference(await res.text(), phrase.repeat(repeat));
+      })
+    );
+    expect(results.filter((d) => d !== -1)).toEqual([]);
   });
 });
 
