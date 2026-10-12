@@ -76,8 +76,17 @@ env:
 
 jobs:
   harness_ios:
-    name: Harness iOS
+    name: ${{ matrix.name }}
     runs-on: macOS-26
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Harness iOS
+            tests: ''
+          - name: Harness iOS (NSURLSession WebSockets)
+            nsurlsession: true
+            tests: nitrowebsockets
     steps:
       - uses: actions/checkout@v4
         with:
@@ -129,6 +138,10 @@ jobs:
           path: example/ios/build
           key: ${{ runner.os }}-dd-nitrofetch-${{ hashFiles('**/Podfile.lock', '**/Gemfile.lock', '**/package.json', '**/bun.lock') }}-xcode${{ env.XCODE_VERSION }}
 
+      - name: Use the NSURLSession WebSocket transport
+        if: matrix.nsurlsession
+        run: /usr/libexec/PlistBuddy -c "Add :NitroWebSocketsUseNetworkFramework bool false" example/ios/NitroFetchExample/Info.plist
+
       - name: Build iOS app
         working-directory: example/ios
         run: |
@@ -173,4 +186,4 @@ jobs:
             sleep 1
           done
           curl -sf http://127.0.0.1:9876/get >/dev/null || { echo "test server failed to start"; exit 1; }
-          ec=1; for i in 1 2 3; do bun run test:harness --harnessRunner ios && { ec=0; break; }; echo "harness attempt $i failed"; done; exit $ec
+          ec=1; for i in 1 2 3; do bun run test:harness --harnessRunner ios ${{ matrix.tests }} && { ec=0; break; }; echo "harness attempt $i failed"; done; exit $ec

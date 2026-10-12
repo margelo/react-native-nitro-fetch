@@ -148,6 +148,30 @@ Add to your `app.json`:
 
 If prewarmed sockets need fresh headers, register token refresh with `target: 'websocket'` or `'all'` using `registerTokenRefresh` from `react-native-nitro-fetch`. See the [Token Refresh guide](./token-refresh.md) for details.
 
+## iOS transport
+
+On iOS, connections run on a client built on Network.framework, which reads the socket in bulk and frames messages in-process. It is much faster for bursts of messages than `NSURLSessionWebSocketTask`. Setting `NitroWebSocketsUseNetworkFramework` to `false` in `Info.plist` switches back to `NSURLSessionWebSocketTask`, which you need for App Transport Security, `NSPinnedDomains` pinning, proxies or HTTP authentication.
+
+```xml
+<key>NitroWebSocketsUseNetworkFramework</key>
+<false/>
+```
+
+With Expo, set it under `ios.infoPlist` in the app config.
+
+App Transport Security does not apply to Network.framework, so `ws://` connects to any host and `NSPinnedDomains` pinning is not applied. `wss://` connections still validate the server certificate against the system trust store, and redirects from `wss://` to `ws://` are refused.
+
+Other differences from `NSURLSessionWebSocketTask`:
+
+- the system HTTP or PAC proxy may not be used
+- `user:pass@` credentials and `401` challenges are not handled
+- the handshake sends no `Accept`, `Accept-Language` or `Accept-Encoding` header
+- messages can be up to 16 MB instead of 1 MB
+- if the server does not answer `close()` within 5 seconds, `onclose` fires with code `1006`
+- a close frame with a reserved code or a reason that is not valid UTF-8 fails the connection: `onerror`, then `onclose` with `1006`
+- a failed send does not fire `onerror` by itself; the connection failing does
+- network changes are not watched and no TCP keepalives are sent, so an idle connection can stay open after the network changes until a read or write fails
+
 ## See also
 
 - [Prefetch & Auto-Prefetch](./prefetch.md) — HTTP prefetch; pairs conceptually with WS prewarm
