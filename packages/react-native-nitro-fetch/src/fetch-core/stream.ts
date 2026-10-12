@@ -57,6 +57,13 @@ export async function nitroStreamFetch(
   else if (normalized?.bodyString != null)
     builder.setUploadBody(normalized.bodyString);
 
+  const nativeBufferOption = (init as any)?.nativeBuffer;
+  const nativeBuffer = nativeBufferOption
+    ? builder.enableNativeBuffer(
+        nativeBufferOption.capacity ?? 16 * 1024 * 1024
+      )
+    : undefined;
+
   return new Promise((resolveResponse, rejectResponse) => {
     let streamController: ReadableStreamDefaultController<
       Uint8Array<ArrayBuffer>
@@ -127,11 +134,12 @@ export async function nitroStreamFetch(
         headers: responseHeaders,
         redirected: false,
         body: stream,
+        nativeBuffer,
       });
       resolveResponse(response as unknown as Response);
       // Android/Cronet: kick off the first buffer read.
       // iOS/URLSession handles reading automatically so this is a no-op there.
-      request.read();
+      if (!nativeBuffer) request.read();
     });
 
     builder.onReadCompleted((_info, byteBuffer, bytesRead) => {

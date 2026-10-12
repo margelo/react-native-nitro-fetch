@@ -340,6 +340,15 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
   using std__weak_ptr_HybridUrlRequestBuilderSpec_ = std::weak_ptr<HybridUrlRequestBuilderSpec>;
   inline std__weak_ptr_HybridUrlRequestBuilderSpec_ weakify_std__shared_ptr_HybridUrlRequestBuilderSpec_(const std::shared_ptr<HybridUrlRequestBuilderSpec>& strong) noexcept { return strong; }
   
+  // pragma MARK: Result<std::shared_ptr<ArrayBuffer>>
+  using Result_std__shared_ptr_ArrayBuffer__ = Result<std::shared_ptr<ArrayBuffer>>;
+  inline Result_std__shared_ptr_ArrayBuffer__ create_Result_std__shared_ptr_ArrayBuffer__(const std::shared_ptr<ArrayBuffer>& value) noexcept {
+    return Result<std::shared_ptr<ArrayBuffer>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_ArrayBuffer__ create_Result_std__shared_ptr_ArrayBuffer__(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<ArrayBuffer>>::withError(error);
+  }
+  
   // pragma MARK: Result<std::shared_ptr<HybridUrlRequestSpec>>
   using Result_std__shared_ptr_HybridUrlRequestSpec__ = Result<std::shared_ptr<HybridUrlRequestSpec>>;
   inline Result_std__shared_ptr_HybridUrlRequestSpec__ create_Result_std__shared_ptr_HybridUrlRequestSpec__(const std::shared_ptr<HybridUrlRequestSpec>& value) noexcept {

@@ -336,7 +336,9 @@ describe('NitroFetch - Response bodies', () => {
   const CJK = '日本語のテキストを読む。';
 
   const textUrl = (phrase: string, repeat: number, query = '') =>
-    `${BASE}/text?phrase=${encodeURIComponent(phrase)}&repeat=${repeat}${query}`;
+    `${BASE}/text?phrase=${encodeURIComponent(
+      phrase
+    )}&repeat=${repeat}${query}`;
 
   const firstDifference = (a: string, b: string) => {
     const n = Math.min(a.length, b.length);
@@ -955,6 +957,73 @@ describe('NitroFetch - real HTTPS (PokeAPI)', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.name).toBe('ditto');
+  });
+});
+
+describe('NitroFetch - nativeBuffer', () => {
+  const fetchIntoNativeBuffer = async (url: string, nativeBuffer: unknown) => {
+    const res = (await (nitroFetch as any)(url, {
+      stream: true,
+      nativeBuffer,
+    })) as any;
+    const reader = res.body.getReader();
+    let chunks = 0;
+    while (!(await reader.read()).done) chunks++;
+    const view = new DataView(res.nativeBuffer);
+    const committed = view.getUint32(8, true);
+    const data = new Uint8Array(res.nativeBuffer, 64, committed);
+    return {
+      chunks,
+      magic: view.getUint32(0, true),
+      committed,
+      capacity: view.getUint32(16, true),
+      status: view.getUint32(24, true),
+      intact: data.every((b, i) => b === i % 256),
+    };
+  };
+
+  it('writes the body into the native buffer instead of response.body', async () => {
+    const r = await fetchIntoNativeBuffer(`${BASE}/bytes/100000`, true);
+    expect(r).toEqual({
+      chunks: 0,
+      magic: 0x31425354,
+      committed: 100000,
+      capacity: 16 * 1024 * 1024,
+      status: 1,
+      intact: true,
+    });
+  });
+
+  it('fills the buffer exactly without overflowing', async () => {
+    const r = await fetchIntoNativeBuffer(`${BASE}/bytes/50000`, {
+      capacity: 50000,
+    });
+    expect(r.status).toBe(1);
+    expect(r.committed).toBe(50000);
+    expect(r.intact).toBe(true);
+  });
+
+  it('stops writing at capacity and marks the buffer as overflowed', async () => {
+    const r = await fetchIntoNativeBuffer(`${BASE}/bytes/400000`, {
+      capacity: 50000,
+    });
+    expect(r.status).toBe(4);
+    expect(r.committed).toBeLessThanOrEqual(50000);
+    expect(r.intact).toBe(true);
+  });
+
+  it('marks the buffer as cancelled when the request is aborted', async () => {
+    const controller = new AbortController();
+    const res = (await (nitroFetch as any)(
+      `${BASE}/drip?duration=5&numbytes=5&delay=0`,
+      { stream: true, nativeBuffer: true, signal: controller.signal }
+    )) as any;
+    controller.abort();
+    const view = new DataView(res.nativeBuffer);
+    for (let i = 0; i < 100 && view.getUint32(24, true) === 0; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(view.getUint32(24, true)).toBe(3);
   });
 });
 

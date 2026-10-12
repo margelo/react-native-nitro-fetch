@@ -54,6 +54,10 @@ abstract class HybridUrlRequestBuilderSpec: HybridObject() {
   @Keep
   abstract fun setPriority(priority: NitroRequestPriority): Unit
   
+  @DoNotStrip
+  @Keep
+  abstract fun enableNativeBuffer(capacity: Double): ArrayBuffer
+  
   abstract fun onSucceeded(callback: (info: UrlResponseInfo) -> Unit): Unit
   
   @DoNotStrip
