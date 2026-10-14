@@ -2,7 +2,7 @@ import type {
   NitroRequest as NitroRequestNative,
   NitroResponse as NitroResponseNative,
 } from '../NitroFetch.nitro';
-import { ensureClient } from './client';
+import { ensureClient, clientUnavailableError } from './client';
 
 function base64ToBytes(b64: string): Uint8Array {
   const decode = (globalThis as { atob?: (s: string) => string }).atob;
@@ -147,7 +147,7 @@ export async function fetchLocalResource(
   }
   const client = ensureClient();
   if (!client || typeof client.request !== 'function') {
-    throw new Error('NitroFetch client not available');
+    throw clientUnavailableError();
   }
   return client.request(req);
 }

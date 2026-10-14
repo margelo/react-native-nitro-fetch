@@ -100,7 +100,7 @@ object AutoPrefetcher {
         val refreshURL = refreshConfig.optString("url", "(unknown)")
         NitroLogger.d("NitroFetch", "[TokenRefresh] Calling refresh endpoint: $refreshURL")
 
-        val refreshed = callTokenRefreshSync(refreshConfig)
+        val refreshed = callTokenRefreshSync(app, refreshConfig)
 
         val tokens: TokenRefreshResult = if (refreshed != null) {
           NitroLogger.d(
@@ -330,7 +330,7 @@ object AutoPrefetcher {
     }
   }
 
-  private fun callTokenRefreshSync(config: JSONObject): TokenRefreshResult? {
+  private fun callTokenRefreshSync(context: Context, config: JSONObject): TokenRefreshResult? {
     var connection: HttpURLConnection? = null
     return try {
       val urlStr = config.optStringOrNull("url") ?: return null
@@ -341,6 +341,7 @@ object AutoPrefetcher {
 
       val conn = URL(urlStr).openConnection() as HttpURLConnection
       connection = conn
+      CertificatePinning.apply(conn, context)
       conn.requestMethod = method
       conn.connectTimeout = 10_000
       conn.readTimeout = 10_000

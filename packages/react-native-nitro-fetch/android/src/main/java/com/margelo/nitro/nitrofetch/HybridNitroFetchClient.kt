@@ -558,8 +558,10 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
 
     private fun readFileBytes(uri: String): ByteArray {
       if (uri.startsWith("http://") || uri.startsWith("https://")) {
-        val url = java.net.URL(uri)
-        return url.openStream().use { it.readBytes() }
+        val connection = java.net.URL(uri).openConnection()
+        // The engine is always built before a request reaches here, so the pins are already loaded.
+        CertificatePinning.apply(connection, NitroModules.applicationContext)
+        return connection.getInputStream().use { it.readBytes() }
       }
       if (uri.startsWith("content://")) {
         val context = NitroModules.applicationContext

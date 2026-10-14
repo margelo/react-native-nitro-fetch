@@ -1,7 +1,19 @@
 import withAndroidAutoPrefetch from './withAndroid';
+import withCertificatePinning from './withCertificatePinning';
 
-const withNitroFetch: any = (config: any) => {
+type NitroFetchPluginProps = {
+  /** Path, from the project root, to a nitro-fetch-pinning.json to bundle with the app. */
+  certificatePinning?: string;
+};
+
+const withNitroFetch: any = (
+  config: any,
+  props: NitroFetchPluginProps | null = {}
+) => {
   config = withAndroidAutoPrefetch(config);
+  if (props?.certificatePinning) {
+    config = withCertificatePinning(config, props.certificatePinning);
+  }
   return config;
 };
 
