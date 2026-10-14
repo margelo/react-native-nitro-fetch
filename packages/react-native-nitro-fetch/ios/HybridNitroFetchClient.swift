@@ -398,8 +398,12 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
       guard let url = URL(string: uri) else {
         throw NSError(domain: "NitroFetch", code: -4, userInfo: [NSLocalizedDescriptionKey: "Invalid URL: \(uri)"])
       }
-      let (data, _) = try await session.data(from: url)
-      return data
+      do {
+        let (data, _) = try await session.data(from: url)
+        return data
+      } catch {
+        throw CertificatePinning.mapFailure(error, requestURL: url, cancelledByCaller: Task.isCancelled)
+      }
     }
     return try localData(forURI: uri)
   }

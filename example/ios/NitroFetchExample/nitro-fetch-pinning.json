@@ -11,5 +11,8 @@
   "gstatic.com": {
     "includeSubdomains": true,
     "publicKeyHashes": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]
+  },
+  "google.com": {
+    "publicKeyHashes": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]
   }
 }
