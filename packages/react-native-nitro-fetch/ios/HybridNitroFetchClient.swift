@@ -202,13 +202,14 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     do {
       (data, response) = try await session.data(for: urlRequest, delegate: delegate)
     } catch {
+      let failure = CertificatePinning.mapFailure(error, requestURL: urlRequest.url, cancelledByCaller: Task.isCancelled)
       #if DEBUG
       if NitroDevToolsReporter.isDebuggingEnabled() {
-        let cancelled = (error as NSError).code == NSURLErrorCancelled
+        let cancelled = (failure as NSError).code == NSURLErrorCancelled
         NitroDevToolsReporter.reportRequestFailed(devToolsId, cancelled: cancelled)
       }
       #endif
-      throw error
+      throw failure
     }
     guard let http = response as? HTTPURLResponse else {
       #if DEBUG
@@ -326,7 +327,8 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
         )
         FetchCache.complete(key, with: .success(res))
       } catch {
-        FetchCache.complete(key, with: .failure(error))
+        let failure = CertificatePinning.mapFailure(error, requestURL: URL(string: req.url), cancelledByCaller: false)
+        FetchCache.complete(key, with: .failure(failure))
       }
     }
   }

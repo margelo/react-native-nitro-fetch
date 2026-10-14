@@ -196,7 +196,12 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
       guard let self = self else { return }
       self.hybridRequest?.markDone()
 
-      if let error = error {
+      if let rawError = error {
+        let error = CertificatePinning.mapFailure(
+          rawError,
+          requestURL: task.originalRequest?.url,
+          cancelledByCaller: self.hybridRequest?.cancelRequested ?? false
+        )
         let nsError = error as NSError
         if nsError.code == NSURLErrorCancelled {
           #if DEBUG

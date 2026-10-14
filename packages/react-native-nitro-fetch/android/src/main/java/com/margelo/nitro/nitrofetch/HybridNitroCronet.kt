@@ -64,6 +64,8 @@ class HybridNitroCronet : HybridNitroCronetSpec() {
           (50 * 1024 * 1024).toLong()
         )
 
+        CertificatePinning.apply(builder, app)
+
         val engine = builder.build()
         engineRef = engine
         return engine

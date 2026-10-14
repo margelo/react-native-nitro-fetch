@@ -5,6 +5,7 @@ class HybridUrlRequest: HybridUrlRequestSpec {
   private weak var task: URLSessionDataTask?
   private weak var delegate: URLSessionDelegate?
   private var isDoneFlag = false
+  private(set) var cancelRequested = false
 
   init(task: URLSessionDataTask, delegate: URLSessionDelegate) {
     self.task = task
@@ -27,6 +28,7 @@ class HybridUrlRequest: HybridUrlRequestSpec {
   }
 
   func cancel() throws {
+    cancelRequested = true
     task?.cancel()
     isDoneFlag = true
   }

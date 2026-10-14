@@ -59,6 +59,8 @@ class HybridNitroFetch : HybridNitroFetchSpec() {
         // Prove DNS issues by mapping a host (TESTING ONLY, remove in prod):
         // builder.setExperimentalOptions("""{"HostResolverRules":{"host_resolver_rules":"MAP httpbin.org 54.167.17.38"}}""")
 
+        CertificatePinning.apply(builder, app)
+
         val engine = builder.build()
         NitroLogger.i("NitroFetch", "CronetEngine initialized. Provider=${nativeProvider?.name ?: "Default"} Cache=${cacheDir.absolutePath}")
         engineRef = engine
