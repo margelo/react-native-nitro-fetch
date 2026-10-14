@@ -1,5 +1,5 @@
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   IOSConfig,
   withDangerousMod,
@@ -11,48 +11,54 @@ const PINNING_FILE = 'nitro-fetch-pinning.json';
 
 const HOSTNAME =
   /^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/;
+// A SHA-256 hash in standard, padded base64 is always 43 alphabet characters plus "=".
+const HASH = /^[A-Za-z0-9+/]{43}=$/;
+
+function isCalendarDate(value: unknown): boolean {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const date = new Date(`${value}T00:00:00Z`);
+  return !isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
 
 /**
- * Resolves the pin file and checks it the way the native code will, so a mistake fails
- * `expo prebuild` instead of every request at runtime.
+ * Throws if `json` isn't a pin file the native code will accept. The rules match the Android and
+ * iOS parsers exactly, so a file that passes here never fails closed at runtime.
  */
-function resolvePinningFile(projectRoot: string, file: string): string {
-  const source = path.resolve(projectRoot, file);
-  const fail = (reason: string): never => {
-    throw new Error(
-      `[react-native-nitro-fetch] certificatePinning (${file}): ${reason}`
-    );
-  };
-  if (!fs.existsSync(source)) fail('file not found');
-
+export function validatePinningConfig(json: string): void {
   let pins: any;
   try {
-    pins = JSON.parse(fs.readFileSync(source, 'utf8'));
+    pins = JSON.parse(json);
   } catch (e: any) {
-    fail(`invalid JSON (${e.message})`);
+    throw new Error(`not valid JSON (${e.message})`);
   }
   if (!pins || typeof pins !== 'object' || Array.isArray(pins)) {
-    fail('expected a JSON object keyed by hostname');
+    throw new Error('expected a JSON object keyed by hostname');
   }
-  for (const [host, entry] of Object.entries<any>(pins)) {
-    const normalized = host.trim().toLowerCase().replace(/\.$/, '');
-    if (!HOSTNAME.test(normalized) || /^[0-9.]+$/.test(normalized)) {
-      fail(
-        `"${host}" is not a hostname (no scheme, port, path, wildcard or IP)`
+  const hosts = new Set<string>();
+  for (const [key, entry] of Object.entries<any>(pins)) {
+    const host = key.toLowerCase().replace(/\.$/, '');
+    if (!HOSTNAME.test(host) || /^[0-9.]+$/.test(host)) {
+      throw new Error(
+        `"${key}" is not a hostname (no scheme, port, path, wildcard or IP; use punycode for IDNs)`
       );
     }
-    const hashes = entry?.publicKeyHashes;
+    if (hosts.has(host)) {
+      throw new Error(`"${key}" lists a host that is already in the file`);
+    }
+    hosts.add(host);
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new Error(`"${key}" must be an object`);
+    }
+    const hashes = entry.publicKeyHashes;
     if (!Array.isArray(hashes) || hashes.length === 0) {
-      fail(`"${host}" needs at least one entry in publicKeyHashes`);
+      throw new Error(`"${key}" needs at least one entry in publicKeyHashes`);
     }
     for (const hash of hashes) {
-      const valid =
-        typeof hash === 'string' &&
-        /^[A-Za-z0-9+/]+={0,2}$/.test(hash) &&
-        Buffer.from(hash, 'base64').length === 32;
-      if (!valid) {
-        fail(
-          `"${host}" has a publicKeyHashes entry that isn't a base64 SHA-256 hash: ${hash}`
+      if (typeof hash !== 'string' || !HASH.test(hash)) {
+        throw new Error(
+          `"${key}" has a publicKeyHashes entry that isn't a base64 SHA-256 hash: ${hash}`
         );
       }
     }
@@ -60,14 +66,26 @@ function resolvePinningFile(projectRoot: string, file: string): string {
       entry.includeSubdomains !== undefined &&
       typeof entry.includeSubdomains !== 'boolean'
     ) {
-      fail(`"${host}".includeSubdomains must be true or false`);
+      throw new Error(`"${key}".includeSubdomains must be true or false`);
     }
     if (
       entry.expirationDate !== undefined &&
-      !/^\d{4}-\d{2}-\d{2}$/.test(String(entry.expirationDate))
+      !isCalendarDate(entry.expirationDate)
     ) {
-      fail(`"${host}".expirationDate must be yyyy-MM-dd`);
+      throw new Error(`"${key}".expirationDate must be yyyy-MM-dd`);
     }
+  }
+}
+
+/** Resolves the pin file from the project root and validates it, so mistakes fail `expo prebuild`. */
+export function resolvePinningFile(projectRoot: string, file: string): string {
+  const source = path.resolve(projectRoot, file);
+  const prefix = `[react-native-nitro-fetch] certificatePinning (${file})`;
+  if (!fs.existsSync(source)) throw new Error(`${prefix}: file not found`);
+  try {
+    validatePinningConfig(fs.readFileSync(source, 'utf8'));
+  } catch (e: any) {
+    throw new Error(`${prefix}: ${e.message}`);
   }
   return source;
 }

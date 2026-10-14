@@ -3,7 +3,11 @@ import type {
   NitroResponse as NitroResponseNative,
 } from '../NitroFetch.nitro';
 import { NetworkInspector } from '../NetworkInspector';
-import { NitroFetchHybrid, ensureClient } from './client';
+import {
+  NitroFetchHybrid,
+  ensureClient,
+  clientUnavailableError,
+} from './client';
 import { resolveRequestBody, resolveBlobBody } from './body';
 import { buildNitroRequest } from './request';
 import { isHttpUrl } from './url';
@@ -78,7 +82,7 @@ export async function nitroFetchRaw(
 
   const client = ensureClient();
   if (!client || typeof (client as any).request !== 'function')
-    throw new Error('NitroFetch client not available');
+    throw clientUnavailableError();
 
   // Wire up the abort listener with { once: true } so it auto-removes
   // after firing, avoiding a dangling reference to the client closure.

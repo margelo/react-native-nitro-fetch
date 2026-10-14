@@ -129,7 +129,7 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
 
 // MARK: - URLSession Delegate Adapter
 
-private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate {
+private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate, CancelRequestTracking {
   let onRedirectReceived: ((_ info: UrlResponseInfo, _ newLocationUrl: String) -> Void)?
   let onResponseStarted: ((_ info: UrlResponseInfo) -> Void)?
   let onReadCompleted: ((_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer, _ bytesRead: Double) -> Void)?
@@ -142,6 +142,21 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
   weak var hybridRequest: HybridUrlRequest?
 
   private var response: HTTPURLResponse?
+  // Written from the JS thread by cancel(), read when the task completes.
+  private let cancelLock = NSLock()
+  private var cancelRequested = false
+
+  func markCancelRequested() {
+    cancelLock.lock()
+    cancelRequested = true
+    cancelLock.unlock()
+  }
+
+  private var wasCancelRequested: Bool {
+    cancelLock.lock()
+    defer { cancelLock.unlock() }
+    return cancelRequested
+  }
   private let devToolsRequestId: String
   private var devToolsBytes: Int = 0
   private var devToolsTextual: Bool = false
@@ -200,7 +215,7 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
         let error = CertificatePinning.mapFailure(
           rawError,
           requestURL: task.originalRequest?.url,
-          cancelledByCaller: self.hybridRequest?.cancelRequested ?? false
+          cancelledByCaller: self.wasCancelRequested
         )
         let nsError = error as NSError
         if nsError.code == NSURLErrorCancelled {

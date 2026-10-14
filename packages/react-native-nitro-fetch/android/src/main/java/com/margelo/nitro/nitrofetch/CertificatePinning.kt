@@ -3,9 +3,11 @@ package com.margelo.nitro.nitrofetch
 import android.content.Context
 import android.net.http.X509TrustManagerExtensions
 import android.util.Base64
+import android.util.JsonReader
+import android.util.JsonToken
 import org.chromium.net.CronetEngine
-import org.json.JSONObject
 import java.io.FileNotFoundException
+import java.io.StringReader
 import java.net.Socket
 import java.net.URLConnection
 import java.security.KeyStore
@@ -46,9 +48,12 @@ internal object CertificatePinning {
   // Cronet requires an expiration; without one the pins stay enforced until the app ships new ones.
   private val NO_EXPIRATION = Date(4102444800000L) // 2100-01-01 UTC
 
-  private val HOSTNAME = Regex("^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$")
-  private val NUMERIC_HOST = Regex("^[0-9.]+$")
-  private val DATE = Regex("^\\d{4}-\\d{2}-\\d{2}$")
+  // Lazy: apps without a pin file never parse one.
+  private val HOSTNAME by lazy { Regex("^(?=.{1,253}$)[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$") }
+  private val NUMERIC_HOST by lazy { Regex("^[0-9.]+$") }
+  private val DATE by lazy { Regex("^\\d{4}-\\d{2}-\\d{2}$") }
+  // A SHA-256 hash in standard, padded base64 is always 43 alphabet characters plus "=".
+  private val HASH by lazy { Regex("^[A-Za-z0-9+/]{43}=$") }
 
   private class DomainPins(
     val host: String,
@@ -65,6 +70,7 @@ internal object CertificatePinning {
     factory.init(null as KeyStore?)
     factory.trustManagers.filterIsInstance<X509TrustManager>().first()
   }
+  private val trustExtensions by lazy { X509TrustManagerExtensions(systemTrustManager) }
 
   fun apply(builder: CronetEngine.Builder, context: Context) {
     val domains = domains(context)
@@ -80,8 +86,9 @@ internal object CertificatePinning {
    * Pins an HTTPS [URLConnection]. The pins are checked by the trust manager during the handshake, before
    * any request bytes (headers, refresh tokens) are sent. The dedicated socket factory also keeps the
    * connection out of pools shared with unpinned HttpURLConnections. Call before connecting.
+   * [context] may be null once a Cronet engine has been built, since that already loaded the pins.
    */
-  fun apply(connection: URLConnection, context: Context) {
+  fun apply(connection: URLConnection, context: Context?) {
     if (connection !is HttpsURLConnection) return
     val domains = domains(context)
     if (domains.isEmpty()) return
@@ -102,14 +109,23 @@ internal object CertificatePinning {
 
   /** The platform's validation (including network_security_config), then the pins of the host being connected to. */
   private class PinningTrustManager(private val domains: Map<String, DomainPins>) : X509ExtendedTrustManager() {
+    // The socket and engine forms pass the TLS session through, so the platform still sees stapled OCSP
+    // and SCTs (Certificate Transparency), exactly as with the default trust manager.
     override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket) =
-      check(chain, authType, (socket as? SSLSocket)?.handshakeSession?.peerHost)
+      check(chain, authType, (socket as? SSLSocket)?.handshakeSession?.peerHost) {
+        (systemTrustManager as? X509ExtendedTrustManager)?.checkServerTrusted(chain, authType, socket)
+          ?: trustExtensions.checkServerTrusted(chain, authType, it)
+      }
 
     override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, engine: SSLEngine) =
-      check(chain, authType, engine.handshakeSession?.peerHost)
+      check(chain, authType, engine.handshakeSession?.peerHost) {
+        (systemTrustManager as? X509ExtendedTrustManager)?.checkServerTrusted(chain, authType, engine)
+          ?: trustExtensions.checkServerTrusted(chain, authType, it)
+      }
 
     // Without a socket there is no host to pin against; refuse rather than skip the check.
-    override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) = check(chain, authType, null)
+    override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) =
+      check(chain, authType, null) {}
 
     override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String): Unit =
       throw CertificateException("Client certificates aren't supported")
@@ -122,11 +138,12 @@ internal object CertificatePinning {
 
     override fun getAcceptedIssuers(): Array<X509Certificate> = systemTrustManager.acceptedIssuers
 
-    private fun check(chain: Array<X509Certificate>, authType: String, host: String?) {
+    private fun check(chain: Array<X509Certificate>, authType: String, host: String?, platformCheck: (String) -> Unit) {
       if (host == null) throw CertificateException("Certificate pinning: unknown host")
-      // The verified chain runs up to the trust anchor, so a pinned root matches even though servers never send it.
-      val verified = X509TrustManagerExtensions(systemTrustManager).checkServerTrusted(chain, authType, host)
+      platformCheck(host)
       val pins = activePins(host, domains) ?: return
+      // The verified chain runs up to the trust anchor, so a pinned root matches even though servers never send it.
+      val verified = trustExtensions.checkServerTrusted(chain, authType, host)
       val matched = verified.any { cert ->
         val digest = MessageDigest.getInstance("SHA-256").digest(cert.publicKey.encoded)
         pins.hashes.any { it.contentEquals(digest) }
@@ -138,20 +155,28 @@ internal object CertificatePinning {
     }
   }
 
-  /** The most specific entry covering [host]: an exact match, else the closest parent with includeSubdomains. */
+  /**
+   * The pins covering [host], by Cronet's rule so this path and the engines agree: walk up from the full
+   * host, skip expired entries, and let the first live entry decide. It applies if it is an exact match or
+   * has includeSubdomains; otherwise the host is unpinned, even if a parent entry has includeSubdomains.
+   */
   private fun activePins(host: String, domains: Map<String, DomainPins>): DomainPins? {
+    val now = Date()
     var candidate = host.lowercase(Locale.US).removeSuffix(".")
-    var pins = domains[candidate]
-    while (pins == null && candidate.contains('.')) {
+    var exact = true
+    while (true) {
+      val pins = domains[candidate]
+      if (pins != null && pins.expiration.after(now)) return pins.takeIf { exact || it.includeSubdomains }
+      if (!candidate.contains('.')) return null
       candidate = candidate.substringAfter('.')
-      pins = domains[candidate]?.takeIf { it.includeSubdomains }
+      exact = false
     }
-    // Expired entries don't pin, matching Cronet.
-    return pins?.takeIf { it.expiration.after(Date()) }
   }
 
-  private fun domains(context: Context): Map<String, DomainPins> {
+  private fun domains(context: Context?): Map<String, DomainPins> {
     cached?.let { return it.getOrThrow() }
+    // Without a context the file can't be read, and guessing "no pins" would fail open.
+    if (context == null) throw IllegalStateException("NitroFetch: can't read $CONFIG_FILE without an Android Context")
     synchronized(this) {
       val result = cached ?: runCatching { read(context)?.let(::parse) ?: emptyMap() }
         .onSuccess { if (it.isNotEmpty()) NitroLogger.i("NitroFetch", "Certificate pinning enabled for ${it.size} host(s)") }
@@ -167,46 +192,68 @@ internal object CertificatePinning {
     null
   }
 
-  private fun parse(json: String): Map<String, DomainPins> {
-    val root = try {
-      JSONObject(json)
-    } catch (e: Exception) {
-      invalid("expected a JSON object keyed by hostname (${e.message})")
-    }
-    return root.keys().asSequence().map { key ->
-      val host = key.trim().lowercase(Locale.US).removeSuffix(".")
-      if (!HOSTNAME.matches(host) || NUMERIC_HOST.matches(host)) {
-        invalid("\"$key\" is not a hostname (no scheme, port, path, wildcard or IP; use punycode for IDNs)")
-      }
-      val entry = root.optJSONObject(key) ?: invalid("\"$key\" must be an object")
-
-      val rawHashes = entry.optJSONArray("publicKeyHashes")
-      if (rawHashes == null || rawHashes.length() == 0) {
-        invalid("\"$key\" needs at least one entry in publicKeyHashes")
-      }
-      val hashes = (0 until rawHashes.length()).map { i ->
-        val raw = rawHashes.opt(i)
-        val hash = (raw as? String)?.let { runCatching { Base64.decode(it, Base64.DEFAULT) }.getOrNull() }
-        if (hash == null || hash.size != 32) {
-          invalid("\"$key\" has a publicKeyHashes entry that isn't a base64 SHA-256 hash: $raw")
+  /** Strict JSON, as on iOS and in the Expo plugin: no comments, unquoted names or trailing content. */
+  private fun parse(json: String): Map<String, DomainPins> = try {
+    JsonReader(StringReader(json)).use { reader ->
+      reader.isLenient = false
+      if (reader.peek() != JsonToken.BEGIN_OBJECT) invalid("expected a JSON object keyed by hostname")
+      val domains = LinkedHashMap<String, DomainPins>()
+      reader.beginObject()
+      while (reader.hasNext()) {
+        val key = reader.nextName()
+        val host = key.lowercase(Locale.US).removeSuffix(".")
+        if (!HOSTNAME.matches(host) || NUMERIC_HOST.matches(host)) {
+          invalid("\"$key\" is not a hostname (no scheme, port, path, wildcard or IP; use punycode for IDNs)")
         }
-        hash
-      }.toSet()
-
-      val includeSubdomains = when (val value = entry.opt("includeSubdomains")) {
-        null -> false
-        is Boolean -> value
-        else -> invalid("\"$key\".includeSubdomains must be true or false")
+        if (host in domains) invalid("\"$key\" lists a host that is already in the file")
+        domains[host] = readEntry(reader, key, host)
       }
+      reader.endObject()
+      if (reader.peek() != JsonToken.END_DOCUMENT) invalid("unexpected content after the JSON object")
+      domains
+    }
+  } catch (e: InvalidConfig) {
+    throw e
+  } catch (e: Exception) {
+    invalid("not valid JSON (${e.message})")
+  }
 
-      val expiration = when (val value = entry.opt("expirationDate")) {
-        null -> NO_EXPIRATION
-        is String -> parseDate(value) ?: invalid("\"$key\".expirationDate must be yyyy-MM-dd")
-        else -> invalid("\"$key\".expirationDate must be yyyy-MM-dd")
+  private fun readEntry(reader: JsonReader, key: String, host: String): DomainPins {
+    if (reader.peek() != JsonToken.BEGIN_OBJECT) invalid("\"$key\" must be an object")
+    var hashes = emptySet<ByteArray>()
+    var includeSubdomains = false
+    var expiration = NO_EXPIRATION
+    reader.beginObject()
+    while (reader.hasNext()) {
+      when (reader.nextName()) {
+        "publicKeyHashes" -> {
+          if (reader.peek() != JsonToken.BEGIN_ARRAY) invalid("\"$key\" needs at least one entry in publicKeyHashes")
+          val decoded = mutableSetOf<ByteArray>()
+          reader.beginArray()
+          while (reader.hasNext()) {
+            val raw = if (reader.peek() == JsonToken.STRING) reader.nextString() else null
+            if (raw == null || !HASH.matches(raw)) {
+              invalid("\"$key\" has a publicKeyHashes entry that isn't a base64 SHA-256 hash: ${raw ?: reader.peek()}")
+            }
+            decoded += Base64.decode(raw, Base64.DEFAULT)
+          }
+          reader.endArray()
+          hashes = decoded
+        }
+        "includeSubdomains" -> {
+          if (reader.peek() != JsonToken.BOOLEAN) invalid("\"$key\".includeSubdomains must be true or false")
+          includeSubdomains = reader.nextBoolean()
+        }
+        "expirationDate" -> {
+          val raw = if (reader.peek() == JsonToken.STRING) reader.nextString() else null
+          expiration = raw?.let(::parseDate) ?: invalid("\"$key\".expirationDate must be yyyy-MM-dd")
+        }
+        else -> reader.skipValue()
       }
-
-      host to DomainPins(host, hashes, includeSubdomains, expiration)
-    }.toMap()
+    }
+    reader.endObject()
+    if (hashes.isEmpty()) invalid("\"$key\" needs at least one entry in publicKeyHashes")
+    return DomainPins(host, hashes, includeSubdomains, expiration)
   }
 
   private fun parseDate(value: String): Date? {
@@ -218,6 +265,7 @@ internal object CertificatePinning {
     return runCatching { format.parse(value) }.getOrNull()
   }
 
-  private fun invalid(reason: String): Nothing =
-    throw IllegalStateException("NitroFetch: invalid $CONFIG_FILE: $reason")
+  private class InvalidConfig(reason: String) : IllegalStateException("NitroFetch: invalid $CONFIG_FILE: $reason")
+
+  private fun invalid(reason: String): Nothing = throw InvalidConfig(reason)
 }

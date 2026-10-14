@@ -8,8 +8,19 @@
       "KwccWaCgrnaw6tsrrSO61FgLacNgG2MMLq8GE6+oP5I="
     ]
   },
+  "amazon.com": {
+    "includeSubdomains": true,
+    "publicKeyHashes": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]
+  },
+  "www.amazon.com": {
+    "expirationDate": "2020-01-01",
+    "publicKeyHashes": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]
+  },
   "gstatic.com": {
     "includeSubdomains": true,
+    "publicKeyHashes": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]
+  },
+  "expired.badssl.com": {
     "publicKeyHashes": ["AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="]
   },
   "google.com": {

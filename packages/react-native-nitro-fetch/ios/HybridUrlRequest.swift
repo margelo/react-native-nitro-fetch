@@ -1,11 +1,15 @@
 import Foundation
 import NitroModules
 
+/// Lets the task's delegate, which outlives this object, tell a caller's cancel from a rejected challenge.
+protocol CancelRequestTracking: AnyObject {
+  func markCancelRequested()
+}
+
 class HybridUrlRequest: HybridUrlRequestSpec {
   private weak var task: URLSessionDataTask?
   private weak var delegate: URLSessionDelegate?
   private var isDoneFlag = false
-  private(set) var cancelRequested = false
 
   init(task: URLSessionDataTask, delegate: URLSessionDelegate) {
     self.task = task
@@ -28,7 +32,7 @@ class HybridUrlRequest: HybridUrlRequestSpec {
   }
 
   func cancel() throws {
-    cancelRequested = true
+    (delegate as? CancelRequestTracking)?.markCancelRequested()
     task?.cancel()
     isDoneFlag = true
   }

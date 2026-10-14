@@ -1,15 +1,19 @@
 import Foundation
 
-/// Keeps authentication challenges observable by delegate-based networking middleware,
-/// and enforces certificate pinning when the app bundles a pinning config.
-private final class NitroURLSessionDelegate: NSObject, URLSessionDelegate {
+/// Keeps authentication challenges observable by delegate-based networking middleware.
+private final class NitroURLSessionDelegate: NSObject, URLSessionDelegate {}
+
+/// Used instead of `NitroURLSessionDelegate` only when the app bundles a pinning config, so apps
+/// without one never get a server-trust callback on the session's delegate queue.
+private final class NitroPinningURLSessionDelegate: NSObject, URLSessionDelegate {
   func urlSession(
     _ session: URLSession,
     didReceive challenge: URLAuthenticationChallenge,
     completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
   ) {
-    let (disposition, credential) = CertificatePinning.evaluate(challenge) ?? (.performDefaultHandling, nil)
-    completionHandler(disposition, credential)
+    if !CertificatePinning.handle(challenge, completion: completionHandler) {
+      completionHandler(.performDefaultHandling, nil)
+    }
   }
 }
 
@@ -25,9 +29,12 @@ enum NitroURLSession {
   static let shared = make(configuration: .default)
 
   static func make(configuration: URLSessionConfiguration) -> URLSession {
+    let delegate: URLSessionDelegate = CertificatePinning.isConfigured
+      ? NitroPinningURLSessionDelegate()
+      : NitroURLSessionDelegate()
     return URLSession(
       configuration: configuration,
-      delegate: NitroURLSessionDelegate(),
+      delegate: delegate,
       delegateQueue: nil
     )
   }

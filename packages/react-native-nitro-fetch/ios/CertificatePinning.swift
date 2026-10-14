@@ -44,32 +44,60 @@ enum CertificatePinning {
     return config
   }()
 
+  /// True when the app ships a pin file, valid or not (an invalid one must still fail closed).
+  static var isConfigured: Bool {
+    if case .disabled = config { return false }
+    return true
+  }
+
   // MARK: - Challenge handling
 
-  /// The disposition for a server-trust challenge on a pinned host, or nil to fall back to default handling.
-  static func evaluate(_ challenge: URLAuthenticationChallenge) -> (URLSession.AuthChallengeDisposition, URLCredential?)? {
+  // Trust evaluation can take milliseconds (or block on network for an incomplete chain), so it runs
+  // here rather than on the session's serial delegate queue, which also delivers streaming chunks.
+  private static let evaluationQueue = DispatchQueue(
+    label: "com.margelo.nitrofetch.pinning",
+    qos: .userInitiated,
+    attributes: .concurrent
+  )
+
+  /// Answers a server-trust challenge for a pinned host (possibly later, on another queue) and returns true.
+  /// Returns false without calling `completion` when default handling applies.
+  static func handle(
+    _ challenge: URLAuthenticationChallenge,
+    completion: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+  ) -> Bool {
     guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
-          let trust = challenge.protectionSpace.serverTrust else { return nil }
+          let trust = challenge.protectionSpace.serverTrust else { return false }
     let host = challenge.protectionSpace.host
 
     switch config {
     case .disabled:
-      return nil
+      return false
     case .invalid:
-      return (.cancelAuthenticationChallenge, nil)
+      completion(.cancelAuthenticationChallenge, nil)
+      return true
     case .enabled(let domains):
-      guard let pins = activePins(for: host, in: domains) else { return nil }
+      guard let pins = activePins(for: host, in: domains) else { return false }
       // Evaluate first: it rejects untrusted chains and hostname mismatches, and builds the
       // chain up to the trust anchor so a pinned root matches even though servers never send it.
-      guard SecTrustEvaluateWithError(trust, nil) else {
-        NitroLogger.log("[NitroFetch] Certificate pinning: untrusted chain for \(host)")
-        return (.cancelAuthenticationChallenge, nil)
+      // SecTrustEvaluateAsyncWithError must be called on the queue it reports back on.
+      evaluationQueue.async {
+        SecTrustEvaluateAsyncWithError(trust, evaluationQueue) { trust, trusted, _ in
+          guard trusted else {
+            // Default handling evaluates this same trust and rejects it too, with the system's own
+            // "certificate invalid" error, so only real pin mismatches carry the pinning error.
+            completion(.performDefaultHandling, nil)
+            return
+          }
+          guard chainMatches(trust, pins.hashes) else {
+            NitroLogger.log("[NitroFetch] Certificate pinning: no pinned key in the chain for \(host)")
+            completion(.cancelAuthenticationChallenge, nil)
+            return
+          }
+          completion(.useCredential, URLCredential(trust: trust))
+        }
       }
-      guard chainMatches(trust, pins.hashes) else {
-        NitroLogger.log("[NitroFetch] Certificate pinning: no pinned key in the chain for \(host)")
-        return (.cancelAuthenticationChallenge, nil)
-      }
-      return (.useCredential, URLCredential(trust: trust))
+      return true
     }
   }
 
@@ -97,18 +125,20 @@ enum CertificatePinning {
     ])
   }
 
-  /// The most specific entry covering `host`: an exact match, else the closest parent with includeSubdomains.
-  /// Expired entries are skipped, so the system's default validation takes over for that host.
+  /// The pins covering `host`, using Cronet's rule so every transport agrees: walk up from the full host,
+  /// skip expired entries, and let the first live entry decide. It applies if it is an exact match or has
+  /// includeSubdomains; otherwise the host is unpinned, even if a parent entry has includeSubdomains.
   static func activePins(for host: String, in domains: [String: DomainPins], now: Date = Date()) -> DomainPins? {
     var candidate = normalizedHost(host)
-    var pins = domains[candidate]
-    while pins == nil, let dot = candidate.firstIndex(of: ".") {
+    var exact = true
+    while true {
+      if let pins = domains[candidate], !(pins.expiration.map { $0 <= now } ?? false) {
+        return exact || pins.includeSubdomains ? pins : nil
+      }
+      guard let dot = candidate.firstIndex(of: ".") else { return nil }
       candidate = String(candidate[candidate.index(after: dot)...])
-      if let parent = domains[candidate], parent.includeSubdomains { pins = parent }
+      exact = false
     }
-    guard let pins = pins else { return nil }
-    if let expiration = pins.expiration, expiration <= now { return nil }
-    return pins
   }
 
   private static func chainMatches(_ trust: SecTrust, _ hashes: Set<Data>) -> Bool {
@@ -164,7 +194,7 @@ enum CertificatePinning {
     }
     var domains: [String: DomainPins] = [:]
     for (key, value) in root {
-      let host = normalizedHost(key.trimmingCharacters(in: .whitespaces))
+      let host = normalizedHost(key)
       guard isHostname(host) else {
         return .invalid("\"\(key)\" is not a hostname (no scheme, port, path, wildcard or IP; use punycode for IDNs)")
       }
@@ -175,7 +205,7 @@ enum CertificatePinning {
       }
       var hashes = Set<Data>()
       for raw in rawHashes {
-        guard let string = raw as? String, let hash = Data(base64Encoded: string), hash.count == 32 else {
+        guard let string = raw as? String, isCanonicalHash(string), let hash = Data(base64Encoded: string) else {
           return .invalid("\"\(key)\" has a publicKeyHashes entry that isn't a base64 SHA-256 hash: \(raw)")
         }
         hashes.insert(hash)
@@ -197,9 +227,15 @@ enum CertificatePinning {
         expiration = date
       }
 
+      guard domains[host] == nil else { return .invalid("\"\(key)\" lists a host that is already in the file") }
       domains[host] = DomainPins(hashes: hashes, includeSubdomains: includeSubdomains, expiration: expiration)
     }
     return domains.isEmpty ? .disabled : .enabled(domains)
+  }
+
+  /// A SHA-256 hash in standard, padded base64 is always 43 alphabet characters plus "=".
+  private static func isCanonicalHash(_ string: String) -> Bool {
+    string.range(of: "^[A-Za-z0-9+/]{43}=$", options: .regularExpression) != nil
   }
 
   private static func normalizedHost(_ host: String) -> String {
