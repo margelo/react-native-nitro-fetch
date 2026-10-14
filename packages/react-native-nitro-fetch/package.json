@@ -46,7 +46,7 @@
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "clean": "del-cli android/build example/android/build example/android/app/build example/ios/build lib expo/plugins/dist",
     "prepare": "bob build",
-    "build:plugin": "cd expo/plugins && npx tsc",
+    "build:plugin": "tsc -p expo/plugins/tsconfig.json",
     "nitrogen": "nitrogen",
     "release": "npm run build:plugin && release-it --only-version",
     "prepack": "cp ../../README.md ./README.md",

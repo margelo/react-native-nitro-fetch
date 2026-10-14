@@ -47,6 +47,18 @@ Pin at least two keys per host. Root or intermediate CA keys survive certificate
 
 ## 2. Bundle it with the app
 
+**Expo:** point the config plugin at the file. `expo prebuild` copies it into both native projects, and fails if the file is malformed.
+
+```json
+{
+  "plugins": [
+    ["react-native-nitro-fetch", { "certificatePinning": "./nitro-fetch-pinning.json" }]
+  ]
+}
+```
+
+**Bare React Native:**
+
 - **Android:** `android/app/src/main/assets/nitro-fetch-pinning.json`
 - **iOS:** add `nitro-fetch-pinning.json` to the app target in Xcode, so it shows up under *Build Phases → Copy Bundle Resources*.
 
