@@ -74,10 +74,10 @@
     "lint": "eslint \"**/*.{js,ts,tsx}\" --fix",
     "lint-ci": "eslint \"**/*.{js,ts,tsx}\" -f @jamesacarr/github-actions",
     "typescript": "tsc",
-    "build:plugin": "cd expo/plugins && npx tsc",
+    "build:plugin": "tsc -p expo/plugins/tsconfig.json",
     "release": "npm run build:plugin && release-it --only-version",
     "specs": "tsc --noEmit false && nitrogen --logLevel=\"debug\"",
-    "prepack": "cp ../../README.md ./README.md",
+    "prepack": "npm run build:plugin && cp ../../README.md ./README.md",
     "postpack": "rm -f ./README.md"
   },
   "keywords": [
