@@ -16,22 +16,27 @@ export async function profileFetch<T>(
   outputPath?: string
 ): Promise<ProfileResult<T>> {
   const hermes = global.HermesInternal;
-  if (!hermes) {
+  if (
+    typeof hermes?.enableSamplingProfiler !== 'function' ||
+    typeof hermes.disableSamplingProfiler !== 'function' ||
+    typeof hermes.dumpSamplingProfiler !== 'function'
+  ) {
     const result = await fn();
     return { result };
   }
 
   const path = outputPath ?? `/tmp/nitrofetch-profile-${Date.now()}.cpuprofile`;
   hermes.enableSamplingProfiler();
+  let profilePath: string | undefined;
+  let result: T;
   try {
-    const result = await fn();
-    return { result, profilePath: path };
+    result = await fn();
   } finally {
     hermes.disableSamplingProfiler();
     try {
       hermes.dumpSamplingProfiler(path);
-    } catch {
-      // Profile dump may fail on some platforms
-    }
+      profilePath = path;
+    } catch {}
   }
+  return profilePath ? { result, profilePath } : { result };
 }
