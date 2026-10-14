@@ -245,10 +245,12 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
     private val directExecutor = Executor(Runnable::run)
 
     @JvmStatic
+    @JvmOverloads
     fun fetch(
       req: NitroRequest,
       onSuccess: (NitroResponse) -> Unit,
-      onFail: (Throwable) -> Unit
+      onFail: (Throwable) -> Unit,
+      onRestarted: ((UrlRequest) -> Unit)? = null
     ): UrlRequest? {
       return try {
         // Local resources (file://, content://, scheme-less paths) aren't HTTP; read off disk -> 200.
@@ -259,10 +261,38 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         if (hostHasWhitespace(req.url)) throw invalidUrlException(req.url)
         val engine = HybridNitroFetch.getEngine()
         val executor = HybridNitroFetch.ioExecutor
-        startCronet(engine, executor, req, onSuccess, onFail)
+        startCronet(engine, executor, req, onSuccess, onFail, onRestarted)
       } catch (t: Throwable) {
         onFail(t)
         null
+      }
+    }
+
+    private fun originOf(url: String): String? = try {
+      val uri = java.net.URI(url)
+      val scheme = uri.scheme?.lowercase()
+      val host = uri.host?.lowercase()
+      if (scheme == null || host == null) null
+      else "$scheme://$host:${if (uri.port != -1) uri.port else if (scheme == "https") 443 else 80}"
+    } catch (_: Throwable) {
+      null
+    }
+
+    private fun hasAuthorization(req: NitroRequest): Boolean =
+      req.headers?.any { it.key.equals("Authorization", ignoreCase = true) } == true
+
+    private fun crossOriginRedirectWithoutAuthorization(req: NitroRequest, status: Int, location: String): NitroRequest {
+      val method = req.method ?: NitroRequestMethod.GET
+      val dropBody = ((status == 301 || status == 302) && method == NitroRequestMethod.POST) ||
+        (status == 303 && method != NitroRequestMethod.GET && method != NitroRequestMethod.HEAD)
+      val headers = req.headers?.filterNot {
+        it.key.equals("Authorization", ignoreCase = true) ||
+          (dropBody && it.key.equals("Content-Type", ignoreCase = true))
+      }?.toTypedArray()
+      return if (dropBody) {
+        req.copy(url = location, method = NitroRequestMethod.GET, headers = headers, bodyString = null, bodyBytes = null, bodyBytesBase64 = null, bodyFormData = null)
+      } else {
+        req.copy(url = location, headers = headers)
       }
     }
 
@@ -271,7 +301,8 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       executor: Executor,
       req: NitroRequest,
       onSuccess: (NitroResponse) -> Unit,
-      onFail: (Throwable) -> Unit
+      onFail: (Throwable) -> Unit,
+      onRestarted: ((UrlRequest) -> Unit)?
     ): UrlRequest {
       val url = req.url
       val shouldFollowRedirects = req.followRedirects ?: true
@@ -315,6 +346,18 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
               NitroCookieSync.storeSetCookieFromUrlResponseInfo(info.url, info, flush = false)
             ) {
               setCookieAppliedOnRedirect = true
+            }
+            if (hasAuthorization(req) && originOf(info.url).let { it == null || it != originOf(newLocationUrl) }) {
+              redirectStopped = true
+              request.cancel()
+              val next = crossOriginRedirectWithoutAuthorization(req, info.httpStatusCode, newLocationUrl)
+              try {
+                val restarted = startCronet(engine, executor, next, { res -> onSuccess(res.copy(redirected = true)) }, onFail, onRestarted)
+                onRestarted?.invoke(restarted)
+              } catch (t: Throwable) {
+                onFail(t)
+              }
+              return@complete
             }
             request.followRedirect()
           } else {
@@ -705,6 +748,9 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         finished.set(true)
         if (requestId != null) activeRequests.remove(requestId)
         promise.reject(err)
+      },
+      onRestarted = { restarted ->
+        if (requestId != null && !finished.get()) activeRequests[requestId] = restarted
       }
     )
     // Store after start() — if cancelRequest races and misses, the JS
