@@ -5,9 +5,9 @@
 @source "../lib/**/*.tsx";
 @source "../components/**/*.tsx";
 
-/* Plus Jakarta Sans and Geist Mono, loaded in src/app/layout.tsx. */
+/* Geist and Geist Mono, as in the VisionCamera docs. Loaded in src/app/layout.tsx. */
 @theme inline {
-  --font-sans: var(--font-plus-jakarta-sans);
+  --font-sans: var(--font-geist);
   --font-mono: var(--font-geist-mono);
   --default-mono-font-family: var(--font-mono);
 }
