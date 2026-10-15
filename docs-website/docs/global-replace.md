@@ -26,7 +26,7 @@ That's it — every `fetch()` call in the process now uses the Nitro implementat
 
 ## WebSocket
 
-The same pattern works for the WebSocket package:
+`NitroWebSocket` can be installed globally the same way:
 
 ```ts
 import { NitroWebSocket } from 'react-native-nitro-websockets';
@@ -34,19 +34,10 @@ import { NitroWebSocket } from 'react-native-nitro-websockets';
 globalThis.WebSocket = NitroWebSocket;
 ```
 
-:::tip
-Many WebSocket libraries (Socket.IO, Centrifuge) accept a `WebSocket` constructor option — passing `NitroWebSocket` there avoids touching the global entirely:
+:::caution
+`NitroWebSocket` is not a drop-in `WebSocket`: `readyState` is a string, there are no `WebSocket.OPEN`/`CLOSED` constants, `addEventListener` and `binaryType` don't exist, binary frames arrive in `e.binaryData` with `e.data === ''`, and the third constructor argument is the headers object itself. Code written for the standard `WebSocket`, including libraries such as socket.io-client, can break when the global is replaced. See the [NitroWebSocket API](./websockets.md#nitrowebsocket-api).
 
-```ts
-import { io } from 'socket.io-client';
-import { NitroWebSocket } from 'react-native-nitro-websockets';
-
-const socket = io('https://example.com', {
-  transports: ['websocket'],
-  WebSocket: NitroWebSocket,
-});
-```
-
+socket.io-client has no option for a custom `WebSocket` constructor: engine.io-client uses the global `WebSocket` that exists when it is imported.
 :::
 
 ## Axios

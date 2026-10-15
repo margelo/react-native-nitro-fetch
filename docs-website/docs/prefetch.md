@@ -159,7 +159,7 @@ NitroAutoPrefetcher.registerPrefetch(
   withURL: "https://api.example.com/feed",
   prefetchKey: "feed",
   headers: ["Accept": "application/json"],
-  method: nil, bodyString: nil, bodyBytes: nil, bodyFormData: nil,
+  method: nil, bodyString: nil, bodyBytesBase64: nil, bodyFormData: nil,
   timeoutMs: nil, followRedirects: nil,
   prefetchCacheTtlMs: NSNumber(value: 300_000)
 )
@@ -295,7 +295,7 @@ NitroAutoPrefetcher.registerPrefetch(
   headers: ["X-App": "demo"],
   method: "POST",
   bodyString: nil,
-  bodyBytes: nil,
+  bodyBytesBase64: nil,
   bodyFormData: [
     ["name": "user", "value": "alice"],
   ],
