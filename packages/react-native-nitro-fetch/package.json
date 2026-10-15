@@ -49,7 +49,7 @@
     "build:plugin": "tsc -p expo/plugins/tsconfig.json",
     "nitrogen": "nitrogen",
     "release": "npm run build:plugin && release-it --only-version",
-    "prepack": "cp ../../README.md ./README.md",
+    "prepack": "npm run build:plugin && cp ../../README.md ./README.md",
     "postpack": "rm -f ./README.md"
   },
   "keywords": [
