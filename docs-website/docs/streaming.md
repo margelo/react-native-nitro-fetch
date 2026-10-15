@@ -71,3 +71,7 @@ Pass `{ stream: true }` in the fetch options to enable streaming mode. Without i
 4. Decode each `Uint8Array` chunk with `TextDecoder` for UTF-8 text
 
 Streaming is supported on both Android and iOS.
+
+:::note
+On iOS, URLSession holds back a `text/plain` response until it has 512 bytes or the body ends, to sniff its type, so `fetch()` resolves late and small chunks arrive together. Responses sent with `X-Content-Type-Options: nosniff`, or with a type such as `text/event-stream`, `application/json`, `application/x-ndjson` or `application/octet-stream`, stream right away.
+:::

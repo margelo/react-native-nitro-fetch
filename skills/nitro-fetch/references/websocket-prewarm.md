@@ -125,7 +125,7 @@ const ws = new NitroWebSocket('wss://stream.example.com/feed', ['v1.feed.proto']
 // ↑ adopts the warm connection if the URL matches the prewarm queue
 ```
 
-Libraries that accept an injectable constructor (`socket.io-client`, `centrifuge-js`, and similar) can be pointed at `NitroWebSocket` the same way — pass it as the library's `WebSocket` option so its internal `new WebSocket(...)` becomes `new NitroWebSocket(...)`. Don't swap `globalThis.WebSocket`; it breaks devtools and hot reload and hides which code paths actually use the native socket.
+Only sockets created as `NitroWebSocket` adopt a prewarmed connection. Third-party libraries written for the standard `WebSocket` API (socket.io-client, for example, which has no option for a custom constructor) keep opening their own sockets. Don't swap `globalThis.WebSocket`; it breaks devtools and hot reload and hides which code paths actually use the native socket.
 
 ### Tear down on logout
 

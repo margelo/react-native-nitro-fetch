@@ -48,7 +48,7 @@ For more on the new API surface, see [`using-websockets.md`](./using-websockets.
 
 ### 1. Replace `new WebSocket(...)` with `new NitroWebSocket(...)` at the call sites
 
-> You can also do a global swap (`globalThis.WebSocket = NitroWebSocket`) — see the [Global Replace docs](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace).
+> A global swap (`globalThis.WebSocket = NitroWebSocket`) also works, but only for code that follows the rewrites below — see the [Global Replace docs](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace).
 
 ```ts
 // before
@@ -192,19 +192,9 @@ Don't forget the Android `Application.onCreate` wiring — see [`websocket-prewa
 
 ## Library compatibility
 
-Libraries that accept an injectable `WebSocket` constructor (socket.io-client, centrifuge-js, phoenix in some configurations) can be pointed at `NitroWebSocket` directly:
+Libraries written for the standard `WebSocket` API depend on what the rewrites above change (numeric `readyState`, `addEventListener`, binary data in `e.data`), so they don't work on `NitroWebSocket` unchanged, whether it is passed in or installed globally. socket.io-client has no option for a custom `WebSocket` constructor at all: engine.io-client uses the global `WebSocket` that exists when it is imported, and with `globalThis.WebSocket = NitroWebSocket` its binary packets and `extraHeaders` break.
 
-```ts
-import { NitroWebSocket } from 'react-native-nitro-websockets';
-import { io } from 'socket.io-client';
-
-const socket = io('wss://example.com', {
-  transports: ['websocket'],
-  WebSocket: NitroWebSocket, // or whatever field the library uses
-});
-```
-
-Libraries that *don't* accept an injection and hard-code `new WebSocket(...)` internally will keep using React Native's built-in WebSocket. You can do a [global replace](https://margelo.github.io/react-native-nitro-fetch/docs/global-replace) to route everything through NitroWebSocket.
+Libraries you don't change keep using React Native's built-in WebSocket.
 
 ## Checklist
 
