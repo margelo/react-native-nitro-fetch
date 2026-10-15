@@ -4,6 +4,7 @@ import { NitroFetchHybrid } from './client';
 import { buildNitroRequestPure } from './request';
 import { nitroFetchRaw } from './raw';
 
+/** Turns a response into your own value. Runs on the worklet runtime. */
 export type NitroWorkletMapper<T> = (payload: {
   url: string;
   status: number;
@@ -27,13 +28,24 @@ function ensureWorkletRuntime(name = 'nitro-fetch'): any | undefined {
   }
 }
 
+/** Makes a request and runs `mapWorklet` off the JS thread, if `react-native-worklets` is installed. */
 export async function nitroFetchOnWorklet<T>(
   input: RequestInfo | URL,
   init:
-    | (RequestInit & { timeoutMs?: number; priority?: RequestPriority })
+    | (RequestInit & {
+        /** Fails the request if no data arrives for this many milliseconds. */
+        timeoutMs?: number;
+        /** How urgent the request is. Default `'auto'`. */
+        priority?: RequestPriority;
+      })
     | undefined,
   mapWorklet: NitroWorkletMapper<T>,
-  options?: { preferBytes?: boolean; runtimeName?: string }
+  options?: {
+    /** Pass the body to `mapWorklet` as `bodyBytes` instead of `bodyString`. Default `false`. */
+    preferBytes?: boolean;
+    /** Name of the worklet runtime. Default `'nitro-fetch'`. */
+    runtimeName?: string;
+  }
 ): Promise<T> {
   const preferBytes = options?.preferBytes === true; // default true
   let runOnRuntimeAsync: any;
