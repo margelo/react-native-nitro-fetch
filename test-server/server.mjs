@@ -324,6 +324,11 @@ server.on('upgrade', (req, socket, head) => {
     socket.end();
     return;
   }
+  if (url.pathname === '/ws/raw-headers') {
+    acceptRawWebSocket(req, socket)(1, Buffer.from(JSON.stringify(req.headers)));
+    socket.on('data', () => socket.end());
+    return;
+  }
   wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
 });
 

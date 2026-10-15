@@ -573,6 +573,35 @@ describe('NitroWebSocket - Handshake headers', () => {
   });
 });
 
+describe('NitroWebSocket - Subprotocols with line breaks', () => {
+  const itIos = Platform.OS === 'ios' ? it : it.skip;
+
+  itIos(
+    'never writes a line break from a subprotocol into the handshake',
+    async () => {
+      const { ws, headers } = await withTimeout(
+        new Promise<{ ws: NitroWebSocket; headers: Record<string, string> }>(
+          (resolve, reject) => {
+            const socket = new NitroWebSocket(`${WS_BASE}/ws/raw-headers`, [
+              'chat\r\nX-Injected: 1',
+            ]);
+            socket.onmessage = (e) =>
+              resolve({ ws: socket, headers: JSON.parse(e.data) });
+            socket.onerror = (err) =>
+              reject(new Error(`Connection error: ${err}`));
+          }
+        ),
+        5_000,
+        'handshake with a line break in a subprotocol'
+      );
+      expect(headers['x-injected']).toBe(undefined);
+      expect(headers['sec-websocket-protocol']).toBe(undefined);
+      expect(ws.protocol).toBe('');
+      ws.close();
+    }
+  );
+});
+
 // ─── Error Handling ───────────────────────────────────────────────────────────
 
 describe('NitroWebSocket - Error Handling', () => {
