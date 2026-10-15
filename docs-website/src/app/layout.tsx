@@ -1,12 +1,12 @@
 import { RootProvider } from 'fumadocs-ui/provider/next'
 import type { Metadata } from 'next'
-import { Geist_Mono, Plus_Jakarta_Sans } from 'next/font/google'
+import { Geist, Geist_Mono } from 'next/font/google'
 import { getOgImage, siteConfig } from '@/lib/site-config'
 import './global.css'
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+const geist = Geist({
   display: 'block',
-  variable: '--font-plus-jakarta-sans',
+  variable: '--font-geist',
   subsets: ['latin'],
 })
 
@@ -43,7 +43,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${plusJakartaSans.variable} ${geistMono.variable}`}
+      className={`${geist.variable} ${geistMono.variable}`}
       suppressHydrationWarning
     >
       <body className="flex min-h-dvh flex-col antialiased">
