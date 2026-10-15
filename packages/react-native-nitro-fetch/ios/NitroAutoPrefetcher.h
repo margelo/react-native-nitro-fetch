@@ -41,6 +41,9 @@ NS_ASSUME_NONNULL_BEGIN
                 followRedirects:(nullable NSNumber *)followRedirects
              prefetchCacheTtlMs:(nullable NSNumber *)prefetchCacheTtlMs;
 
+/// Starts prefetch immediately without persisting options or replaying stored tokens.
++ (void)prefetchWithOptions:(NSDictionary<NSString *, id> *)options NS_SWIFT_NAME(prefetch(options:));
+
 @end
 
 NS_ASSUME_NONNULL_END

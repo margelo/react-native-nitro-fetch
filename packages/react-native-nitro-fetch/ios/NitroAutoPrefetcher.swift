@@ -123,6 +123,13 @@ public final class NitroAutoPrefetcher: NSObject {
     }
   }
 
+  /// Starts prefetch immediately without registering it for a future launch.
+  @objc(prefetchWithOptions:)
+  public static func prefetch(options: [String: Any]) {
+    let request = buildNitroRequest(from: options)
+    Task { try? await HybridNitroFetchClient.prefetchStatic(request) }
+  }
+
   @objc
   public static func prefetchOnStart() {
     workQueue.async {

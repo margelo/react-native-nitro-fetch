@@ -78,6 +78,28 @@ object AutoPrefetcher {
     }
   }
 
+  /** Prefetches now without persisting the request. Completes after the response is cached. */
+  @JvmStatic
+  fun prefetch(req: NitroRequest): CompletableFuture<NitroResponse> {
+    val key = req.headers?.firstOrNull { it.key.equals("prefetchKey", ignoreCase = true) }?.value
+    if (key.isNullOrEmpty()) {
+      return CompletableFuture<NitroResponse>().also {
+        it.completeExceptionally(IllegalArgumentException("prefetch: missing 'prefetchKey' header"))
+      }
+    }
+    FetchCache.peekResultIfFresh(key, req.prefetchCacheTtlMs?.toLong() ?: 5_000L)?.let {
+      return CompletableFuture.completedFuture(it)
+    }
+    val future = CompletableFuture<NitroResponse>()
+    val shared = FetchCache.beginPending(key, future) ?: future.also {
+      HybridNitroFetchClient.fetch(req,
+        onSuccess = { response -> FetchCache.complete(key, response) },
+        onFail = { error -> FetchCache.completeExceptionally(key, error) })
+    }
+    // A caller can cancel its future without cancelling the shared request.
+    return shared.thenApply { it }
+  }
+
   fun prefetchOnStart(app: Application) {
     // Queue decrypt + token refresh are blocking — keep them off the startup critical path.
     executor.execute { runPrefetchOnStart(app) }

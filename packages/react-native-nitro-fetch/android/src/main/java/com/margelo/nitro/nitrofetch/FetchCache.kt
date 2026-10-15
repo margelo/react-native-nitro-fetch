@@ -34,6 +34,12 @@ object FetchCache {
     return entry.response
   }
 
+  /** Reads a fresh result without consuming the response reserved for JavaScript. */
+  fun peekResultIfFresh(key: String, maxAgeMs: Long): NitroResponse? =
+    results[key]?.takeIf {
+      maxAgeMs > 0 && System.currentTimeMillis() - it.timestampMs <= maxAgeMs
+    }?.response
+
   fun getResultIfFresh(key: String, maxAgeMs: Long): NitroResponse? {
     val entry = results.remove(key) ?: return null
     val age = System.currentTimeMillis() - entry.timestampMs
