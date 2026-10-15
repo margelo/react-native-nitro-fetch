@@ -413,7 +413,9 @@ struct NWStreamWebSocketConnection::Impl {
       { "Sec-WebSocket-Key", base64(nonce, sizeof(nonce)) },
       { "Sec-WebSocket-Version", "13" },
     };
-    if (!requestedProtocols.empty()) fields.emplace_back("Sec-WebSocket-Protocol", requestedProtocols);
+    if (!requestedProtocols.empty() && requestedProtocols.find_first_of("\r\n") == std::string::npos) {
+      fields.emplace_back("Sec-WebSocket-Protocol", requestedProtocols);
+    }
     fields.emplace_back("Sec-WebSocket-Extensions", "permessage-deflate");
     NSMutableArray<NSHTTPCookie*>* cookies = [NSMutableArray array];
     for (NSHTTPCookie* stored in [NSHTTPCookieStorage.sharedHTTPCookieStorage cookiesForURL:cookieURL(url)]) {
