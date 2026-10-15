@@ -14,9 +14,13 @@ export type {
   WebSocketReadyState,
 } from './NitroWebSocket.nitro'
 
+/** Passed to `onmessage`. */
 export type WebSocketMessageEvent = {
+  /** Message text. Empty for binary messages. */
   data: string
+  /** Whether it is a binary message. */
   isBinary: boolean
+  /** Message bytes, for binary messages only. */
   binaryData?: ArrayBuffer
 }
 
@@ -45,10 +49,7 @@ type Handlers = {
   onclose: ((e: NitroWSCloseEvent) => void) | null
 }
 
-/**
- * Browser-compatible WebSocket wrapper backed by a Nitro HybridObject
- * using libwebsockets + mbedTLS under the hood.
- */
+/** Browser-like WebSocket wrapper backed by a Nitro HybridObject. */
 export class NitroWebSocket {
   private _ws: HybridWebSocket
   private _inspectorId: string | undefined
@@ -61,6 +62,7 @@ export class NitroWebSocket {
   private _bound: Handlers = { ...this._handlers }
   private _bindScheduled = false
 
+  /** Opens a connection to `url`. `headers` are added to the upgrade request. */
   constructor(
     url: string,
     protocols?: string | string[],
@@ -90,34 +92,43 @@ export class NitroWebSocket {
     this._ws.connect(url, protocolList, headers ?? {})
   }
 
+  /** Connection state. */
   get readyState() {
     return this._ws.readyState
   }
+  /** The URL it connected to. */
   get url() {
     return this._ws.url
   }
+  /** The subprotocol the server picked. */
   get protocol() {
     return this._ws.protocol
   }
+  /** Bytes waiting to be sent. */
   get bufferedAmount() {
     return this._ws.bufferedAmount
   }
+  /** The extensions the server picked. */
   get extensions() {
     return this._ws.extensions
   }
 
+  /** Called when the connection opens. */
   set onopen(fn: (() => void) | null) {
     this._handlers.onopen = fn
     this._scheduleBind()
   }
+  /** Called for each message. */
   set onmessage(fn: ((e: WebSocketMessageEvent) => void) | null) {
     this._handlers.onmessage = fn
     this._scheduleBind()
   }
+  /** Called with an error message when the connection fails. */
   set onerror(fn: ((error: string) => void) | null) {
     this._handlers.onerror = fn
     this._scheduleBind()
   }
+  /** Called when the connection closes. */
   set onclose(fn: ((e: NitroWSCloseEvent) => void) | null) {
     this._handlers.onclose = fn
     this._scheduleBind()
@@ -224,6 +235,7 @@ export class NitroWebSocket {
     }
   }
 
+  /** Sends a text or binary message. */
   send(data: string | ArrayBuffer) {
     if (typeof data === 'string') {
       if (this._inspectorId && _inspector?.isEnabled()) {
@@ -250,6 +262,7 @@ export class NitroWebSocket {
     }
   }
 
+  /** Closes the connection. Default code `1000`. */
   close(code = 1000, reason = '') {
     this._ws.close(code, reason)
   }

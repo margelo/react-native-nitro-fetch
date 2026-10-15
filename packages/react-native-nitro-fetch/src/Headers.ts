@@ -1,6 +1,7 @@
 import type { NitroHeader } from './NitroFetch.nitro';
 
-type HeadersInitInput =
+/** Anything `new Headers()` accepts: an object, a list of pairs, or another `Headers`. */
+export type HeadersInitInput =
   | NitroHeaders
   | NitroHeader[]
   | [string, string][]
@@ -12,6 +13,7 @@ function normalizeName(name: string): string {
   return name.toLowerCase();
 }
 
+/** A list of HTTP headers. Works like the standard `Headers`, and names are not case-sensitive. */
 export class NitroHeaders {
   private _map: Map<string, string[]>;
 
@@ -68,6 +70,7 @@ export class NitroHeaders {
     }
   }
 
+  /** Adds a value, keeping any values already set for `name`. */
   append(name: string, value: string): void {
     const key = normalizeName(name);
     const existing = this._map.get(key);
@@ -75,28 +78,34 @@ export class NitroHeaders {
     else this._map.set(key, [value]);
   }
 
+  /** Removes a header. */
   delete(name: string): void {
     this._map.delete(normalizeName(name));
   }
 
+  /** Gets a header's values joined with `, `, or `null` if it isn't set. */
   get(name: string): string | null {
     const values = this._map.get(normalizeName(name));
     if (!values || values.length === 0) return null;
     return values.join(', ');
   }
 
+  /** Gets each `Set-Cookie` value separately. */
   getSetCookie(): string[] {
     return this._map.get('set-cookie') ?? [];
   }
 
+  /** Whether a header is set. */
   has(name: string): boolean {
     return this._map.has(normalizeName(name));
   }
 
+  /** Sets a header, replacing any values it had. */
   set(name: string, value: string): void {
     this._map.set(normalizeName(name), [value]);
   }
 
+  /** Calls `callback` for each header, sorted by name. */
   forEach(
     callback: (value: string, key: string, headers: NitroHeaders) => void,
     thisArg?: any
@@ -107,6 +116,7 @@ export class NitroHeaders {
     }
   }
 
+  /** Each `[name, value]` pair, sorted by name. */
   entries(): HeadersIterator<[string, string]> {
     const map = this._map;
     const sortedKeys = Array.from(map.keys()).sort();
@@ -118,6 +128,7 @@ export class NitroHeaders {
     return gen() as unknown as HeadersIterator<[string, string]>;
   }
 
+  /** Each header name, sorted. */
   keys(): HeadersIterator<string> {
     const map = this._map;
     const sortedKeys = Array.from(map.keys()).sort();
@@ -129,6 +140,7 @@ export class NitroHeaders {
     return gen() as unknown as HeadersIterator<string>;
   }
 
+  /** Each header value, sorted by name. */
   values(): HeadersIterator<string> {
     const map = this._map;
     const sortedKeys = Array.from(map.keys()).sort();

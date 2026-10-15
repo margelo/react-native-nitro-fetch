@@ -11,12 +11,17 @@ import type {
 const TextEncoding =
   NitroModules.createHybridObject<NitroTextEncoding>('NitroTextEncoding')
 
+/** Turns UTF-8 bytes into a string natively. Works like the standard `TextDecoder`. */
 export class TextDecoder {
+  /** Always `'utf-8'`. */
   public readonly encoding: string
+  /** Whether invalid bytes throw. Set in the constructor. */
   public readonly fatal: boolean
+  /** Whether a leading byte order mark is kept. Set in the constructor. */
   public readonly ignoreBOM: boolean
   private readonly decoder: NitroTextDecoder
 
+  /** Only UTF-8 is supported. Other labels throw a `RangeError`. */
   constructor(label: string = 'utf-8', options?: TextDecoderOptions) {
     if (label === null) {
       throw new RangeError('Invalid encoding label')
@@ -35,6 +40,7 @@ export class TextDecoder {
     this.ignoreBOM = this.decoder.ignoreBOM
   }
 
+  /** Turns `input` into a string. */
   decode(
     input?: ArrayBuffer | ArrayBufferView,
     options?: TextDecodeOptions

@@ -6,11 +6,15 @@ declare const global: {
   };
 };
 
+/** What {@link profileFetch} returns. */
 export interface ProfileResult<T> {
+  /** What `fn` returned. */
   result: T;
+  /** Where the profile is written. Not set without Hermes, and the file is missing if writing failed. */
   profilePath?: string;
 }
 
+/** Runs `fn` with the Hermes sampling profiler on and saves a `.cpuprofile` file. Without Hermes it just runs `fn`. */
 export async function profileFetch<T>(
   fn: () => Promise<T>,
   outputPath?: string
