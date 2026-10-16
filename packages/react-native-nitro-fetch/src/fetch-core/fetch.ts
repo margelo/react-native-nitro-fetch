@@ -12,6 +12,7 @@ import { nitroStreamFetch } from './stream';
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
+/** Makes a request with the native client. Works like the standard `fetch`. */
 export async function nitroFetch(
   input: RequestInfo | URL,
   init?: RequestInit & {
@@ -35,9 +36,13 @@ export async function nitroFetch(
      * @default false
      */
     stream?: boolean;
+    /** What to do with a redirect. Default `'follow'`. */
     redirect?: RequestRedirect;
+    /** Adds cache headers to the request. See {@link RequestCache}. */
     cache?: RequestCache;
+    /** Fails the request if no data arrives for this many milliseconds. */
     timeoutMs?: number;
+    /** How urgent the request is. Default `'auto'`. */
     priority?: RequestPriority;
   }
 ): Promise<Response> {

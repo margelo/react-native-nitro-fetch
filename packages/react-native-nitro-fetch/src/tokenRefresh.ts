@@ -6,54 +6,84 @@ const KEY_FETCH = 'nitro_token_refresh_fetch';
 const KEY_WS_CACHE = 'nitro_token_refresh_ws_cache';
 const KEY_FETCH_CACHE = 'nitro_token_refresh_fetch_cache';
 
-type TokenRefreshTarget = 'websocket' | 'fetch' | 'all';
+/** Which app-start requests a token refresh applies to. */
+export type TokenRefreshTarget = 'websocket' | 'fetch' | 'all';
 
-type TokenRefreshJsonMapping = {
+/** Copies a value from the refresh response into a request header. */
+export type TokenRefreshJsonMapping = {
+  /** Dot path to the value in the JSON response, such as `data.token`. */
   jsonPath: string;
+  /** Header to set. */
   header: string;
+  /** Template for the value, such as `Bearer {{value}}`. */
   valueTemplate?: string;
 };
 
-type TokenRefreshCompositeHeader = {
+/** Builds one header from several values in the refresh response. */
+export type TokenRefreshCompositeHeader = {
+  /** Header to set. */
   header: string;
+  /** Template with a `{{name}}` placeholder for each entry in `paths`. */
   template: string;
+  /** Placeholder names mapped to dot paths in the JSON response. */
   paths: Record<string, string>;
 };
 
-type TokenRefreshBodyMapping = {
+/** Copies a value from the refresh response into a prefetch's JSON body. */
+export type TokenRefreshBodyMapping = {
+  /** Dot path to the value in the JSON response. */
   jsonPath: string;
+  /** Dot path to set in the request body, such as `auth.token`. */
   bodyPath: string;
+  /** Template for the value, such as `Bearer {{value}}`. */
   valueTemplate?: string;
 };
 
-type TokenRefreshFormDataMapping = {
+/** Copies a value from the refresh response into a prefetch's form-data field. */
+export type TokenRefreshFormDataMapping = {
+  /** Dot path to the value in the JSON response. */
   jsonPath: string;
+  /** Form field to set. */
   field: string;
+  /** Template for the value, such as `Bearer {{value}}`. */
   valueTemplate?: string;
 };
 
+/** How to get a fresh token at app start, before JavaScript runs, and where to put it. */
 export type TokenRefreshConfig = {
+  /** Refresh endpoint. */
   url: string;
+  /** Default `'POST'`. */
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH';
+  /** Headers for the refresh request. */
   headers?: Record<string, string>;
+  /** Body for the refresh request. */
   body?: string;
+  /** How to read the refresh response. Default `'json'`. */
   responseType?: 'json' | 'text';
+  /** Values to copy into headers. */
   mappings?: TokenRefreshJsonMapping[];
+  /** Headers built from several values. */
   compositeHeaders?: TokenRefreshCompositeHeader[];
+  /** With a `'text'` response, the header to set. */
   textHeader?: string;
+  /** With a `'text'` response, a template for the value, such as `Bearer {{value}}`. */
   textTemplate?: string;
+  /** Values to copy into a prefetch's JSON body. */
   bodyMappings?: TokenRefreshBodyMapping[];
+  /** Values to copy into a prefetch's form-data fields. */
   formDataMappings?: TokenRefreshFormDataMapping[];
+  /** With a `'text'` response, the dot path to set in a prefetch's JSON body. */
   bodyTextPath?: string;
+  /** With a `'text'` response, the form field to set. */
   formDataTextField?: string;
+  /** What to do if the refresh fails. The default, `'useStoredHeaders'`, reuses the last good headers. */
   onFailure?: 'skip' | 'useStoredHeaders';
 };
 
 // — Helpers —
 
-/**
- * Resolve a dot-notation path inside a parsed JSON object.
- */
+/** Read the value at a dot path, such as `data.token`, in a parsed JSON object. */
 export function getNestedField(
   obj: unknown,
   dotPath: string
@@ -67,6 +97,7 @@ export function getNestedField(
   return current != null ? String(current) : undefined;
 }
 
+/** Replaces each `{{value}}` in `template` with `value`. */
 export function applyTemplate(template: string, value: string): string {
   return template.replace(/\{\{value\}\}/g, value);
 }
@@ -81,6 +112,7 @@ function applyCompositeTemplate(
   );
 }
 
+/** Calls the refresh endpoint from JavaScript and returns the headers the config builds from its response. */
 export async function callRefreshEndpoint(
   config: TokenRefreshConfig
 ): Promise<Record<string, string>> {
@@ -137,6 +169,7 @@ export async function callRefreshEndpoint(
   return headers;
 }
 
+/** Saves a token refresh config, encrypted, for app-start prefetches and WebSocket prewarms. */
 export function registerTokenRefresh(
   options: { target: TokenRefreshTarget } & TokenRefreshConfig
 ): void {
@@ -150,6 +183,7 @@ export function registerTokenRefresh(
   }
 }
 
+/** Removes the saved config and cached headers. Default `'all'`. */
 export function clearTokenRefresh(target?: TokenRefreshTarget): void {
   const t = target ?? 'all';
   if (t === 'websocket' || t === 'all') {
@@ -162,6 +196,7 @@ export function clearTokenRefresh(target?: TokenRefreshTarget): void {
   }
 }
 
+/** Reads back the saved config, or `null` if none is saved. */
 export function getStoredTokenRefreshConfig(
   target: 'websocket' | 'fetch'
 ): TokenRefreshConfig | null {
