@@ -51,6 +51,9 @@ android {
     def disableDevToolsReporting = (getExtOrDefault("disableDevToolsReporting") ?: "false").toString().toBoolean()
     buildConfigField "boolean", "NITRO_FETCH_DISABLE_DEVTOOLS_REPORTING", disableDevToolsReporting.toString()
 
+    def httpCacheSizeMB = (getExtOrDefault("httpCacheSizeMB") ?: "50").toString().toInteger()
+    buildConfigField "int", "NITRO_FETCH_HTTP_CACHE_SIZE_MB", httpCacheSizeMB.toString()
+
     externalNativeBuild {
       cmake {
         cppFlags "-frtti -fexceptions -Wall -fstack-protector-all"

@@ -1,5 +1,6 @@
 package com.margelo.nitro.nitrofetch
 
+import org.chromium.net.CronetEngine
 import org.chromium.net.UrlResponseInfo as CronetUrlResponseInfo
 import org.chromium.net.CronetException as CronetNativeException
 import org.chromium.net.NetworkException
@@ -64,3 +65,12 @@ val NitroRequestPriority.cronetPriority: Int
     NitroRequestPriority.HIGH -> org.chromium.net.UrlRequest.Builder.REQUEST_PRIORITY_HIGHEST
     NitroRequestPriority.LOW -> org.chromium.net.UrlRequest.Builder.REQUEST_PRIORITY_LOW
   }
+
+fun CronetEngine.Builder.enableConfiguredHttpCache(): CronetEngine.Builder {
+  val sizeMB = BuildConfig.NITRO_FETCH_HTTP_CACHE_SIZE_MB
+  return if (sizeMB > 0) {
+    enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISK, sizeMB * 1024L * 1024L)
+  } else {
+    enableHttpCache(CronetEngine.Builder.HTTP_CACHE_DISABLED, 0)
+  }
+}

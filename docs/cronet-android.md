@@ -20,7 +20,7 @@ A single `CronetEngine` is created lazily and shared for the process lifetime (`
 
 - Logs every available `CronetProvider` and prefers the one whose name contains `"Native"` (avoids Play-Services DNS quirks); falls back to the default provider.
 - Built with `enableHttp2(true)`, `enableQuic(true)` (HTTP/3), and `enableBrotli(true)`.
-- Disk cache: `HTTP_CACHE_DISK`, 50 MB, at `<cacheDir>/nitrofetch_cronet_cache`.
+- Disk cache: `HTTP_CACHE_DISK`, 50 MB, at `<cacheDir>/nitrofetch_cronet_cache`. Set the size in MB with the `NitroFetch_httpCacheSizeMB` gradle property; `0` disables the cache.
 - User-Agent: `NitroFetch/1.0`.
 - Callbacks run on a fixed-size `NitroCronet-io` thread pool.
 
