@@ -1,41 +1,43 @@
-# Website
+# Documentation site
 
-This website is built using [Docusaurus](https://docusaurus.io/), a modern static website generator.
+The fetch.margelo.com website. [Next.js](https://nextjs.org) App Router with
+[fumadocs](https://fumadocs.dev), built the same way as the react-native-mnn
+documentation site.
 
-## Installation
-
-```bash
-yarn
-```
-
-## Local Development
+Run these from this folder:
 
 ```bash
-yarn start
+bun install
+bun run dev          # http://localhost:3000
+bun run build        # production build
+bun run types:check  # tsc --noEmit
 ```
 
-This command starts a local development server and opens up a browser window. Most changes are reflected live without having to restart the server.
+## Layout
 
-## Build
+- `content/docs/` - the pages. Each `(section)` folder is a collapsible
+  sidebar section, and its `meta.json` sets the title and page order. The
+  parentheses keep the folder name out of the URL.
+- `content/api/` - the API reference, generated from the packages' TSDoc
+  comments by `bun run docs:api`. It is not committed.
+- `src/app/(home)/page.tsx` - the landing page.
+- `src/app/(content)/docs/[[...slug]]/page.tsx` - the page route.
+- `src/mdx-components.tsx` - the MDX component map, including the code block.
+- `src/components/mdx-media.tsx` - `Video`, `VideoAside`, `YouTube`, `Img` and
+  `Callout`.
+- `src/components/site-logo.tsx` - the wordmark.
+- `src/app/global.css` - fumadocs theme variables, prose styles, code block
+  tokens, table of contents.
 
-```bash
-yarn build
-```
+## Styling
 
-This command generates static content into the `build` directory and can be served using any static contents hosting service.
+Every color is a CSS variable defined for both themes in `src/app/global.css`.
+Orange is the only accent.
 
-## Deployment
+Code is highlighted by Prism, not by fumadocs' own Shiki pipeline.
+`source.config.ts` sets `rehypeCodeOptions: false` and adds
+`rehype-prism-plus` in its place. Changing the highlighter means rewriting the
+token colors in `global.css`.
 
-Using SSH:
-
-```bash
-USE_SSH=true yarn deploy
-```
-
-Not using SSH:
-
-```bash
-GIT_USER=<Your GitHub username> yarn deploy
-```
-
-If you are using GitHub pages for hosting, this command is a convenient way to build the website and push to the `gh-pages` branch.
+The landing page photo is by Yifu Wu on
+[Unsplash](https://unsplash.com/photos/7vnXRYujDig).
