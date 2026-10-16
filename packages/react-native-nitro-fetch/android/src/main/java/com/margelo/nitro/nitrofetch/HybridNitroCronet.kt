@@ -59,10 +59,7 @@ class HybridNitroCronet : HybridNitroCronetSpec() {
           .setStoragePath(cacheDir.absolutePath)
           .setUserAgent("NitroCronet/1.0")
 
-        builder.enableHttpCache(
-          CronetEngine.Builder.HTTP_CACHE_DISK,
-          (50 * 1024 * 1024).toLong()
-        )
+        builder.enableConfiguredHttpCache()
 
         CertificatePinning.apply(builder, app)
 

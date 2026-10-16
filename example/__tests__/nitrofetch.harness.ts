@@ -454,6 +454,31 @@ describe('NitroFetch - Redirects', () => {
   });
 });
 
+describe('NitroFetch - HTTP cache', () => {
+  const cacheId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const cacheReport = async (id: string) =>
+    (await nitroFetch(`${BASE}/cache-report/${id}`)).json();
+
+  it('serves a fresh max-age response from the cache', async () => {
+    const id = cacheId();
+    const url = `${BASE}/cache/${id}?maxAge=60`;
+    const first = await (await nitroFetch(url)).json();
+    const second = await (await nitroFetch(url)).json();
+    expect(second).toEqual(first);
+    expect(await cacheReport(id)).toEqual({ requests: 1, conditional: 0 });
+  });
+
+  it('revalidates with If-None-Match and reuses the cached body on 304', async () => {
+    const id = cacheId();
+    const url = `${BASE}/cache/${id}`;
+    const first = await (await nitroFetch(url)).json();
+    const res = await nitroFetch(url);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(first);
+    expect(await cacheReport(id)).toEqual({ requests: 2, conditional: 1 });
+  });
+});
+
 describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
   const findEntry = (key: string) =>
     __readAutoPrefetchQueue().find((e: any) => e?.prefetchKey === key);

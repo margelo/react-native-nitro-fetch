@@ -262,6 +262,25 @@ app.get('/drip-report/:id', (req, res) => {
   res.json(dripReports.get(req.params.id) ?? { missing: true });
 });
 
+const cacheReports = new Map();
+
+app.get('/cache/:id', (req, res) => {
+  const report = cacheReports.get(req.params.id) ?? {
+    requests: 0,
+    conditional: 0,
+  };
+  report.requests++;
+  if (req.headers['if-none-match']) report.conditional++;
+  cacheReports.set(req.params.id, report);
+  if (req.query.maxAge) res.set('Cache-Control', `max-age=${req.query.maxAge}`);
+  res.json({ id: req.params.id });
+});
+
+app.get('/cache-report/:id', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(cacheReports.get(req.params.id) ?? { requests: 0, conditional: 0 });
+});
+
 app.all('/delay/:n', (req, res) => {
   const n = Math.min(60, Math.max(0, parseInt(req.params.n, 10) || 0));
   const timer = setTimeout(() => res.json(baseInfo(req)), n * 1000);
