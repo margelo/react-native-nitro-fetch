@@ -52,6 +52,7 @@ object AutoPrefetcher {
     val appContext = context.applicationContext
     executor.execute {
       try {
+        NitroFetchSecureAtRest.initialize(appContext)
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         // Entries embed request headers (may hold credentials) — encrypted-at-rest; legacy plaintext migrates on read.
         val raw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: ""
@@ -87,6 +88,7 @@ object AutoPrefetcher {
     if (initialized) return
     initialized = true
     try {
+      NitroFetchSecureAtRest.initialize(app)
       val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
       val raw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: ""
       if (raw.isEmpty()) return
