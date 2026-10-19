@@ -381,3 +381,8 @@ export class NitroResponse {
     });
   }
 }
+
+Object.defineProperty(NitroResponse.prototype, Symbol.toStringTag, {
+  value: 'Response',
+  configurable: true,
+});
