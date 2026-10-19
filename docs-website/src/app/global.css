@@ -566,3 +566,52 @@ button[data-search-full] {
 article {
   padding-top: 2rem;
 }
+
+/* Landing page parallax, as .vc-landing-parallax-layer in the VisionCamera docs. */
+.site-landing-parallax-layer {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* NITRO and FETCH move apart while the pigeon flies out from between them. */
+.site-landing-wordmark[data-pigeon] [data-word='nitro'] {
+  animation: site-landing-part-nitro 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.site-landing-wordmark[data-pigeon] [data-word='fetch'] {
+  animation: site-landing-part-fetch 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* A CSS animation so the browser runs the flight on the GPU, off the main thread. */
+.site-landing-pigeon[data-flying] {
+  animation: site-landing-pigeon-flight 1.8s ease-in;
+}
+
+/* Easing restarts at every keyframe, so the transform has only a start and an end. */
+@keyframes site-landing-pigeon-flight {
+  0% {
+    transform: translate(0, 0) rotate(0) scale(0.1);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(1000px, -800px) rotate(-14deg) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes site-landing-part-nitro {
+  20%,
+  50% {
+    transform: translateX(-24px);
+  }
+}
+
+@keyframes site-landing-part-fetch {
+  20%,
+  50% {
+    transform: translateX(24px);
+  }
+}

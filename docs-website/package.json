@@ -30,6 +30,7 @@
     "fumadocs-mdx": "^15.4.3",
     "fumadocs-typescript": "^5.4.1",
     "fumadocs-ui": "^16.15.12",
+    "motion": "^14.0.0",
     "next": "16",
     "react": "19",
     "react-dom": "19",
