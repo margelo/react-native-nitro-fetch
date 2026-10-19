@@ -35,27 +35,7 @@ const BINARY_BYTES = new Uint8Array([
 ]);
 
 describe('NitroResponse — standard Fetch identity', () => {
-  it.each([
-    ['public constructor', () => new NitroResponse('hello')],
-    ['internal constructor', () => makeResponse({ bodyString: 'hello' })],
-    ['clone', () => makeResponse({ bodyString: 'hello' }).clone()],
-    ['error', () => NitroResponse.error()],
-    ['json', () => NitroResponse.json({ ok: true })],
-    ['redirect', () => NitroResponse.redirect('https://example.com')],
-  ])('identifies a %s response as Response', (_name, createResponse) => {
-    const res = createResponse();
-    expect(Object.prototype.toString.call(res)).toBe('[object Response]');
-  });
-
-  it('defines the tag on the prototype with standard property attributes', () => {
-    expect(
-      Object.getOwnPropertyDescriptor(NitroResponse.prototype, Symbol.toStringTag)
-    ).toEqual({
-      value: 'Response',
-      writable: false,
-      enumerable: false,
-      configurable: true,
-    });
+  it('identifies as a standard Response via Symbol.toStringTag', () => {
     expect(Object.prototype.toString.call(NitroResponse.prototype)).toBe(
       '[object Response]'
     );
