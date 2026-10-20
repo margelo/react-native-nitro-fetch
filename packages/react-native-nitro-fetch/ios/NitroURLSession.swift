@@ -26,9 +26,20 @@ enum NitroURLCache {
 }
 
 enum NitroURLSession {
+  /// `NitroFetchDisableCookies` = YES in Info.plist keeps every session out of `HTTPCookieStorage.shared`,
+  /// which WebKit also writes to: no stored cookie is sent and no `Set-Cookie` is saved, including on the
+  /// native auto-prefetch and token-refresh requests that run before JS can pass `credentials: 'omit'`.
+  static let cookiesDisabled =
+    Bundle.main.object(forInfoDictionaryKey: "NitroFetchDisableCookies") as? Bool ?? false
+
   static let shared = make(configuration: .default)
 
   static func make(configuration: URLSessionConfiguration) -> URLSession {
+    if cookiesDisabled {
+      configuration.httpCookieStorage = nil
+      configuration.httpCookieAcceptPolicy = .never
+      configuration.httpShouldSetCookies = false
+    }
     let delegate: URLSessionDelegate = CertificatePinning.isConfigured
       ? NitroPinningURLSessionDelegate()
       : NitroURLSessionDelegate()
