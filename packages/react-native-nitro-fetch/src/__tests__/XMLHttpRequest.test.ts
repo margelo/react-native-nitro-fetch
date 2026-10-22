@@ -1,3 +1,7 @@
+// Dynamic imports do not mark this file as a TypeScript module. Keep generated
+// test declarations module-scoped so they cannot collide with the source file.
+export {};
+
 jest.mock('../fetch-core/fetch', () => ({
   nitroFetch: jest.fn(),
 }));
