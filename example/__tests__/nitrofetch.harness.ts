@@ -1090,6 +1090,40 @@ describe('NitroFetch - nitroFetchOnWorklet', () => {
   });
 });
 
+describe('NitroFetch - Streaming garbage collection', () => {
+  async function streamAndRead(refs: WeakRef<object>[]) {
+    const res = await (nitroFetch as any)(`${BASE}/stream/3`, {
+      stream: true,
+    });
+    refs.push(new WeakRef(res.body));
+    await res.text();
+  }
+
+  async function collectGarbage() {
+    let sink = 0;
+    for (let round = 0; round < 3; round++) {
+      for (let i = 0; i < 8; i++) {
+        const res = await nitroFetch(`${BASE}/bytes/4000000`);
+        sink += (await res.arrayBuffer()).byteLength;
+      }
+      for (let i = 0; i < 20; i++) {
+        sink += new Array(1_000_000).fill(i).length;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+    return sink;
+  }
+
+  it('frees stream: true requests once they finish', async () => {
+    const refs: WeakRef<object>[] = [];
+    for (let i = 0; i < 20; i++) await streamAndRead(refs);
+    await collectGarbage();
+    const alive = refs.filter((ref) => ref.deref() !== undefined).length;
+    expect(alive).toBeLessThan(refs.length / 2);
+  });
+});
+
 // Real-world HTTPS smoke test against a public API. The bulk of the suite runs
 // against the local Express server (test-server/), so this keeps coverage of an
 // actual TLS handshake + cert validation on the device's native stack.
