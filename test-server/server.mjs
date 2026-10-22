@@ -173,6 +173,11 @@ app.all('/redirect/:n', (req, res) => {
   res.status(302).set('Location', n > 1 ? `/redirect/${n - 1}` : '/get').end();
 });
 
+app.all('/redirect-to', (req, res) => {
+  const status = parseInt(String(req.query.status ?? '302'), 10);
+  res.status(status).set('Location', String(req.query.url)).end();
+});
+
 app.get('/image/png', (_req, res) => {
   res.set('Content-Type', 'image/png').send(PNG_1x1);
 });
@@ -291,6 +296,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
   console.log(`nitro-fetch-test-server listening on http://0.0.0.0:${PORT}`);
 });
+app.listen(PORT + 2, '0.0.0.0');
 
 // WebSocket endpoints for the nitrowebsockets harness.
 //   /ws/echo                                -> echoes every frame back
