@@ -2,10 +2,13 @@ jest.mock('../fetch-core/fetch', () => ({
   nitroFetch: jest.fn(),
 }));
 
-import { nitroFetch } from '../fetch-core/fetch';
-import { NitroXMLHttpRequest } from '../XMLHttpRequest';
+type NitroFetchFunction = typeof import('../fetch-core/fetch').nitroFetch;
+type NitroXMLHttpRequestConstructor =
+  typeof import('../XMLHttpRequest').NitroXMLHttpRequest;
+type NitroXMLHttpRequestInstance = InstanceType<NitroXMLHttpRequestConstructor>;
 
-const mockNitroFetch = nitroFetch as jest.MockedFunction<typeof nitroFetch>;
+let mockNitroFetch: jest.MockedFunction<NitroFetchFunction>;
+let NitroXMLHttpRequest: NitroXMLHttpRequestConstructor;
 
 function makeResponse(
   chunks: Uint8Array[],
@@ -33,7 +36,10 @@ function makeResponse(
   } as Response;
 }
 
-function waitForEvent(xhr: NitroXMLHttpRequest, type: string): Promise<Event> {
+function waitForEvent(
+  xhr: NitroXMLHttpRequestInstance,
+  type: string
+): Promise<Event> {
   return new Promise((resolve) => {
     xhr.addEventListener(type, (event) => {
       resolve(event);
@@ -42,6 +48,17 @@ function waitForEvent(xhr: NitroXMLHttpRequest, type: string): Promise<Event> {
 }
 
 describe('NitroXMLHttpRequest', () => {
+  beforeAll(async () => {
+    // Bun does not hoist Jest-compatible module mocks. Load the implementation
+    // only after registering the mock so native React Native modules stay out
+    // of the unit-test process.
+    const fetchModule = await import('../fetch-core/fetch');
+    const xhrModule = await import('../XMLHttpRequest');
+    mockNitroFetch =
+      fetchModule.nitroFetch as jest.MockedFunction<NitroFetchFunction>;
+    NitroXMLHttpRequest = xhrModule.NitroXMLHttpRequest;
+  });
+
   beforeEach(() => {
     mockNitroFetch.mockReset();
   });
