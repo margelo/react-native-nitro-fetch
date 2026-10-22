@@ -3,10 +3,66 @@ import superagent from 'superagent';
 import { XMLHttpRequest as NitroXMLHttpRequest } from 'react-native-nitro-fetch';
 import { BASE } from '../test-utils/server';
 
+type XMLHttpRequestConstructor = new () => XMLHttpRequest;
+
+const ReactNativeXMLHttpRequest = globalThis.XMLHttpRequest;
+
 // SuperAgent reads the global constructor when it creates each request.
 (globalThis as any).XMLHttpRequest = NitroXMLHttpRequest;
 
+function observeRequest(
+  XMLHttpRequestClass: XMLHttpRequestConstructor,
+  url: string
+): Promise<{
+  events: string[];
+  responseText: string;
+  states: number[];
+  status: number;
+}> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequestClass();
+    const events: string[] = [];
+    const states: number[] = [];
+    xhr.addEventListener('readystatechange', () => {
+      const previousState = states[states.length - 1];
+      if (previousState !== xhr.readyState) {
+        states.push(xhr.readyState);
+      }
+    });
+    xhr.addEventListener('load', () => {
+      events.push('load');
+    });
+    xhr.addEventListener('loadend', () => {
+      events.push('loadend');
+      resolve({
+        events,
+        responseText: xhr.responseText,
+        states,
+        status: xhr.status,
+      });
+    });
+    xhr.addEventListener('error', () => {
+      reject(new Error('XMLHttpRequest failed'));
+    });
+    xhr.open('GET', url, true);
+    xhr.send();
+  });
+}
+
 describe('NitroXMLHttpRequest - SuperAgent 8.1.2 compatibility', () => {
+  it('matches React Native observable request lifecycle', async () => {
+    const url = `${BASE}/drip?duration=0.05&numbytes=3`;
+    const reactNativeResult = await observeRequest(
+      ReactNativeXMLHttpRequest,
+      url
+    );
+    const NitroXMLHttpRequestClass =
+      NitroXMLHttpRequest as unknown as XMLHttpRequestConstructor;
+    const nitroResult = await observeRequest(NitroXMLHttpRequestClass, url);
+
+    expect(nitroResult).toEqual(reactNativeResult);
+  });
+
   it('sends query parameters and headers and parses JSON', async () => {
     const response = await superagent
       .get(`${BASE}/get`)

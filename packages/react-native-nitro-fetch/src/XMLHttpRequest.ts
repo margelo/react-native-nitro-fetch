@@ -1,7 +1,20 @@
+/**
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the LICENSE file
+ * in the root directory of the React Native source tree.
+ *
+ * Derived from React Native's XMLHttpRequest implementation at v0.88.0-rc.3.
+ * The state machine is preserved while the RCTNetworking boundary is adapted
+ * to Nitro Fetch and the Flow types are expressed as TypeScript.
+ */
+
 import { bytesToBlob } from './blob';
-import { nitroFetch } from './fetch-core/fetch';
-import { isFormData } from './fetch-core/body';
-import { stringToUTF8, utf8ToString } from './utf8';
+import {
+  sendXMLHttpRequest,
+  type XMLHttpRequestTransportHandle,
+} from './XMLHttpRequestTransport';
+import { utf8ToString } from './utf8';
 
 type Listener = EventListenerOrEventListenerObject;
 
@@ -112,7 +125,7 @@ class NitroEventTarget {
   }
 }
 
-class NitroXMLHttpRequestUpload extends NitroEventTarget {
+class NitroXMLHttpRequestEventTarget extends NitroEventTarget {
   onabort: ((event: ProgressEvent) => void) | null = null;
   onerror: ((event: ProgressEvent) => void) | null = null;
   onload: ((event: ProgressEvent) => void) | null = null;
@@ -126,41 +139,68 @@ class NitroXMLHttpRequestUpload extends NitroEventTarget {
   }
 }
 
-type NitroRequestInit = RequestInit & { stream?: boolean };
-
-type RequestHeader = {
-  name: string;
-  value: string;
+type XHRInterceptor = {
+  requestSent(
+    id: number,
+    url: string,
+    method: string,
+    headers: Record<string, string>
+  ): void;
+  responseReceived(
+    id: number,
+    url: string,
+    status: number,
+    headers: Record<string, string>
+  ): void;
+  dataReceived(id: number, data: string): void;
+  loadingFinished(id: number, encodedDataLength: number): void;
+  loadingFailed(id: number, error: string): void;
 };
 
-const SUPPORTED_RESPONSE_TYPES = new Set<XMLHttpRequestResponseType>([
-  '',
-  'arraybuffer',
-  'blob',
-  'document',
-  'json',
-  'text',
-]);
+type XHRPerformanceLogger = {
+  startTimespan(key: string): void;
+  stopTimespan(key: string): void;
+};
+
+type ResponseType = '' | 'arraybuffer' | 'blob' | 'document' | 'json' | 'text';
+
+const UNSENT = 0;
+const OPENED = 1;
+const HEADERS_RECEIVED = 2;
+const LOADING = 3;
+const DONE = 4;
+
+const SUPPORTED_RESPONSE_TYPES: Record<ResponseType, boolean> = {
+  'arraybuffer': typeof globalThis.ArrayBuffer === 'function',
+  'blob': typeof globalThis.Blob === 'function',
+  'document': false,
+  'json': true,
+  'text': true,
+  '': true,
+};
+
+let nextRequestId = 1;
 
 /**
- * XMLHttpRequest-compatible wrapper backed by Nitro Fetch.
+ * React Native-compatible XMLHttpRequest state machine backed by Nitro Fetch.
  *
- * The implementation targets React Native clients such as SuperAgent. It uses
- * Nitro's streaming transport so response headers and download progress arrive
- * before the full body has been buffered.
+ * React Native normally feeds this state machine with RCTNetworking events.
+ * XMLHttpRequestTransport emits the same lifecycle from a Nitro Fetch request.
  */
 export class NitroXMLHttpRequest extends NitroEventTarget {
-  static readonly UNSENT = 0;
-  static readonly OPENED = 1;
-  static readonly HEADERS_RECEIVED = 2;
-  static readonly LOADING = 3;
-  static readonly DONE = 4;
+  static readonly UNSENT = UNSENT;
+  static readonly OPENED = OPENED;
+  static readonly HEADERS_RECEIVED = HEADERS_RECEIVED;
+  static readonly LOADING = LOADING;
+  static readonly DONE = DONE;
 
-  readonly UNSENT = NitroXMLHttpRequest.UNSENT;
-  readonly OPENED = NitroXMLHttpRequest.OPENED;
-  readonly HEADERS_RECEIVED = NitroXMLHttpRequest.HEADERS_RECEIVED;
-  readonly LOADING = NitroXMLHttpRequest.LOADING;
-  readonly DONE = NitroXMLHttpRequest.DONE;
+  static _interceptor: XHRInterceptor | null = null;
+
+  readonly UNSENT = UNSENT;
+  readonly OPENED = OPENED;
+  readonly HEADERS_RECEIVED = HEADERS_RECEIVED;
+  readonly LOADING = LOADING;
+  readonly DONE = DONE;
 
   onabort: ((event: ProgressEvent) => void) | null = null;
   onerror: ((event: ProgressEvent) => void) | null = null;
@@ -171,354 +211,510 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   onreadystatechange: ((event: Event) => void) | null = null;
   ontimeout: ((event: ProgressEvent) => void) | null = null;
 
-  readonly upload = new NitroXMLHttpRequestUpload();
+  readonly upload = new NitroXMLHttpRequestEventTarget();
 
-  readyState = NitroXMLHttpRequest.UNSENT;
-  response: unknown = null;
-  responseText = '';
-  responseURL = '';
-  responseXML: Document | null = null;
+  readyState = UNSENT;
+  responseHeaders: Record<string, string> | null | undefined;
   status = 0;
   statusText = '';
   timeout = 0;
-  withCredentials = false;
+  responseURL = '';
+  withCredentials = true;
 
-  private _responseType: XMLHttpRequestResponseType = '';
-  private _method = '';
-  private _url = '';
-  private _requestHeaders = new Map<string, RequestHeader>();
-  private _responseHeaders = new Map<string, RequestHeader>();
-  private _abortController: AbortController | null = null;
-  private _timeoutTimer: ReturnType<typeof setTimeout> | null = null;
-  private _requestVersion = 0;
-  private _sending = false;
-  private _uploadComplete = true;
-  private _uploadSize: number | undefined;
-  private _loaded = 0;
-  private _total = 0;
-  private _lengthComputable = false;
+  _requestId: number | null = null;
+  _aborted = false;
+  _cachedResponse: unknown;
+  _hasError = false;
+  _headers: Record<string, string> = {};
+  _lowerCaseResponseHeaders: Record<string, string> = {};
+  _method: string | null = null;
+  _perfKey: string | null = null;
+  _responseType: ResponseType = '';
+  _response = '';
+  _sent = false;
+  _url: string | null = null;
+  _timedOut = false;
+  _trackingName: string | null = null;
+  _incrementalEvents = false;
+  _performanceLogger: XHRPerformanceLogger | null = null;
+
+  private _requestHandle: XMLHttpRequestTransportHandle | null = null;
   private _chunks: Uint8Array<ArrayBuffer>[] = [];
+  private _loaded = 0;
 
-  get responseType(): XMLHttpRequestResponseType {
+  static __setInterceptor_DO_NOT_USE(interceptor: XHRInterceptor | null): void {
+    NitroXMLHttpRequest._interceptor = interceptor;
+  }
+
+  constructor() {
+    super();
+    this._reset();
+  }
+
+  _reset(): void {
+    this.readyState = this.UNSENT;
+    this.responseHeaders = undefined;
+    this.status = 0;
+    this.statusText = '';
+    this.responseURL = '';
+    this._requestId = null;
+    this._requestHandle = null;
+    this._cachedResponse = undefined;
+    this._hasError = false;
+    this._headers = {};
+    this._response = '';
+    this._responseType = '';
+    this._sent = false;
+    this._lowerCaseResponseHeaders = {};
+    this._timedOut = false;
+    this._chunks = [];
+    this._loaded = 0;
+  }
+
+  get responseType(): ResponseType {
     return this._responseType;
   }
 
-  set responseType(value: XMLHttpRequestResponseType) {
+  set responseType(responseType: ResponseType) {
+    if (this._sent) {
+      throw new Error(
+        "Failed to set the 'responseType' property on 'XMLHttpRequest': The " +
+          'response type cannot be set after the request has been sent.'
+      );
+    }
+    const isSupported = Object.prototype.hasOwnProperty.call(
+      SUPPORTED_RESPONSE_TYPES,
+      responseType
+    );
+    if (!isSupported) {
+      console.warn(
+        `The provided value '${responseType}' is not a valid 'responseType'.`
+      );
+      return;
+    }
     if (
-      this.readyState === NitroXMLHttpRequest.LOADING ||
-      this.readyState === NitroXMLHttpRequest.DONE
+      !SUPPORTED_RESPONSE_TYPES[responseType] &&
+      responseType !== 'document'
     ) {
-      throw new Error('responseType cannot be changed while loading');
+      throw new Error(
+        `The provided value '${responseType}' is unsupported in this environment.`
+      );
     }
-    if (!SUPPORTED_RESPONSE_TYPES.has(value)) {
-      throw new Error(`Unsupported XMLHttpRequest responseType: ${value}`);
+    this._responseType = responseType;
+  }
+
+  get responseText(): string {
+    if (this._responseType !== '' && this._responseType !== 'text') {
+      throw new Error(
+        "The 'responseText' property is only available if 'responseType' " +
+          `is set to '' or 'text', but it is '${this._responseType}'.`
+      );
     }
-    this._responseType = value;
+    if (this.readyState < LOADING) return '';
+    return this._response;
+  }
+
+  get response(): unknown {
+    const responseType = this.responseType;
+    if (responseType === '' || responseType === 'text') {
+      if (this.readyState < LOADING || this._hasError) return '';
+      return this._response;
+    }
+
+    if (this.readyState !== DONE) return null;
+    if (this._cachedResponse !== undefined) return this._cachedResponse;
+
+    if (responseType === 'document') {
+      this._cachedResponse = null;
+    } else if (responseType === 'arraybuffer') {
+      const bytes = this._mergeChunks();
+      this._cachedResponse = bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength
+      );
+    } else if (responseType === 'blob') {
+      const bytes = this._mergeChunks();
+      const buffer = bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength
+      );
+      const contentType = this.getResponseHeader('content-type') ?? '';
+      this._cachedResponse = bytesToBlob(buffer, contentType);
+    } else if (responseType === 'json') {
+      try {
+        this._cachedResponse = JSON.parse(this._response);
+      } catch {
+        this._cachedResponse = null;
+      }
+    } else {
+      this._cachedResponse = null;
+    }
+
+    return this._cachedResponse;
+  }
+
+  __didCreateRequest(requestId: number): void {
+    this._requestId = requestId;
+    const interceptor = NitroXMLHttpRequest._interceptor;
+    if (interceptor == null) return;
+    interceptor.requestSent(
+      requestId,
+      this._url ?? '',
+      this._method ?? 'GET',
+      this._headers
+    );
+  }
+
+  __didUploadProgress(
+    requestId: number,
+    progress: number,
+    total: number
+  ): void {
+    if (requestId !== this._requestId) return;
+    this.upload.dispatchProgress('progress', {
+      lengthComputable: true,
+      loaded: progress,
+      total,
+    });
+  }
+
+  __didReceiveResponse(
+    requestId: number,
+    status: number,
+    responseHeaders: Record<string, string> | null,
+    responseURL: string | null
+  ): void {
+    if (requestId !== this._requestId) return;
+    const performanceLogger = this._performanceLogger;
+    if (this._perfKey != null && performanceLogger != null) {
+      performanceLogger.stopTimespan(this._perfKey);
+    }
+    this.status = status;
+    this.setResponseHeaders(responseHeaders);
+    this.setReadyState(this.HEADERS_RECEIVED);
+    this.responseURL = responseURL ?? '';
+
+    const interceptor = NitroXMLHttpRequest._interceptor;
+    if (interceptor == null) return;
+    interceptor.responseReceived(
+      requestId,
+      responseURL ?? this._url ?? '',
+      status,
+      responseHeaders ?? {}
+    );
+  }
+
+  __didReceiveData(requestId: number, response: string): void {
+    if (requestId !== this._requestId) return;
+    this._response = response;
+    this._cachedResponse = undefined;
+    this.setReadyState(this.LOADING);
+
+    const interceptor = NitroXMLHttpRequest._interceptor;
+    interceptor?.dataReceived(requestId, response);
+  }
+
+  __didReceiveIncrementalData(
+    requestId: number,
+    responseText: string,
+    progress: number,
+    total: number
+  ): void {
+    if (requestId !== this._requestId) return;
+    // Nitro decodes all bytes received so far. Assigning the complete text keeps
+    // split UTF-8 characters correct while preserving React Native's lifecycle.
+    this._response = responseText;
+    this._cachedResponse = undefined;
+
+    const interceptor = NitroXMLHttpRequest._interceptor;
+    interceptor?.dataReceived(requestId, responseText);
+
+    this.setReadyState(this.LOADING);
+    this.__didReceiveDataProgress(requestId, progress, total);
+  }
+
+  __didReceiveDataProgress(
+    requestId: number,
+    loaded: number,
+    total: number
+  ): void {
+    if (requestId !== this._requestId) return;
+    this._dispatch('progress', {
+      lengthComputable: total >= 0,
+      loaded,
+      total,
+    });
+  }
+
+  __didCompleteResponse(
+    requestId: number,
+    error: string,
+    timeOutError: boolean
+  ): void {
+    if (requestId !== this._requestId) return;
+    if (error) {
+      if (this._responseType === '' || this._responseType === 'text') {
+        this._response = error;
+      }
+      this._hasError = true;
+      this._timedOut = timeOutError;
+    }
+    this._requestHandle = null;
+    this._requestId = null;
+    this.setReadyState(this.DONE);
+
+    const interceptor = NitroXMLHttpRequest._interceptor;
+    if (interceptor == null) return;
+    if (error) {
+      interceptor.loadingFailed(requestId, error);
+    } else {
+      interceptor.loadingFinished(requestId, this._response.length);
+    }
+  }
+
+  getAllResponseHeaders(): string | null {
+    if (!this.responseHeaders) return null;
+
+    const unsortedHeaders = new Map<
+      string,
+      {
+        lowerHeaderName: string;
+        upperHeaderName: string;
+        headerValue: string;
+      }
+    >();
+    for (const rawHeaderName of Object.keys(this.responseHeaders)) {
+      const headerValue = this.responseHeaders[rawHeaderName];
+      if (headerValue == null) continue;
+      const lowerHeaderName = rawHeaderName.toLowerCase();
+      const header = unsortedHeaders.get(lowerHeaderName);
+      if (header) {
+        header.headerValue += `, ${headerValue}`;
+        unsortedHeaders.set(lowerHeaderName, header);
+      } else {
+        unsortedHeaders.set(lowerHeaderName, {
+          lowerHeaderName,
+          upperHeaderName: rawHeaderName.toUpperCase(),
+          headerValue,
+        });
+      }
+    }
+
+    const sortedHeaders = Array.from(unsortedHeaders.values());
+    sortedHeaders.sort((a, b) => {
+      if (a.upperHeaderName < b.upperHeaderName) return -1;
+      if (a.upperHeaderName > b.upperHeaderName) return 1;
+      return 0;
+    });
+    const headerLines = sortedHeaders.map((header) => {
+      return `${header.lowerHeaderName}: ${header.headerValue}`;
+    });
+    return `${headerLines.join('\r\n')}\r\n`;
+  }
+
+  getResponseHeader(header: string): string | null {
+    const value = this._lowerCaseResponseHeaders[header.toLowerCase()];
+    return value ?? null;
+  }
+
+  setRequestHeader(header: string, value: unknown): void {
+    if (this.readyState !== this.OPENED) {
+      throw new Error('Request has not been opened');
+    }
+    const key = header.toLowerCase();
+    const existing = this._headers[key];
+    const stringValue = String(value);
+    this._headers[key] =
+      existing !== undefined ? `${existing}, ${stringValue}` : stringValue;
+  }
+
+  setTrackingName(trackingName: string | null): NitroXMLHttpRequest {
+    this._trackingName = trackingName;
+    return this;
+  }
+
+  setPerformanceLogger(
+    performanceLogger: XHRPerformanceLogger
+  ): NitroXMLHttpRequest {
+    this._performanceLogger = performanceLogger;
+    return this;
   }
 
   open(
     method: string,
     url: string | URL,
-    async: boolean = true,
+    async?: boolean,
     _username?: string | null,
     _password?: string | null
   ): void {
-    if (!async) {
-      throw new Error('Synchronous XMLHttpRequest is not supported');
+    if (this.readyState !== this.UNSENT) {
+      throw new Error('Cannot open, already sending');
     }
-    if (method.length === 0) {
-      throw new Error('XMLHttpRequest method cannot be empty');
+    if (async !== undefined && !async) {
+      throw new Error('Synchronous http requests are not supported');
     }
-    if (this._sending) {
-      this.abort();
+    const requestURL = String(url);
+    if (!requestURL) {
+      throw new Error('Cannot load an empty url');
     }
-
-    this._requestVersion += 1;
     this._method = method.toUpperCase();
-    this._url = String(url);
-    this._requestHeaders.clear();
-    this._resetResponse();
-    this.readyState = NitroXMLHttpRequest.OPENED;
-    this._dispatch('readystatechange');
-  }
-
-  setRequestHeader(name: string, value: string): void {
-    if (this.readyState !== NitroXMLHttpRequest.OPENED || this._sending) {
-      throw new Error('setRequestHeader() requires an opened request');
-    }
-    const normalizedName = name.toLowerCase();
-    const previous = this._requestHeaders.get(normalizedName);
-    if (previous == null) {
-      const stringValue = String(value);
-      this._requestHeaders.set(normalizedName, { name, value: stringValue });
-      return;
-    }
-    const stringValue = String(value);
-    previous.value = `${previous.value}, ${stringValue}`;
-  }
-
-  getResponseHeader(name: string): string | null {
-    if (this.readyState < NitroXMLHttpRequest.HEADERS_RECEIVED) return null;
-    const normalizedName = name.toLowerCase();
-    const header = this._responseHeaders.get(normalizedName);
-    return header?.value ?? null;
-  }
-
-  getAllResponseHeaders(): string {
-    if (this.readyState < NitroXMLHttpRequest.HEADERS_RECEIVED) return '';
-    let result = '';
-    for (const header of this._responseHeaders.values()) {
-      result += `${header.name}: ${header.value}\r\n`;
-    }
-    return result;
+    this._url = requestURL;
+    this._aborted = false;
+    this.setReadyState(this.OPENED);
   }
 
   overrideMimeType(_mime: string): void {
-    if (this.readyState === NitroXMLHttpRequest.LOADING) {
+    if (this.readyState === this.LOADING || this.readyState === this.DONE) {
       throw new Error('overrideMimeType() cannot be called while loading');
     }
   }
 
-  send(body: Document | XMLHttpRequestBodyInit | null = null): void {
-    if (this.readyState !== NitroXMLHttpRequest.OPENED || this._sending) {
-      throw new Error('send() requires an opened request');
+  send(data: Document | XMLHttpRequestBodyInit | null = null): void {
+    if (this.readyState !== this.OPENED) {
+      throw new Error('Request has not been opened');
+    }
+    if (this._sent) {
+      throw new Error('Request has already been sent');
+    }
+    this._sent = true;
+
+    const method = this._method;
+    const url = this._url;
+    if (method == null) {
+      throw new Error('XMLHttpRequest method needs to be defined');
+    }
+    if (url == null) {
+      throw new Error('XMLHttpRequest URL needs to be defined');
+    }
+    if (method === 'GET' || method === 'HEAD') {
+      data = null;
     }
 
-    let requestBody = body;
-    if (this._method === 'GET' || this._method === 'HEAD') {
-      requestBody = null;
+    const friendlyName = this._trackingName ?? url;
+    const performanceLogger = this._performanceLogger;
+    if (performanceLogger != null) {
+      this._perfKey = `network_XMLHttpRequest_${friendlyName}`;
+      performanceLogger.startTimespan(this._perfKey);
     }
 
-    this._sending = true;
-    this._loaded = 0;
-    this._chunks = [];
-    this._uploadComplete = requestBody == null;
-    this._uploadSize = this._bodySize(requestBody);
-    this._abortController = new AbortController();
-    const requestVersion = this._requestVersion;
+    const incrementalEvents =
+      this._incrementalEvents ||
+      this.onreadystatechange != null ||
+      this.onprogress != null;
+    const requestId = nextRequestId;
+    nextRequestId += 1;
+    this.__didCreateRequest(requestId);
 
-    const headers: [string, string][] = [];
-    for (const header of this._requestHeaders.values()) {
-      headers.push([header.name, header.value]);
-    }
-
-    const credentials: RequestCredentials = this.withCredentials
-      ? 'include'
-      : 'same-origin';
-    // Nitro's streaming builder cannot read React Native file URIs. Keep
-    // multipart requests on the buffered client, which builds them natively.
-    const stream = !isFormData(requestBody);
-    const init: NitroRequestInit = {
-      method: this._method,
-      headers,
-      credentials,
-      signal: this._abortController.signal,
-      stream,
-    };
-    if (requestBody != null) {
-      init.body = requestBody as BodyInit;
-    }
-
-    this._dispatch('loadstart');
-    if (!this._uploadComplete) {
-      this.upload.dispatchProgress('loadstart');
-    }
-    this._armTimeout(requestVersion);
-    this._performRequest(requestVersion, init);
+    this._requestHandle = sendXMLHttpRequest(
+      {
+        body: data,
+        headers: this._headers,
+        method,
+        timeout: this.timeout,
+        url,
+        withCredentials: this.withCredentials,
+      },
+      {
+        onChunk: (chunk, loaded, total) => {
+          if (requestId !== this._requestId) return;
+          this._chunks.push(chunk);
+          this._loaded = loaded;
+          const receivesText =
+            this._responseType !== 'arraybuffer' &&
+            this._responseType !== 'blob';
+          if (receivesText && incrementalEvents) {
+            const bytes = this._mergeChunks();
+            const responseText = utf8ToString(bytes);
+            this.__didReceiveIncrementalData(
+              requestId,
+              responseText,
+              loaded,
+              total
+            );
+          } else {
+            this.__didReceiveDataProgress(requestId, loaded, total);
+          }
+        },
+        onComplete: (error, timedOut) => {
+          if (requestId !== this._requestId) return;
+          if (!error) {
+            const receivesText =
+              this._responseType !== 'arraybuffer' &&
+              this._responseType !== 'blob';
+            if (receivesText) {
+              const bytes = this._mergeChunks();
+              const responseText = utf8ToString(bytes);
+              if (!incrementalEvents || this.readyState < this.LOADING) {
+                this.__didReceiveData(requestId, responseText);
+              }
+            } else if (this.readyState < this.LOADING) {
+              this.setReadyState(this.LOADING);
+            }
+          }
+          this.__didCompleteResponse(requestId, error, timedOut);
+        },
+        onResponse: (status, headers, responseURL) => {
+          this.__didReceiveResponse(requestId, status, headers, responseURL);
+        },
+        onUploadProgress: (loaded, total) => {
+          this.__didUploadProgress(requestId, loaded, total);
+        },
+      }
+    );
   }
 
   abort(): void {
-    if (!this._sending) {
-      this.readyState = NitroXMLHttpRequest.UNSENT;
-      return;
+    this._aborted = true;
+    const requestHandle = this._requestHandle;
+    this._requestHandle = null;
+    requestHandle?.abort();
+    if (
+      !(
+        this.readyState === this.UNSENT ||
+        (this.readyState === this.OPENED && !this._sent) ||
+        this.readyState === this.DONE
+      )
+    ) {
+      this._reset();
+      this.setReadyState(this.DONE);
     }
-    this._terminate('abort');
+    this._reset();
   }
 
-  private async _performRequest(
-    requestVersion: number,
-    init: NitroRequestInit
-  ): Promise<void> {
-    try {
-      const response = await nitroFetch(this._url, init);
-      if (!this._isCurrent(requestVersion)) return;
-
-      this._setResponseMetadata(response);
-      this._completeUpload();
-      this._setReadyState(NitroXMLHttpRequest.HEADERS_RECEIVED);
-
-      const body = response.body;
-      if (body != null) {
-        const reader = body.getReader();
-        while (true) {
-          const result = await reader.read();
-          if (!this._isCurrent(requestVersion)) return;
-          if (result.done) break;
-          if (result.value != null) {
-            this._receiveChunk(result.value);
-          }
-        }
-      }
-
-      if (!this._isCurrent(requestVersion)) return;
-      this._finishResponse();
-    } catch {
-      if (!this._isCurrent(requestVersion)) return;
-      this._failRequest();
+  setResponseHeaders(responseHeaders: Record<string, string> | null): void {
+    this.responseHeaders = responseHeaders;
+    const headers = responseHeaders ?? {};
+    this._lowerCaseResponseHeaders = {};
+    for (const headerName of Object.keys(headers)) {
+      const headerValue = headers[headerName];
+      if (headerValue == null) continue;
+      this._lowerCaseResponseHeaders[headerName.toLowerCase()] = headerValue;
     }
   }
 
-  private _setResponseMetadata(response: Response): void {
-    this.status = response.status;
-    this.statusText = response.statusText;
-    this.responseURL = response.url;
-    this._responseHeaders.clear();
-    response.headers.forEach((value, name) => {
-      const normalizedName = name.toLowerCase();
-      this._responseHeaders.set(normalizedName, { name, value });
-    });
-
-    const contentLength = response.headers.get('content-length');
-    const parsedLength = contentLength == null ? 0 : Number(contentLength);
-    this._lengthComputable = Number.isFinite(parsedLength) && parsedLength > 0;
-    this._total = this._lengthComputable ? parsedLength : 0;
-  }
-
-  private _receiveChunk(chunk: Uint8Array<ArrayBuffer>): void {
-    const ownedChunk = chunk.slice();
-    this._chunks.push(ownedChunk);
-    this._loaded += ownedChunk.byteLength;
-
-    if (this._responseType === '' || this._responseType === 'text') {
-      const bytes = this._mergeChunks();
-      this.responseText = utf8ToString(bytes);
-      this.response = this.responseText;
-    }
-
-    this._setReadyState(NitroXMLHttpRequest.LOADING, true);
-    this._dispatch('progress', {
-      lengthComputable: this._lengthComputable,
-      loaded: this._loaded,
-      total: this._total,
-    });
-  }
-
-  private _finishResponse(): void {
-    const bytes = this._mergeChunks();
-    const buffer = bytes.buffer.slice(
-      bytes.byteOffset,
-      bytes.byteOffset + bytes.byteLength
-    );
-
-    if (this._responseType === 'arraybuffer') {
-      this.response = buffer;
-    } else if (this._responseType === 'blob') {
-      const contentType = this.getResponseHeader('content-type') ?? '';
-      this.response = bytesToBlob(buffer, contentType);
-    } else if (this._responseType === 'json') {
-      const text = utf8ToString(bytes);
-      try {
-        this.response = text.length === 0 ? null : JSON.parse(text);
-      } catch {
-        this.response = null;
-      }
-    } else if (this._responseType === 'document') {
-      this.response = null;
-      this.responseXML = null;
-    } else {
-      this.responseText = utf8ToString(bytes);
-      this.response = this.responseText;
-    }
-
-    this._sending = false;
-    this._abortController = null;
-    this._clearTimeout();
-    this._setReadyState(NitroXMLHttpRequest.DONE);
-    const progress = this._responseProgress();
-    this._dispatch('load', progress);
-    this._dispatch('loadend', progress);
-  }
-
-  private _failRequest(): void {
-    this._sending = false;
-    this._abortController = null;
-    this._clearTimeout();
-    this.status = 0;
-    this.statusText = '';
-    this.responseURL = '';
-    this._failUpload('error');
-    this._setReadyState(NitroXMLHttpRequest.DONE);
-    this._dispatch('error');
-    this._dispatch('loadend');
-  }
-
-  private _terminate(type: 'abort' | 'timeout'): void {
-    this._requestVersion += 1;
-    this._sending = false;
-    this._clearTimeout();
-    const controller = this._abortController;
-    this._abortController = null;
-    controller?.abort();
-    this.status = 0;
-    this.statusText = '';
-    this.responseURL = '';
-    this._failUpload(type);
-    this._setReadyState(NitroXMLHttpRequest.DONE);
-    this._dispatch(type);
-    this._dispatch('loadend');
-    if (type === 'abort') {
-      this.readyState = NitroXMLHttpRequest.UNSENT;
-    }
-  }
-
-  private _completeUpload(): void {
-    if (this._uploadComplete) return;
-    this._uploadComplete = true;
-    const lengthComputable = this._uploadSize != null;
-    const total = this._uploadSize ?? 0;
-    const progress = { lengthComputable, loaded: total, total };
-    this.upload.dispatchProgress('progress', progress);
-    this.upload.dispatchProgress('load', progress);
-    this.upload.dispatchProgress('loadend', progress);
-  }
-
-  private _failUpload(type: 'abort' | 'error' | 'timeout'): void {
-    if (this._uploadComplete) return;
-    this._uploadComplete = true;
-    this.upload.dispatchProgress(type);
-    this.upload.dispatchProgress('loadend');
-  }
-
-  private _armTimeout(requestVersion: number): void {
-    if (this.timeout <= 0) return;
-    this._timeoutTimer = setTimeout(() => {
-      if (!this._isCurrent(requestVersion)) return;
-      this._terminate('timeout');
-    }, this.timeout);
-  }
-
-  private _clearTimeout(): void {
-    if (this._timeoutTimer == null) return;
-    clearTimeout(this._timeoutTimer);
-    this._timeoutTimer = null;
-  }
-
-  private _isCurrent(requestVersion: number): boolean {
-    return this._sending && requestVersion === this._requestVersion;
-  }
-
-  private _setReadyState(readyState: number, repeat: boolean = false): void {
-    if (this.readyState === readyState && !repeat) return;
-    this.readyState = readyState;
+  setReadyState(newState: number): void {
+    this.readyState = newState;
     this._dispatch('readystatechange');
+    if (newState !== this.DONE) return;
+    if (this._aborted) {
+      this._dispatch('abort');
+    } else if (this._hasError) {
+      this._dispatch(this._timedOut ? 'timeout' : 'error');
+    } else {
+      this._dispatch('load');
+    }
+    this._dispatch('loadend');
   }
 
-  private _responseProgress(): ProgressInit {
-    return {
-      lengthComputable: this._lengthComputable,
-      loaded: this._loaded,
-      total: this._total,
-    };
+  addEventListener(
+    type: string,
+    listener: Listener | null,
+    options?: boolean | AddEventListenerOptions
+  ): void {
+    if (type === 'readystatechange' || type === 'progress') {
+      this._incrementalEvents = true;
+    }
+    super.addEventListener(type, listener, options);
   }
 
   private _mergeChunks(): Uint8Array<ArrayBuffer> {
@@ -529,45 +725,6 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
       offset += chunk.byteLength;
     }
     return merged;
-  }
-
-  private _bodySize(
-    body: Document | XMLHttpRequestBodyInit | null
-  ): number | undefined {
-    if (body == null) return 0;
-    if (typeof body === 'string') {
-      const bytes = stringToUTF8(body);
-      return bytes.byteLength;
-    }
-    if (body instanceof ArrayBuffer) return body.byteLength;
-    if (ArrayBuffer.isView(body)) return body.byteLength;
-    if (typeof Blob !== 'undefined' && body instanceof Blob) return body.size;
-    if (
-      typeof URLSearchParams !== 'undefined' &&
-      body instanceof URLSearchParams
-    ) {
-      const serialized = body.toString();
-      const encoded = stringToUTF8(serialized);
-      return encoded.byteLength;
-    }
-    return undefined;
-  }
-
-  private _resetResponse(): void {
-    this._sending = false;
-    this._abortController = null;
-    this._clearTimeout();
-    this._responseHeaders.clear();
-    this._chunks = [];
-    this._loaded = 0;
-    this._total = 0;
-    this._lengthComputable = false;
-    this.response = null;
-    this.responseText = '';
-    this.responseURL = '';
-    this.responseXML = null;
-    this.status = 0;
-    this.statusText = '';
   }
 }
 

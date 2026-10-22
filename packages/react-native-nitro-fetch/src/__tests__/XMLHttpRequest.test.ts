@@ -82,6 +82,8 @@ describe('NitroXMLHttpRequest', () => {
     const xhr = new NitroXMLHttpRequest();
     const states: number[] = [];
     const progress: number[] = [];
+    expect(xhr.withCredentials).toBe(true);
+    expect(xhr.getAllResponseHeaders()).toBeNull();
     xhr.addEventListener('readystatechange', () => {
       states.push(xhr.readyState);
     });
@@ -98,6 +100,7 @@ describe('NitroXMLHttpRequest', () => {
     expect(states).toEqual([1, 2, 3, 3, 4]);
     expect(progress).toEqual([6, 11]);
     expect(xhr.status).toBe(200);
+    expect(xhr.statusText).toBe('');
     expect(xhr.responseText).toBe('{"ok":true}');
     expect(xhr.getResponseHeader('Content-Type')).toBe('application/json');
     expect(xhr.getAllResponseHeaders()).toContain(
@@ -105,7 +108,11 @@ describe('NitroXMLHttpRequest', () => {
     );
     expect(mockNitroFetch).toHaveBeenCalledWith(
       'https://example.com/source',
-      expect.objectContaining({ method: 'GET', stream: true })
+      expect.objectContaining({
+        credentials: 'include',
+        method: 'GET',
+        stream: true,
+      })
     );
   });
 
@@ -160,6 +167,9 @@ describe('NitroXMLHttpRequest', () => {
     xhr.addEventListener('loadend', () => events.push('loadend'));
     xhr.open('GET', 'https://example.com/slow');
     xhr.send();
+    expect(() => {
+      xhr.responseType = 'json';
+    }).toThrow('response type cannot be set after the request has been sent');
     xhr.abort();
 
     expect(capturedSignal?.aborted).toBe(true);
@@ -181,5 +191,31 @@ describe('NitroXMLHttpRequest', () => {
     expect(xhr.status).toBe(0);
     expect(xhr.readyState).toBe(NitroXMLHttpRequest.DONE);
     expect(events).toEqual(['error']);
+  });
+
+  it('uses React Native timeout event ordering', async () => {
+    let capturedSignal: AbortSignal | undefined;
+    mockNitroFetch.mockImplementation((_input, init) => {
+      capturedSignal = init?.signal ?? undefined;
+      return new Promise((_resolve, reject) => {
+        capturedSignal?.addEventListener('abort', () => {
+          reject(new Error('aborted'));
+        });
+      });
+    });
+
+    const xhr = new NitroXMLHttpRequest();
+    const events: string[] = [];
+    xhr.timeout = 5;
+    xhr.addEventListener('timeout', () => events.push('timeout'));
+    xhr.addEventListener('loadend', () => events.push('loadend'));
+    xhr.open('GET', 'https://example.com/slow');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+    await completed;
+
+    expect(capturedSignal?.aborted).toBe(true);
+    expect(events).toEqual(['timeout', 'loadend']);
+    expect(xhr.readyState).toBe(NitroXMLHttpRequest.DONE);
   });
 });
