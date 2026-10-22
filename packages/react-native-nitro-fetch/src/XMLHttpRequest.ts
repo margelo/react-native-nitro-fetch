@@ -4,7 +4,8 @@
  * This source code is licensed under the MIT license found in the LICENSE file
  * in the root directory of the React Native source tree.
  *
- * Derived from React Native's XMLHttpRequest implementation at v0.88.0-rc.3.
+ * Derived from React Native's XMLHttpRequest implementation at v0.88.0-rc.3:
+ * https://github.com/facebook/react-native/blob/v0.88.0-rc.3/packages/react-native/Libraries/Network/XMLHttpRequest.js
  * The state machine is preserved while the RCTNetworking boundary is adapted
  * to Nitro Fetch and the Flow types are expressed as TypeScript.
  */
