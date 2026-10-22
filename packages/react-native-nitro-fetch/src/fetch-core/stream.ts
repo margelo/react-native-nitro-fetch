@@ -3,6 +3,7 @@ import { NitroHeaders } from '../Headers';
 import { NitroResponse } from '../Response';
 import type { RequestCache } from '../Request';
 import { NetworkInspector } from '../NetworkInspector';
+import type { UrlResponseInfo } from '../NitroCronet.nitro';
 import {
   applyDefaultContentType,
   applyCacheHeaders,
@@ -114,8 +115,8 @@ export async function nitroStreamFetch(
       }
     };
 
-    builder.onResponseStarted((info) => {
-      if (responseResolved || signal?.aborted) return;
+    let redirected = false;
+    const resolveWith = (info: UrlResponseInfo) => {
       responseResolved = true;
       const status = info.httpStatusCode;
       const responseHeaders = new NitroHeaders(
@@ -127,10 +128,52 @@ export async function nitroStreamFetch(
         status,
         statusText: info.httpStatusText,
         headers: responseHeaders,
-        redirected: false,
+        redirected,
         body: stream,
       });
       resolveResponse(response as unknown as Response);
+    };
+
+    let stoppedAtRedirect = false;
+    builder.onRedirectReceived((info, newLocationUrl) => {
+      if (responseResolved) return;
+      if (init?.redirect !== 'error' && init?.redirect !== 'manual') {
+        redirected = true;
+        request.followRedirect();
+        return;
+      }
+      stoppedAtRedirect = true;
+      cleanupAbortListener();
+      if (init.redirect === 'manual') {
+        resolveWith(info);
+        streamController.close();
+        if (inspectorId) {
+          NetworkInspector._recordEnd(
+            inspectorId,
+            info.httpStatusCode,
+            info.httpStatusText,
+            info.allHeadersAsList,
+            0
+          );
+        }
+      } else {
+        const err = new TypeError(
+          `redirect mode is "error": redirected request to "${newLocationUrl}"`
+        );
+        if (inspectorId) {
+          NetworkInspector._recordEnd(inspectorId, 0, '', [], 0, err.message);
+        }
+        responseResolved = true;
+        rejectResponse(err);
+      }
+      try {
+        request.cancel();
+      } catch {}
+    });
+
+    builder.onResponseStarted((info) => {
+      if (responseResolved || signal?.aborted) return;
+      resolveWith(info);
       // Android/Cronet: kick off the first buffer read.
       // iOS/URLSession handles reading automatically so this is a no-op there.
       request.read();
@@ -138,7 +181,7 @@ export async function nitroStreamFetch(
 
     builder.onReadCompleted((_info, byteBuffer, bytesRead) => {
       // A cancelled stream can still receive an in-flight native read.
-      if (streamCancelled || signal?.aborted) return;
+      if (streamCancelled || stoppedAtRedirect || signal?.aborted) return;
       const chunk = new Uint8Array(byteBuffer, 0, bytesRead).slice();
       streamBytesReceived += bytesRead;
       streamController.enqueue(chunk);
@@ -149,7 +192,7 @@ export async function nitroStreamFetch(
 
     builder.onSucceeded((_info) => {
       cleanupAbortListener();
-      if (streamCancelled || signal?.aborted) return;
+      if (streamCancelled || stoppedAtRedirect || signal?.aborted) return;
       streamController.close();
       if (inspectorId) {
         const info = _info as any;
@@ -180,7 +223,9 @@ export async function nitroStreamFetch(
       }
     });
 
-    builder.onCanceled(() => settleAborted());
+    builder.onCanceled(() => {
+      if (!stoppedAtRedirect) settleAborted();
+    });
 
     const request = builder.build();
     if (signal) {

@@ -29,8 +29,7 @@ export async function nitroFetch(
      * Nothing arrives early.
      *
      * Not a free upgrade: the streaming transport is a separate native client.
-     * It does not consult the prefetch cache, always reports
-     * `response.redirected === false`, and ignores `redirect: 'error'`.
+     * It does not consult the prefetch cache.
      *
      * @default false
      */

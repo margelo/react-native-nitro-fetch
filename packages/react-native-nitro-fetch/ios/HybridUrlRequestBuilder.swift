@@ -129,7 +129,7 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
 
 // MARK: - URLSession Delegate Adapter
 
-private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate, CancelRequestTracking {
+private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate, CancelRequestTracking, RedirectFollowing {
   let onRedirectReceived: ((_ info: UrlResponseInfo, _ newLocationUrl: String) -> Void)?
   let onResponseStarted: ((_ info: UrlResponseInfo) -> Void)?
   let onReadCompleted: ((_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer, _ bytesRead: Double) -> Void)?
@@ -145,17 +145,31 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
   // Written from the JS thread by cancel(), read when the task completes.
   private let cancelLock = NSLock()
   private var cancelRequested = false
+  private var pendingRedirect: ((Bool) -> Void)?
 
   func markCancelRequested() {
     cancelLock.lock()
     cancelRequested = true
     cancelLock.unlock()
+    resolvePendingRedirect(follow: false)
   }
 
   private var wasCancelRequested: Bool {
     cancelLock.lock()
     defer { cancelLock.unlock() }
     return cancelRequested
+  }
+
+  func followRedirect() {
+    resolvePendingRedirect(follow: true)
+  }
+
+  private func resolvePendingRedirect(follow: Bool) {
+    cancelLock.lock()
+    let resolve = pendingRedirect
+    pendingRedirect = nil
+    cancelLock.unlock()
+    resolve?(follow)
   }
   private let devToolsRequestId: String
   private var devToolsBytes: Int = 0
@@ -191,15 +205,25 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
     newRequest request: URLRequest,
     completionHandler: @escaping (URLRequest?) -> Void
   ) {
-    executor.sync { [weak self] in
-      guard let self = self else { return }
-      if let callback = self.onRedirectReceived {
-        let info = response.toNitro()
-        let newUrl = request.url?.absoluteString ?? ""
-        callback(info, newUrl)
-      }
+    guard let callback = onRedirectReceived else {
+      completionHandler(request)
+      return
     }
-    completionHandler(request)
+    cancelLock.lock()
+    let cancelled = cancelRequested
+    if !cancelled {
+      pendingRedirect = { follow in completionHandler(follow ? request : nil) }
+    }
+    cancelLock.unlock()
+    if cancelled {
+      completionHandler(nil)
+      return
+    }
+    let info = response.toNitro()
+    let newUrl = request.url?.absoluteString ?? ""
+    executor.sync {
+      callback(info, newUrl)
+    }
   }
 
   func urlSession(
@@ -207,6 +231,7 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
     task: URLSessionTask,
     didCompleteWithError error: Error?
   ) {
+    resolvePendingRedirect(follow: false)
     executor.sync { [weak self] in
       guard let self = self else { return }
       self.hybridRequest?.markDone()
