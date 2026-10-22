@@ -63,6 +63,18 @@ export function isFormData(body: unknown): body is FormData {
   return false;
 }
 
+export function assertBodyAllowed(
+  method: string | undefined,
+  body: BodyInit | null | undefined
+): void {
+  'worklet';
+  if (body == null) return;
+  const m = (method ?? 'GET').toUpperCase();
+  if (m === 'GET' || m === 'HEAD') {
+    throw new TypeError('Request with GET/HEAD method cannot have body.');
+  }
+}
+
 export function normalizeBody(body: BodyInit | null | undefined):
   | {
       bodyString?: string;
