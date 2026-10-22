@@ -391,6 +391,62 @@ describe('Request - Body', () => {
   });
 });
 
+describe('Fetch - body on GET and HEAD', () => {
+  const ownConnectionBase = BASE.replace('127.0.0.1', 'localhost');
+
+  function withTimeout<T>(promise: Promise<T>, ms = 5_000): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`timed out after ${ms} ms`)),
+        ms
+      );
+      promise.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error);
+        }
+      );
+    });
+  }
+
+  for (const method of ['GET', 'HEAD']) {
+    for (const stream of [false, true]) {
+      it(`${method} with a body rejects with a TypeError${stream ? ' (stream: true)' : ''}`, async () => {
+        let name = 'resolved';
+        try {
+          await withTimeout(
+            (nitroFetch as any)(`${ownConnectionBase}/anything`, {
+              method,
+              body: 'x',
+              stream,
+            })
+          );
+        } catch (e: any) {
+          name = e?.name;
+        }
+        expect(name).toBe('TypeError');
+      });
+    }
+  }
+
+  it('init.method overrides the method of a standard Request', async () => {
+    const StdRequest = (globalThis as any).Request;
+    const res = await withTimeout(
+      nitroFetch(new StdRequest(`${ownConnectionBase}/anything`), {
+        method: 'POST',
+        body: 'x',
+      })
+    );
+    const body = await res.json();
+    expect(body.method).toBe('POST');
+    expect(body.data).toBe('x');
+  });
+});
+
 describe('Request - Integration with fetch()', () => {
   it('fetch() accepts Request object', async () => {
     const req = new Request(`${BASE}/get`);
