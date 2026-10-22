@@ -243,6 +243,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
 
   companion object {
     private val directExecutor = Executor(Runnable::run)
+    private val requestBodyHeaders = arrayOf("Content-Type", "Content-Encoding", "Content-Language", "Content-Location")
 
     @JvmStatic
     @JvmOverloads
@@ -250,7 +251,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       req: NitroRequest,
       onSuccess: (NitroResponse) -> Unit,
       onFail: (Throwable) -> Unit,
-      onRestarted: ((UrlRequest) -> Unit)? = null
+      onRestarted: ((UrlRequest, UrlRequest) -> Unit)? = null
     ): UrlRequest? {
       return try {
         // Local resources (file://, content://, scheme-less paths) aren't HTTP; read off disk -> 200.
@@ -261,7 +262,9 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         if (hostHasWhitespace(req.url)) throw invalidUrlException(req.url)
         val engine = HybridNitroFetch.getEngine()
         val executor = HybridNitroFetch.ioExecutor
-        startCronet(engine, executor, req, onSuccess, onFail, onRestarted)
+        val formParts = req.bodyFormData
+        val multipart = if (formParts != null && formParts.isNotEmpty()) buildMultipartBody(formParts) else null
+        startCronet(engine, executor, req, multipart?.first ?: uploadBytes(req), multipart?.second, onSuccess, onFail, onRestarted)
       } catch (t: Throwable) {
         onFail(t)
         null
@@ -269,11 +272,8 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
     }
 
     private fun originOf(url: String): String? = try {
-      val uri = java.net.URI(url)
-      val scheme = uri.scheme?.lowercase()
-      val host = uri.host?.lowercase()
-      if (scheme == null || host == null) null
-      else "$scheme://$host:${if (uri.port != -1) uri.port else if (scheme == "https") 443 else 80}"
+      val u = java.net.URL(url)
+      "${u.protocol}://${u.host.lowercase()}:${if (u.port != -1) u.port else u.defaultPort}"
     } catch (_: Throwable) {
       null
     }
@@ -285,9 +285,9 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       val method = req.method ?: NitroRequestMethod.GET
       val dropBody = ((status == 301 || status == 302) && method == NitroRequestMethod.POST) ||
         (status == 303 && method != NitroRequestMethod.GET && method != NitroRequestMethod.HEAD)
-      val headers = req.headers?.filterNot {
-        it.key.equals("Authorization", ignoreCase = true) ||
-          (dropBody && it.key.equals("Content-Type", ignoreCase = true))
+      val headers = req.headers?.filterNot { header ->
+        header.key.equals("Authorization", ignoreCase = true) ||
+          (dropBody && requestBodyHeaders.any { header.key.equals(it, ignoreCase = true) })
       }?.toTypedArray()
       return if (dropBody) {
         req.copy(url = location, method = NitroRequestMethod.GET, headers = headers, bodyString = null, bodyBytes = null, bodyBytesBase64 = null, bodyFormData = null)
@@ -300,9 +300,11 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       engine: CronetEngine,
       executor: Executor,
       req: NitroRequest,
+      uploadBody: ByteArray?,
+      uploadContentType: String?,
       onSuccess: (NitroResponse) -> Unit,
       onFail: (Throwable) -> Unit,
-      onRestarted: ((UrlRequest) -> Unit)?
+      onRestarted: ((UrlRequest, UrlRequest) -> Unit)?
     ): UrlRequest {
       val url = req.url
       val shouldFollowRedirects = req.followRedirects ?: true
@@ -333,7 +335,8 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       val callback = object : UrlRequest.Callback() {
         private val buffer = ByteBuffer.allocateDirect(64 * 1024)
         private var body = ResponseBody(0)
-        private var redirectStopped = false
+        private val stopped = AtomicBoolean(false)
+        private var restarting = false
         /** True if a redirect response applied at least one `Set-Cookie` (in memory, not yet flushed). */
         private var setCookieAppliedOnRedirect = false
         private var devToolsBytes = 0
@@ -348,21 +351,33 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
               setCookieAppliedOnRedirect = true
             }
             if (hasAuthorization(req) && originOf(info.url).let { it == null || it != originOf(newLocationUrl) }) {
-              redirectStopped = true
+              if (!stopped.compareAndSet(false, true)) return@complete
+              restarting = true
               request.cancel()
               val next = crossOriginRedirectWithoutAuthorization(req, info.httpStatusCode, newLocationUrl)
+              val keepBody = next.method == req.method
               try {
-                val restarted = startCronet(engine, executor, next, { res -> onSuccess(res.copy(redirected = true)) }, onFail, onRestarted)
-                onRestarted?.invoke(restarted)
+                val restarted = startCronet(
+                  engine,
+                  executor,
+                  if (devToolsEnabled) next.copy(requestId = devToolsRequestId) else next,
+                  if (keepBody) uploadBody else null,
+                  if (keepBody) uploadContentType else null,
+                  { res -> onSuccess(res.copy(redirected = true)) },
+                  onFail,
+                  onRestarted
+                )
+                onRestarted?.invoke(request, restarted)
               } catch (t: Throwable) {
                 onFail(t)
               }
+              if (setCookieAppliedOnRedirect) NitroCookieSync.flushCookieManager()
               return@complete
             }
             request.followRedirect()
           } else {
             // Return the redirect response as-is without following
-            redirectStopped = true
+            if (!stopped.compareAndSet(false, true)) return@complete
             request.cancel()
             try {
               val headersArr = info.allHeadersAsList.map { NitroHeader(it.key, it.value) }.toTypedArray()
@@ -467,20 +482,22 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           if (BuildConfig.NITRO_FETCH_TRACING) {
             Trace.endAsyncSection(traceLabel, traceCookie)
           }
-          if (devToolsEnabled) {
+          if (devToolsEnabled && !restarting) {
             DevToolsReporter.reportRequestFailed(devToolsRequestId, false)
           }
-          onFail(if (error.isInvalidUrl) invalidUrlException(url) else RuntimeException("Cronet failed: ${error.message}", error))
+          if (stopped.compareAndSet(false, true)) {
+            onFail(if (error.isInvalidUrl) invalidUrlException(url) else RuntimeException("Cronet failed: ${error.message}", error))
+          }
         }
 
         override fun onCanceled(request: UrlRequest, info: UrlResponseInfo?) = complete {
           if (BuildConfig.NITRO_FETCH_TRACING) {
             Trace.endAsyncSection(traceLabel, traceCookie)
           }
-          if (devToolsEnabled) {
+          if (devToolsEnabled && !restarting) {
             DevToolsReporter.reportRequestFailed(devToolsRequestId, true)
           }
-          if (!redirectStopped) {
+          if (stopped.compareAndSet(false, true)) {
             onFail(RuntimeException("Cronet canceled"))
           }
         }
@@ -506,18 +523,10 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         ) { key, value -> builder.addHeader(key, value) }
       }
 
-      val formParts = req.bodyFormData
-      if (formParts != null && formParts.isNotEmpty()) {
-        val (multipartBody, contentType) = buildMultipartBody(formParts)
-        builder.addHeader("Content-Type", contentType)
-        val provider = createUploadProvider(multipartBody)
+      if (uploadBody != null) {
+        if (uploadContentType != null) builder.addHeader("Content-Type", uploadContentType)
+        val provider = createUploadProvider(uploadBody)
         builder.setUploadDataProvider(provider, callbackExecutor)
-      } else {
-        val body = uploadBytes(req)
-        if (body != null) {
-          val provider = createUploadProvider(body)
-          builder.setUploadDataProvider(provider, callbackExecutor)
-        }
       }
 
       val request = builder.build()
@@ -737,6 +746,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
     }
     val requestId = req.requestId
     val finished = AtomicBoolean(false)
+    val stored = if (requestId != null) AtomicBoolean(false) else null
     val urlRequest = fetch(
       req,
       onSuccess = { res ->
@@ -749,14 +759,18 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         if (requestId != null) activeRequests.remove(requestId)
         promise.reject(err)
       },
-      onRestarted = { restarted ->
-        if (requestId != null && !finished.get()) activeRequests[requestId] = restarted
+      onRestarted = if (requestId == null || stored == null) null else fun(old: UrlRequest, restarted: UrlRequest) {
+        val current = activeRequests.compute(requestId) { _, cur ->
+          if (!finished.get() && (cur === old || !stored.get())) restarted else cur
+        }
+        if (current !== restarted) restarted.cancel()
       }
     )
     // Store after start() — if cancelRequest races and misses, the JS
     // catch block checks signal.aborted and throws AbortError anyway.
     if (requestId != null && urlRequest != null) {
-      activeRequests[requestId] = urlRequest
+      activeRequests.putIfAbsent(requestId, urlRequest)
+      stored?.set(true)
       if (finished.get()) activeRequests.remove(requestId, urlRequest)
     }
     return promise
