@@ -474,10 +474,31 @@ describe('NitroFetch - Cross-origin redirects', () => {
     expect(json.headers.Authorization).toBe(undefined);
   });
 
+  it('resends a byte body without Authorization on a cross-origin 307', async () => {
+    const res = await nitroFetch(redirectTo(`${OTHER_ORIGIN}/anything`, 307), {
+      method: 'POST',
+      headers: { Authorization: 'Bearer secret' },
+      body: new Uint8Array([0, 127, 128, 255, 254]),
+    });
+    const json = await res.json();
+    expect(json.method).toBe('POST');
+    expect(json.dataLength).toBe(5);
+    expect(json.dataBase64).toBe('AH+A//4=');
+    expect(json.headers.Authorization).toBe(undefined);
+  });
+
   const itAndroid = Platform.OS === 'android' ? it : it.skip;
 
   itAndroid('keeps Authorization on a same-origin redirect', async () => {
     const res = await nitroFetch(redirectTo(`${BASE}/headers`), {
+      headers: { Authorization: 'Bearer secret' },
+    });
+    const json = await res.json();
+    expect(json.headers.Authorization).toBe('Bearer secret');
+  });
+
+  itAndroid('keeps Authorization when a same-origin URL has a |', async () => {
+    const res = await nitroFetch(redirectTo(`${BASE}/headers?q=a|b`), {
       headers: { Authorization: 'Bearer secret' },
     });
     const json = await res.json();
