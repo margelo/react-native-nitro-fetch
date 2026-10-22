@@ -9,7 +9,7 @@ import {
   headersToPairs,
   normalizeAndValidateHeaders,
 } from './headers';
-import { normalizeBody } from './body';
+import { assertBodyAllowed, normalizeBody } from './body';
 import { getUrlString } from './url';
 import { createAbortError } from './errors';
 
@@ -26,6 +26,7 @@ export async function nitroStreamFetch(
   const src = input as { method?: string; headers?: HeadersInit };
   const method = (init?.method ?? src?.method)?.toUpperCase() ?? 'GET';
   const headers = headersToPairs(init?.headers ?? src?.headers) ?? [];
+  assertBodyAllowed(method, init?.body);
   const normalized = normalizeBody(init?.body);
   applyDefaultContentType(headers, normalized?.contentType);
   applyCacheHeaders(headers, init?.cache as RequestCache | undefined);
