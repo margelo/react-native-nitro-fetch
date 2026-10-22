@@ -1,0 +1,617 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+
+@source "../lib/**/*.tsx";
+@source "../components/**/*.tsx";
+
+/* Geist and Geist Mono, as in the VisionCamera docs. Loaded in src/app/layout.tsx. */
+@theme inline {
+  --font-sans: var(--font-geist);
+  --font-mono: var(--font-geist-mono);
+  --default-mono-font-family: var(--font-mono);
+}
+
+/*
+ * Black and white with orange only for the active item, after the colorway of
+ * oss.callstack.com. Light: near-black text and buttons on white, faint
+ * lavender panels. Dark: the inverse on a warm near-black.
+ */
+@theme {
+  --color-fd-background: #ffffff;
+  --color-fd-foreground: #201f24;
+  --color-fd-muted: #f9f8fd;
+  --color-fd-muted-foreground: #838289;
+  --color-fd-popover: #ffffff;
+  --color-fd-popover-foreground: #201f24;
+  --color-fd-card: #f9f8fd;
+  --color-fd-card-foreground: #201f24;
+  --color-fd-border: #e9e7ee;
+  --color-fd-primary: #c2410c;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #f9f8fd;
+  --color-fd-secondary-foreground: #201f24;
+  --color-fd-accent: #fff1ea;
+  --color-fd-accent-foreground: #201f24;
+  --color-fd-ring: #c2410c;
+}
+
+.dark {
+  --color-fd-background: #201f24;
+  --color-fd-foreground: #f4f3f7;
+  --color-fd-muted: #2b2a2f;
+  --color-fd-muted-foreground: #a9a8b0;
+  --color-fd-popover: #2b2a2f;
+  --color-fd-popover-foreground: #f4f3f7;
+  --color-fd-card: #2b2a2f;
+  --color-fd-card-foreground: #f4f3f7;
+  --color-fd-border: #424145;
+  --color-fd-primary: #ff6626;
+  --color-fd-primary-foreground: #201f24;
+  --color-fd-secondary: #2b2a2f;
+  --color-fd-secondary-foreground: #f4f3f7;
+  --color-fd-accent: #3a2b25;
+  --color-fd-accent-foreground: #f4f3f7;
+  --color-fd-ring: #ff6626;
+}
+
+.dark #nd-sidebar {
+  --color-fd-muted: #26252a;
+  --color-fd-secondary: #2b2a2f;
+  --color-fd-muted-foreground: #a9a8b0;
+}
+
+/* Buttons are black on white in light mode and white on black in dark mode. */
+:root {
+  --site-button-bg: #201f24;
+  --site-button-fg: #ffffff;
+}
+
+.dark {
+  --site-button-bg: #f4f3f7;
+  --site-button-fg: #201f24;
+}
+
+/* Fumadocs gives the sidebar bg-fd-card; keep one surface color like the blog. */
+#nd-sidebar {
+  background-color: var(--color-fd-background);
+}
+
+body {
+  background-color: var(--color-fd-background);
+}
+
+/*
+ * Code blocks.
+ *
+ * margelo.com hardcodes each token color with `!important`
+ * (margelo.com/src/app/globals.css:653-740). Two themes need the values in
+ * variables instead, so the light column below is those exact hex values and
+ * the dark column is their brightened counterparts on the same Tailwind scale.
+ */
+:root {
+  --site-code-bg: #f9f8fd;
+  --site-code-border: #e9e7ee;
+  --site-code-fg: #201f24;
+  --site-code-label: #838289;
+
+  --site-token-comment: #617184;
+  --site-token-punctuation: #475569;
+  --site-token-number: #c2410c;
+  --site-token-tag: #dc2626;
+  --site-token-string: #15803d;
+  --site-token-operator: #0f766e;
+  --site-token-keyword: #9333ea;
+  --site-token-function: #2563eb;
+  --site-token-variable: #0e7490;
+}
+
+.dark {
+  --site-code-bg: #2b2a2f;
+  --site-code-border: #424145;
+  --site-code-fg: #e9e7ee;
+  --site-code-label: #a9a8b0;
+
+  --site-token-comment: #8b9bb4;
+  --site-token-punctuation: #94a3b8;
+  --site-token-number: #fb923c;
+  --site-token-tag: #f87171;
+  --site-token-string: #4ade80;
+  --site-token-operator: #2dd4bf;
+  --site-token-keyword: #c084fc;
+  --site-token-function: #60a5fa;
+  --site-token-variable: #22d3ee;
+}
+
+.site-code-block {
+  background-color: var(--site-code-bg);
+  border: 1px solid var(--site-code-border);
+  border-radius: 0.75rem;
+  margin-block: 1.5rem;
+  overflow: hidden;
+  position: relative;
+}
+
+.site-code-block code,
+.site-code-block pre,
+.site-code-block .code-line {
+  color: var(--site-code-fg) !important;
+  font-family: var(--font-mono), monospace;
+  line-height: 1.18 !important;
+}
+
+.site-code-block pre {
+  background-color: transparent;
+  border: none;
+  border-radius: 0;
+  margin: 0;
+  overflow-x: auto;
+  padding: 2.5rem 1.25rem 1rem;
+}
+
+.site-code-block__label {
+  color: var(--site-code-label);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  left: 1rem;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  position: absolute;
+  top: 0.625rem;
+  z-index: 10;
+}
+
+/*
+ * Fumadocs' typography plugin gives every `code` a 1px border and a 5px
+ * radius. Inside a `pre` that `code` is one inline box spanning every line, so
+ * the browser draws a border fragment around each line. Remove it here and on
+ * inline code, which margelo.com renders as a flat chip with no border.
+ */
+.site-code-block code {
+  border: none !important;
+  border-radius: 0 !important;
+  font-variant-ligatures: none;
+  font-feature-settings: 'liga' 0, 'calt' 0;
+  padding: 0 !important;
+}
+
+.site-code-block .token.comment,
+.site-code-block .token.prolog,
+.site-code-block .token.doctype,
+.site-code-block .token.cdata {
+  color: var(--site-token-comment) !important;
+  font-style: italic;
+}
+
+.site-code-block .token.punctuation {
+  color: var(--site-token-punctuation) !important;
+}
+
+.site-code-block .token.property,
+.site-code-block .token.property-access,
+.site-code-block .token.boolean,
+.site-code-block .token.number,
+.site-code-block .token.constant,
+.site-code-block .token.symbol {
+  color: var(--site-token-number) !important;
+}
+
+.site-code-block .token.tag,
+.site-code-block .token.deleted {
+  color: var(--site-token-tag) !important;
+}
+
+.site-code-block .token.selector,
+.site-code-block .token.attr-name,
+.site-code-block .token.string,
+.site-code-block .token.char,
+.site-code-block .token.builtin,
+.site-code-block .token.inserted {
+  color: var(--site-token-string) !important;
+}
+
+.site-code-block .token.operator,
+.site-code-block .token.entity,
+.site-code-block .token.url,
+.site-code-block .token.arrow,
+.site-code-block .token.spread {
+  color: var(--site-token-operator) !important;
+}
+
+.site-code-block .token.atrule,
+.site-code-block .token.attr-value,
+.site-code-block .token.keyword,
+.site-code-block .token.parameter {
+  color: var(--site-token-keyword) !important;
+  font-weight: inherit !important;
+}
+
+.site-code-block .token.function,
+.site-code-block .token.method,
+.site-code-block .token.generic-function,
+.site-code-block .token.class-name {
+  color: var(--site-token-function) !important;
+  font-weight: inherit !important;
+}
+
+.site-code-block .token.regex,
+.site-code-block .token.important,
+.site-code-block .token.variable {
+  color: var(--site-token-variable) !important;
+}
+
+.site-code-block .token.path {
+  color: var(--site-token-string) !important;
+}
+
+/*
+ * Prose.
+ *
+ * Ported from margelo.com's blog article styles
+ * (margelo.com/src/app/blog/[slug]/BlogPostPage.module.css), with sans-serif
+ * headings instead of the blog's Crimson Pro. margelo.com wraps
+ * each rule in `:where()` for zero specificity; fumadocs' own prose rules would
+ * then win, so these are plain descendant selectors instead.
+ */
+:root {
+  --site-prose-fg: #3a3940;
+  --site-prose-heading: #201f24;
+  --site-prose-link: #c2410c;
+  --site-prose-link-line: #fed7c3;
+  --site-prose-link-line-hover: #c2410c;
+  --site-prose-quote: #838289;
+  --site-rule: #e9e7ee;
+  --site-surface: #f9f8fd;
+  --site-image-frame: #cfced5;
+}
+
+.dark {
+  --site-prose-fg: #cfced5;
+  --site-prose-heading: #f4f3f7;
+  --site-prose-link: #ff6626;
+  --site-prose-link-line: #6b3420;
+  --site-prose-link-line-hover: #ff6626;
+  --site-prose-quote: #a9a8b0;
+  --site-rule: #424145;
+  --site-surface: #2b2a2f;
+  --site-image-frame: #636266;
+}
+
+.prose {
+  color: var(--site-prose-fg);
+  font-family: var(--font-sans), sans-serif;
+  font-size: 1rem;
+  line-height: 1.75rem;
+  max-width: none;
+}
+
+.prose a {
+  color: var(--site-prose-link);
+  text-decoration-color: var(--site-prose-link-line);
+  text-decoration-line: underline;
+  text-underline-offset: 3px;
+}
+
+.prose a:hover {
+  text-decoration-color: var(--site-prose-link-line-hover);
+}
+
+.prose blockquote {
+  border-left: 2px solid var(--site-prose-link);
+  color: var(--site-prose-quote);
+  font-weight: 500;
+  margin: 1.75rem 0;
+  padding-left: 1.25rem;
+}
+
+.prose :not(pre) > code {
+  background: var(--site-surface);
+  border: none;
+  border-radius: 0.375rem;
+  color: var(--site-prose-heading);
+  font-family: var(--font-mono), monospace;
+  font-size: 0.84em;
+  font-weight: 500;
+  font-variant-ligatures: none;
+  overflow-wrap: anywhere;
+  padding: 0.125rem 0.35rem;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/*
+ * Fumadocs wraps every heading's text in an anchor to its own id
+ * (fumadocs-ui/dist/components/heading.js). Without this the link styling
+ * above turns every heading blue and underlines it.
+ */
+.prose :is(h1, h2, h3, h4, h5, h6) a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.prose :is(h1, h2, h3, h4, h5, h6) code {
+  background: transparent;
+  font-size: inherit;
+  padding: 0;
+}
+
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  color: var(--site-prose-heading);
+  scroll-margin-top: 5rem;
+}
+
+.prose h2,
+.prose h3,
+.prose h4 {
+  font-family: var(--font-sans), sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.prose h2 {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  margin: 3rem 0 0.75rem;
+}
+
+.prose h3 {
+  font-size: 1.375rem;
+  line-height: 1.25;
+  margin: 2.25rem 0 0.5rem;
+}
+
+.prose h4 {
+  font-size: 1.125rem;
+  line-height: 1.3;
+  margin: 1.75rem 0 0.5rem;
+}
+
+.prose h5 {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 1.125rem;
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 1.75rem 0 0.5rem;
+}
+
+.prose h6 {
+  font-family: var(--font-sans), sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  margin: 1.5rem 0 0.5rem;
+  text-transform: uppercase;
+}
+
+.prose hr {
+  background: var(--site-rule);
+  border: none;
+  height: 1px;
+  margin: 2.5rem 0;
+}
+
+.prose p {
+  margin-bottom: 1.25rem;
+}
+
+.prose li {
+  margin-bottom: 0.5rem;
+}
+
+.prose ol {
+  list-style-type: decimal;
+  margin-bottom: 1.5rem;
+  padding-left: 1.25rem;
+}
+
+.prose ul {
+  list-style-type: disc;
+  margin-bottom: 1.5rem;
+  padding-left: 1.25rem;
+}
+
+.prose strong {
+  color: var(--site-prose-heading);
+  font-weight: 600;
+}
+
+/*
+ * The rounded outer border is on the table's wrapper in src/mdx-components.tsx,
+ * so cells draw only the lines between them.
+ */
+.prose table {
+  border-collapse: separate;
+  border-spacing: 0;
+  display: table;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  margin: 0;
+  min-width: 100%;
+  width: 100%;
+}
+
+.prose td,
+.prose th {
+  border: 0;
+  border-bottom: 1px solid var(--site-rule);
+  border-right: 1px solid var(--site-rule);
+  padding: 0.625rem 1rem;
+  vertical-align: top;
+}
+
+.prose tr > :last-child {
+  border-right: 0;
+}
+
+.prose tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.prose th {
+  background: var(--site-surface);
+  font-weight: 600;
+  text-align: left;
+}
+
+.site-code-block pre:focus-visible {
+  outline: 2px solid var(--site-prose-link);
+  outline-offset: -2px;
+}
+
+.site-code-block pre code {
+  background: transparent;
+  font-size: 0.84rem;
+  font-weight: 400;
+  line-height: 1.3;
+  padding: 0;
+}
+
+/* Media, framed the way blog images and videos are. */
+.site-media {
+  border: 1px solid var(--site-rule);
+  border-radius: 0.75rem;
+  display: block;
+  height: auto;
+  width: 100%;
+}
+
+.prose img {
+  margin: 2rem 0;
+  outline: 1px solid var(--site-image-frame);
+  outline-offset: -1px;
+  width: 100%;
+}
+
+.prose img.no-frame {
+  outline: none;
+}
+
+.site-caption {
+  border-left: 2px solid var(--site-rule);
+  color: var(--color-fd-muted-foreground);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  margin-top: 0.5rem;
+  padding-left: 0.75rem;
+}
+
+/*
+ * Table of contents, rendered by src/components/site-toc.tsx with the border
+ * treatment from margelo.com/src/app/blog/[slug]/BlogTableOfContents.tsx.
+ */
+#nd-toc nav a {
+  border-left: 2px solid var(--site-toc-border, #e9e7ee);
+  border-radius: 0 0.5rem 0.5rem 0;
+  color: var(--color-fd-muted-foreground);
+  font-family: var(--font-sans), sans-serif;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  padding: 0.375rem 0.75rem;
+  text-decoration: none;
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    color 150ms;
+}
+
+#nd-toc nav a:hover {
+  background: var(--site-surface);
+  border-left-color: var(--site-rule);
+  color: var(--site-prose-heading);
+}
+
+#nd-toc nav a[data-active='true'] {
+  background: var(--site-surface);
+  border-left-color: var(--site-prose-link);
+  color: var(--site-prose-link);
+}
+
+.dark #nd-toc nav a {
+  --site-toc-border: #424145;
+}
+
+/*
+ * Top bar, from react-native-vision-camera/docs/src/app/global.css. A HomeLayout
+ * sits above the DocsLayout; on desktop its wrapper is flattened so the sticky
+ * nav takes part in the shell's layout, and fumadocs offsets the sidebar and
+ * table of contents by --fd-banner-height.
+ */
+button[data-search-full] {
+  @apply mx-auto! max-w-lg! rounded-xl!;
+}
+
+@media (min-width: 768px) {
+  .site-docs-shell > #nd-home-layout {
+    display: contents;
+  }
+
+  .site-docs-shell {
+    --fd-banner-height: 3.5rem;
+  }
+
+  .site-docs-shell > #nd-docs-layout {
+    min-height: calc(100dvh - var(--fd-banner-height));
+  }
+
+  #nd-sidebar > div:has(.site-mobile-sidebar-logo) {
+    display: none;
+  }
+}
+
+article {
+  padding-top: 2rem;
+}
+
+/* Landing page parallax, as .vc-landing-parallax-layer in the VisionCamera docs. */
+.site-landing-parallax-layer {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+/* NITRO and FETCH move apart while the pigeon flies out from between them. */
+.site-landing-wordmark[data-pigeon] [data-word='nitro'] {
+  animation: site-landing-part-nitro 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.site-landing-wordmark[data-pigeon] [data-word='fetch'] {
+  animation: site-landing-part-fetch 1.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* A CSS animation so the browser runs the flight on the GPU, off the main thread. */
+.site-landing-pigeon[data-flying] {
+  animation: site-landing-pigeon-flight 1.8s ease-in;
+}
+
+/* Easing restarts at every keyframe, so the transform has only a start and an end. */
+@keyframes site-landing-pigeon-flight {
+  0% {
+    transform: translate(0, 0) rotate(0) scale(0.1);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(1000px, -800px) rotate(-14deg) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes site-landing-part-nitro {
+  20%,
+  50% {
+    transform: translateX(-24px);
+  }
+}
+
+@keyframes site-landing-part-fetch {
+  20%,
+  50% {
+    transform: translateX(24px);
+  }
+}

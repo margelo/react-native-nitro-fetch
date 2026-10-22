@@ -1,0 +1,14 @@
+{
+  "title": "Nitro Fetch",
+  "description": "The react-native-nitro-fetch documentation",
+  "root": true,
+  "pages": [
+    "index",
+    "(core)",
+    "websockets",
+    "benchmarks",
+    "(advanced)",
+    "skills",
+    "troubleshooting"
+  ]
+}
