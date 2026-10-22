@@ -10,7 +10,7 @@ import {
 } from 'react-native-nitro-fetch';
 import { Platform } from 'react-native';
 import { getRuntimeKind, RuntimeKind } from 'react-native-worklets';
-import { BASE } from '../test-utils/server';
+import { BASE, OTHER_ORIGIN } from '../test-utils/server';
 
 const image = `${BASE}/image/jpeg`;
 
@@ -443,6 +443,45 @@ describe('NitroFetch - Response bodies', () => {
       })
     );
     expect(results.filter((d) => d !== -1)).toEqual([]);
+  });
+});
+
+describe('NitroFetch - Cross-origin redirects', () => {
+  const redirectTo = (url: string, status = 302) =>
+    `${BASE}/redirect-to?status=${status}&url=${encodeURIComponent(url)}`;
+
+  it('drops Authorization when a redirect leaves the origin', async () => {
+    const res = await nitroFetch(redirectTo(`${OTHER_ORIGIN}/headers`), {
+      headers: { Authorization: 'Bearer secret' },
+    });
+    const json = await res.json();
+    expect(res.redirected).toBe(true);
+    expect(json.headers.Authorization).toBe(undefined);
+  });
+
+  it('drops Authorization on a cross-origin 307 that keeps the body', async () => {
+    const res = await nitroFetch(redirectTo(`${OTHER_ORIGIN}/anything`, 307), {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer secret',
+        'Content-Type': 'text/plain',
+      },
+      body: 'payload',
+    });
+    const json = await res.json();
+    expect(json.method).toBe('POST');
+    expect(json.data).toBe('payload');
+    expect(json.headers.Authorization).toBe(undefined);
+  });
+
+  const itAndroid = Platform.OS === 'android' ? it : it.skip;
+
+  itAndroid('keeps Authorization on a same-origin redirect', async () => {
+    const res = await nitroFetch(redirectTo(`${BASE}/headers`), {
+      headers: { Authorization: 'Bearer secret' },
+    });
+    const json = await res.json();
+    expect(json.headers.Authorization).toBe('Bearer secret');
   });
 });
 
