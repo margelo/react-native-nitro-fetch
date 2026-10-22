@@ -34,6 +34,14 @@ const BINARY_BYTES = new Uint8Array([
   0x00, 0x01, 0x7f, 0x80, 0x9f, 0xa0, 0xc0, 0xfe, 0xff, 0xd0, 0xb1,
 ]);
 
+describe('NitroResponse — standard Fetch identity', () => {
+  it('identifies as a standard Response via Symbol.toStringTag', () => {
+    expect(Object.prototype.toString.call(NitroResponse.prototype)).toBe(
+      '[object Response]'
+    );
+  });
+});
+
 describe('NitroResponse — text body', () => {
   it('arrayBuffer() returns UTF-8 encoded bytes for a text body', async () => {
     const res = makeResponse({ bodyString: 'hello' });
