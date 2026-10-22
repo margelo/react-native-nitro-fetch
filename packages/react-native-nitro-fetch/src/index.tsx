@@ -20,6 +20,7 @@ export type {
 export { NitroHeaders as Headers } from './Headers';
 export { NitroResponse as Response } from './Response';
 export { NitroRequest as Request } from './Request';
+export { NitroXMLHttpRequest as XMLHttpRequest } from './XMLHttpRequest';
 export { NitroFetch } from './NitroInstances';
 export {
   registerTokenRefresh,

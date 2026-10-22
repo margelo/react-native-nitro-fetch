@@ -10,6 +10,8 @@ export { NitroResponse as Response } from './Response';
 export { NitroRequest as Request } from './Request';
 export type { RequestRedirect, RequestCache, RequestPriority } from './Request';
 
+export const XMLHttpRequest = globalThis.XMLHttpRequest;
+
 export { NetworkInspector } from './NetworkInspector';
 export type {
   NetworkEntry,

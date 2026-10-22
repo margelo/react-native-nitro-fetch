@@ -24,6 +24,23 @@ globalThis.Response = Response;
 
 That's it — every `fetch()` call in the process now uses the Nitro implementation.
 
+## XMLHttpRequest and SuperAgent
+
+Libraries such as SuperAgent use the global `XMLHttpRequest` constructor instead
+of `fetch`. Install Nitro's bridge before creating any requests:
+
+```ts
+import { XMLHttpRequest as NitroXMLHttpRequest } from 'react-native-nitro-fetch';
+
+globalThis.XMLHttpRequest = NitroXMLHttpRequest;
+```
+
+The bridge supports the asynchronous API used by SuperAgent, including headers,
+credentials, aborts, response types, ready-state changes, and download progress.
+Synchronous XHR is not supported. React Native `FormData` uploads use Nitro's
+buffered native transport so file URIs continue to work; they emit completion
+progress rather than incremental upload progress.
+
 ## WebSocket
 
 `NitroWebSocket` can be installed globally the same way:
