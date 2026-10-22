@@ -3,6 +3,7 @@ import { stringToUTF8, utf8ToString } from './utf8';
 import { bytesToBlob } from './blob';
 import type { NitroHeader } from './NitroFetch.nitro';
 
+/** The kind of response. Responses from `fetch` are `'basic'`. */
 export type ResponseType =
   | 'basic'
   | 'cors'
@@ -11,16 +12,22 @@ export type ResponseType =
   | 'opaque'
   | 'opaqueredirect';
 
+/** Everything a {@link NitroResponse} is built from, such as a mocked response in tests. */
 export interface NitroResponseInit {
   url: string;
   status: number;
   statusText: string;
+  /** Whether the request succeeded. Not worked out from `status`. */
   ok: boolean;
   redirected: boolean;
   headers: NitroHeader[] | NitroHeaders;
+  /** Body as raw bytes. */
   bodyBytes?: ArrayBuffer;
+  /** Body as a string. */
   bodyString?: string;
+  /** Body as a stream. */
   body?: ReadableStream<Uint8Array<ArrayBuffer>>;
+  /** Default `'basic'`. */
   type?: ResponseType;
 }
 
@@ -67,13 +74,18 @@ export function parseFormData(
   return form;
 }
 
+/** The response `fetch` returns. Works like the standard `Response`. */
 export class NitroResponse {
+  /** Final URL after redirects. Empty for `new Response()`. */
   readonly url: string;
+  /** `true` for a status from 200 to 299. */
   readonly ok: boolean;
   readonly status: number;
   readonly statusText: string;
+  /** Whether the request was redirected. Always `false` for streamed responses. */
   readonly redirected: boolean;
   readonly headers: NitroHeaders;
+  /** `'default'` for `new Response()`, `'error'` for `Response.error()`, otherwise `'basic'`. */
   readonly type: ResponseType;
 
   private _bodyBytes: ArrayBuffer | undefined;
@@ -155,10 +167,12 @@ export class NitroResponse {
     }
   }
 
+  /** `true` once the body has been read. A body can only be read once. */
   get bodyUsed(): boolean {
     return this._bodyUsed;
   }
 
+  /** The body as a stream, or `null` if there is none. */
   get body(): ReadableStream<Uint8Array<ArrayBuffer>> | null {
     if (this._bodyStream) return this._bodyStream;
     const bytes = this._getBodyBytes();
@@ -198,6 +212,7 @@ export class NitroResponse {
     return '';
   }
 
+  /** Reads the body as text. */
   async text(): Promise<string> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
@@ -224,6 +239,7 @@ export class NitroResponse {
     return this._getBodyString();
   }
 
+  /** Reads the body as JSON. An empty body gives `{}`. */
   async json(): Promise<any> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
@@ -231,6 +247,7 @@ export class NitroResponse {
     return JSON.parse(t || '{}');
   }
 
+  /** Reads the body as raw bytes. */
   async arrayBuffer(): Promise<ArrayBuffer> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
@@ -282,6 +299,7 @@ export class NitroResponse {
     );
   }
 
+  /** Reads the body as a `Blob`. */
   async blob(): Promise<Blob> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
@@ -296,6 +314,7 @@ export class NitroResponse {
     return new Blob([this._getBodyString()], { type: contentType });
   }
 
+  /** Reads the body as a `Uint8Array`. */
   async bytes(): Promise<Uint8Array<ArrayBuffer>> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
@@ -303,6 +322,7 @@ export class NitroResponse {
     return new Uint8Array(buffer);
   }
 
+  /** Makes a copy. Throws if the body has already been read. */
   clone(): NitroResponse {
     if (this._bodyUsed) {
       throw new TypeError('Cannot clone a Response whose body has been used.');
@@ -320,12 +340,14 @@ export class NitroResponse {
     });
   }
 
+  /** Reads a URL-encoded form body. Other body types throw. */
   async formData(): Promise<FormData> {
     return parseFormData(await this.text(), this.headers.get('content-type'));
   }
 
   // --- Static methods ---
 
+  /** Makes a network error response, with status `0`. */
   static error(): NitroResponse {
     return new NitroResponse({
       url: '',
@@ -338,6 +360,7 @@ export class NitroResponse {
     });
   }
 
+  /** Makes a response with `data` as its JSON body. */
   static json(
     data: unknown,
     init?: {
@@ -362,6 +385,7 @@ export class NitroResponse {
     });
   }
 
+  /** Makes a redirect response to `url`. `status` must be 301, 302, 303, 307 or 308. */
   static redirect(url: string, status: number = 302): NitroResponse {
     const validStatuses = [301, 302, 303, 307, 308];
     if (!validStatuses.includes(status)) {
