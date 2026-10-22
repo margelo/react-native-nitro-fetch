@@ -3,6 +3,7 @@ import {
   fetch as nitroFetch,
   NetworkInspector,
   generateCurl,
+  profileFetch,
 } from 'react-native-nitro-fetch';
 import { BASE } from '../test-utils/server';
 
@@ -294,5 +295,16 @@ describe('NetworkInspector - WebSocket', () => {
     expect(NetworkInspector.getWebSocketEntries().length).toBe(1);
     NetworkInspector.disable();
     NetworkInspector.clear();
+  });
+});
+
+describe('profileFetch', () => {
+  it('returns the result whether or not Hermes has a sampling profiler', async () => {
+    const { result, profilePath } = await profileFetch(async () => {
+      const res = await nitroFetch(`${BASE}/get`);
+      return res.status;
+    });
+    expect(result).toBe(200);
+    expect(['undefined', 'string']).toContain(typeof profilePath);
   });
 });
