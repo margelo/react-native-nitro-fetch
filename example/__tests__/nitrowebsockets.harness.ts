@@ -492,6 +492,53 @@ describe('NitroWebSocket - Closing handshake', () => {
   });
 });
 
+describe('NitroWebSocket - Garbage collection', () => {
+  const noop = () => {};
+
+  function closedByServer(refs: WeakRef<object>[], done: () => void) {
+    const ws = new NitroWebSocket(`${WS_BASE}/ws/close?delay=1`);
+    refs.push(new WeakRef(ws));
+    ws.onclose = done;
+    ws.onerror = noop;
+  }
+
+  function closedByClient(refs: WeakRef<object>[], done: () => void) {
+    const ws = new NitroWebSocket(`${WS_BASE}/ws/echo`);
+    refs.push(new WeakRef(ws));
+    ws.onopen = () => ws.close();
+    ws.onclose = done;
+    ws.onerror = noop;
+  }
+
+  async function collectGarbage() {
+    let sink = 0;
+    for (let i = 0; i < 40; i++) {
+      sink += new Array(1_000_000).fill(i).length;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    return sink;
+  }
+
+  for (const [label, open] of [
+    ['the server', closedByServer],
+    ['the client', closedByClient],
+  ] as const) {
+    it(`frees sockets with handlers after ${label} closes them`, async () => {
+      const refs: WeakRef<object>[] = [];
+      for (let i = 0; i < 20; i++) {
+        await withTimeout(
+          new Promise<void>((resolve) => open(refs, resolve)),
+          5_000,
+          'socket close'
+        );
+      }
+      await collectGarbage();
+      const alive = refs.filter((ref) => ref.deref() !== undefined).length;
+      expect(alive).toBeLessThan(refs.length / 2);
+    });
+  }
+});
+
 describe('NitroWebSocket - Handshake headers', () => {
   function handshake(
     protocols?: string[],
