@@ -39,6 +39,7 @@ class HybridUrlRequestBuilder(
   private var devToolsTextual: Boolean = false
   private var httpMethod: String = "GET"
   private val requestHeaders: LinkedHashMap<String, String> = LinkedHashMap()
+  private var cookiesEnabled: Boolean = true
   private var uploadBodyString: String = ""
   private var uploadBodyLength: Long = 0L
 
@@ -56,6 +57,9 @@ class HybridUrlRequestBuilder(
         info: CronetUrlResponseInfo,
         newLocationUrl: String
       ) {
+       if (cookiesEnabled) {
+         NitroCookieSync.storeSetCookieFromUrlResponseInfo(info.url, info, flush = true)
+       }
         onRedirectReceivedCallback?.let { callback ->
           val nitroInfo = info.toNitro()
           callback(nitroInfo, newLocationUrl)
@@ -66,6 +70,10 @@ class HybridUrlRequestBuilder(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo
       ) {
+        if (cookiesEnabled) {
+          // Streams can remain open indefinitely; persist cookies when headers arrive.
+          NitroCookieSync.storeSetCookieFromUrlResponseInfo(info.url, info, flush = true)
+        }
         if (devToolsEnabled) {
           val headersMap = LinkedHashMap<String, String>()
           info.allHeadersAsList.forEach { headersMap[it.key] = it.value }
@@ -206,8 +214,8 @@ class HybridUrlRequestBuilder(
     builder.disableCache()
   }
 
-  // Cronet has no cookie jar; nothing to skip on Android
   override fun disableCookies() {
+    cookiesEnabled = false
   }
 
   override fun setPriority(priority: NitroRequestPriority) {
@@ -239,6 +247,13 @@ class HybridUrlRequestBuilder(
   }
 
   override fun build(): HybridUrlRequestSpec {
+    if (cookiesEnabled) {
+      // Cronet does not share the WebView session jar without the opt-in bridge.
+      NitroCookieSync.attachCookieFromManagerIfMissing(
+        url,
+        requestHeaders.keys.any { it.equals("Cookie", ignoreCase = true) }
+      ) { name, value -> addHeader(name, value) }
+    }
     val cronetRequest = builder.build()
     if (devToolsEnabled) {
       DevToolsReporter.reportRequestStart(
