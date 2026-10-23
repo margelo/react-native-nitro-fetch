@@ -8,13 +8,12 @@ import org.chromium.net.UrlResponseInfo as CronetUrlResponseInfo
 import org.chromium.net.CronetException as CronetNativeException
 import java.nio.ByteBuffer
 import java.util.UUID
-import java.util.concurrent.Executor as JavaExecutor
 
 @DoNotStrip
 class HybridUrlRequestBuilder(
   private val engine: CronetEngine,
   private val url: String,
-  private val executor: JavaExecutor
+  private val executor: CronetSerialExecutor
 ) : HybridUrlRequestBuilderSpec() {
 
   // Callbacks stored as optionals and set via setter methods
@@ -29,7 +28,11 @@ class HybridUrlRequestBuilder(
   private var onCanceledCallback: ((info: UrlResponseInfo?) -> Unit)? = null
 
   private val builder: CronetUrlRequest.Builder
-  private val byteBuffer: ByteBuffer
+  private val readController = CronetReadController(
+    executor,
+    ::onRequestOperationFailed
+  )
+  private var terminalCallbackDelivered = false
   // BuildConfig.DEBUG short-circuits in release so R8 strips DevTools paths.
   // UUID generation is gated too so SecureRandom isn't touched in release.
   // Opt out via `NitroFetch_disableDevToolsReporting=true` in gradle.properties
@@ -48,10 +51,6 @@ class HybridUrlRequestBuilder(
 
   init {
     if (hostHasWhitespace(url)) throw invalidUrlException(url)
-
-    // Allocate ONE reusable owning buffer for all reads (64KB)
-    val reusableBuffer = ArrayBuffer.allocate(65536)
-    byteBuffer = reusableBuffer.getBuffer(false)
 
     val cronetCallback = object : CronetUrlRequest.Callback() {
 
@@ -115,9 +114,11 @@ class HybridUrlRequestBuilder(
             DevToolsReporter.storeResponseBodyIncremental(devToolsRequestId, String(arr, Charsets.UTF_8))
           }
         }
+        val completedBuffer = readController.completeRead(receivedBuffer)
+        if (completedBuffer == null) return
         onReadCompletedCallback?.let { callback ->
           val nitroInfo = info.toNitro()
-          callback(nitroInfo, reusableBuffer, bytesRead.toDouble())
+          callback(nitroInfo, completedBuffer, bytesRead.toDouble())
         }
       }
 
@@ -125,7 +126,9 @@ class HybridUrlRequestBuilder(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo
       ) {
+        if (!beginTerminalCallback()) return
         emitNativeTimestamp(onNativeCompletedCallback)
+        readController.finish()
         if (devToolsEnabled) {
           DevToolsReporter.reportResponseEnd(devToolsRequestId, devToolsBytes.toLong())
         }
@@ -140,6 +143,8 @@ class HybridUrlRequestBuilder(
         info: CronetUrlResponseInfo?,
         error: CronetNativeException
       ) {
+        if (!beginTerminalCallback()) return
+        readController.finish()
         if (devToolsEnabled) {
           DevToolsReporter.reportRequestFailed(devToolsRequestId, false)
         }
@@ -154,6 +159,8 @@ class HybridUrlRequestBuilder(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo?
       ) {
+        if (!beginTerminalCallback()) return
+        readController.finish()
         if (devToolsEnabled) {
           DevToolsReporter.reportRequestFailed(devToolsRequestId, true)
         }
@@ -167,11 +174,30 @@ class HybridUrlRequestBuilder(
     builder = engine.newUrlRequestBuilder(url, cronetCallback, executor)
   }
 
+  private fun beginTerminalCallback(): Boolean {
+    if (terminalCallbackDelivered) return false
+    terminalCallbackDelivered = true
+    return true
+  }
+
   private fun emitNativeTimestamp(callback: ((timestampMs: Double) -> Unit)?) {
     if (callback == null) return
     val timestampMs = System.currentTimeMillis()
     val timestamp = timestampMs.toDouble()
     callback(timestamp)
+  }
+
+  private fun onRequestOperationFailed(error: Throwable) {
+    if (!beginTerminalCallback()) return
+    if (devToolsEnabled) {
+      DevToolsReporter.reportRequestFailed(devToolsRequestId, false)
+    }
+    val callback = onFailedCallback
+    if (callback != null) {
+      val message = error.toString()
+      val nitroError = RequestException(message = message)
+      callback(null, nitroError)
+    }
   }
 
   override fun setHttpMethod(httpMethod: String) {
@@ -290,6 +316,6 @@ class HybridUrlRequestBuilder(
         uploadBodyLength
       )
     }
-    return HybridUrlRequest(cronetRequest, byteBuffer)
+    return HybridUrlRequest(cronetRequest, readController)
   }
 }

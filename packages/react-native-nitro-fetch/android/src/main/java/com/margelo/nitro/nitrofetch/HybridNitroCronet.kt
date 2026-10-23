@@ -16,10 +16,11 @@ import java.util.concurrent.Executors
 class HybridNitroCronet : HybridNitroCronetSpec() {
 
   override fun newUrlRequestBuilder(url: String): HybridUrlRequestBuilderSpec {
+    val requestExecutor = CronetSerialExecutor(ioExecutor)
     return HybridUrlRequestBuilder(
       engine = getOrCreateCronetEngine(),
       url = url,
-      executor = ioExecutor
+      executor = requestExecutor
     )
   }
 
