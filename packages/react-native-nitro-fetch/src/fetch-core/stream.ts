@@ -7,6 +7,7 @@ import {
   applyDefaultContentType,
   applyCacheHeaders,
   headersToPairs,
+  normalizeAndValidateHeaders,
 } from './headers';
 import { normalizeBody } from './body';
 import { getUrlString } from './url';
@@ -28,6 +29,7 @@ export async function nitroStreamFetch(
   const normalized = normalizeBody(init?.body);
   applyDefaultContentType(headers, normalized?.contentType);
   applyCacheHeaders(headers, init?.cache as RequestCache | undefined);
+  normalizeAndValidateHeaders(headers);
 
   // Inspector: record start
   let inspectorId: string | undefined;

@@ -34,6 +34,59 @@ export function applyCacheHeaders(
   }
 }
 
+function isTokenChar(c: number): boolean {
+  'worklet';
+  return (
+    (c >= 0x61 && c <= 0x7a) ||
+    (c >= 0x41 && c <= 0x5a) ||
+    (c >= 0x30 && c <= 0x39) ||
+    c === 0x2d ||
+    c === 0x5f ||
+    c === 0x2e ||
+    c === 0x21 ||
+    (c >= 0x23 && c <= 0x27) ||
+    c === 0x2a ||
+    c === 0x2b ||
+    c === 0x5e ||
+    c === 0x60 ||
+    c === 0x7c ||
+    c === 0x7e
+  );
+}
+
+function isHttpWhitespace(c: number): boolean {
+  'worklet';
+  return c === 0x09 || c === 0x0a || c === 0x0d || c === 0x20;
+}
+
+export function normalizeAndValidateHeaders(headers: NitroHeader[]): void {
+  'worklet';
+  for (let i = 0; i < headers.length; i++) {
+    const header = headers[i]!;
+    const name = String(header.key);
+    if (name.length === 0) throw new TypeError('Invalid header name: ""');
+    for (let j = 0; j < name.length; j++) {
+      if (!isTokenChar(name.charCodeAt(j))) {
+        throw new TypeError(`Invalid header name: ${JSON.stringify(name)}`);
+      }
+    }
+    const raw = String(header.value);
+    let start = 0;
+    let end = raw.length;
+    while (start < end && isHttpWhitespace(raw.charCodeAt(start))) start++;
+    while (end > start && isHttpWhitespace(raw.charCodeAt(end - 1))) end--;
+    for (let j = start; j < end; j++) {
+      const c = raw.charCodeAt(j);
+      if (c === 0x00 || c === 0x0a || c === 0x0d) {
+        throw new TypeError(`Invalid header value for ${JSON.stringify(name)}`);
+      }
+    }
+    if (start !== 0 || end !== raw.length) {
+      headers[i] = { key: name, value: raw.slice(start, end) };
+    }
+  }
+}
+
 export function headersToPairs(
   headers?: HeadersInit
 ): NitroHeader[] | undefined {

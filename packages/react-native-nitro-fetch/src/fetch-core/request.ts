@@ -6,6 +6,7 @@ import {
   applyCacheHeaders,
   headersToPairs,
   headersToPairsPure,
+  normalizeAndValidateHeaders,
 } from './headers';
 import { normalizeBody, normalizeBodyPure } from './body';
 
@@ -57,6 +58,7 @@ export function buildNitroRequest(
   applyDefaultContentType(headers, normalized?.contentType);
 
   applyCacheHeaders(headers, cacheOption);
+  normalizeAndValidateHeaders(headers);
 
   // Determine followRedirects based on redirect option
   const followRedirects = redirectOption === 'follow';
@@ -123,6 +125,7 @@ export function buildNitroRequestPure(
   const normalized = normalizeBodyPure(body);
   applyDefaultContentType(headers, normalized?.contentType);
   applyCacheHeaders(headers, init?.cache as RequestCache | undefined);
+  normalizeAndValidateHeaders(headers);
 
   const prefetchCacheTtlMs =
     typeof init?.prefetchCacheTtlMs === 'number'
