@@ -610,7 +610,9 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
       {
         body: data,
         headers: this._headers,
+        incremental: incrementalEvents,
         method,
+        responseType: this._responseType,
         timeout: this.timeout,
         url,
         withCredentials: this.withCredentials,

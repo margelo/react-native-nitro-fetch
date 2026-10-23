@@ -1,10 +1,15 @@
 import { isFormData } from './fetch-core/body';
 import { nitroFetch } from './fetch-core/fetch';
+import type { NitroRequestMethod } from './NitroFetch.nitro';
 
 export type XMLHttpRequestTransportRequest = {
   body: Document | XMLHttpRequestBodyInit | null;
   headers: Record<string, string>;
+  // The caller observes the response before it completes, like React Native's
+  // incrementalUpdates.
+  incremental: boolean;
   method: string;
+  responseType: XMLHttpRequestResponseType;
   timeout: number;
   url: string;
   withCredentials: boolean;
@@ -62,6 +67,30 @@ function bodySize(
   return undefined;
 }
 
+const BUFFERED_METHODS = new Set<string>([
+  'GET',
+  'HEAD',
+  'POST',
+  'PUT',
+  'PATCH',
+  'DELETE',
+  'OPTIONS',
+] satisfies NitroRequestMethod[]);
+
+// A text response nobody watches arrives in one native-to-JS hop on the
+// buffered client. Everything else streams: the caller watches the body
+// arrive, the buffered client would hand binary bodies back decoded as text
+// and hold them whole on the Java heap, or it cannot send the method.
+function shouldStream(request: XMLHttpRequestTransportRequest): boolean {
+  if (isFormData(request.body)) return false;
+  return (
+    request.incremental ||
+    request.responseType === 'arraybuffer' ||
+    request.responseType === 'blob' ||
+    !BUFFERED_METHODS.has(request.method)
+  );
+}
+
 /**
  * Adapts Nitro Fetch to the callback boundary used by React Native's
  * XMLHttpRequest implementation. XHR behavior stays in the copied state
@@ -90,7 +119,7 @@ export function sendXMLHttpRequest(
 
   const performRequest = async () => {
     try {
-      const stream = !isFormData(request.body);
+      const stream = shouldStream(request);
       const credentials: RequestCredentials = request.withCredentials
         ? 'include'
         : 'same-origin';
