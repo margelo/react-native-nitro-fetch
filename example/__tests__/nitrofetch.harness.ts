@@ -514,6 +514,66 @@ describe('NitroFetch - Redirects', () => {
   });
 });
 
+describe('NitroFetch - Streaming redirects', () => {
+  function withTimeout<T>(promise: Promise<T>, ms = 5_000): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`timed out after ${ms} ms`)),
+        ms
+      );
+      promise.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error);
+        }
+      );
+    });
+  }
+
+  it('stream: true follows redirects and reports redirected', async () => {
+    const res = await withTimeout<any>(
+      (nitroFetch as any)(`${BASE}/redirect/2`, { stream: true })
+    );
+    expect(res.status).toBe(200);
+    expect(res.redirected).toBe(true);
+    const json = JSON.parse(await withTimeout<string>(res.text()));
+    expect(json.url).toContain('/get');
+  });
+
+  it("stream: true rejects a redirect with a TypeError when redirect is 'error'", async () => {
+    let error: any;
+    try {
+      await withTimeout(
+        (nitroFetch as any)(`${BASE}/redirect/1`, {
+          stream: true,
+          redirect: 'error',
+        })
+      );
+    } catch (e) {
+      error = e;
+    }
+    expect(error?.name).toBe('TypeError');
+  });
+
+  it("stream: true returns the 3xx response when redirect is 'manual'", async () => {
+    const res = await withTimeout<any>(
+      (nitroFetch as any)(`${BASE}/redirect/1`, {
+        stream: true,
+        redirect: 'manual',
+      })
+    );
+    expect(res.status).toBeGreaterThanOrEqual(300);
+    expect(res.status).toBeLessThan(400);
+    expect(res.redirected).toBe(false);
+    expect(res.headers.get('location')).not.toBeNull();
+    expect(await withTimeout<string>(res.text())).toBe('');
+  });
+});
+
 describe('NitroFetch - HTTP cache', () => {
   const cacheId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const cacheReport = async (id: string) =>
