@@ -117,6 +117,37 @@ describe('Headers - Case Insensitivity', () => {
   });
 });
 
+describe('Fetch - invalid request headers', () => {
+  const invalid: Record<string, string>[] = [
+    { 'X-A\r\nX-Injected': '1' },
+    { 'bad name': '1' },
+    { 'bad:name': '1' },
+    { 'X-Bad': 'a\r\nX-Injected: 1' },
+    { 'X-Bad': 'a\nb' },
+    { 'X-Nul': 'a\u0000b' },
+  ];
+
+  async function errorName(headers: Record<string, string>, stream: boolean) {
+    try {
+      await (nitroFetch as any)(`${BASE}/headers`, { headers, stream });
+      return 'resolved';
+    } catch (e: any) {
+      return e?.name;
+    }
+  }
+
+  for (const stream of [false, true]) {
+    it(`rejects invalid header names and values with a TypeError${stream ? ' (stream: true)' : ''}`, async () => {
+      for (const headers of invalid) {
+        const name = await errorName(headers, stream);
+        expect(`${JSON.stringify(headers)} ${name}`).toBe(
+          `${JSON.stringify(headers)} TypeError`
+        );
+      }
+    });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Response
 // ---------------------------------------------------------------------------
