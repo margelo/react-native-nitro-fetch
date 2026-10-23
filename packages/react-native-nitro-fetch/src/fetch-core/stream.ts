@@ -14,6 +14,8 @@ import { assertBodyAllowed, normalizeBody } from './body';
 import { getUrlString } from './url';
 import { createAbortError } from './errors';
 
+const noop = () => {};
+
 export async function nitroStreamFetch(
   input: RequestInfo | URL,
   init?: RequestInit
@@ -92,10 +94,20 @@ export async function nitroStreamFetch(
     let responseResolved = false;
     let streamBytesReceived = 0;
 
+    const release = () => {
+      builder.onRedirectReceived(noop);
+      builder.onResponseStarted(noop);
+      builder.onReadCompleted(noop);
+      builder.onSucceeded(noop);
+      builder.onFailed(noop);
+      builder.onCanceled(noop);
+    };
+
     let abortSettled = false;
     const settleAborted = () => {
       if (abortSettled) return;
       abortSettled = true;
+      release();
       cleanupAbortListener();
       if (inspectorId) {
         NetworkInspector._recordEnd(
@@ -144,6 +156,7 @@ export async function nitroStreamFetch(
         return;
       }
       stoppedAtRedirect = true;
+      release();
       cleanupAbortListener();
       if (init.redirect === 'manual') {
         resolveWith(info);
@@ -192,6 +205,7 @@ export async function nitroStreamFetch(
     });
 
     builder.onSucceeded((_info) => {
+      release();
       cleanupAbortListener();
       if (streamCancelled || stoppedAtRedirect || signal?.aborted) return;
       streamController.close();
@@ -211,6 +225,7 @@ export async function nitroStreamFetch(
 
     builder.onFailed((_info, error) => {
       if (signal?.aborted) return settleAborted();
+      release();
       cleanupAbortListener();
       const err = new Error(error.message);
       if (inspectorId) {
