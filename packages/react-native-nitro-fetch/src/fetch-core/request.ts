@@ -8,7 +8,7 @@ import {
   headersToPairsPure,
   normalizeAndValidateHeaders,
 } from './headers';
-import { normalizeBody, normalizeBodyPure } from './body';
+import { assertBodyAllowed, normalizeBody, normalizeBodyPure } from './body';
 
 export function buildNitroRequest(
   input: RequestInfo | URL,
@@ -47,12 +47,13 @@ export function buildNitroRequest(
   } else {
     // Standard Request object
     url = input.url;
-    method = input.method;
+    method = init?.method ?? input.method;
     headersInit = input.headers as any;
     body = init?.body ?? null;
     if (!init?.credentials) credentialsOption = (input as Request).credentials;
   }
 
+  assertBodyAllowed(method, body);
   const headers = headersToPairs(headersInit) ?? [];
   const normalized = normalizeBody(body);
   applyDefaultContentType(headers, normalized?.contentType);
@@ -115,12 +116,13 @@ export function buildNitroRequestPure(
     // Request object
     const req = input as Request;
     url = req.url;
-    method = req.method;
+    method = init?.method ?? req.method;
     headersInit = req.headers;
     // Clone body if needed – Request objects in RN typically allow direct access
     body = init?.body ?? null;
   }
 
+  assertBodyAllowed(method, body);
   const headers = headersToPairsPure(headersInit) ?? [];
   const normalized = normalizeBodyPure(body);
   applyDefaultContentType(headers, normalized?.contentType);
