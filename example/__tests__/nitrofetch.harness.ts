@@ -33,6 +33,31 @@ const timeoutReason = () => {
   return reason;
 };
 
+type NitroXMLHttpRequestInstance = InstanceType<typeof NitroXMLHttpRequest>;
+
+// Sends a GET; `done` resolves on load. `setUp` runs between open() and
+// send(), where headers and listeners can be set.
+const sendXMLHttpRequest = (
+  url: string,
+  setUp?: (xhr: NitroXMLHttpRequestInstance) => void
+) => {
+  const xhr = new NitroXMLHttpRequest();
+  const done = new Promise<void>((resolve, reject) => {
+    xhr.onload = () => resolve();
+    xhr.onerror = () => reject(new Error('XMLHttpRequest failed'));
+  });
+  xhr.open('GET', url);
+  setUp?.(xhr);
+  xhr.send();
+  return { xhr, done };
+};
+
+// SuperAgent adds this listener to every request, so its XMLHttpRequests
+// stream.
+const watchLikeSuperAgent = (xhr: NitroXMLHttpRequestInstance) => {
+  xhr.addEventListener('readystatechange', () => {});
+};
+
 const abortAfterNativeDone = async (
   init?: Record<string, unknown>,
   reason?: unknown
@@ -597,6 +622,27 @@ describe('NitroFetch - HTTP cache', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(first);
     expect(await cacheReport(id)).toEqual({ requests: 2, conditional: 1 });
+  });
+
+  // A watched XMLHttpRequest streams, but on the default client, so the two
+  // share one cache.
+  it('a watched XMLHttpRequest is served from what the default transport cached', async () => {
+    const id = cacheId();
+    const url = `${BASE}/cache/${id}?maxAge=60`;
+    const first = await (await nitroFetch(url)).text();
+    const { xhr, done } = sendXMLHttpRequest(url, watchLikeSuperAgent);
+    await done;
+    expect(xhr.responseText).toBe(first);
+    expect(await cacheReport(id)).toEqual({ requests: 1, conditional: 0 });
+  });
+
+  it('the default transport is served from what a watched XMLHttpRequest cached', async () => {
+    const id = cacheId();
+    const url = `${BASE}/cache/${id}?maxAge=60`;
+    const { xhr, done } = sendXMLHttpRequest(url, watchLikeSuperAgent);
+    await done;
+    expect(await (await nitroFetch(url)).text()).toBe(xhr.responseText);
+    expect(await cacheReport(id)).toEqual({ requests: 1, conditional: 0 });
   });
 });
 
@@ -1188,25 +1234,85 @@ describe('NitroFetch - Reading while JavaScript is busy', () => {
     });
   });
 
-  const sendXMLHttpRequest = () => {
-    const xhr = new NitroXMLHttpRequest();
-    const done = new Promise<void>((resolve, reject) => {
-      xhr.onload = () => resolve();
-      xhr.onerror = () => reject(new Error('XMLHttpRequest failed'));
-    });
-    xhr.open('GET', url);
-    xhr.send();
-    return { xhr, done };
-  };
-
-  it('XMLHttpRequest reads the body while JavaScript is blocked', async () => {
-    await sendXMLHttpRequest().done;
-    const { xhr, done } = sendXMLHttpRequest();
+  const readXMLHttpRequestWhileBlocked = async (
+    setUp?: (xhr: NitroXMLHttpRequestInstance) => void
+  ) => {
+    await sendXMLHttpRequest(url, setUp).done;
+    const { xhr, done } = sendXMLHttpRequest(url, setUp);
     await blockJsWhileResponding();
     const readyStateWhenUnblocked = xhr.readyState;
     await done;
     expect(xhr.responseText.length).toBe(SIZE);
-    expect(readyStateWhenUnblocked).toBe(NitroXMLHttpRequest.DONE);
+    return readyStateWhenUnblocked;
+  };
+
+  it('XMLHttpRequest reads the body while JavaScript is blocked', async () => {
+    expect(await readXMLHttpRequestWhileBlocked()).toBe(
+      NitroXMLHttpRequest.DONE
+    );
+  });
+
+  it('XMLHttpRequest with a readystatechange listener reads the body while JavaScript is blocked', async () => {
+    expect(await readXMLHttpRequestWhileBlocked(watchLikeSuperAgent)).toBe(
+      NitroXMLHttpRequest.DONE
+    );
+  });
+});
+
+describe('NitroFetch - XMLHttpRequest event streams', () => {
+  // EventSource clients send this Accept header by spec.
+  const acceptEventStream = (xhr: NitroXMLHttpRequestInstance) => {
+    xhr.setRequestHeader('Accept', 'text/event-stream');
+    watchLikeSuperAgent(xhr);
+  };
+
+  it('streams the body as it arrives', async () => {
+    const lengths: number[] = [];
+    const { xhr, done } = sendXMLHttpRequest(
+      `${BASE}/drip?duration=1&numbytes=4`,
+      (request) => {
+        acceptEventStream(request);
+        request.addEventListener('progress', () => {
+          lengths.push(request.responseText.length);
+        });
+      }
+    );
+    await done;
+    expect(xhr.responseText).toBe('****');
+    expect(lengths.some((length) => length > 0 && length < 4)).toBe(true);
+  });
+
+  // Over HTTP/1.1, Cronet and URLSession open at most 6 connections per host.
+  // Event streams on the default client would take all of them, and every
+  // other request to the host would wait for a stream to end.
+  it("doesn't hold the default client's connections", async () => {
+    const streams = Array.from({ length: 6 }, () =>
+      sendXMLHttpRequest(
+        `${BASE}/drip?duration=10&numbytes=10`,
+        acceptEventStream
+      )
+    );
+    try {
+      await Promise.all(
+        streams.map(
+          ({ xhr }) =>
+            new Promise<void>((resolve) => {
+              xhr.addEventListener('readystatechange', () => {
+                if (xhr.readyState >= NitroXMLHttpRequest.HEADERS_RECEIVED) {
+                  resolve();
+                }
+              });
+            })
+        )
+      );
+      const res = await nitroFetch(`${BASE}/get`);
+      expect(res.status).toBe(200);
+      expect(streams.map(({ xhr }) => xhr.readyState)).not.toContain(
+        NitroXMLHttpRequest.DONE
+      );
+    } finally {
+      streams.forEach(({ xhr }) => xhr.abort());
+    }
   });
 });
 

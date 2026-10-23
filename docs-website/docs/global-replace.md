@@ -41,6 +41,15 @@ Synchronous XHR is not supported. React Native `FormData` uploads use Nitro's
 buffered native transport so file URIs continue to work; they emit completion
 progress rather than incremental upload progress.
 
+A request nothing watches while it loads (no `readystatechange` or `progress`
+listener) with a text response is buffered like a plain `fetch`. Other requests
+stream on the same native client, so they share its connections and HTTP cache.
+A request that sends `Accept: text/event-stream`, as EventSource clients do,
+uses the separate streaming client instead, so long-lived event streams can't
+take the default client's connections. Other long-lived responses, such as long
+polling, count toward the default client's HTTP/1.1 limit of connections per
+host, as they do with React Native's `XMLHttpRequest`.
+
 ## WebSocket
 
 `NitroWebSocket` can be installed globally the same way:

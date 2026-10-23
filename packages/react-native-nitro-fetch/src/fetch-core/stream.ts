@@ -16,9 +16,16 @@ import { createAbortError } from './errors';
 
 const noop = () => {};
 
+export type NitroStreamInit = RequestInit & {
+  // Set by the XMLHttpRequest polyfill. Runs the request on the default
+  // client's native engine, sharing its connections and HTTP cache, instead of
+  // the stream client's own.
+  _useDefaultClient?: boolean;
+};
+
 export async function nitroStreamFetch(
   input: RequestInfo | URL,
-  init?: RequestInit
+  init?: NitroStreamInit
 ): Promise<Response> {
   const signal = init?.signal as AbortSignal | undefined | null;
   if (signal?.aborted) {
@@ -49,6 +56,7 @@ export async function nitroStreamFetch(
   }
 
   const builder = NitroCronetSingleton.newUrlRequestBuilder(url);
+  if (init?._useDefaultClient) builder.useDefaultClient();
   builder.setHttpMethod(method);
   if (init?.credentials === 'omit') builder.disableCookies();
   if (init?.priority === 'high' || init?.priority === 'low')

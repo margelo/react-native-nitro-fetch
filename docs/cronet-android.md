@@ -29,5 +29,5 @@ A single `CronetEngine` is created lazily and shared for the process lifetime (`
 ## Request paths
 
 - **Buffered** (`HybridNitroFetchClient.kt`): `request()` (async `Promise`) and `requestSync()` (used by worklets) build a `UrlRequest`, accumulate the body, and resolve a `NitroResponse`. Cancellation is wired through `cancelRequest(requestId)`.
-- **Streaming** (`HybridNitroCronet.kt`): `newUrlRequestBuilder(url)` exposes a `HybridUrlRequestBuilder` whose `onResponseStarted` / `onReadCompleted` callbacks drive a `ReadableStream` (used by `fetch(url, { stream: true })`).
+- **Streaming** (`HybridNitroCronet.kt`): `newUrlRequestBuilder(url)` exposes a `HybridUrlRequestBuilder` whose `onResponseStarted` / `onReadCompleted` callbacks drive a `ReadableStream` (used by `fetch(url, { stream: true })`). These requests run on a second Cronet engine (`<cacheDir>/nitro_cronet_cache`) with its own connections and HTTP cache, unless the builder's `useDefaultClient()` moves them to the engine above. The `XMLHttpRequest` polyfill does that for every request except those that send `Accept: text/event-stream`.
 - **Prefetch / auto-prefetch** (`AutoPrefetcher.kt`, `HybridNitroFetchClient.kt`): results are kept in `FetchCache` and served with a `nitroPrefetched: true` header.

@@ -92,8 +92,9 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     return promise
   }
   
-  // Shared URLSession for static operations
-  private static let session: URLSession = {
+  // Shared URLSession for static operations, and for stream requests built
+  // with useDefaultClient()
+  static let session: URLSession = {
     let config = URLSessionConfiguration.default
     config.requestCachePolicy = .useProtocolCachePolicy
     config.urlCache = NitroURLCache.shared

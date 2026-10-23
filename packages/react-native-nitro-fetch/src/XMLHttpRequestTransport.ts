@@ -1,5 +1,6 @@
 import { isFormData } from './fetch-core/body';
 import { nitroFetch } from './fetch-core/fetch';
+import type { NitroStreamInit } from './fetch-core/stream';
 import type { NitroRequestMethod } from './NitroFetch.nitro';
 
 export type XMLHttpRequestTransportRequest = {
@@ -30,7 +31,7 @@ export type XMLHttpRequestTransportHandle = {
   abort(): void;
 };
 
-type NitroRequestInit = RequestInit & { stream?: boolean };
+type NitroRequestInit = NitroStreamInit & { stream?: boolean };
 
 function responseHeaders(response: Response): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -91,6 +92,21 @@ function shouldStream(request: XMLHttpRequestTransportRequest): boolean {
   );
 }
 
+const EVENT_STREAM = /(?:^|,)\s*text\/event-stream\s*(?:[;,]|$)/i;
+
+// Streamed XHRs run on the default client's engine, sharing its connections
+// and HTTP cache: whether the server streams is only known from the response
+// headers, after the engine is picked. A request for an event stream
+// (EventSource clients send this Accept header by spec) keeps the stream
+// client's own engine, so long-lived streams can't hold the default client's
+// connections.
+function acceptsEventStream(headers: Record<string, string>): boolean {
+  return Object.entries(headers).some(
+    ([name, value]) =>
+      name.toLowerCase() === 'accept' && EVENT_STREAM.test(value)
+  );
+}
+
 /**
  * Adapts Nitro Fetch to the callback boundary used by React Native's
  * XMLHttpRequest implementation. XHR behavior stays in the copied state
@@ -130,6 +146,7 @@ export function sendXMLHttpRequest(
         method: request.method,
         signal: abortController.signal,
         stream,
+        _useDefaultClient: stream && !acceptsEventStream(request.headers),
       };
       const response = await nitroFetch(request.url, init);
       if (completed) return;

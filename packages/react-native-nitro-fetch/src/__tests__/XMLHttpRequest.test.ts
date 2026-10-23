@@ -212,9 +212,41 @@ describe('NitroXMLHttpRequest', () => {
 
     expect(mockNitroFetch).toHaveBeenCalledWith(
       'https://example.com/streamed',
-      expect.objectContaining({ method, stream: true })
+      expect.objectContaining({ method, stream: true, _useDefaultClient: true })
     );
   });
+
+  it.each<[string, boolean]>([
+    ['text/event-stream', true],
+    ['Text/Event-Stream', true],
+    ['text/event-stream; charset=utf-8', true],
+    ['application/json, text/event-stream;q=0.9', true],
+    ['application/json, text/plain, */*', false],
+    ['text/event-streams', false],
+  ])(
+    'with Accept %p, streams on the stream client: %p',
+    async (accept, streamClient) => {
+      const encoder = new TextEncoder();
+      const response = makeResponse([encoder.encode('data: ok\n\n')]);
+      mockNitroFetch.mockResolvedValue(response);
+
+      const xhr = new NitroXMLHttpRequest();
+      xhr.onreadystatechange = () => {};
+      xhr.open('GET', 'https://example.com/events');
+      xhr.setRequestHeader('Accept', accept);
+      const completed = waitForEvent(xhr, 'loadend');
+      xhr.send();
+      await completed;
+
+      expect(mockNitroFetch).toHaveBeenCalledWith(
+        'https://example.com/events',
+        expect.objectContaining({
+          stream: true,
+          _useDefaultClient: !streamClient,
+        })
+      );
+    }
+  );
 
   it('returns parsed JSON for responseType json', async () => {
     const encoder = new TextEncoder();
