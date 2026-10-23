@@ -6,6 +6,10 @@ protocol CancelRequestTracking: AnyObject {
   func markCancelRequested()
 }
 
+protocol RedirectFollowing: AnyObject {
+  func followRedirect()
+}
+
 class HybridUrlRequest: HybridUrlRequestSpec {
   private weak var task: URLSessionDataTask?
   private weak var delegate: URLSessionDelegate?
@@ -22,8 +26,7 @@ class HybridUrlRequest: HybridUrlRequestSpec {
   }
 
   func followRedirect() throws {
-    // Redirects are handled automatically by URLSession
-    // This is a no-op on iOS but required for API compatibility
+    (delegate as? RedirectFollowing)?.followRedirect()
   }
 
   func read() throws {
