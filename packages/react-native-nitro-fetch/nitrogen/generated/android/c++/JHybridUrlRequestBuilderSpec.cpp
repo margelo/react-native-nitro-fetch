@@ -43,6 +43,7 @@ namespace margelo::nitro::nitrofetch { struct RequestException; }
 #include "JRequestException.hpp"
 #include "JFunc_void_std__optional_UrlResponseInfo_.hpp"
 #include "JFunc_void_UrlResponseInfo_std__string.hpp"
+#include "JFunc_void_double.hpp"
 #include "JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double.hpp"
 
 namespace margelo::nitro::nitrofetch {
@@ -117,6 +118,18 @@ namespace margelo::nitro::nitrofetch {
   void JHybridUrlRequestBuilderSpec::onRedirectReceived(const std::function<void(const UrlResponseInfo& /* info */, const std::string& /* newLocationUrl */)>& callback) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo_std__string::javaobject> /* callback */)>("onRedirectReceived_cxx");
     method(_javaPart, JFunc_void_UrlResponseInfo_std__string_cxx::fromCpp(callback));
+  }
+  void JHybridUrlRequestBuilderSpec::onNativeResponseStarted(const std::function<void(double /* timestampMs */)>& callback) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_double::javaobject> /* callback */)>("onNativeResponseStarted_cxx");
+    method(_javaPart, JFunc_void_double_cxx::fromCpp(callback));
+  }
+  void JHybridUrlRequestBuilderSpec::onNativeRead(const std::function<void(double /* timestampMs */)>& callback) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_double::javaobject> /* callback */)>("onNativeRead_cxx");
+    method(_javaPart, JFunc_void_double_cxx::fromCpp(callback));
+  }
+  void JHybridUrlRequestBuilderSpec::onNativeCompleted(const std::function<void(double /* timestampMs */)>& callback) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_double::javaobject> /* callback */)>("onNativeCompleted_cxx");
+    method(_javaPart, JFunc_void_double_cxx::fromCpp(callback));
   }
   void JHybridUrlRequestBuilderSpec::onResponseStarted(const std::function<void(const UrlResponseInfo& /* info */)>& callback) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo::javaobject> /* callback */)>("onResponseStarted_cxx");

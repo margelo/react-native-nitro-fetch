@@ -18,6 +18,9 @@ export interface NetworkEntry {
   duration: number;
   curl: string;
   error?: string;
+  nativeResponseStartedAtMs?: number;
+  nativeFirstReadAtMs?: number;
+  nativeCompletedAtMs?: number;
 }
 
 export interface WebSocketMessage {
@@ -179,6 +182,25 @@ class NetworkInspectorImpl {
       entry.responseBody = responseBody.slice(0, this._maxBodyCapture);
     }
     this._notify(entry);
+  }
+
+  _recordNativeEvent(
+    id: string,
+    event: 'response-started' | 'read' | 'completed',
+    timestampMs: number
+  ): void {
+    if (!this._enabled) return;
+    const entry = this._entries.find(
+      (candidate) => candidate.id === id && candidate.type === 'http'
+    ) as NetworkEntry | undefined;
+    if (!entry) return;
+    if (event === 'response-started') {
+      entry.nativeResponseStartedAtMs = timestampMs;
+    } else if (event === 'read') {
+      entry.nativeFirstReadAtMs ??= timestampMs;
+    } else {
+      entry.nativeCompletedAtMs = timestampMs;
+    }
   }
 
   // --- WebSocket recording ---

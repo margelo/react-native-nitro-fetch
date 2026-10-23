@@ -306,6 +306,28 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return Func_void_UrlResponseInfo_std__string_Wrapper(std::move(value));
   }
   
+  // pragma MARK: std::function<void(double /* timestampMs */)>
+  /**
+   * Specialized version of `std::function<void(double)>`.
+   */
+  using Func_void_double = std::function<void(double /* timestampMs */)>;
+  /**
+   * Wrapper class for a `std::function<void(double / * timestampMs * /)>`, this can be used from Swift.
+   */
+  class Func_void_double_Wrapper final {
+  public:
+    explicit Func_void_double_Wrapper(std::function<void(double /* timestampMs */)>&& func): _function(std::make_unique<std::function<void(double /* timestampMs */)>>(std::move(func))) {}
+    inline void call(double timestampMs) const noexcept {
+      _function->operator()(timestampMs);
+    }
+  private:
+    std::unique_ptr<std::function<void(double /* timestampMs */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_double create_Func_void_double(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_double_Wrapper wrap_Func_void_double(Func_void_double value) noexcept {
+    return Func_void_double_Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */, double /* bytesRead */)>
   /**
    * Specialized version of `std::function<void(const UrlResponseInfo&, const std::shared_ptr<ArrayBuffer>&, double)>`.

@@ -7,6 +7,9 @@ import {
   appleSimulator,
 } from '@react-native-harness/platform-apple';
 
+const androidAvd = process.env.HARNESS_ANDROID_AVD ?? 'Pixel_8_API_35';
+const androidDevice = androidEmulator(androidAvd);
+
 const config = {
   entryPoint: './index.js',
   appRegistryComponentName: 'NitroFetchExample',
@@ -14,7 +17,7 @@ const config = {
   runners: [
     androidPlatform({
       name: 'android',
-      device: androidEmulator('Pixel_8_API_35'), // Your Android emulator name
+      device: androidDevice,
       bundleId: 'nitrofetch.example', // Your Android bundle ID
     }),
     applePlatform({
@@ -25,6 +28,8 @@ const config = {
   ],
   defaultRunner: 'android',
   bridgeTimeout: 180000,
+  bundleStartTimeout: 30000,
+  forwardClientLogs: true,
 };
 
 export default config;

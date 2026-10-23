@@ -8,6 +8,9 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
 
   // Callbacks stored as optionals and set via setter methods
   private var onRedirectReceivedCallback: ((_ info: UrlResponseInfo, _ newLocationUrl: String) -> Void)?
+  private var onNativeResponseStartedCallback: ((_ timestampMs: Double) -> Void)?
+  private var onNativeReadCallback: ((_ timestampMs: Double) -> Void)?
+  private var onNativeCompletedCallback: ((_ timestampMs: Double) -> Void)?
   private var onResponseStartedCallback: ((_ info: UrlResponseInfo) -> Void)?
   private var onReadCompletedCallback: ((_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer, _ bytesRead: Double) -> Void)?
   private var onSucceededCallback: ((_ info: UrlResponseInfo) -> Void)?
@@ -58,6 +61,18 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
     self.onRedirectReceivedCallback = callback
   }
 
+  func onNativeResponseStarted(callback: @escaping (_ timestampMs: Double) -> Void) {
+    self.onNativeResponseStartedCallback = callback
+  }
+
+  func onNativeRead(callback: @escaping (_ timestampMs: Double) -> Void) {
+    self.onNativeReadCallback = callback
+  }
+
+  func onNativeCompleted(callback: @escaping (_ timestampMs: Double) -> Void) {
+    self.onNativeCompletedCallback = callback
+  }
+
   func onResponseStarted(callback: @escaping (_ info: UrlResponseInfo) -> Void) {
     self.onResponseStartedCallback = callback
   }
@@ -98,6 +113,9 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
   func build() throws -> any HybridUrlRequestSpec {
     let delegate = URLSessionDelegateAdapter(
       onRedirectReceived: onRedirectReceivedCallback,
+      onNativeResponseStarted: onNativeResponseStartedCallback,
+      onNativeRead: onNativeReadCallback,
+      onNativeCompleted: onNativeCompletedCallback,
       onResponseStarted: onResponseStartedCallback,
       onReadCompleted: onReadCompletedCallback,
       onSucceeded: onSucceededCallback,
@@ -131,6 +149,9 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
 
 private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSessionTaskDelegate, CancelRequestTracking, RedirectFollowing {
   let onRedirectReceived: ((_ info: UrlResponseInfo, _ newLocationUrl: String) -> Void)?
+  let onNativeResponseStarted: ((_ timestampMs: Double) -> Void)?
+  let onNativeRead: ((_ timestampMs: Double) -> Void)?
+  let onNativeCompleted: ((_ timestampMs: Double) -> Void)?
   let onResponseStarted: ((_ info: UrlResponseInfo) -> Void)?
   let onReadCompleted: ((_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer, _ bytesRead: Double) -> Void)?
   let onSucceeded: ((_ info: UrlResponseInfo) -> Void)?
@@ -177,6 +198,9 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
 
   init(
     onRedirectReceived: ((_ info: UrlResponseInfo, _ newLocationUrl: String) -> Void)?,
+    onNativeResponseStarted: ((_ timestampMs: Double) -> Void)?,
+    onNativeRead: ((_ timestampMs: Double) -> Void)?,
+    onNativeCompleted: ((_ timestampMs: Double) -> Void)?,
     onResponseStarted: ((_ info: UrlResponseInfo) -> Void)?,
     onReadCompleted: ((_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer, _ bytesRead: Double) -> Void)?,
     onSucceeded: ((_ info: UrlResponseInfo) -> Void)?,
@@ -187,6 +211,9 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
     devToolsRequestId: String
   ) {
     self.onRedirectReceived = onRedirectReceived
+    self.onNativeResponseStarted = onNativeResponseStarted
+    self.onNativeRead = onNativeRead
+    self.onNativeCompleted = onNativeCompleted
     self.onResponseStarted = onResponseStarted
     self.onReadCompleted = onReadCompleted
     self.onSucceeded = onSucceeded
@@ -196,6 +223,13 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
     self.hybridRequest = hybridRequest
     self.devToolsRequestId = devToolsRequestId
     super.init()
+  }
+
+  private func emitNativeTimestamp(_ callback: ((_ timestampMs: Double) -> Void)?) {
+    guard let callback = callback else { return }
+    let date = Date()
+    let timestampMs = date.timeIntervalSince1970 * 1000
+    callback(timestampMs)
   }
 
   func urlSession(
@@ -266,6 +300,7 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
           }
         }
       } else if let response = self.response {
+        self.emitNativeTimestamp(self.onNativeCompleted)
         #if DEBUG
         if NitroDevToolsReporter.isDebuggingEnabled() {
           NitroDevToolsReporter.reportResponseEnd(self.devToolsRequestId, encodedDataLength: self.devToolsBytes)
@@ -294,6 +329,7 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
 
     executor.sync { [weak self] in
       guard let self = self else { return }
+      self.emitNativeTimestamp(self.onNativeResponseStarted)
       #if DEBUG
       if NitroDevToolsReporter.isDebuggingEnabled() {
         var headerDict: [String: String] = [:]
@@ -327,6 +363,7 @@ private class URLSessionDelegateAdapter: NSObject, URLSessionDataDelegate, URLSe
     if let callback = self.onReadCompleted {
       executor.sync { [weak self] in
         guard let self = self, let response = self.response else { return }
+        self.emitNativeTimestamp(self.onNativeRead)
 
         #if DEBUG
         if NitroDevToolsReporter.isDebuggingEnabled() {

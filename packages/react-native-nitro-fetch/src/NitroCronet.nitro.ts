@@ -55,6 +55,10 @@ export interface UrlRequestBuilder extends HybridObject<{
   onRedirectReceived(
     callback: (info: UrlResponseInfo, newLocationUrl: string) => void
   ): void;
+  // Optional diagnostics keep native clock reads off the normal callback path.
+  onNativeResponseStarted(callback: (timestampMs: number) => void): void;
+  onNativeRead(callback: (timestampMs: number) => void): void;
+  onNativeCompleted(callback: (timestampMs: number) => void): void;
   onResponseStarted(callback: (info: UrlResponseInfo) => void): void;
   onReadCompleted(
     callback: (

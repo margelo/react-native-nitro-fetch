@@ -230,6 +230,46 @@ app.get('/stream/:n', (req, res) => {
   tick();
 });
 
+// Deterministic response used by the startup scheduler test.
+app.get('/startup-stream', (req, res) => {
+  const parsedChunkCount = parseInt(req.query.chunks ?? '4', 10);
+  const parsedChunkSize = parseInt(req.query.chunkSize ?? '16384', 10);
+  const parsedHeaderDelayMs = parseInt(req.query.headerDelayMs ?? '0', 10);
+  const parsedIntervalMs = parseInt(req.query.intervalMs ?? '1', 10);
+  const chunkCount = Math.max(1, parsedChunkCount);
+  const chunkSize = Math.max(1, parsedChunkSize);
+  const headerDelayMs = Math.max(0, parsedHeaderDelayMs);
+  const intervalMs = Math.max(0, parsedIntervalMs);
+  let sent = 0;
+
+  res.set('Cache-Control', 'no-store');
+  res.set('Content-Type', 'application/octet-stream');
+
+  const scheduleChunk = () => {
+    setTimeout(writeChunk, intervalMs);
+  };
+  const writeChunk = () => {
+    if (sent >= chunkCount) {
+      res.end();
+      return;
+    }
+
+    const chunk = Buffer.alloc(chunkSize, 0x61 + sent);
+    const canContinue = res.write(chunk);
+    sent++;
+    if (canContinue) {
+      scheduleChunk();
+    } else {
+      res.once('drain', scheduleChunk);
+    }
+  };
+
+  setTimeout(() => {
+    res.flushHeaders();
+    writeChunk();
+  }, headerDelayMs);
+});
+
 // Reports for /drip?id=... so tests can assert the client actually hung up
 // mid-body instead of draining the response to completion.
 const dripReports = new Map();

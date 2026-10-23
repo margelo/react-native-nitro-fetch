@@ -101,6 +101,9 @@ export async function nitroStreamFetch(
       builder.onSucceeded(noop);
       builder.onFailed(noop);
       builder.onCanceled(noop);
+      builder.onNativeResponseStarted(noop);
+      builder.onNativeRead(noop);
+      builder.onNativeCompleted(noop);
     };
 
     let abortSettled = false;
@@ -127,6 +130,26 @@ export async function nitroStreamFetch(
         streamController.error(err);
       }
     };
+
+    if (inspectorId) {
+      builder.onNativeResponseStarted((timestampMs) => {
+        NetworkInspector._recordNativeEvent(
+          inspectorId,
+          'response-started',
+          timestampMs
+        );
+      });
+      builder.onNativeRead((timestampMs) => {
+        NetworkInspector._recordNativeEvent(inspectorId, 'read', timestampMs);
+      });
+      builder.onNativeCompleted((timestampMs) => {
+        NetworkInspector._recordNativeEvent(
+          inspectorId,
+          'completed',
+          timestampMs
+        );
+      });
+    }
 
     let redirected = false;
     const resolveWith = (info: UrlResponseInfo) => {

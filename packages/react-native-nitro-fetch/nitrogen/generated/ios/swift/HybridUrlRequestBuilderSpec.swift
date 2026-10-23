@@ -23,6 +23,9 @@ public protocol HybridUrlRequestBuilderSpec_protocol: HybridObject {
   func onFailed(callback: @escaping (_ info: UrlResponseInfo?, _ error: RequestException) -> Void) throws -> Void
   func onCanceled(callback: @escaping (_ info: UrlResponseInfo?) -> Void) throws -> Void
   func onRedirectReceived(callback: @escaping (_ info: UrlResponseInfo, _ newLocationUrl: String) -> Void) throws -> Void
+  func onNativeResponseStarted(callback: @escaping (_ timestampMs: Double) -> Void) throws -> Void
+  func onNativeRead(callback: @escaping (_ timestampMs: Double) -> Void) throws -> Void
+  func onNativeCompleted(callback: @escaping (_ timestampMs: Double) -> Void) throws -> Void
   func onResponseStarted(callback: @escaping (_ info: UrlResponseInfo) -> Void) throws -> Void
   func onReadCompleted(callback: @escaping (_ info: UrlResponseInfo, _ byteBuffer: ArrayBuffer, _ bytesRead: Double) -> Void) throws -> Void
   func build() throws -> (any HybridUrlRequestSpec)

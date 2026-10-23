@@ -150,6 +150,24 @@ namespace margelo::nitro::nitrofetch {
         std::rethrow_exception(__result.error());
       }
     }
+    inline void onNativeResponseStarted(const std::function<void(double /* timestampMs */)>& callback) override {
+      auto __result = _swiftPart.onNativeResponseStarted(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline void onNativeRead(const std::function<void(double /* timestampMs */)>& callback) override {
+      auto __result = _swiftPart.onNativeRead(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline void onNativeCompleted(const std::function<void(double /* timestampMs */)>& callback) override {
+      auto __result = _swiftPart.onNativeCompleted(callback);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
     inline void onResponseStarted(const std::function<void(const UrlResponseInfo& /* info */)>& callback) override {
       auto __result = _swiftPart.onResponseStarted(callback);
       if (__result.hasError()) [[unlikely]] {

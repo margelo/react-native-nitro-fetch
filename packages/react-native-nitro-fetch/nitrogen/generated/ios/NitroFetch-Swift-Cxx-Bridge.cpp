@@ -67,6 +67,14 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     };
   }
   
+  // pragma MARK: std::function<void(double /* timestampMs */)>
+  Func_void_double create_Func_void_double(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_double::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](double timestampMs) mutable -> void {
+      swiftClosure.call(timestampMs);
+    };
+  }
+  
   // pragma MARK: std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */, double /* bytesRead */)>
   Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double create_Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = NitroFetch::Func_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double::fromUnsafe(swiftClosureWrapper);

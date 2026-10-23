@@ -279,6 +279,54 @@ open class HybridUrlRequestBuilderSpec_cxx {
   }
   
   @inline(__always)
+  public final func onNativeResponseStarted(callback: bridge.Func_void_double) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.onNativeResponseStarted(callback: { () -> (Double) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_double(callback)
+        return { (__timestampMs: Double) -> Void in
+          __wrappedFunction.call(__timestampMs)
+        }
+      }())
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onNativeRead(callback: bridge.Func_void_double) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.onNativeRead(callback: { () -> (Double) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_double(callback)
+        return { (__timestampMs: Double) -> Void in
+          __wrappedFunction.call(__timestampMs)
+        }
+      }())
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func onNativeCompleted(callback: bridge.Func_void_double) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.onNativeCompleted(callback: { () -> (Double) -> Void in
+        let __wrappedFunction = bridge.wrap_Func_void_double(callback)
+        return { (__timestampMs: Double) -> Void in
+          __wrappedFunction.call(__timestampMs)
+        }
+      }())
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func onResponseStarted(callback: bridge.Func_void_UrlResponseInfo) -> bridge.Result_void_ {
     do {
       try self.__implementation.onResponseStarted(callback: { () -> (UrlResponseInfo) -> Void in

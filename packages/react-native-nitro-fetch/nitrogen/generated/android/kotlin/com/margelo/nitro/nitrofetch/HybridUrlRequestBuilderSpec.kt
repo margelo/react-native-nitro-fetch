@@ -90,6 +90,33 @@ abstract class HybridUrlRequestBuilderSpec: HybridObject() {
     return __result
   }
   
+  abstract fun onNativeResponseStarted(callback: (timestampMs: Double) -> Unit): Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onNativeResponseStarted_cxx(callback: Func_void_double): Unit {
+    val __result = onNativeResponseStarted(callback)
+    return __result
+  }
+  
+  abstract fun onNativeRead(callback: (timestampMs: Double) -> Unit): Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onNativeRead_cxx(callback: Func_void_double): Unit {
+    val __result = onNativeRead(callback)
+    return __result
+  }
+  
+  abstract fun onNativeCompleted(callback: (timestampMs: Double) -> Unit): Unit
+  
+  @DoNotStrip
+  @Keep
+  private fun onNativeCompleted_cxx(callback: Func_void_double): Unit {
+    val __result = onNativeCompleted(callback)
+    return __result
+  }
+  
   abstract fun onResponseStarted(callback: (info: UrlResponseInfo) -> Unit): Unit
   
   @DoNotStrip

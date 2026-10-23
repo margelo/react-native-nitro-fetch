@@ -21,6 +21,7 @@
 #include "JFunc_void_std__optional_UrlResponseInfo__RequestException.hpp"
 #include "JFunc_void_std__optional_UrlResponseInfo_.hpp"
 #include "JFunc_void_UrlResponseInfo_std__string.hpp"
+#include "JFunc_void_double.hpp"
 #include "JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double.hpp"
 #include "JHybridNitroCronetSpec.hpp"
 #include "JHybridNitroFetchClientSpec.hpp"
@@ -80,6 +81,7 @@ void registerAllNatives() {
   margelo::nitro::nitrofetch::JFunc_void_std__optional_UrlResponseInfo__RequestException_cxx::registerNatives();
   margelo::nitro::nitrofetch::JFunc_void_std__optional_UrlResponseInfo__cxx::registerNatives();
   margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_std__string_cxx::registerNatives();
+  margelo::nitro::nitrofetch::JFunc_void_double_cxx::registerNatives();
   margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double_cxx::registerNatives();
   margelo::nitro::nitrofetch::JHybridNitroCronetSpec::CxxPart::registerNatives();
   margelo::nitro::nitrofetch::JHybridNitroFetchClientSpec::CxxPart::registerNatives();

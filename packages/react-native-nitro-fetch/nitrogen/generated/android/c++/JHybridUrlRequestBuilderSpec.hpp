@@ -64,6 +64,9 @@ namespace margelo::nitro::nitrofetch {
     void onFailed(const std::function<void(const std::optional<UrlResponseInfo>& /* info */, const RequestException& /* error */)>& callback) override;
     void onCanceled(const std::function<void(const std::optional<UrlResponseInfo>& /* info */)>& callback) override;
     void onRedirectReceived(const std::function<void(const UrlResponseInfo& /* info */, const std::string& /* newLocationUrl */)>& callback) override;
+    void onNativeResponseStarted(const std::function<void(double /* timestampMs */)>& callback) override;
+    void onNativeRead(const std::function<void(double /* timestampMs */)>& callback) override;
+    void onNativeCompleted(const std::function<void(double /* timestampMs */)>& callback) override;
     void onResponseStarted(const std::function<void(const UrlResponseInfo& /* info */)>& callback) override;
     void onReadCompleted(const std::function<void(const UrlResponseInfo& /* info */, const std::shared_ptr<ArrayBuffer>& /* byteBuffer */, double /* bytesRead */)>& callback) override;
     std::shared_ptr<HybridUrlRequestSpec> build() override;

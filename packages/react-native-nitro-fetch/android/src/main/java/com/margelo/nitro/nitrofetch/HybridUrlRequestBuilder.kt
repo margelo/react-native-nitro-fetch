@@ -19,6 +19,9 @@ class HybridUrlRequestBuilder(
 
   // Callbacks stored as optionals and set via setter methods
   private var onRedirectReceivedCallback: ((info: UrlResponseInfo, newLocationUrl: String) -> Unit)? = null
+  private var onNativeResponseStartedCallback: ((timestampMs: Double) -> Unit)? = null
+  private var onNativeReadCallback: ((timestampMs: Double) -> Unit)? = null
+  private var onNativeCompletedCallback: ((timestampMs: Double) -> Unit)? = null
   private var onResponseStartedCallback: ((info: UrlResponseInfo) -> Unit)? = null
   private var onReadCompletedCallback: ((info: UrlResponseInfo, byteBuffer: ArrayBuffer, bytesRead: Double) -> Unit)? = null
   private var onSucceededCallback: ((info: UrlResponseInfo) -> Unit)? = null
@@ -70,6 +73,7 @@ class HybridUrlRequestBuilder(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo
       ) {
+        emitNativeTimestamp(onNativeResponseStartedCallback)
         if (cookiesEnabled) {
           // Streams can remain open indefinitely; persist cookies when headers arrive.
           NitroCookieSync.storeSetCookieFromUrlResponseInfo(info.url, info, flush = true)
@@ -98,6 +102,7 @@ class HybridUrlRequestBuilder(
         info: CronetUrlResponseInfo,
         receivedBuffer: ByteBuffer
       ) {
+        emitNativeTimestamp(onNativeReadCallback)
         val bytesRead = receivedBuffer.position()
         if (devToolsEnabled && bytesRead > 0) {
           devToolsBytes += bytesRead
@@ -120,6 +125,7 @@ class HybridUrlRequestBuilder(
         request: CronetUrlRequest,
         info: CronetUrlResponseInfo
       ) {
+        emitNativeTimestamp(onNativeCompletedCallback)
         if (devToolsEnabled) {
           DevToolsReporter.reportResponseEnd(devToolsRequestId, devToolsBytes.toLong())
         }
@@ -159,6 +165,13 @@ class HybridUrlRequestBuilder(
     }
 
     builder = engine.newUrlRequestBuilder(url, cronetCallback, executor)
+  }
+
+  private fun emitNativeTimestamp(callback: ((timestampMs: Double) -> Unit)?) {
+    if (callback == null) return
+    val timestampMs = System.currentTimeMillis()
+    val timestamp = timestampMs.toDouble()
+    callback(timestamp)
   }
 
   override fun setHttpMethod(httpMethod: String) {
@@ -236,6 +249,18 @@ class HybridUrlRequestBuilder(
 
   override fun onRedirectReceived(callback: (info: UrlResponseInfo, newLocationUrl: String) -> Unit) {
     this.onRedirectReceivedCallback = callback
+  }
+
+  override fun onNativeResponseStarted(callback: (timestampMs: Double) -> Unit) {
+    this.onNativeResponseStartedCallback = callback
+  }
+
+  override fun onNativeRead(callback: (timestampMs: Double) -> Unit) {
+    this.onNativeReadCallback = callback
+  }
+
+  override fun onNativeCompleted(callback: (timestampMs: Double) -> Unit) {
+    this.onNativeCompletedCallback = callback
   }
 
   override fun onResponseStarted(callback: (info: UrlResponseInfo) -> Unit) {

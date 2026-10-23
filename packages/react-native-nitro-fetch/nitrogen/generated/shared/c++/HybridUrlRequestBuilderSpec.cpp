@@ -24,6 +24,9 @@ namespace margelo::nitro::nitrofetch {
       prototype.registerHybridMethod("onFailed", &HybridUrlRequestBuilderSpec::onFailed);
       prototype.registerHybridMethod("onCanceled", &HybridUrlRequestBuilderSpec::onCanceled);
       prototype.registerHybridMethod("onRedirectReceived", &HybridUrlRequestBuilderSpec::onRedirectReceived);
+      prototype.registerHybridMethod("onNativeResponseStarted", &HybridUrlRequestBuilderSpec::onNativeResponseStarted);
+      prototype.registerHybridMethod("onNativeRead", &HybridUrlRequestBuilderSpec::onNativeRead);
+      prototype.registerHybridMethod("onNativeCompleted", &HybridUrlRequestBuilderSpec::onNativeCompleted);
       prototype.registerHybridMethod("onResponseStarted", &HybridUrlRequestBuilderSpec::onResponseStarted);
       prototype.registerHybridMethod("onReadCompleted", &HybridUrlRequestBuilderSpec::onReadCompleted);
       prototype.registerHybridMethod("build", &HybridUrlRequestBuilderSpec::build);
