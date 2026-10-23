@@ -597,6 +597,27 @@ describe('NitroFetch - HTTP cache', () => {
     expect(await res.json()).toEqual(first);
     expect(await cacheReport(id)).toEqual({ requests: 2, conditional: 1 });
   });
+
+  // stream: true and the default transport must share one native client, so
+  // they share its cache and its open connections too.
+  it('stream: true is served from what the default transport cached', async () => {
+    const id = cacheId();
+    const url = `${BASE}/cache/${id}?maxAge=60`;
+    const first = await (await nitroFetch(url)).text();
+    const res = await (nitroFetch as any)(url, { stream: true });
+    expect(await res.text()).toBe(first);
+    expect(await cacheReport(id)).toEqual({ requests: 1, conditional: 0 });
+  });
+
+  it('the default transport is served from what stream: true cached', async () => {
+    const id = cacheId();
+    const url = `${BASE}/cache/${id}?maxAge=60`;
+    const first = await (
+      await (nitroFetch as any)(url, { stream: true })
+    ).text();
+    expect(await (await nitroFetch(url)).text()).toBe(first);
+    expect(await cacheReport(id)).toEqual({ requests: 1, conditional: 0 });
+  });
 });
 
 describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
