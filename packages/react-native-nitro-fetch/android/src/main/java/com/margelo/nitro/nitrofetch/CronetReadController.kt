@@ -5,19 +5,21 @@ import org.chromium.net.UrlRequest as CronetUrlRequest
 import java.nio.ByteBuffer
 
 /**
- * Routes every UrlRequest operation through the executor Cronet uses for that
- * request. The existing JS-driven read cadence still controls body progress.
+ * Keeps Cronet reading on its executor while bounding buffers whose JS callbacks
+ * have not run yet. Each read owns its ArrayBuffer so queued callbacks cannot
+ * observe a buffer that Cronet has already reused. Once the 16-buffer window is
+ * full, native progress intentionally waits for JS demand to release a slot.
  */
 class CronetReadController(
   private val executor: CronetSerialExecutor,
   private val onOperationFailed: (error: Throwable) -> Unit
 ) {
   private lateinit var cronetRequest: CronetUrlRequest
-  private val reusableBuffer = ArrayBuffer.allocate(READ_BUFFER_SIZE)
-  private val byteBuffer = reusableBuffer.getBuffer(false)
   private var attached = false
   @Volatile private var finished = false
   private var readInProgress = false
+  private var activeBuffer: ArrayBuffer? = null
+  private var inFlightReads = 0
 
   fun attach(request: CronetUrlRequest) {
     check(!attached) { "Cronet read controller is already attached" }
@@ -51,32 +53,38 @@ class CronetReadController(
 
   fun requestRead() {
     executor.execute {
-      checkAttached()
-      if (finished) return@execute
-      check(!readInProgress) { "Cronet read is already in progress" }
-      byteBuffer.clear()
-      readInProgress = true
-      try {
-        cronetRequest.read(byteBuffer)
-      } catch (error: Throwable) {
-        readInProgress = false
-        failOperation(error)
-      }
+      requestReadOnExecutor()
     }
   }
 
   fun completeRead(receivedBuffer: ByteBuffer): ArrayBuffer? {
     executor.checkIsRunning()
     check(readInProgress) { "Cronet completed a read that was not in progress" }
-    check(receivedBuffer === byteBuffer) { "Cronet returned an unexpected read buffer" }
+    val arrayBuffer = checkNotNull(activeBuffer) {
+      "Cronet completed a read without an active buffer"
+    }
+    activeBuffer = null
     readInProgress = false
+
     if (finished) return null
 
     val bytesRead = receivedBuffer.position()
     check(bytesRead >= 0 && bytesRead <= READ_BUFFER_SIZE) {
       "Cronet returned an invalid read size: $bytesRead"
     }
-    return reusableBuffer
+    inFlightReads++
+    check(inFlightReads <= MAX_IN_FLIGHT_READS) {
+      "Cronet exceeded the in-flight read window"
+    }
+    return arrayBuffer
+  }
+
+  fun acknowledgeRead() {
+    executor.execute {
+      check(inFlightReads > 0) { "Cronet received an unexpected read acknowledgement" }
+      inFlightReads--
+      requestReadOnExecutor()
+    }
   }
 
   fun finish() {
@@ -99,6 +107,28 @@ class CronetReadController(
 
   fun isFinished(): Boolean = finished
 
+  fun getReadBufferWindowSize(): Double = MAX_IN_FLIGHT_READS.toDouble()
+
+  private fun requestReadOnExecutor() {
+    executor.checkIsRunning()
+    checkAttached()
+    if (finished || readInProgress) return
+    if (inFlightReads >= MAX_IN_FLIGHT_READS) return
+
+    val arrayBuffer = ArrayBuffer.allocate(READ_BUFFER_SIZE)
+    val byteBuffer = arrayBuffer.getBuffer(false)
+    activeBuffer = arrayBuffer
+    readInProgress = true
+
+    try {
+      cronetRequest.read(byteBuffer)
+    } catch (error: Throwable) {
+      activeBuffer = null
+      readInProgress = false
+      failOperation(error)
+    }
+  }
+
   private fun failOperation(
     error: Throwable,
     shouldCancelRequest: Boolean = true
@@ -106,6 +136,7 @@ class CronetReadController(
     executor.checkIsRunning()
     if (finished) return
     finished = true
+    activeBuffer = null
     readInProgress = false
     if (shouldCancelRequest) {
       // Stop native work before publishing the original operation failure.
@@ -126,5 +157,6 @@ class CronetReadController(
 
   companion object {
     private const val READ_BUFFER_SIZE = 64 * 1024
+    private const val MAX_IN_FLIGHT_READS = 16
   }
 }

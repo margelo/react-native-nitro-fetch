@@ -56,6 +56,15 @@ namespace margelo::nitro::nitrofetch {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("read");
     method(_javaPart);
   }
+  void JHybridUrlRequestSpec::acknowledgeRead() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("acknowledgeRead");
+    method(_javaPart);
+  }
+  double JHybridUrlRequestSpec::getReadBufferWindowSize() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<double()>("getReadBufferWindowSize");
+    auto __result = method(_javaPart);
+    return __result;
+  }
   void JHybridUrlRequestSpec::cancel() {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("cancel");
     method(_javaPart);

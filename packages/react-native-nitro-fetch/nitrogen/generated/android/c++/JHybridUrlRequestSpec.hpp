@@ -57,6 +57,8 @@ namespace margelo::nitro::nitrofetch {
     void start() override;
     void followRedirect() override;
     void read() override;
+    void acknowledgeRead() override;
+    double getReadBufferWindowSize() override;
     void cancel() override;
     bool isDone() override;
 

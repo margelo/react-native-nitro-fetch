@@ -84,6 +84,20 @@ namespace margelo::nitro::nitrofetch {
         std::rethrow_exception(__result.error());
       }
     }
+    inline void acknowledgeRead() override {
+      auto __result = _swiftPart.acknowledgeRead();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
+    inline double getReadBufferWindowSize() override {
+      auto __result = _swiftPart.getReadBufferWindowSize();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
     inline void cancel() override {
       auto __result = _swiftPart.cancel();
       if (__result.hasError()) [[unlikely]] {

@@ -230,26 +230,44 @@ app.get('/stream/:n', (req, res) => {
   tick();
 });
 
-// Deterministic response used by the startup scheduler test.
+const startupStreamReports = new Map();
+
+// Deterministic response used by the startup scheduler and backpressure tests.
 app.get('/startup-stream', (req, res) => {
   const parsedChunkCount = parseInt(req.query.chunks ?? '4', 10);
   const parsedChunkSize = parseInt(req.query.chunkSize ?? '16384', 10);
   const parsedHeaderDelayMs = parseInt(req.query.headerDelayMs ?? '0', 10);
   const parsedIntervalMs = parseInt(req.query.intervalMs ?? '1', 10);
+  const parsedFailAfterChunks = parseInt(req.query.failAfterChunks ?? '0', 10);
   const chunkCount = Math.max(1, parsedChunkCount);
   const chunkSize = Math.max(1, parsedChunkSize);
   const headerDelayMs = Math.max(0, parsedHeaderDelayMs);
   const intervalMs = Math.max(0, parsedIntervalMs);
+  const failAfterChunks = Math.max(0, parsedFailAfterChunks);
+  const id = req.query.id;
   let sent = 0;
+  const report = {
+    disconnected: false,
+    failed: false,
+    finished: false,
+    sentBytes: 0,
+    sentChunks: 0,
+    totalBytes: chunkCount * chunkSize,
+  };
+  if (id) startupStreamReports.set(id, report);
 
   res.set('Cache-Control', 'no-store');
   res.set('Content-Type', 'application/octet-stream');
+  res.on('close', () => {
+    if (!report.finished && !report.failed) report.disconnected = true;
+  });
 
   const scheduleChunk = () => {
     setTimeout(writeChunk, intervalMs);
   };
   const writeChunk = () => {
     if (sent >= chunkCount) {
+      report.finished = true;
       res.end();
       return;
     }
@@ -257,6 +275,14 @@ app.get('/startup-stream', (req, res) => {
     const chunk = Buffer.alloc(chunkSize, 0x61 + sent);
     const canContinue = res.write(chunk);
     sent++;
+    report.sentBytes += chunkSize;
+    report.sentChunks = sent;
+    if (failAfterChunks > 0 && sent >= failAfterChunks) {
+      report.failed = true;
+      const error = new Error('intentional startup stream failure');
+      res.destroy(error);
+      return;
+    }
     if (canContinue) {
       scheduleChunk();
     } else {
@@ -268,6 +294,13 @@ app.get('/startup-stream', (req, res) => {
     res.flushHeaders();
     writeChunk();
   }, headerDelayMs);
+});
+
+app.get('/startup-stream-report/:id', (req, res) => {
+  const missing = { missing: true };
+  const report = startupStreamReports.get(req.params.id) ?? missing;
+  res.set('Cache-Control', 'no-store');
+  res.json(report);
 });
 
 // Reports for /drip?id=... so tests can assert the client actually hung up

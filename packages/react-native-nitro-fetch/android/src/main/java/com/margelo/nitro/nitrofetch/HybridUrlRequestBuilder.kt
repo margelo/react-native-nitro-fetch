@@ -94,6 +94,9 @@ class HybridUrlRequestBuilder(
           val nitroInfo = info.toNitro()
           callback(nitroInfo)
         }
+        // Header delivery to JS is asynchronous. Start native body progress now
+        // so a busy JS thread cannot leave Cronet waiting for its first read.
+        readController.requestRead()
       }
 
       override fun onReadCompleted(
@@ -116,10 +119,15 @@ class HybridUrlRequestBuilder(
         }
         val completedBuffer = readController.completeRead(receivedBuffer)
         if (completedBuffer == null) return
-        onReadCompletedCallback?.let { callback ->
+        val callback = onReadCompletedCallback
+        if (callback != null) {
           val nitroInfo = info.toNitro()
-          callback(nitroInfo, completedBuffer, bytesRead.toDouble())
+          val byteCount = bytesRead.toDouble()
+          callback(nitroInfo, completedBuffer, byteCount)
+        } else {
+          readController.acknowledgeRead()
         }
+        readController.requestRead()
       }
 
       override fun onSucceeded(

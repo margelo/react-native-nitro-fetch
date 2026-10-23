@@ -43,6 +43,14 @@ abstract class HybridUrlRequestSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun acknowledgeRead(): Unit
+  
+  @DoNotStrip
+  @Keep
+  abstract fun getReadBufferWindowSize(): Double
+  
+  @DoNotStrip
+  @Keep
   abstract fun cancel(): Unit
   
   @DoNotStrip

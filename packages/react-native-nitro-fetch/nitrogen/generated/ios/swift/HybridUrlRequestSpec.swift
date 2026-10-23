@@ -16,6 +16,8 @@ public protocol HybridUrlRequestSpec_protocol: HybridObject {
   func start() throws -> Void
   func followRedirect() throws -> Void
   func read() throws -> Void
+  func acknowledgeRead() throws -> Void
+  func getReadBufferWindowSize() throws -> Double
   func cancel() throws -> Void
   func isDone() throws -> Bool
 }

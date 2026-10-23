@@ -34,6 +34,15 @@ class HybridUrlRequest: HybridUrlRequestSpec {
     // This is a no-op on iOS but required for API compatibility
   }
 
+  func acknowledgeRead() throws {
+    // URLSession owns its read flow and does not need JS acknowledgements.
+  }
+
+  func getReadBufferWindowSize() throws -> Double {
+    // Zero means this backend does not use acknowledgement-based flow control.
+    return 0
+  }
+
   func cancel() throws {
     (delegate as? CancelRequestTracking)?.markCancelRequested()
     task?.cancel()

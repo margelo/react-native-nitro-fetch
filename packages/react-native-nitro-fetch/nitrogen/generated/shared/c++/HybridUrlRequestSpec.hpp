@@ -51,6 +51,8 @@ namespace margelo::nitro::nitrofetch {
       virtual void start() = 0;
       virtual void followRedirect() = 0;
       virtual void read() = 0;
+      virtual void acknowledgeRead() = 0;
+      virtual double getReadBufferWindowSize() = 0;
       virtual void cancel() = 0;
       virtual bool isDone() = 0;
 

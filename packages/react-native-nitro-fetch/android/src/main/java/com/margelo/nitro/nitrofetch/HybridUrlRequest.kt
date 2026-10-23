@@ -25,6 +25,14 @@ class HybridUrlRequest(
     readController.requestRead()
   }
 
+  override fun acknowledgeRead() {
+    readController.acknowledgeRead()
+  }
+
+  override fun getReadBufferWindowSize(): Double {
+    return readController.getReadBufferWindowSize()
+  }
+
   override fun cancel() {
     readController.cancel()
   }

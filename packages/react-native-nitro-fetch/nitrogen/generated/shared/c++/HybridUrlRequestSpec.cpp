@@ -17,6 +17,8 @@ namespace margelo::nitro::nitrofetch {
       prototype.registerHybridMethod("start", &HybridUrlRequestSpec::start);
       prototype.registerHybridMethod("followRedirect", &HybridUrlRequestSpec::followRedirect);
       prototype.registerHybridMethod("read", &HybridUrlRequestSpec::read);
+      prototype.registerHybridMethod("acknowledgeRead", &HybridUrlRequestSpec::acknowledgeRead);
+      prototype.registerHybridMethod("getReadBufferWindowSize", &HybridUrlRequestSpec::getReadBufferWindowSize);
       prototype.registerHybridMethod("cancel", &HybridUrlRequestSpec::cancel);
       prototype.registerHybridMethod("isDone", &HybridUrlRequestSpec::isDone);
     });

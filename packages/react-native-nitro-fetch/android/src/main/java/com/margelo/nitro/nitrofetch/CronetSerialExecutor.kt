@@ -4,8 +4,9 @@ import java.util.ArrayDeque
 import java.util.concurrent.Executor
 
 /**
- * Preserves callback and operation order for one Cronet request while sharing
- * the global I/O pool.
+ * Preserves callback order for one Cronet request while sharing the global I/O
+ * pool. Starting the next read inside a callback can otherwise let another pool
+ * thread enqueue a later JS callback first.
  */
 class CronetSerialExecutor(
   private val delegate: Executor

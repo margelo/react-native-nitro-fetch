@@ -30,6 +30,9 @@ export interface UrlRequest extends HybridObject<{
   start(): void;
   followRedirect(): void;
   read(): void;
+  acknowledgeRead(): void;
+  // Zero means native reading does not wait for acknowledgements.
+  getReadBufferWindowSize(): number;
   cancel(): void;
   isDone(): boolean;
 }

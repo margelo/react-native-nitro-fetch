@@ -68,6 +68,10 @@ export async function nitroStreamFetch(
       Uint8Array<ArrayBuffer>
     >;
     let abortListener: (() => void) | undefined;
+    const pendingChunks: Uint8Array<ArrayBuffer>[] = [];
+    let nativeSucceeded = false;
+    let nativeSuccessInfo: UrlResponseInfo;
+    let readBufferWindowSize = 0;
 
     const cleanupAbortListener = () => {
       if (!signal || !abortListener) return;
@@ -75,10 +79,56 @@ export async function nitroStreamFetch(
       abortListener = undefined;
     };
 
+    const acknowledgeReadIfNeeded = () => {
+      if (readBufferWindowSize <= 0) return;
+      request.acknowledgeRead();
+    };
+
+    const releasePendingChunks = () => {
+      const pendingCount = pendingChunks.length;
+      pendingChunks.length = 0;
+      for (let index = 0; index < pendingCount; index++) {
+        acknowledgeReadIfNeeded();
+      }
+    };
+
     let streamCancelled = false;
+    let streamClosed = false;
+    const closeCompletedStream = () => {
+      if (!nativeSucceeded || pendingChunks.length > 0 || streamClosed) return;
+      streamClosed = true;
+      streamController.close();
+      if (inspectorId) {
+        const info = nativeSuccessInfo;
+        NetworkInspector._recordEnd(
+          inspectorId,
+          info.httpStatusCode,
+          info.httpStatusText,
+          info.allHeadersAsList,
+          streamBytesReceived
+        );
+      }
+    };
+
+    const drainPendingChunks = () => {
+      while (pendingChunks.length > 0) {
+        const desiredSize = streamController.desiredSize;
+        if (desiredSize == null || desiredSize <= 0) break;
+        const chunk = pendingChunks.shift();
+        if (chunk == null) throw new Error('Missing pending stream chunk');
+        streamController.enqueue(chunk);
+        // Releasing a native slot follows stream demand, not callback delivery.
+        acknowledgeReadIfNeeded();
+      }
+      closeCompletedStream();
+    };
+
     const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
       start(controller) {
         streamController = controller;
+      },
+      pull() {
+        drainPendingChunks();
       },
       cancel() {
         streamCancelled = true;
@@ -86,8 +136,9 @@ export async function nitroStreamFetch(
         try {
           request.cancel();
         } catch {
-          return;
+          // The request may already have reached a terminal callback.
         }
+        releasePendingChunks();
       },
     });
 
@@ -112,6 +163,7 @@ export async function nitroStreamFetch(
       abortSettled = true;
       release();
       cleanupAbortListener();
+      releasePendingChunks();
       if (inspectorId) {
         NetworkInspector._recordEnd(
           inspectorId,
@@ -211,45 +263,42 @@ export async function nitroStreamFetch(
     builder.onResponseStarted((info) => {
       if (responseResolved || signal?.aborted) return;
       resolveWith(info);
-      // Android/Cronet: kick off the first buffer read.
-      // iOS/URLSession handles reading automatically so this is a no-op there.
-      request.read();
     });
 
     builder.onReadCompleted((_info, byteBuffer, bytesRead) => {
       // A cancelled stream can still receive an in-flight native read.
-      if (streamCancelled || stoppedAtRedirect || signal?.aborted) return;
-      const chunk = new Uint8Array(byteBuffer, 0, bytesRead).slice();
-      streamBytesReceived += bytesRead;
-      streamController.enqueue(chunk);
-      if (!request.isDone()) {
-        request.read();
+      if (streamCancelled || stoppedAtRedirect || signal?.aborted) {
+        acknowledgeReadIfNeeded();
+        return;
       }
+      const chunkView = new Uint8Array(byteBuffer, 0, bytesRead);
+      const chunk = chunkView.slice();
+      streamBytesReceived += bytesRead;
+      pendingChunks.push(chunk);
+      if (
+        readBufferWindowSize > 0 &&
+        pendingChunks.length > readBufferWindowSize
+      ) {
+        throw new Error('Native stream read window exceeded');
+      }
+      drainPendingChunks();
     });
 
-    builder.onSucceeded((_info) => {
+    builder.onSucceeded((info) => {
       release();
       cleanupAbortListener();
       if (streamCancelled || stoppedAtRedirect || signal?.aborted) return;
-      streamController.close();
-      if (inspectorId) {
-        const info = _info as any;
-        const status = info?.httpStatusCode ?? 0;
-        const hdrs = info?.allHeadersAsList ?? [];
-        NetworkInspector._recordEnd(
-          inspectorId,
-          status,
-          info?.httpStatusText ?? '',
-          hdrs,
-          streamBytesReceived
-        );
-      }
+      nativeSucceeded = true;
+      nativeSuccessInfo = info;
+      drainPendingChunks();
     });
 
     builder.onFailed((_info, error) => {
       if (signal?.aborted) return settleAborted();
       release();
       cleanupAbortListener();
+      releasePendingChunks();
+      if (streamCancelled) return;
       const err = new Error(error.message);
       if (inspectorId) {
         NetworkInspector._recordEnd(inspectorId, 0, '', [], 0, error.message);
@@ -267,6 +316,7 @@ export async function nitroStreamFetch(
     });
 
     const request = builder.build();
+    readBufferWindowSize = request.getReadBufferWindowSize();
     if (signal) {
       abortListener = () => {
         try {
