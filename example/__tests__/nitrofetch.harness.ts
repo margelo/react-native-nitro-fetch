@@ -1155,9 +1155,10 @@ describe('NitroFetch - Reading while JavaScript is busy', () => {
   const SIZE = 16 * 1024;
   const url = `${BASE}/text?phrase=x&repeat=${SIZE}`;
 
-  // Each case sends one request first: the first stream: true request in a
-  // session waits about a second for its native client to start, which would
-  // push the headers past the block.
+  // Each case sends one request first. The first request on a transport opens
+  // a new connection (on Android, stream: true has its own Cronet engine),
+  // which takes about a second on the emulator and would push the headers
+  // past the block.
   const readWhileBlocked = async (init?: Record<string, unknown>) => {
     await (await (nitroFetch as any)(url, init)).arrayBuffer();
     const seen = { headers: false, body: false };
