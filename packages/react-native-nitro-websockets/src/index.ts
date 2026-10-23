@@ -60,6 +60,7 @@ export class NitroWebSocket {
   }
   private _bound: Handlers = { ...this._handlers }
   private _bindScheduled = false
+  private _closed = false
 
   constructor(
     url: string,
@@ -128,6 +129,7 @@ export class NitroWebSocket {
     this._bindScheduled = true
     queueMicrotask(() => {
       this._bindScheduled = false
+      if (this._closed) return
       const handlers = this._handlers
       const bound = this._bound
       if (handlers.onopen !== bound.onopen) this._bindOpen(handlers.onopen)
@@ -207,6 +209,11 @@ export class NitroWebSocket {
       if (inspectorId && _inspector?.isEnabled()) {
         _inspector._recordWsClose(inspectorId, e.code, e.reason)
       }
+      this._closed = true
+      this._ws.onOpen = undefined
+      this._ws.onMessage = undefined
+      this._ws.onError = undefined
+      this._ws.onClose = undefined
       fn(e)
     }
   }
