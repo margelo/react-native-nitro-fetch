@@ -28,7 +28,7 @@ import javax.net.ssl.X509ExtendedTrustManager
 import javax.net.ssl.X509TrustManager
 
 /**
- * Optional public-key (SPKI) pinning for every connection NitroFetch opens: both Cronet engines and the
+ * Optional public-key (SPKI) pinning for every connection NitroFetch opens: the Cronet engine and the
  * HttpURLConnection paths (cold-start token refresh, FormData parts fetched from a URL).
  *
  * Cronet uses its own BoringSSL trust stack and ignores network_security_config.xml, so the pins are
