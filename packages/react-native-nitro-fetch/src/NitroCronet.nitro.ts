@@ -44,6 +44,12 @@ export interface UrlRequestBuilder extends HybridObject<{
   disableCache(): void;
   disableCookies(): void;
   setPriority(priority: NitroRequestPriority): void;
+  /**
+   * Runs the request on the default client's Cronet engine (Android) or
+   * URLSession (iOS) instead of the stream client's own, so it shares the
+   * default client's connections and HTTP cache.
+   */
+  useDefaultClient(): void;
   onSucceeded(callback: (info: UrlResponseInfo) => void): void;
   onFailed(
     callback: (

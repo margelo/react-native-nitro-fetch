@@ -102,6 +102,10 @@ namespace margelo::nitro::nitrofetch {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JNitroRequestPriority> /* priority */)>("setPriority");
     method(_javaPart, JNitroRequestPriority::fromCpp(priority));
   }
+  void JHybridUrlRequestBuilderSpec::useDefaultClient() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("useDefaultClient");
+    method(_javaPart);
+  }
   void JHybridUrlRequestBuilderSpec::onSucceeded(const std::function<void(const UrlResponseInfo& /* info */)>& callback) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void(jni::alias_ref<JFunc_void_UrlResponseInfo::javaobject> /* callback */)>("onSucceeded_cxx");
     method(_javaPart, JFunc_void_UrlResponseInfo_cxx::fromCpp(callback));

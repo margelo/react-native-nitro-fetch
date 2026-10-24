@@ -3,7 +3,7 @@ import NitroModules
 
 class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
   private let url: String
-  private let session: URLSession
+  private var session: URLSession
   private let executor: DispatchQueue
 
   // Callbacks stored as optionals and set via setter methods
@@ -93,6 +93,10 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
 
   func setPriority(priority: NitroRequestPriority) throws {
     self.priority = priority.taskPriority
+  }
+
+  func useDefaultClient() throws {
+    self.session = HybridNitroFetchClient.session
   }
 
   func build() throws -> any HybridUrlRequestSpec {

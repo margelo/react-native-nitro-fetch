@@ -2,7 +2,6 @@ package com.margelo.nitro.nitrofetch
 
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.core.ArrayBuffer
-import org.chromium.net.CronetEngine
 import org.chromium.net.UrlRequest as CronetUrlRequest
 import org.chromium.net.UrlResponseInfo as CronetUrlResponseInfo
 import org.chromium.net.CronetException as CronetNativeException
@@ -18,10 +17,14 @@ private const val POOL_SIZE = 2
 
 @DoNotStrip
 class HybridUrlRequestBuilder(
-  private val engine: CronetEngine,
-  private val url: String,
-  private val executor: JavaExecutor
+  private val url: String
 ) : HybridUrlRequestBuilderSpec() {
+
+  // Set by useDefaultClient(): the request runs on the default client's Cronet
+  // engine and executor instead of the stream client's.
+  private var usesDefaultClient = false
+  private val executor: JavaExecutor
+    get() = if (usesDefaultClient) HybridNitroFetch.ioExecutor else HybridNitroCronet.ioExecutor
 
   // Callbacks stored as optionals and set via setter methods
   private var onRedirectReceivedCallback: ((info: UrlResponseInfo, newLocationUrl: String) -> Unit)? = null
@@ -31,7 +34,10 @@ class HybridUrlRequestBuilder(
   private var onFailedCallback: ((info: UrlResponseInfo?, error: RequestException) -> Unit)? = null
   private var onCanceledCallback: ((info: UrlResponseInfo?) -> Unit)? = null
 
-  private val builder: CronetUrlRequest.Builder
+  private val cronetCallback: CronetUrlRequest.Callback
+  // A Cronet request builder belongs to one engine, so the setters queue their
+  // calls and build() applies them once the engine is known.
+  private val builderCalls = ArrayList<(CronetUrlRequest.Builder) -> Unit>()
   // BuildConfig.DEBUG short-circuits in release so R8 strips DevTools paths.
   // UUID generation is gated too so SecureRandom isn't touched in release.
   // Opt out via `NitroFetch_disableDevToolsReporting=true` in gradle.properties
@@ -168,7 +174,7 @@ class HybridUrlRequestBuilder(
   init {
     if (hostHasWhitespace(url)) throw invalidUrlException(url)
 
-    val cronetCallback = object : CronetUrlRequest.Callback() {
+    cronetCallback = object : CronetUrlRequest.Callback() {
 
       override fun onRedirectReceived(
         request: CronetUrlRequest,
@@ -291,18 +297,16 @@ class HybridUrlRequestBuilder(
         }
       }
     }
-
-    builder = engine.newUrlRequestBuilder(url, cronetCallback, executor)
   }
 
   override fun setHttpMethod(httpMethod: String) {
     this.httpMethod = httpMethod
-    builder.setHttpMethod(httpMethod)
+    builderCalls.add { it.setHttpMethod(httpMethod) }
   }
 
   override fun addHeader(name: String, value: String) {
     requestHeaders[name] = value
-    builder.addHeader(name, value)
+    builderCalls.add { it.addHeader(name, value) }
   }
 
   override fun setUploadBody(body: Variant_ArrayBuffer_String) {
@@ -341,11 +345,11 @@ class HybridUrlRequestBuilder(
       }
     }
 
-    builder.setUploadDataProvider(provider, executor)
+    builderCalls.add { it.setUploadDataProvider(provider, executor) }
   }
 
   override fun disableCache() {
-    builder.disableCache()
+    builderCalls.add { it.disableCache() }
   }
 
   override fun disableCookies() {
@@ -353,7 +357,11 @@ class HybridUrlRequestBuilder(
   }
 
   override fun setPriority(priority: NitroRequestPriority) {
-    builder.setPriority(priority.cronetPriority)
+    builderCalls.add { it.setPriority(priority.cronetPriority) }
+  }
+
+  override fun useDefaultClient() {
+    usesDefaultClient = true
   }
 
   override fun onSucceeded(callback: (info: UrlResponseInfo) -> Unit) {
@@ -388,6 +396,13 @@ class HybridUrlRequestBuilder(
         requestHeaders.keys.any { it.equals("Cookie", ignoreCase = true) }
       ) { name, value -> addHeader(name, value) }
     }
+    val engine = if (usesDefaultClient) {
+      HybridNitroFetch.getEngine()
+    } else {
+      HybridNitroCronet.getOrCreateCronetEngine()
+    }
+    val builder = engine.newUrlRequestBuilder(url, cronetCallback, executor)
+    builderCalls.forEach { it(builder) }
     val cronetRequest = builder.build()
     if (devToolsEnabled) {
       DevToolsReporter.reportRequestStart(

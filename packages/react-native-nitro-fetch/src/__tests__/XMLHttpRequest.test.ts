@@ -135,6 +135,119 @@ describe('NitroXMLHttpRequest', () => {
     );
   });
 
+  it.each(['', 'text', 'json'] as const)(
+    'uses the buffered transport for a %p response nothing observes early',
+    async (responseType) => {
+      const encoder = new TextEncoder();
+      const response = makeResponse([encoder.encode('{"ok":true}')]);
+      mockNitroFetch.mockResolvedValue(response);
+
+      const xhr = new NitroXMLHttpRequest();
+      xhr.onload = () => {};
+      xhr.upload.addEventListener('progress', () => {});
+      xhr.open('POST', 'https://example.com/plain');
+      xhr.responseType = responseType;
+      const completed = waitForEvent(xhr, 'loadend');
+      xhr.send('body');
+      await completed;
+
+      expect(xhr.response).toEqual(
+        responseType === 'json' ? { ok: true } : '{"ok":true}'
+      );
+      expect(mockNitroFetch).toHaveBeenCalledWith(
+        'https://example.com/plain',
+        expect.objectContaining({ body: 'body', stream: false })
+      );
+    }
+  );
+
+  it.each<[string, string, (xhr: NitroXMLHttpRequestInstance) => void]>([
+    [
+      'onreadystatechange is set',
+      'GET',
+      (xhr) => {
+        xhr.onreadystatechange = () => {};
+      },
+    ],
+    [
+      'onprogress is set',
+      'GET',
+      (xhr) => {
+        xhr.onprogress = () => {};
+      },
+    ],
+    [
+      'a progress listener is added',
+      'GET',
+      (xhr) => {
+        xhr.addEventListener('progress', () => {});
+      },
+    ],
+    [
+      'the response is an arraybuffer',
+      'GET',
+      (xhr) => {
+        xhr.responseType = 'arraybuffer';
+      },
+    ],
+    [
+      'the response is a blob',
+      'GET',
+      (xhr) => {
+        xhr.responseType = 'blob';
+      },
+    ],
+    ['the buffered client cannot send the method', 'PROPFIND', () => {}],
+  ])('streams when %s', async (_reason, method, setUp) => {
+    const encoder = new TextEncoder();
+    const response = makeResponse([encoder.encode('ok')]);
+    mockNitroFetch.mockResolvedValue(response);
+
+    const xhr = new NitroXMLHttpRequest();
+    xhr.open(method, 'https://example.com/streamed');
+    setUp(xhr);
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+    await completed;
+
+    expect(mockNitroFetch).toHaveBeenCalledWith(
+      'https://example.com/streamed',
+      expect.objectContaining({ method, stream: true, _useDefaultClient: true })
+    );
+  });
+
+  it.each<[string, boolean]>([
+    ['text/event-stream', true],
+    ['Text/Event-Stream', true],
+    ['text/event-stream; charset=utf-8', true],
+    ['application/json, text/event-stream;q=0.9', true],
+    ['application/json, text/plain, */*', false],
+    ['text/event-streams', false],
+  ])(
+    'with Accept %p, streams on the stream client: %p',
+    async (accept, streamClient) => {
+      const encoder = new TextEncoder();
+      const response = makeResponse([encoder.encode('data: ok\n\n')]);
+      mockNitroFetch.mockResolvedValue(response);
+
+      const xhr = new NitroXMLHttpRequest();
+      xhr.onreadystatechange = () => {};
+      xhr.open('GET', 'https://example.com/events');
+      xhr.setRequestHeader('Accept', accept);
+      const completed = waitForEvent(xhr, 'loadend');
+      xhr.send();
+      await completed;
+
+      expect(mockNitroFetch).toHaveBeenCalledWith(
+        'https://example.com/events',
+        expect.objectContaining({
+          stream: true,
+          _useDefaultClient: !streamClient,
+        })
+      );
+    }
+  );
+
   it('returns parsed JSON for responseType json', async () => {
     const encoder = new TextEncoder();
     const response = makeResponse([encoder.encode('{"value":42}')]);
