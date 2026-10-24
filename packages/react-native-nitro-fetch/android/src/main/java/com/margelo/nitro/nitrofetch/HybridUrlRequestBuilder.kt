@@ -10,6 +10,12 @@ import java.nio.ByteBuffer
 import java.util.UUID
 import java.util.concurrent.Executor as JavaExecutor
 
+private const val BUFFER_SIZE = 65536
+// Chunks JS can have queued before native stops reading.
+private const val MAX_QUEUED_CHUNKS = 16
+// Chunk buffers kept for reuse after JS has copied them.
+private const val POOL_SIZE = 2
+
 @DoNotStrip
 class HybridUrlRequestBuilder(
   private val engine: CronetEngine,
@@ -26,7 +32,6 @@ class HybridUrlRequestBuilder(
   private var onCanceledCallback: ((info: UrlResponseInfo?) -> Unit)? = null
 
   private val builder: CronetUrlRequest.Builder
-  private val byteBuffer: ByteBuffer
   // BuildConfig.DEBUG short-circuits in release so R8 strips DevTools paths.
   // UUID generation is gated too so SecureRandom isn't touched in release.
   // Opt out via `NitroFetch_disableDevToolsReporting=true` in gradle.properties
@@ -43,12 +48,125 @@ class HybridUrlRequestBuilder(
   private var uploadBodyString: String = ""
   private var uploadBodyLength: Long = 0L
 
+  // Native reads the body without waiting for JS: each JS callback waits in
+  // React Native's task queue, so a read per callback would add a wait per
+  // chunk. Every Cronet read lands in readBuffer and is copied into a chunk.
+  // A chunk goes to JS once JS has handled the earlier ones, once it is full,
+  // or when the body ends, so reads add up into full chunks while JS is busy.
+  // JS calls read() after each chunk, which hands the chunk back.
+  // bodyLock guards this state: Cronet calls back on a thread pool and read()
+  // comes from the JS thread. Chunks are sent under it, so JS gets them in order.
+  private class Chunk {
+    val arrayBuffer: ArrayBuffer = ArrayBuffer.allocate(BUFFER_SIZE)
+    val bytes: ByteBuffer = arrayBuffer.getBuffer(false)
+  }
+  private val bodyLock = Any()
+  private var readBuffer: ByteBuffer? = null
+  private var filling: Chunk? = null
+  private val queued = ArrayDeque<Chunk>()
+  private val pool = ArrayList<Chunk>(POOL_SIZE)
+  private var stoppedRequest: CronetUrlRequest? = null
+  private var resumePosted = false
+  private var settled = false
+  private var bodyInfo: UrlResponseInfo? = null
+
+  private fun takeChunk(): Chunk {
+    val chunk = pool.removeLastOrNull() ?: Chunk()
+    chunk.bytes.clear()
+    return chunk
+  }
+
+  // Under bodyLock.
+  private fun send(chunk: Chunk) {
+    queued.addLast(chunk)
+    onReadCompletedCallback?.invoke(bodyInfo!!, chunk.arrayBuffer, chunk.bytes.position().toDouble())
+  }
+
+  // Under bodyLock. Whether the filling chunk should go to JS now.
+  private fun fillingIsDue(): Boolean {
+    val bytes = filling?.bytes ?: return false
+    if (bytes.position() == 0) return false
+    return queued.isEmpty() || (!bytes.hasRemaining() && queued.size < MAX_QUEUED_CHUNKS)
+  }
+
+  // Under bodyLock.
+  private fun sendFilling() {
+    val chunk = filling ?: return
+    if (chunk.bytes.position() == 0) return
+    filling = null
+    send(chunk)
+  }
+
+  // Under bodyLock. Starts the next read, or stops reading until JS hands a
+  // chunk back. With every chunk slot taken, a read only gets the room left
+  // in the filling chunk.
+  private fun readNext(request: CronetUrlRequest) {
+    val room = if (queued.size < MAX_QUEUED_CHUNKS) BUFFER_SIZE else filling?.bytes?.remaining() ?: BUFFER_SIZE
+    if (room == 0) {
+      stoppedRequest = request
+      return
+    }
+    val buffer = readBuffer!!
+    buffer.clear()
+    buffer.limit(room)
+    request.read(buffer)
+  }
+
+  // Under bodyLock. Copies a read into chunks, sending each chunk it fills.
+  private fun append(read: ByteBuffer) {
+    while (read.hasRemaining()) {
+      val chunk = filling ?: takeChunk().also { filling = it }
+      val bytes = chunk.bytes
+      val end = read.limit()
+      read.limit(read.position() + minOf(read.remaining(), bytes.remaining()))
+      bytes.put(read)
+      read.limit(end)
+      // readNext sizes reads so that bytes never remain once every slot is taken.
+      if (!bytes.hasRemaining() && (queued.size < MAX_QUEUED_CHUNKS || read.hasRemaining())) {
+        filling = null
+        send(chunk)
+      }
+    }
+  }
+
+  // Runs on the Cronet executor after JS hands a chunk back.
+  private val resume = Runnable {
+    synchronized(bodyLock) {
+      resumePosted = false
+      if (settled) return@Runnable
+      if (fillingIsDue()) sendFilling()
+      val request = stoppedRequest ?: return@Runnable
+      stoppedRequest = null
+      readNext(request)
+    }
+  }
+
+  private fun onChunkHandled() {
+    synchronized(bodyLock) {
+      if (settled) return
+      val chunk = queued.removeFirstOrNull() ?: return
+      if (pool.size < POOL_SIZE) pool.add(chunk)
+      if (!resumePosted && (stoppedRequest != null || fillingIsDue())) {
+        resumePosted = true
+        executor.execute(resume)
+      }
+    }
+  }
+
+  // Under bodyLock. Once the request settles nothing reads the buffers again;
+  // JS has its own reference to every chunk it was sent.
+  private fun settle() {
+    settled = true
+    readBuffer = null
+    filling = null
+    queued.clear()
+    pool.clear()
+    stoppedRequest = null
+    bodyInfo = null
+  }
+
   init {
     if (hostHasWhitespace(url)) throw invalidUrlException(url)
-
-    // Allocate ONE reusable owning buffer for all reads (64KB)
-    val reusableBuffer = ArrayBuffer.allocate(65536)
-    byteBuffer = reusableBuffer.getBuffer(false)
 
     val cronetCallback = object : CronetUrlRequest.Callback() {
 
@@ -87,9 +205,14 @@ class HybridUrlRequestBuilder(
             -1L
           )
         }
-        onResponseStartedCallback?.let { callback ->
-          val nitroInfo = info.toNitro()
-          callback(nitroInfo)
+        val nitroInfo = info.toNitro()
+        synchronized(bodyLock) {
+          if (settled) return
+          // Converted once: every chunk is sent with the same info.
+          bodyInfo = nitroInfo
+          readBuffer = ByteBuffer.allocateDirect(BUFFER_SIZE)
+          onResponseStartedCallback?.invoke(nitroInfo)
+          readNext(request)
         }
       }
 
@@ -110,9 +233,12 @@ class HybridUrlRequestBuilder(
             DevToolsReporter.storeResponseBodyIncremental(devToolsRequestId, String(arr, Charsets.UTF_8))
           }
         }
-        onReadCompletedCallback?.let { callback ->
-          val nitroInfo = info.toNitro()
-          callback(nitroInfo, reusableBuffer, bytesRead.toDouble())
+        synchronized(bodyLock) {
+          if (settled) return
+          receivedBuffer.flip()
+          append(receivedBuffer)
+          if (queued.isEmpty()) sendFilling()
+          readNext(request)
         }
       }
 
@@ -123,9 +249,12 @@ class HybridUrlRequestBuilder(
         if (devToolsEnabled) {
           DevToolsReporter.reportResponseEnd(devToolsRequestId, devToolsBytes.toLong())
         }
-        onSucceededCallback?.let { callback ->
-          val nitroInfo = info.toNitro()
-          callback(nitroInfo)
+        val nitroInfo = info.toNitro()
+        synchronized(bodyLock) {
+          if (settled) return
+          sendFilling()
+          onSucceededCallback?.invoke(nitroInfo)
+          settle()
         }
       }
 
@@ -137,10 +266,13 @@ class HybridUrlRequestBuilder(
         if (devToolsEnabled) {
           DevToolsReporter.reportRequestFailed(devToolsRequestId, false)
         }
-        onFailedCallback?.let { callback ->
-          val nitroInfo = info?.toNitro()
-          val nitroError = error.toNitro(url)
-          callback(nitroInfo, nitroError)
+        val nitroInfo = info?.toNitro()
+        val nitroError = error.toNitro(url)
+        synchronized(bodyLock) {
+          if (settled) return
+          sendFilling()
+          onFailedCallback?.invoke(nitroInfo, nitroError)
+          settle()
         }
       }
 
@@ -151,9 +283,11 @@ class HybridUrlRequestBuilder(
         if (devToolsEnabled) {
           DevToolsReporter.reportRequestFailed(devToolsRequestId, true)
         }
-        onCanceledCallback?.let { callback ->
-          val nitroInfo = info?.toNitro()
-          callback(nitroInfo)
+        val nitroInfo = info?.toNitro()
+        synchronized(bodyLock) {
+          if (settled) return
+          onCanceledCallback?.invoke(nitroInfo)
+          settle()
         }
       }
     }
@@ -265,6 +399,6 @@ class HybridUrlRequestBuilder(
         uploadBodyLength
       )
     }
-    return HybridUrlRequest(cronetRequest, byteBuffer)
+    return HybridUrlRequest(cronetRequest, ::onChunkHandled)
   }
 }
