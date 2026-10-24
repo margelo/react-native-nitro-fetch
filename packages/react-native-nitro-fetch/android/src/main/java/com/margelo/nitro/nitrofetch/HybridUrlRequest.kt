@@ -2,12 +2,11 @@ package com.margelo.nitro.nitrofetch
 
 import com.facebook.proguard.annotations.DoNotStrip
 import org.chromium.net.UrlRequest as CronetUrlRequest
-import java.nio.ByteBuffer
 
 @DoNotStrip
 class HybridUrlRequest(
   private val cronetRequest: CronetUrlRequest,
-  private val byteBuffer: ByteBuffer
+  private val onChunkHandled: () -> Unit
 ) : HybridUrlRequestSpec() {
 
   override fun start() {
@@ -19,10 +18,7 @@ class HybridUrlRequest(
   }
 
   override fun read() {
-    // Prepare buffer for writing (position=0, limit=capacity)
-    byteBuffer.clear()
-    // Pass to Cronet to fill
-    cronetRequest.read(byteBuffer)
+    onChunkHandled()
   }
 
   override fun cancel() {

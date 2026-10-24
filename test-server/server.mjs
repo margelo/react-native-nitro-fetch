@@ -234,10 +234,13 @@ app.get('/stream/:n', (req, res) => {
 // mid-body instead of draining the response to completion.
 const dripReports = new Map();
 
+// ?chunk=N sends N bytes per piece instead of 1. ?fail=1 drops the connection
+// after the last piece instead of ending the body.
 app.get('/drip', (req, res) => {
   const duration = parseFloat(req.query.duration ?? '2');
   const numbytes = Math.max(0, parseInt(req.query.numbytes ?? '10', 10));
   const delay = parseFloat(req.query.delay ?? '0');
+  const chunk = Buffer.alloc(Math.max(1, parseInt(req.query.chunk ?? '1', 10) || 1), 0x2a);
   const id = req.query.id;
   res.set('Content-Type', 'application/octet-stream');
   const interval = numbytes > 0 ? Math.max(1, (duration * 1000) / numbytes) : 0;
@@ -252,10 +255,11 @@ app.get('/drip', (req, res) => {
   const drip = () => {
     if (closed) return;
     if (sent >= numbytes) {
+      if (req.query.fail) return res.destroy();
       report.finished = true;
       return res.end();
     }
-    res.write(Buffer.from([0x2a]));
+    res.write(chunk);
     sent++;
     report.sent = sent;
     setTimeout(drip, interval);

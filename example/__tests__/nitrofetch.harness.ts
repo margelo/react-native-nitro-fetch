@@ -1395,6 +1395,80 @@ describe('NitroFetch - Streaming', () => {
     expect(report.finished).toBe(false);
   });
 
+  // 4 MB over 4 s. While JS is blocked, native queues as many chunks as it
+  // may and stops reading, so the abort reaches a request that is paused.
+  it('aborting while native waits for JavaScript disconnects too', async () => {
+    const id = `paused-abort-${String(Date.now())}`;
+    const controller = new AbortController();
+    const res = (await (nitroFetch as any)(
+      `${BASE}/drip?duration=4&numbytes=64&chunk=65536&delay=0&id=${id}`,
+      { stream: true, signal: controller.signal }
+    )) as any;
+    const reader = res.body.getReader();
+    await reader.read();
+    blockJsThread(2_000);
+    controller.abort();
+
+    const outcome = await reader.read().then(
+      () => 'chunk',
+      (e: any) => e?.name ?? 'rejected'
+    );
+    expect(outcome).toBe('AbortError');
+    const report = await awaitDripOutcome(id);
+    expect(report.disconnected).toBe(true);
+    expect(report.finished).toBe(false);
+  });
+
+  // URLSession reports a chunked body whose connection closes before the
+  // final chunk as complete, so only Android sees this drop as an error.
+  const itAndroid = Platform.OS === 'android' ? it : it.skip;
+
+  itAndroid('a connection dropped mid-body rejects the reader', async () => {
+    const res = (await (nitroFetch as any)(
+      `${BASE}/drip?duration=0.5&numbytes=8&chunk=65536&delay=0&fail=1`,
+      { stream: true }
+    )) as any;
+    const reader = res.body.getReader();
+    // The body and the failure arrive while JS is busy.
+    blockJsThread(1_000);
+    let received = 0;
+    const outcome = await (async () => {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) return 'done';
+        received += value.byteLength;
+      }
+    })().catch(() => 'rejected');
+    expect(outcome).toBe('rejected');
+    expect(received).toBeGreaterThan(0);
+  });
+
+  // Every 251st byte is a 'b', so a lost, repeated or reordered chunk moves
+  // a 'b'. The reader keeps JS busy for 10 ms per chunk.
+  it('delivers a multi-megabyte body byte-exact to a slow reader', async () => {
+    const period = 251;
+    const repeat = 16_000;
+    const res = (await (nitroFetch as any)(
+      `${BASE}/text?phrase=b${'a'.repeat(period - 1)}&repeat=${repeat}`,
+      { stream: true }
+    )) as any;
+    const reader = res.body.getReader();
+    let offset = 0;
+    let firstWrongByte = -1;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      for (let i = 0; i < value.length && firstWrongByte < 0; i++) {
+        const expected = (offset + i) % period === 0 ? 0x62 : 0x61;
+        if (value[i] !== expected) firstWrongByte = offset + i;
+      }
+      offset += value.length;
+      blockJsThread(10);
+    }
+    expect(firstWrongByte).toBe(-1);
+    expect(offset).toBe(period * repeat);
+  });
+
   // Smoke check, not a discriminator: a throw from a Nitro callback is
   // swallowed natively, so this only catches a cancel that wedges the client.
   it('repeated mid-stream cancels leave the client usable', async () => {
@@ -1472,6 +1546,23 @@ describe('NitroFetch - Streaming', () => {
 
     expect(chunks).toBeGreaterThan(0);
     expect(total).toBe(numBytes);
+  });
+
+  it('hands each /drip piece to the reader as it arrives', async () => {
+    const res = (await (nitroFetch as any)(
+      `${BASE}/drip?duration=2&numbytes=5&delay=0`,
+      { stream: true }
+    )) as any;
+    const reader = res.body.getReader();
+    const arrivals: number[] = [];
+    while (true) {
+      const { done } = await reader.read();
+      if (done) break;
+      arrivals.push(Date.now());
+    }
+    // The pieces are 400 ms apart, so none should wait for the next.
+    expect(arrivals.length).toBe(5);
+    expect(arrivals[4]! - arrivals[0]!).toBeGreaterThan(1_000);
   });
 });
 

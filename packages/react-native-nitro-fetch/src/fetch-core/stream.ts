@@ -188,9 +188,6 @@ export async function nitroStreamFetch(
     builder.onResponseStarted((info) => {
       if (responseResolved || signal?.aborted) return;
       resolveWith(info);
-      // Android/Cronet: kick off the first buffer read.
-      // iOS/URLSession handles reading automatically so this is a no-op there.
-      request.read();
     });
 
     builder.onReadCompleted((_info, byteBuffer, bytesRead) => {
@@ -199,9 +196,9 @@ export async function nitroStreamFetch(
       const chunk = new Uint8Array(byteBuffer, 0, bytesRead).slice();
       streamBytesReceived += bytesRead;
       streamController.enqueue(chunk);
-      if (!request.isDone()) {
-        request.read();
-      }
+      // Hands the chunk back. Native reads on its own and stops only when JS
+      // falls behind (a no-op on iOS).
+      request.read();
     });
 
     builder.onSucceeded((_info) => {
