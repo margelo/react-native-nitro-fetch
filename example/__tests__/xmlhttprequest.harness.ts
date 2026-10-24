@@ -102,3 +102,446 @@ describe('XMLHttpRequest streamed responseText', () => {
     expect(large.responseText.length).toBe(largeExpected.length);
   });
 });
+
+describe('XMLHttpRequest state and validation', () => {
+  type Request = InstanceType<typeof NitroXMLHttpRequest>;
+
+  const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  const sleep = (ms: number) =>
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+  // The name of the error fn throws, or 'no error'.
+  const errorName = (fn: () => unknown): string => {
+    try {
+      fn();
+    } catch (error) {
+      return (error as Error).name;
+    }
+    return 'no error';
+  };
+
+  // Resolves at loadend with the event before it (load, error, abort or
+  // timeout), or with 'no loadend' after ms.
+  const ended = (xhr: Request, ms = 10000) =>
+    new Promise<string>((resolve) => {
+      let outcome = 'no loadend';
+      const timer = setTimeout(() => resolve(outcome), ms);
+      for (const type of ['load', 'error', 'abort', 'timeout']) {
+        xhr.addEventListener(type, () => {
+          outcome = type;
+        });
+      }
+      xhr.addEventListener('loadend', () => {
+        clearTimeout(timer);
+        resolve(outcome);
+      });
+    });
+
+  // The methods of the requests that reached /hits/:id.
+  const hitsAt = async (id: string): Promise<string[]> => {
+    const response = await fetch(`${BASE}/hits-report/${id}`);
+    return (await response.json()).methods;
+  };
+
+  // Waits until /drip?id= finished or its client disconnected.
+  const dripReport = async (id: string) => {
+    const until = Date.now() + 6000;
+    while (true) {
+      const response = await fetch(`${BASE}/drip-report/${id}`);
+      const report = await response.json();
+      if (report.finished || report.disconnected || Date.now() > until) {
+        return report;
+      }
+      await sleep(100);
+    }
+  };
+
+  it('throws InvalidStateError for calls in the wrong state', () => {
+    const xhr = new NitroXMLHttpRequest();
+    const errors: Record<string, string> = {};
+    errors.headerBeforeOpen = errorName(() => xhr.setRequestHeader('X-A', '1'));
+    errors.sendBeforeOpen = errorName(() => xhr.send());
+    xhr.open('GET', `${BASE}/delay/3`);
+    xhr.responseType = 'json';
+    errors.responseTextForJSON = errorName(() => xhr.responseText);
+    xhr.send();
+    errors.sendTwice = errorName(() => xhr.send());
+    errors.headerAfterSend = errorName(() => xhr.setRequestHeader('X-A', '1'));
+    xhr.abort();
+
+    expect(errors).toEqual({
+      headerBeforeOpen: 'InvalidStateError',
+      sendBeforeOpen: 'InvalidStateError',
+      responseTextForJSON: 'InvalidStateError',
+      sendTwice: 'InvalidStateError',
+      headerAfterSend: 'InvalidStateError',
+    });
+  });
+
+  it('allows setting responseType until LOADING', async () => {
+    const xhr = new NitroXMLHttpRequest();
+    const errors: Record<string, string> = {};
+    xhr.onreadystatechange = () => {
+      const setResponseType = () =>
+        errorName(() => {
+          xhr.responseType = 'text';
+        });
+      if (xhr.readyState === NitroXMLHttpRequest.HEADERS_RECEIVED) {
+        errors.headersReceived = setResponseType();
+      } else if (xhr.readyState === NitroXMLHttpRequest.LOADING) {
+        errors.loading ??= setResponseType();
+      } else if (xhr.readyState === NitroXMLHttpRequest.DONE) {
+        errors.done = setResponseType();
+      }
+    };
+    // Download progress streams the body, so LOADING comes before the end.
+    xhr.onprogress = () => {};
+    xhr.open('GET', `${BASE}/drip?numbytes=4&duration=0.4`);
+    const done = ended(xhr);
+    xhr.send();
+    errors.afterSend = errorName(() => {
+      xhr.responseType = 'text';
+    });
+    const outcome = await done;
+
+    expect({ outcome, errors, responseText: xhr.responseText }).toEqual({
+      outcome: 'load',
+      errors: {
+        afterSend: 'no error',
+        headersReceived: 'no error',
+        loading: 'InvalidStateError',
+        done: 'InvalidStateError',
+      },
+      responseText: '****',
+    });
+  });
+
+  it('rejects CONNECT, TRACE and TRACK in open() and sends nothing', async () => {
+    const id = uid();
+    const url = `${BASE}/hits/${id}`;
+    const errors: Record<string, string> = {};
+    const requests: Request[] = [];
+    for (const method of ['CONNECT', 'TRACE', 'trace', 'TRACK', 'Track']) {
+      const xhr = new NitroXMLHttpRequest();
+      requests.push(xhr);
+      errors[`open ${method}`] = errorName(() => xhr.open(method, url));
+      errors[`send ${method}`] = errorName(() => xhr.send());
+    }
+    // A request that is sent shows up in the report.
+    const control = new NitroXMLHttpRequest();
+    control.open('GET', url);
+    const done = ended(control);
+    control.send();
+    await done;
+    const methods = await hitsAt(id);
+    requests.forEach((xhr) => xhr.abort());
+
+    expect({ errors, methods }).toEqual({
+      errors: {
+        'open CONNECT': 'SecurityError',
+        'send CONNECT': 'InvalidStateError',
+        'open TRACE': 'SecurityError',
+        'send TRACE': 'InvalidStateError',
+        'open trace': 'SecurityError',
+        'send trace': 'InvalidStateError',
+        'open TRACK': 'SecurityError',
+        'send TRACK': 'InvalidStateError',
+        'open Track': 'SecurityError',
+        'send Track': 'InvalidStateError',
+      },
+      methods: ['GET'],
+    });
+  });
+
+  it('rejects invalid methods and URLs in open() and sends nothing', async () => {
+    const id = uid();
+    const url = `${BASE}/hits/${id}`;
+    const badPort = `${BASE.replace(/:\d+$/, '')}:99999/hits/${id}`;
+    const errors: Record<string, string> = {};
+    const requests: Request[] = [];
+    const attempt = (label: string, method: string, target: string) => {
+      const xhr = new NitroXMLHttpRequest();
+      requests.push(xhr);
+      errors[label] = errorName(() => {
+        xhr.open(method, target);
+        xhr.send();
+      });
+    };
+    for (const method of ['GE T', 'GET\n', '', 'GET(']) {
+      attempt(`method ${JSON.stringify(method)}`, method, url);
+    }
+    for (const target of ['http://[', 'http://exa mple.com/', badPort]) {
+      attempt(`URL ${target}`, 'GET', target);
+    }
+    const control = new NitroXMLHttpRequest();
+    control.open('GET', url);
+    const done = ended(control);
+    control.send();
+    await done;
+    const methods = await hitsAt(id);
+    requests.forEach((xhr) => xhr.abort());
+
+    expect({ errors, methods }).toEqual({
+      errors: {
+        'method "GE T"': 'SyntaxError',
+        'method "GET\\n"': 'SyntaxError',
+        'method ""': 'SyntaxError',
+        'method "GET("': 'SyntaxError',
+        'URL http://[': 'SyntaxError',
+        'URL http://exa mple.com/': 'SyntaxError',
+        [`URL ${badPort}`]: 'SyntaxError',
+      },
+      methods: ['GET'],
+    });
+  });
+
+  it('rejects invalid header names and values in setRequestHeader()', async () => {
+    const xhr = new NitroXMLHttpRequest();
+    xhr.open('GET', `${BASE}/headers`);
+    const errors: Record<string, string> = {};
+    for (const name of ['Bad Header', 'X-A:', 'X-\u00c4']) {
+      errors[`name ${JSON.stringify(name)}`] = errorName(() =>
+        xhr.setRequestHeader(name, 'v')
+      );
+    }
+    for (const value of ['a\r\nInjected: 1', 'a\nInjected: 1', 'a\u0000b']) {
+      errors[`value ${JSON.stringify(value)}`] = errorName(() =>
+        xhr.setRequestHeader('X-Bad', value)
+      );
+    }
+    // Leading and trailing whitespace is dropped, not rejected.
+    errors.padded = errorName(() =>
+      xhr.setRequestHeader('X-Padded', ' \tvalue\t ')
+    );
+    const done = ended(xhr);
+    xhr.send();
+    const outcome = await done;
+    const headers =
+      outcome === 'load' ? JSON.parse(xhr.responseText).headers : {};
+
+    expect({
+      errors,
+      outcome,
+      padded: headers['X-Padded'],
+      bad: headers['X-Bad'] ?? null,
+      injected: headers.Injected ?? null,
+    }).toEqual({
+      errors: {
+        'name "Bad Header"': 'SyntaxError',
+        'name "X-A:"': 'SyntaxError',
+        'name "X-\u00c4"': 'SyntaxError',
+        'value "a\\r\\nInjected: 1"': 'SyntaxError',
+        'value "a\\nInjected: 1"': 'SyntaxError',
+        'value "a\\u0000b"': 'SyntaxError',
+        'padded': 'no error',
+      },
+      outcome: 'load',
+      padded: 'value',
+      bad: null,
+      injected: null,
+    });
+  });
+
+  it('open() during a response stops it without events and reuses the object', async () => {
+    const id = uid();
+    const xhr = new NitroXMLHttpRequest();
+    const events: string[] = [];
+    for (const type of [
+      'readystatechange',
+      'abort',
+      'error',
+      'timeout',
+      'load',
+      'loadend',
+    ]) {
+      xhr.addEventListener(type, () => events.push(type));
+    }
+    const loading = new Promise<void>((resolve) => {
+      xhr.onprogress = () => resolve();
+    });
+    xhr.open('GET', `${BASE}/drip?numbytes=30&duration=3&id=${id}`);
+    xhr.send();
+    await loading;
+    const stateBefore = xhr.readyState;
+    xhr.onprogress = null;
+    events.length = 0;
+    const openError = errorName(() =>
+      xhr.open('GET', `${BASE}/get?reopened=1`)
+    );
+    const stateAfter = xhr.readyState;
+    const eventsFromOpen = [...events];
+    const report = await dripReport(id);
+    const done = ended(xhr);
+    const sendError = errorName(() => xhr.send());
+    const outcome = sendError === 'no error' ? await done : 'not sent';
+    const reopened =
+      outcome === 'load' ? JSON.parse(xhr.responseText).args.reopened : null;
+
+    expect({
+      stateBefore,
+      openError,
+      stateAfter,
+      eventsFromOpen,
+      disconnected: report.disconnected,
+      finished: report.finished,
+      outcome,
+      reopened,
+    }).toEqual({
+      stateBefore: NitroXMLHttpRequest.LOADING,
+      openError: 'no error',
+      stateAfter: NitroXMLHttpRequest.OPENED,
+      // Only the state change to OPENED.
+      eventsFromOpen: ['readystatechange'],
+      disconnected: true,
+      finished: false,
+      outcome: 'load',
+      reopened: '1',
+    });
+  });
+
+  it('open() after DONE reuses the object', async () => {
+    const xhr = new NitroXMLHttpRequest();
+    xhr.open('GET', `${BASE}/get?n=1`);
+    let done = ended(xhr);
+    xhr.send();
+    const firstOutcome = await done;
+    const openError = errorName(() => xhr.open('GET', `${BASE}/get?n=2`));
+    done = ended(xhr);
+    const sendError = errorName(() => xhr.send());
+    const outcome = sendError === 'no error' ? await done : 'not sent';
+    const n = outcome === 'load' ? JSON.parse(xhr.responseText).args.n : null;
+
+    expect({ firstOutcome, openError, outcome, n }).toEqual({
+      firstOutcome: 'load',
+      openError: 'no error',
+      outcome: 'load',
+      n: '2',
+    });
+  });
+
+  it('abort() before send() keeps the request OPENED, and send() works', async () => {
+    const xhr = new NitroXMLHttpRequest();
+    const events: string[] = [];
+    xhr.open('GET', `${BASE}/get?kept=1`);
+    xhr.setRequestHeader('X-Kept', '1');
+    for (const type of ['readystatechange', 'abort', 'loadend']) {
+      xhr.addEventListener(type, () => events.push(type));
+    }
+    xhr.abort();
+    const eventsFromAbort = [...events];
+    const state = xhr.readyState;
+    const done = ended(xhr);
+    const sendError = errorName(() => xhr.send());
+    const outcome = sendError === 'no error' ? await done : 'not sent';
+    const body = outcome === 'load' ? JSON.parse(xhr.responseText) : null;
+
+    expect({
+      eventsFromAbort,
+      state,
+      sendError,
+      outcome,
+      query: body?.args.kept,
+      header: body?.headers['X-Kept'],
+    }).toEqual({
+      eventsFromAbort: [],
+      state: NitroXMLHttpRequest.OPENED,
+      sendError: 'no error',
+      outcome: 'load',
+      query: '1',
+      header: '1',
+    });
+  });
+
+  it('applies a timeout set after send() from the start of send()', async () => {
+    const xhr = new NitroXMLHttpRequest();
+    xhr.open('GET', `${BASE}/delay/3`);
+    const done = ended(xhr);
+    const start = Date.now();
+    xhr.send();
+    await sleep(600);
+    // 200 ms after this, not 800 ms.
+    xhr.timeout = 800;
+    const outcome = await done;
+    const elapsed = Date.now() - start;
+
+    expect({ outcome, fromSend: elapsed >= 700 && elapsed < 1200 }).toEqual({
+      outcome: 'timeout',
+      fromSend: true,
+    });
+  });
+
+  it('stops the timer when timeout is set to 0 after send()', async () => {
+    const xhr = new NitroXMLHttpRequest();
+    xhr.timeout = 300;
+    xhr.open('GET', `${BASE}/delay/1`);
+    const done = ended(xhr);
+    xhr.send();
+    xhr.timeout = 0;
+
+    expect(await done).toBe('load');
+  });
+
+  it('does not call a listener removed during dispatch', async () => {
+    const xhr = new NitroXMLHttpRequest();
+    const calls: string[] = [];
+    const removed = () => calls.push('removed');
+    xhr.addEventListener('load', () => {
+      calls.push('first');
+      xhr.removeEventListener('load', removed);
+    });
+    xhr.addEventListener('load', removed);
+    xhr.addEventListener('load', () => calls.push('last'));
+    xhr.open('GET', `${BASE}/get`);
+    const done = ended(xhr);
+    xhr.send();
+    await done;
+
+    expect(calls).toEqual(['first', 'last']);
+  });
+
+  it('reports throwing listeners and keeps dispatching', async () => {
+    const boom = new Error('listener failed');
+    const reported: unknown[] = [];
+    const consoleError = console.error;
+    console.error = (error: unknown) => {
+      reported.push(error);
+    };
+    try {
+      const xhr = new NitroXMLHttpRequest();
+      const states: number[] = [];
+      let readyStateChanges = 0;
+      const seen: string[] = [];
+      xhr.addEventListener('readystatechange', () => {
+        throw boom;
+      });
+      xhr.addEventListener('readystatechange', () => {
+        readyStateChanges += 1;
+        if (states[states.length - 1] !== xhr.readyState) {
+          states.push(xhr.readyState);
+        }
+      });
+      xhr.addEventListener('load', () => {
+        throw boom;
+      });
+      for (const type of ['load', 'error', 'loadend']) {
+        xhr.addEventListener(type, () => seen.push(type));
+      }
+      const openError = errorName(() => xhr.open('GET', `${BASE}/get`));
+      const done = ended(xhr, 5000);
+      xhr.send();
+      await done;
+      const reports = reported.filter((error) => error === boom).length;
+
+      expect({ openError, states, seen, reports }).toEqual({
+        openError: 'no error',
+        states: [1, 2, 3, 4],
+        seen: ['load', 'loadend'],
+        // Every readystatechange, then load.
+        reports: readyStateChanges + 1,
+      });
+    } finally {
+      console.error = consoleError;
+    }
+  });
+});

@@ -11,14 +11,13 @@ export type XMLHttpRequestTransportRequest = {
   incremental: boolean;
   method: string;
   responseType: XMLHttpRequestResponseType;
-  timeout: number;
   url: string;
   withCredentials: boolean;
 };
 
 export type XMLHttpRequestTransportCallbacks = {
   onChunk(chunk: Uint8Array<ArrayBuffer>, loaded: number, total: number): void;
-  onComplete(error: string, timedOut: boolean): void;
+  onComplete(error: string): void;
   onResponse(
     status: number,
     headers: Record<string, string>,
@@ -118,19 +117,11 @@ export function sendXMLHttpRequest(
 ): XMLHttpRequestTransportHandle {
   const abortController = new AbortController();
   let completed = false;
-  let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const clearTimer = () => {
-    if (timeoutTimer == null) return;
-    clearTimeout(timeoutTimer);
-    timeoutTimer = null;
-  };
-
-  const complete = (error: string, timedOut: boolean) => {
+  const complete = (error: string) => {
     if (completed) return;
     completed = true;
-    clearTimer();
-    callbacks.onComplete(error, timedOut);
+    callbacks.onComplete(error);
   };
 
   const performRequest = async () => {
@@ -177,21 +168,13 @@ export function sendXMLHttpRequest(
         }
       }
 
-      complete('', false);
+      complete('');
     } catch (error) {
       if (completed) return;
       const message = error instanceof Error ? error.message : String(error);
-      complete(message, false);
+      complete(message);
     }
   };
-
-  if (request.timeout > 0) {
-    timeoutTimer = setTimeout(() => {
-      if (completed) return;
-      abortController.abort();
-      complete('Request timed out', true);
-    }, request.timeout);
-  }
 
   performRequest();
 
@@ -199,7 +182,6 @@ export function sendXMLHttpRequest(
     abort() {
       if (completed) return;
       completed = true;
-      clearTimer();
       abortController.abort();
     },
   };
