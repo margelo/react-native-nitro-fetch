@@ -16,14 +16,13 @@ export type XMLHttpRequestTransportRequest = {
 };
 
 export type XMLHttpRequestTransportCallbacks = {
-  onChunk(chunk: Uint8Array<ArrayBuffer>, loaded: number, total: number): void;
+  onChunk(chunk: Uint8Array<ArrayBuffer>, loaded: number): void;
   onComplete(error: string): void;
   onResponse(
     status: number,
     headers: Record<string, string>,
     responseURL: string
   ): void;
-  onUploadProgress(loaded: number, total: number): void;
 };
 
 export type XMLHttpRequestTransportHandle = {
@@ -40,14 +39,7 @@ function responseHeaders(response: Response): Record<string, string> {
   return headers;
 }
 
-function responseLength(response: Response): number {
-  const contentLength = response.headers.get('content-length');
-  if (contentLength == null) return -1;
-  const parsedLength = Number(contentLength);
-  return Number.isFinite(parsedLength) ? parsedLength : -1;
-}
-
-function bodySize(
+export function bodySize(
   body: Document | XMLHttpRequestBodyInit | null
 ): number | undefined {
   if (body == null) return 0;
@@ -147,13 +139,6 @@ export function sendXMLHttpRequest(
       callbacks.onResponse(response.status, headers, response.url);
       if (completed) return;
 
-      const uploadSize = bodySize(request.body);
-      if (uploadSize != null && uploadSize > 0) {
-        callbacks.onUploadProgress(uploadSize, uploadSize);
-      }
-      if (completed) return;
-
-      const total = responseLength(response);
       const body = response.body;
       if (body != null) {
         const reader = body.getReader();
@@ -165,7 +150,7 @@ export function sendXMLHttpRequest(
           if (result.value == null) continue;
           const chunk = result.value.slice();
           loaded += chunk.byteLength;
-          callbacks.onChunk(chunk, loaded, total);
+          callbacks.onChunk(chunk, loaded);
         }
       }
 
