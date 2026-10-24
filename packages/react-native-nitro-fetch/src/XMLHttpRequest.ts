@@ -182,6 +182,22 @@ const SUPPORTED_RESPONSE_TYPES: Record<ResponseType, boolean> = {
 
 let nextRequestId = 1;
 
+// The length of the bytes that end on a whole UTF-8 sequence. A sequence cut
+// off at the end waits for the next chunk.
+function completeUTF8Length(bytes: Uint8Array): number {
+  const length = bytes.byteLength;
+  // A sequence has at most 4 bytes, so a cut one starts in the last 3.
+  for (let i = length - 1; i >= 0 && i >= length - 3; i--) {
+    const byte = bytes[i] ?? 0;
+    if (byte < 0x80) return length;
+    if (byte >= 0xc0) {
+      const size = byte >= 0xf0 ? 4 : byte >= 0xe0 ? 3 : 2;
+      return length - i < size ? i : length;
+    }
+  }
+  return length;
+}
+
 /**
  * React Native-compatible XMLHttpRequest state machine backed by Nitro Fetch.
  *
@@ -240,8 +256,11 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   _performanceLogger: XHRPerformanceLogger | null = null;
 
   private _requestHandle: XMLHttpRequestTransportHandle | null = null;
+  // Binary response bytes, merged once the response is read.
   private _chunks: Uint8Array<ArrayBuffer>[] = [];
   private _loaded = 0;
+  // The start of a UTF-8 sequence that continues in the next chunk.
+  private _pendingText: Uint8Array | null = null;
 
   static __setInterceptor_DO_NOT_USE(interceptor: XHRInterceptor | null): void {
     NitroXMLHttpRequest._interceptor = interceptor;
@@ -270,6 +289,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     this._timedOut = false;
     this._chunks = [];
     this._loaded = 0;
+    this._pendingText = null;
   }
 
   get responseType(): ResponseType {
@@ -422,9 +442,9 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     total: number
   ): void {
     if (requestId !== this._requestId) return;
-    // Nitro decodes all bytes received so far. Assigning the complete text keeps
-    // split UTF-8 characters correct while preserving React Native's lifecycle.
-    this._response = responseText;
+    // Each chunk is decoded once and appended, so reading a growing response
+    // stays linear.
+    this._response += responseText;
     this._cachedResponse = undefined;
 
     const interceptor = NitroXMLHttpRequest._interceptor;
@@ -605,6 +625,8 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     const requestId = nextRequestId;
     nextRequestId += 1;
     this.__didCreateRequest(requestId);
+    // The text of a response nothing watches, delivered when it completes.
+    let bufferedText = '';
 
     this._requestHandle = sendXMLHttpRequest(
       {
@@ -620,21 +642,22 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
       {
         onChunk: (chunk, loaded, total) => {
           if (requestId !== this._requestId) return;
-          this._chunks.push(chunk);
           this._loaded = loaded;
           const receivesText =
             this._responseType !== 'arraybuffer' &&
             this._responseType !== 'blob';
-          if (receivesText && incrementalEvents) {
-            const bytes = this._mergeChunks();
-            const responseText = utf8ToString(bytes);
+          if (!receivesText) {
+            this._chunks.push(chunk);
+            this.__didReceiveDataProgress(requestId, loaded, total);
+          } else if (incrementalEvents) {
             this.__didReceiveIncrementalData(
               requestId,
-              responseText,
+              this._decodeText(chunk),
               loaded,
               total
             );
           } else {
+            bufferedText += this._decodeText(chunk);
             this.__didReceiveDataProgress(requestId, loaded, total);
           }
         },
@@ -645,10 +668,11 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
               this._responseType !== 'arraybuffer' &&
               this._responseType !== 'blob';
             if (receivesText) {
-              const bytes = this._mergeChunks();
-              const responseText = utf8ToString(bytes);
+              const responseText = this._decodeText(null);
               if (!incrementalEvents || this.readyState < this.LOADING) {
-                this.__didReceiveData(requestId, responseText);
+                this.__didReceiveData(requestId, bufferedText + responseText);
+              } else {
+                this._response += responseText;
               }
             } else if (this.readyState < this.LOADING) {
               this.setReadyState(this.LOADING);
@@ -718,6 +742,38 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
       this._incrementalEvents = true;
     }
     super.addEventListener(type, listener, options);
+  }
+
+  // Decodes the next chunk of a UTF-8 body, or with null the bytes left at
+  // the end. A sequence cut at a chunk boundary waits for the rest, so every
+  // byte is decoded once.
+  private _decodeText(chunk: Uint8Array | null): string {
+    let bytes = chunk ?? new Uint8Array(0);
+    const pending = this._pendingText;
+    if (pending != null) {
+      bytes = new Uint8Array(pending.byteLength + (chunk?.byteLength ?? 0));
+      bytes.set(pending);
+      if (chunk != null) bytes.set(chunk, pending.byteLength);
+    }
+    const end = chunk == null ? bytes.byteLength : completeUTF8Length(bytes);
+    this._pendingText = end < bytes.byteLength ? bytes.slice(end) : null;
+    // utf8ToString drops a leading byte order mark. That is only right at the
+    // start of the body, where these bytes are all that has been received.
+    let start = 0;
+    let marks = '';
+    if (this._loaded !== bytes.byteLength) {
+      while (
+        end - start >= 3 &&
+        bytes[start] === 0xef &&
+        bytes[start + 1] === 0xbb &&
+        bytes[start + 2] === 0xbf
+      ) {
+        start += 3;
+        marks += '\ufeff';
+      }
+    }
+    if (start === end) return marks;
+    return marks + utf8ToString(bytes.subarray(start, end));
   }
 
   private _mergeChunks(): Uint8Array<ArrayBuffer> {

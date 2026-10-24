@@ -51,6 +51,38 @@ function waitForEvent(
   });
 }
 
+// Cuts bytes into chunks at the given offsets.
+function splitAt(bytes: Uint8Array, offsets: number[]): Uint8Array[] {
+  const chunks: Uint8Array[] = [];
+  let start = 0;
+  for (const offset of [...offsets, bytes.byteLength]) {
+    chunks.push(bytes.slice(start, offset));
+    start = offset;
+  }
+  return chunks;
+}
+
+// Streams the chunks as a text response. When watched, responseText is read
+// on every progress event.
+async function receiveText(
+  chunks: Uint8Array[],
+  watched: boolean
+): Promise<{ responseText: string; texts: string[] }> {
+  mockNitroFetch.mockResolvedValue(makeResponse(chunks));
+  const xhr = new NitroXMLHttpRequest();
+  const texts: string[] = [];
+  if (watched) {
+    xhr.onprogress = () => {
+      texts.push(xhr.responseText);
+    };
+  }
+  xhr.open('GET', 'https://example.com/text');
+  const completed = waitForEvent(xhr, 'loadend');
+  xhr.send();
+  await completed;
+  return { responseText: xhr.responseText, texts };
+}
+
 describe('NitroXMLHttpRequest', () => {
   beforeAll(async () => {
     // Bun does not hoist Jest-compatible module mocks. Load the implementation
@@ -114,6 +146,85 @@ describe('NitroXMLHttpRequest', () => {
         stream: true,
       })
     );
+  });
+
+  it.each([
+    ['watched', true],
+    ['unwatched', false],
+  ])(
+    'decodes a %s body split anywhere like the whole body',
+    async (_name, watched) => {
+      const encoder = new TextEncoder();
+      // 2, 3 and 4 byte sequences, byte order marks at the start and inside,
+      // an invalid byte and a sequence cut off at the end of the body.
+      const body = new Uint8Array([
+        ...encoder.encode('\ufeffa\u00e9\u20ac\u{1f600}\ufeff\ufeffb'),
+        0xff,
+        ...encoder.encode('\u00e9c'),
+        0xe2,
+        0x82,
+      ]);
+      const expected = new TextDecoder().decode(body);
+      expect(expected).toBe(
+        'a\u00e9\u20ac\u{1f600}\ufeff\ufeffb\ufffd\u00e9c\ufffd'
+      );
+
+      // Empty chunks at the start, inside a sequence and at the end.
+      const splits = [[0, 2, 2, 5, body.byteLength]];
+      for (let offset = 1; offset < body.byteLength; offset++) {
+        splits.push([offset]);
+      }
+      splits.push(Array.from({ length: body.byteLength - 1 }, (_, i) => i + 1));
+      for (const offsets of splits) {
+        const { responseText, texts } = await receiveText(
+          splitAt(body, offsets),
+          watched
+        );
+        expect({ offsets, responseText }).toEqual({
+          offsets,
+          responseText: expected,
+        });
+        // While it loads, responseText only grows and holds whole characters.
+        let previous = '';
+        for (const text of texts) {
+          expect({ offsets, text }).toEqual({
+            offsets,
+            text: expected.slice(0, text.length),
+          });
+          expect(text.length).toBeGreaterThanOrEqual(previous.length);
+          previous = text;
+        }
+      }
+    }
+  );
+
+  it('decodes each byte once while responseText is read on every progress event', async () => {
+    const encoder = new TextEncoder();
+    const body = encoder.encode('ab\u00e9\u20ac\u{1f600}'.repeat(1000));
+    // 100 chunks, many of them ending inside a character.
+    const chunkSize = Math.ceil(body.byteLength / 100) + 1;
+    const offsets: number[] = [];
+    for (
+      let offset = chunkSize;
+      offset < body.byteLength;
+      offset += chunkSize
+    ) {
+      offsets.push(offset);
+    }
+    const chunks = splitAt(body, offsets);
+    const decode = jest.spyOn(TextDecoder.prototype, 'decode');
+    try {
+      const { responseText, texts } = await receiveText(chunks, true);
+
+      expect(texts).toHaveLength(chunks.length);
+      expect(responseText).toBe('ab\u00e9\u20ac\u{1f600}'.repeat(1000));
+      const decodedBytes = decode.mock.calls.reduce((sum, [input]) => {
+        return sum + ((input as Uint8Array | undefined)?.byteLength ?? 0);
+      }, 0);
+      expect(decodedBytes).toBe(body.byteLength);
+    } finally {
+      decode.mockRestore();
+    }
   });
 
   it('uses the buffered transport for React Native FormData uploads', async () => {
