@@ -7,6 +7,7 @@ import {
   prefetchOnAppStart,
   removeFromAutoPrefetch,
   __readAutoPrefetchQueue,
+  XMLHttpRequest as NitroXMLHttpRequest,
 } from 'react-native-nitro-fetch';
 import { Platform } from 'react-native';
 import { getRuntimeKind, RuntimeKind } from 'react-native-worklets';
@@ -1121,6 +1122,91 @@ describe('NitroFetch - Streaming garbage collection', () => {
     await collectGarbage();
     const alive = refs.filter((ref) => ref.deref() !== undefined).length;
     expect(alive).toBeLessThan(refs.length / 2);
+  });
+});
+
+describe('NitroFetch - Reading while JavaScript is busy', () => {
+  // Native callbacks reach JS through the RuntimeScheduler at
+  // ImmediatePriority, in the order native queues them. A task queued at that
+  // priority when a JS block ends runs after every callback native queued
+  // during the block, and before anything native queues later.
+  const runQueuedNativeCallbacks = () =>
+    new Promise<void>((resolve) => {
+      const scheduler = (globalThis as any).nativeRuntimeScheduler;
+      scheduler.unstable_scheduleCallback(
+        scheduler.unstable_ImmediatePriority,
+        () => resolve()
+      );
+    });
+
+  // Lets the request reach native, keeps JS busy while the whole response
+  // arrives, then returns once JS has handled what native sent meanwhile.
+  // A transport that reads the body natively is done by then. One that waits
+  // for JS before each read has only delivered the headers.
+  const blockJsWhileResponding = async () => {
+    await runQueuedNativeCallbacks();
+    blockJsThread(1_000);
+    await runQueuedNativeCallbacks();
+  };
+
+  // Uncompressed and uncached. Small enough to fit any read-ahead window even
+  // when native gets it in pieces as small as one TCP segment, and still two
+  // native reads after the headers: the data, then the end of the body.
+  const SIZE = 16 * 1024;
+  const url = `${BASE}/text?phrase=x&repeat=${SIZE}`;
+
+  // Each case sends one request first. The first request on a transport opens
+  // a new connection (on Android, stream: true has its own Cronet engine),
+  // which takes about a second on the emulator and would push the headers
+  // past the block.
+  const readWhileBlocked = async (init?: Record<string, unknown>) => {
+    await (await (nitroFetch as any)(url, init)).arrayBuffer();
+    const seen = { headers: false, body: false };
+    const done = (nitroFetch as any)(url, init)
+      .then((res: Response) => {
+        seen.headers = true;
+        return res.arrayBuffer();
+      })
+      .then((buffer: ArrayBuffer) => {
+        seen.body = buffer.byteLength === SIZE;
+      });
+    await blockJsWhileResponding();
+    const whenUnblocked = { ...seen };
+    await done;
+    expect(seen.body).toBe(true);
+    return whenUnblocked;
+  };
+
+  it('default fetch reads the body while JavaScript is blocked', async () => {
+    expect(await readWhileBlocked()).toEqual({ headers: true, body: true });
+  });
+
+  it('stream: true reads the body while JavaScript is blocked', async () => {
+    expect(await readWhileBlocked({ stream: true })).toEqual({
+      headers: true,
+      body: true,
+    });
+  });
+
+  const sendXMLHttpRequest = () => {
+    const xhr = new NitroXMLHttpRequest();
+    const done = new Promise<void>((resolve, reject) => {
+      xhr.onload = () => resolve();
+      xhr.onerror = () => reject(new Error('XMLHttpRequest failed'));
+    });
+    xhr.open('GET', url);
+    xhr.send();
+    return { xhr, done };
+  };
+
+  it('XMLHttpRequest reads the body while JavaScript is blocked', async () => {
+    await sendXMLHttpRequest().done;
+    const { xhr, done } = sendXMLHttpRequest();
+    await blockJsWhileResponding();
+    const readyStateWhenUnblocked = xhr.readyState;
+    await done;
+    expect(xhr.responseText.length).toBe(SIZE);
+    expect(readyStateWhenUnblocked).toBe(NitroXMLHttpRequest.DONE);
   });
 });
 
