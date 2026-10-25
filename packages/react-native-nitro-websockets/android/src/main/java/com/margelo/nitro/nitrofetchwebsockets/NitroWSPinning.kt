@@ -9,7 +9,6 @@ import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.NitroModules
 import java.io.ByteArrayInputStream
 import java.io.FileNotFoundException
-import java.io.InputStream
 import java.io.StringReader
 import java.net.URLConnection
 import java.security.KeyStore
@@ -48,7 +47,10 @@ internal object NitroWSPinning {
 
   private class DomainPins(val hashes: Set<ByteArray>, val includeSubdomains: Boolean, val expiration: Date)
 
-  /** Set by [NitroWebSocketAutoPrewarmer.prewarmOnStart], which runs before React Native has a context. */
+  /**
+   * Set when the process starts by [NitroWSContextProvider], before Application.onCreate, where
+   * React Native has no context yet. [NitroWebSocketAutoPrewarmer.prewarmOnStart] sets it too.
+   */
   @Volatile var application: Context? = null
 
   // The file ships inside the APK, so it is read once and the result (or the error) reused.
@@ -61,9 +63,30 @@ internal object NitroWSPinning {
   }
 
   /**
-   * Called by cpp-adapter.cpp once the TLS handshake of a wss:// connection is done, before the
-   * handshake request (and its headers) is sent. [chain] is the DER chain the server sent, leaf
-   * first. Returns null if the connection may proceed, or the error to fail it with.
+   * Whether the app ships a pin file. Asked once by cpp-adapter.cpp: without one, wss:// connections
+   * skip the check. True when the file can't be read, so every connection asks [isPinned].
+   */
+  @DoNotStrip
+  @JvmStatic
+  fun hasPins(): Boolean = try {
+    domains().isNotEmpty()
+  } catch (_: Exception) {
+    true
+  }
+
+  /** Whether a wss:// connection to [host] must pass [checkServerTrusted]: every host when the file is invalid. */
+  @DoNotStrip
+  @JvmStatic
+  fun isPinned(host: String): Boolean = try {
+    activePins(host, domains()) != null
+  } catch (_: Exception) {
+    true
+  }
+
+  /**
+   * Called by cpp-adapter.cpp for a pinned host once the TLS handshake of a wss:// connection is
+   * done, before the handshake request (and its headers) is sent. [chain] is the DER chain the
+   * server sent, leaf first. Returns null if the connection may proceed, or the error to fail it with.
    */
   @DoNotStrip
   @JvmStatic
@@ -128,27 +151,21 @@ internal object NitroWSPinning {
 
   private fun domains(): Map<String, DomainPins> {
     cached?.let { return it.getOrThrow() }
+    // Without a Context the file can't be read, and guessing "no pins" would fail open.
+    val context = application ?: NitroModules.applicationContext
+      ?: throw IllegalStateException("can't read $CONFIG_FILE without an Android Context")
     synchronized(this) {
-      cached?.let { return it.getOrThrow() }
-      val context = NitroModules.applicationContext ?: application
-      val result = runCatching { read(context)?.let(::parse) ?: emptyMap() }
+      val result = cached ?: runCatching { read(context)?.let(::parse) ?: emptyMap() }
         .onFailure { NitroLogger.e("NitroWS", it.message ?: "Invalid $CONFIG_FILE", it) }
-      // Without a Context (a manual preWarm before React Native starts) the file is read from the
-      // class path, which may not see it. Only a Context's answer is kept.
-      if (context != null) cached = result
+        .also { cached = it }
       return result.getOrThrow()
     }
   }
 
-  private fun read(context: Context?): String? {
-    val stream: InputStream = try {
-      context?.assets?.open(CONFIG_FILE)
-        ?: javaClass.classLoader?.getResourceAsStream("assets/$CONFIG_FILE")
-        ?: return null
-    } catch (_: FileNotFoundException) {
-      return null
-    }
-    return stream.bufferedReader().use { it.readText() }
+  private fun read(context: Context): String? = try {
+    context.assets.open(CONFIG_FILE).bufferedReader().use { it.readText() }
+  } catch (_: FileNotFoundException) {
+    null
   }
 
   /** Strict JSON, as on iOS and in the Expo plugin: no comments, unquoted names or trailing content. */

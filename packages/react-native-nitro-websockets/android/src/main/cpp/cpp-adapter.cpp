@@ -19,25 +19,49 @@ struct JNitroWSPinning : facebook::jni::JavaClass<JNitroWSPinning> {
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
   return facebook::jni::initialize(vm, []() {
     margelo::nitro::nitrofetchwebsockets::registerAllNatives();
-    // Looked up now: the lws service thread that calls it can't find app classes.
-    JNitroWSPinning::javaClassStatic();
+    // Looked up now: the lws service thread that calls it can't find app classes. If it is
+    // missing, the library still loads and checkPinnedChain() fails every wss:// connection.
+    try {
+      JNitroWSPinning::javaClassStatic();
+    } catch (const std::exception&) {
+    }
   });
 }
 
 namespace margelo::nitro::nitrofetchwebsockets {
 
-std::optional<std::string> checkPinnedChain(const std::string& host, const std::vector<std::string_view>& chain) {
+bool hasPins() {
+  static const bool pins = [] {
+    try {
+      const auto cls = JNitroWSPinning::javaClassStatic();
+      return cls->getStaticMethod<jboolean()>("hasPins")(cls) != JNI_FALSE;
+    } catch (const std::exception&) {
+      return true; // Can't tell, so every connection is checked (and fails closed).
+    }
+  }();
+  return pins;
+}
+
+std::optional<std::string> checkPinnedChain(const std::string& host,
+                                            const std::function<std::vector<std::string_view>()>& chain) {
+  if (!hasPins()) return std::nullopt;
+  if (host.empty()) return std::string("Certificate pinning check failed: unknown host");
   namespace jni = facebook::jni;
   try {
-    static const auto check = JNitroWSPinning::javaClassStatic()
-      ->getStaticMethod<jstring(jstring, jni::jtypeArray<jbyteArray>)>("checkServerTrusted");
-    auto certs = jni::JArrayClass<jbyteArray>::newArray(chain.size());
-    for (size_t i = 0; i < chain.size(); i++) {
-      auto der = jni::JArrayByte::newArray(chain[i].size());
-      der->setRegion(0, static_cast<jsize>(chain[i].size()), reinterpret_cast<const jbyte*>(chain[i].data()));
-      certs->setElement(i, der.get());
+    const auto cls = JNitroWSPinning::javaClassStatic();
+    static const auto isPinned = cls->getStaticMethod<jboolean(jstring)>("isPinned");
+    static const auto check = cls->getStaticMethod<jstring(jstring, jni::jtypeArray<jbyteArray>)>("checkServerTrusted");
+    const auto jhost = jni::make_jstring(host);
+    if (!isPinned(cls, jhost.get())) return std::nullopt;
+    const auto certs = chain();
+    if (certs.empty()) return "Certificate pinning failed for " + host + ": can't read the server's certificate chain";
+    auto array = jni::JArrayClass<jbyteArray>::newArray(certs.size());
+    for (size_t i = 0; i < certs.size(); i++) {
+      auto der = jni::JArrayByte::newArray(certs[i].size());
+      der->setRegion(0, static_cast<jsize>(certs[i].size()), reinterpret_cast<const jbyte*>(certs[i].data()));
+      array->setElement(i, der.get());
     }
-    auto error = check(JNitroWSPinning::javaClassStatic(), jni::make_jstring(host).get(), certs.get());
+    auto error = check(cls, jhost.get(), array.get());
     if (!error) return std::nullopt;
     return error->toStdString();
   } catch (const std::exception& e) {

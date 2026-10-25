@@ -18,10 +18,13 @@
 
 namespace margelo::nitro::nitrofetchwebsockets {
 
-// The nitro-fetch-pinning.json check (NitroWSPinning.kt, called in cpp-adapter.cpp).
-// `chain` is the DER chain the server sent, leaf first. Returns the error to fail
-// the connection with, if any.
-std::optional<std::string> checkPinnedChain(const std::string& host, const std::vector<std::string_view>& chain);
+// nitro-fetch-pinning.json (NitroWSPinning.kt, called in cpp-adapter.cpp).
+// Whether the app ships a pin file, asked once. Without one, wss:// connections skip the check.
+bool hasPins();
+// The check of a wss:// connection to `host`. `chain` returns the DER chain the server sent,
+// leaf first; it is only called for a pinned host. Returns the error to fail the connection with.
+std::optional<std::string> checkPinnedChain(const std::string& host,
+                                            const std::function<std::vector<std::string_view>()>& chain);
 
 class WebSocketConnection : public WebSocketConnectionBase {
 public:
