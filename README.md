@@ -209,7 +209,7 @@ import {
   getStoredTokenRefreshConfig,
 } from 'react-native-nitro-fetch'
 
-// Same mapping rules as native; uses global fetch from JS
+// Same mapping rules as native; sends the request with nitro-fetch
 const headers = await callRefreshEndpoint(config)
 
 // Remove stored config and token caches (scope with 'fetch' | 'websocket' | 'all')

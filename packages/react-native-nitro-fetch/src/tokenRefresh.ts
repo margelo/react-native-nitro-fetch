@@ -1,4 +1,5 @@
 import { NativeStorage as NativeStorageSingleton } from './NitroInstances';
+import { nitroFetch } from './fetch-core/fetch';
 
 // Storage keys
 const KEY_WS = 'nitro_token_refresh_websocket';
@@ -85,7 +86,8 @@ export async function callRefreshEndpoint(
   config: TokenRefreshConfig
 ): Promise<Record<string, string>> {
   const method = config.method ?? 'POST';
-  const response = await fetch(config.url, {
+  // The nitro client, so nitro-fetch-pinning.json applies as on native refreshes.
+  const response = await nitroFetch(config.url, {
     method,
     headers: config.headers,
     body: config.body,
@@ -109,8 +111,9 @@ export async function callRefreshEndpoint(
     return headers;
   }
 
-  // Default: json
-  const json = await response.json();
+  // Default: json. Not response.json(), which reads an empty body as {}: an empty
+  // refresh response must reject, as with React Native's fetch and the native refresh.
+  const json = JSON.parse(await response.text());
 
   if (config.mappings) {
     for (const mapping of config.mappings) {

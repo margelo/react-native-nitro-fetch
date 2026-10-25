@@ -58,6 +58,23 @@ describe('validatePinningConfig', () => {
   });
 
   it.each([
+    ['written twice', '"a.com"'],
+    ['written with an escape', '"a\\u002ecom"'],
+  ])('rejects the same host key %s', (_, second) => {
+    const e = JSON.stringify(entry());
+    expect(() =>
+      validatePinningConfig(`{"a.com": ${e}, "b.com": ${e}, ${second}: ${e}}`)
+    ).toThrow('"a.com" lists a host that is already in the file');
+  });
+
+  it('only counts top-level keys as hosts', () => {
+    const nested = { 'note': '"b.com": {', 'b.com': true, ...entry() };
+    expect(() =>
+      validatePinningConfig(file({ 'a.com': nested, 'b.com': entry() }))
+    ).not.toThrow();
+  });
+
+  it.each([
     ['missing', {}],
     ['empty', { publicKeyHashes: [] }],
     ['not an array', { publicKeyHashes: HASH }],
