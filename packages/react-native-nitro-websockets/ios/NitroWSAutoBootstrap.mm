@@ -27,6 +27,21 @@
 // Helpers
 // ---------------------------------------------------------------------------
 
+/// Applies nitro-fetch-pinning.json to the token refresh, as nitro-fetch does to its own.
+@interface NitroWSPinningSessionDelegate : NSObject <NSURLSessionDelegate>
+@end
+
+@implementation NitroWSPinningSessionDelegate
+
+- (void)URLSession:(NSURLSession *)session
+    didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
+      completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential *))completionHandler {
+  NSString *failure = [NitroWSPinningBridge handleChallenge:challenge completionHandler:completionHandler];
+  if (failure) NitroWSLog(@"[NitroWS][TokenRefresh] %@", failure);
+}
+
+@end
+
 static NSString* NitroWSGetNestedField(NSDictionary *dict, NSString *dotPath) {
   NSArray<NSString *> *parts = [dotPath componentsSeparatedByString:@"."];
   id current = dict;
@@ -72,13 +87,18 @@ static NSDictionary<NSString*, NSString*>* NitroWSCallTokenRefreshSync(NSDiction
   __block NSError *responseError = nil;
 
   dispatch_semaphore_t sem = dispatch_semaphore_create(0);
-  [[NSURLSession.sharedSession dataTaskWithRequest:request
-                                completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
+  NSURLSession *session =
+    [NSURLSession sessionWithConfiguration:NSURLSessionConfiguration.defaultSessionConfiguration
+                                  delegate:[NitroWSPinningSessionDelegate new]
+                             delegateQueue:nil];
+  [[session dataTaskWithRequest:request
+              completionHandler:^(NSData *data, NSURLResponse *resp, NSError *err) {
     responseData = data;
     responseObj = resp;
     responseError = err;
     dispatch_semaphore_signal(sem);
   }] resume];
+  [session finishTasksAndInvalidate];
   dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
 
   if (responseError || !responseData) return nil;

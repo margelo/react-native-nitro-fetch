@@ -14,9 +14,14 @@
 #include <mutex>
 #include <atomic>
 #include <optional>
+#include <string_view>
 
 namespace margelo::nitro::nitrofetchwebsockets {
 
+// The nitro-fetch-pinning.json check (NitroWSPinning.kt, called in cpp-adapter.cpp).
+// `chain` is the DER chain the server sent, leaf first. Returns the error to fail
+// the connection with, if any.
+std::optional<std::string> checkPinnedChain(const std::string& host, const std::vector<std::string_view>& chain);
 
 class WebSocketConnection : public WebSocketConnectionBase {
 public:

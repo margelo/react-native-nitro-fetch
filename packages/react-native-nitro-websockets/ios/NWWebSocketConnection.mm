@@ -6,6 +6,12 @@
 //
 
 #import <Foundation/Foundation.h>
+#if __has_include(<NitroFetchWebsockets/NitroFetchWebsockets-Swift.h>)
+#import <NitroFetchWebsockets/NitroFetchWebsockets-Swift.h>
+#else
+#import "NitroFetchWebsockets-Swift.h"
+#endif
+#import "NitroLogger.h"
 #include "NWWebSocketConnection.hpp"
 #include "NWStreamWebSocketConnection.hpp"
 
@@ -27,9 +33,19 @@ static os_log_t nitroWsLog() {
 @property (nonatomic, copy) void (^onOpen)(NSString* _Nullable protocol);
 @property (nonatomic, copy) void (^onServerClose)(int code, NSString* _Nullable reason);
 @property (nonatomic, copy) void (^onComplete)(NSError* _Nullable error);
+// Set when the pin check rejected the server; the task then completes as cancelled.
+@property (nonatomic, copy, nullable) NSString* pinFailure;
 @end
 
 @implementation NWWSDelegate
+
+// nitro-fetch-pinning.json applies here as on the Network.framework transport.
+- (void)URLSession:(NSURLSession *)session
+    didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
+      completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential *))completionHandler {
+  self.pinFailure = [NitroWSPinningBridge handleChallenge:challenge completionHandler:completionHandler];
+  if (self.pinFailure) NitroWSLog(@"[NitroWS] %@", self.pinFailure);
+}
 
 - (void)URLSession:(NSURLSession *)session
     webSocketTask:(NSURLSessionWebSocketTask *)webSocketTask
@@ -224,6 +240,7 @@ void NWWebSocketConnection::connect(
   };
 
   // ── didCompleteWithError (terminal event) ─────────────────────────
+  __weak NWWSDelegate* delegate = _impl->delegate;
   _impl->delegate.onComplete = ^(NSError* error) {
     auto strong = weakSelf.lock();
     if (!strong) return;
@@ -236,7 +253,9 @@ void NWWebSocketConnection::connect(
     } else if (conn->_localCloseCode > 0) {
       conn->fireClose(conn->_localCloseCode, conn->_localCloseReason, true);
     } else {
-      if (error && error.code != NSURLErrorCancelled) {
+      if (NSString* pinFailure = delegate.pinFailure) {
+        conn->fireError(pinFailure.UTF8String);
+      } else if (error && error.code != NSURLErrorCancelled) {
         std::string msg =
           [[error localizedDescription] UTF8String] ?: "Connection error";
         conn->fireError(msg);

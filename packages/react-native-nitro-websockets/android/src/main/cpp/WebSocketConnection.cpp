@@ -9,6 +9,7 @@
 #include "LwsContext.hpp"
 
 #include <libwebsockets.h>
+#include <mbedtls/x509_crt.h>
 #include <cctype>
 #include <cstring>
 #include <stdexcept>
@@ -17,6 +18,9 @@
 #if defined(NITRO_WS_TRACING)
 #include <android/trace.h>
 #endif
+
+// LwsPeerChain.c: the certificate chain the server sent, leaf first.
+extern "C" const mbedtls_x509_crt* nitro_ws_peer_chain(struct lws* wsi);
 
 namespace margelo::nitro::nitrofetchwebsockets {
 
@@ -682,9 +686,27 @@ void WebSocketConnection::handleRedirect(const std::string& location) {
 
 bool WebSocketConnection::handleAppendHandshakeHeader(uint8_t** p, uint8_t* end, lws* wsi) {
   std::unordered_map<std::string, std::string> headers;
+  std::string host;
+  bool isWss = false;
   {
     std::lock_guard<std::mutex> lock(_pendingConnectMu);
-    if (_pendingConnect) headers = _pendingConnect->headers;
+    if (_pendingConnect) {
+      headers = _pendingConnect->headers;
+      host = _pendingConnect->host;
+      isWss = _pendingConnect->isWss;
+    }
+  }
+  // The TLS handshake is done and nothing is sent yet: check the pins before the headers go out.
+  if (isWss) {
+    std::vector<std::string_view> chain;
+    for (const mbedtls_x509_crt* cert = nitro_ws_peer_chain(wsi); cert != nullptr && cert->raw.p != nullptr;
+         cert = cert->next) {
+      chain.emplace_back(reinterpret_cast<const char*>(cert->raw.p), cert->raw.len);
+    }
+    if (auto error = checkPinnedChain(host, chain)) {
+      _failureMessage = *error;
+      return false;
+    }
   }
   for (auto& [key, val] : headers) {
     if (lws_add_http_header_by_name(wsi,

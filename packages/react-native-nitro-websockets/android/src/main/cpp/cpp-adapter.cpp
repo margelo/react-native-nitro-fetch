@@ -1,17 +1,52 @@
 #include <jni.h>
 #include <fbjni/fbjni.h>
 #include "NitroFetchWebsocketsOnLoad.hpp"
+#include "WebSocketConnection.hpp"
 #include "WebSocketPrewarmer.hpp"
 
 #include <string>
 #include <unordered_map>
 #include <vector>
 
+namespace {
+
+struct JNitroWSPinning : facebook::jni::JavaClass<JNitroWSPinning> {
+  static constexpr auto kJavaDescriptor = "Lcom/margelo/nitro/nitrofetchwebsockets/NitroWSPinning;";
+};
+
+} // namespace
+
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
   return facebook::jni::initialize(vm, []() {
     margelo::nitro::nitrofetchwebsockets::registerAllNatives();
+    // Looked up now: the lws service thread that calls it can't find app classes.
+    JNitroWSPinning::javaClassStatic();
   });
 }
+
+namespace margelo::nitro::nitrofetchwebsockets {
+
+std::optional<std::string> checkPinnedChain(const std::string& host, const std::vector<std::string_view>& chain) {
+  namespace jni = facebook::jni;
+  try {
+    static const auto check = JNitroWSPinning::javaClassStatic()
+      ->getStaticMethod<jstring(jstring, jni::jtypeArray<jbyteArray>)>("checkServerTrusted");
+    auto certs = jni::JArrayClass<jbyteArray>::newArray(chain.size());
+    for (size_t i = 0; i < chain.size(); i++) {
+      auto der = jni::JArrayByte::newArray(chain[i].size());
+      der->setRegion(0, static_cast<jsize>(chain[i].size()), reinterpret_cast<const jbyte*>(chain[i].data()));
+      certs->setElement(i, der.get());
+    }
+    auto error = check(JNitroWSPinning::javaClassStatic(), jni::make_jstring(host).get(), certs.get());
+    if (!error) return std::nullopt;
+    return error->toStdString();
+  } catch (const std::exception& e) {
+    // Without the check the pins can't be enforced, so fail rather than connect unpinned.
+    return "Certificate pinning check failed for " + host + ": " + e.what();
+  }
+}
+
+} // namespace margelo::nitro::nitrofetchwebsockets
 
 /**
  * Called from NitroWebSocketPrewarmer.kt (which can be invoked from

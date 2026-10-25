@@ -10,6 +10,12 @@
 #import <CommonCrypto/CommonDigest.h>
 #import <Network/Network.h>
 #import <Security/SecureTransport.h>
+#if __has_include(<NitroFetchWebsockets/NitroFetchWebsockets-Swift.h>)
+#import <NitroFetchWebsockets/NitroFetchWebsockets-Swift.h>
+#else
+#import "NitroFetchWebsockets-Swift.h"
+#endif
+#import "NitroLogger.h"
 #include "NWStreamWebSocketConnection.hpp"
 #include "Utf8.hpp"
 
@@ -324,6 +330,9 @@ struct NWStreamWebSocketConnection::Impl {
   z_stream* inflater = nullptr;
   z_stream* deflater = nullptr;
 
+  // Set when the pin check rejected the server, which Network.framework reports as a TLS error.
+  std::optional<std::string> tlsFailure;
+
   bool closeSent = false;
   bool closeWritten = false;
   bool localClose = false;
@@ -369,11 +378,12 @@ struct NWStreamWebSocketConnection::Impl {
     url = target;
     connected = false;
     handshake.clear();
+    tlsFailure.reset();
     const bool secure = isSecureScheme(target.scheme);
     const int port = target.port ? target.port.intValue : (secure ? 443 : 80);
     nw_endpoint_t endpoint = nw_endpoint_create_host(target.host.UTF8String, std::to_string(port).c_str());
     nw_parameters_t parameters = nw_parameters_create_secure_tcp(
-      secure ? NW_PARAMETERS_DEFAULT_CONFIGURATION : NW_PARAMETERS_DISABLE_PROTOCOL,
+      secure ? tlsConfiguration(target.host) : NW_PARAMETERS_DISABLE_PROTOCOL,
       ^(nw_protocol_options_t options) {
         nw_tcp_options_set_no_delay(options, true);
       });
@@ -396,6 +406,34 @@ struct NWStreamWebSocketConnection::Impl {
     });
     armTimer(kHandshakeTimeout, "The request timed out.");
     nw_connection_start(created);
+  }
+
+  // nitro-fetch-pinning.json applies to wss:// as it does to fetch. Pinned hosts get a verify
+  // block; for the others Network.framework evaluates trust as usual.
+  nw_parameters_configure_protocol_block_t tlsConfiguration(NSString* host) {
+    if (![NitroWSPinningBridge isPinnedHost:host]) return NW_PARAMETERS_DEFAULT_CONFIGURATION;
+    auto weak = weakSelf;
+    dispatch_queue_t connectionQueue = queue;
+    return ^(nw_protocol_options_t tlsOptions) {
+      sec_protocol_options_set_verify_block(
+        nw_tls_copy_sec_protocol_options(tlsOptions),
+        ^(sec_protocol_metadata_t, sec_trust_t trustRef, sec_protocol_verify_complete_t complete) {
+          SecTrustRef trust = sec_trust_copy_ref(trustRef);
+          NSString* failure = nil;
+          const BOOL trusted = [NitroWSPinningBridge checkTrust:trust host:host failure:&failure];
+          CFRelease(trust);
+          if (failure) {
+            NitroWSLog(@"[NitroWS] %@", failure);
+            // Queued before complete() so it is set when the connection fails on that queue.
+            const std::string message = stdString(failure);
+            dispatch_async(connectionQueue, ^{
+              if (auto strong = weak.lock()) from(strong)->tlsFailure = message;
+            });
+          }
+          complete(trusted);
+        },
+        dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0));
+    };
   }
 
   void sendHandshake() {
@@ -948,7 +986,7 @@ struct NWStreamWebSocketConnection::Impl {
     } else if (connected) {
       finish(1006, "", false, handshake.empty() ? "The network connection was lost." : "cannot parse response");
     } else {
-      finish(1006, "", false, connectErrorDescription(error, url.host));
+      finish(1006, "", false, tlsFailure ? *tlsFailure : connectErrorDescription(error, url.host));
     }
   }
 

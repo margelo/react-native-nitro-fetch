@@ -131,6 +131,8 @@ object NitroWebSocketAutoPrewarmer {
   fun prewarmOnStart(app: Application) {
     if (initialized) return
     initialized = true
+    // React Native has no context yet; the wss:// pin check reads the pin file through this one.
+    NitroWSPinning.application = app
     try {
       val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
       val raw = prefs.getString(KEY_QUEUE, null) ?: return
@@ -236,6 +238,8 @@ object NitroWebSocketAutoPrewarmer {
 
       val conn = URL(urlStr).openConnection() as HttpURLConnection
       connection = conn
+      // nitro-fetch-pinning.json applies to the refresh request, as in nitro-fetch.
+      NitroWSPinning.apply(conn)
       conn.requestMethod = method
       conn.connectTimeout = 10_000
       conn.readTimeout = 10_000
