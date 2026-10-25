@@ -51,7 +51,12 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
   }
   
   // Async version - returns Promise<NitroResponse>
-  func request(req: NitroRequest) throws -> Promise<NitroResponse> {
+  func request(
+    req: NitroRequest,
+    onResponseStarted: ((_ info: UrlResponseInfo) -> Void)?,
+    onData: ((_ chunk: ArrayBuffer) -> Void)?,
+    onProgress: ((_ loaded: Double, _ total: Double) -> Void)?
+  ) throws -> Promise<NitroResponse> {
     let promise = Promise<NitroResponse>.init()
     let requestId = req.requestId
     let bodyData = HybridNitroFetchClient.uploadData(from: req)
@@ -64,7 +69,13 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
         }
       }
       do {
-        let response = try await HybridNitroFetchClient.requestStatic(req, bodyData: bodyData)
+        let response = try await HybridNitroFetchClient.requestStatic(
+          req,
+          bodyData: bodyData,
+          onResponseStarted: onResponseStarted,
+          onData: onData,
+          onProgress: onProgress
+        )
         promise.resolve(withResult: response)
       } catch {
         promise.reject(withError: error)
@@ -126,7 +137,13 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     return Data(base64Encoded: b64, options: .ignoreUnknownCharacters)
   }
 
-  public class func requestStatic(_ req: NitroRequest, bodyData: Data? = nil) async throws -> NitroResponse {
+  public class func requestStatic(
+    _ req: NitroRequest,
+    bodyData: Data? = nil,
+    onResponseStarted: ((UrlResponseInfo) -> Void)? = nil,
+    onData: ((ArrayBuffer) -> Void)? = nil,
+    onProgress: ((Double, Double) -> Void)? = nil
+  ) async throws -> NitroResponse {
     // Local resources (file://, scheme-less paths) aren't HTTP; read off disk -> 200.
     if !isHttpURL(req.url) {
       return try makeLocalFileResponse(req)
@@ -201,7 +218,20 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     let data: Data
     let response: URLResponse
     do {
-      (data, response) = try await session.data(for: urlRequest, delegate: delegate)
+      let taskSession = req.separateConnections == true ? HybridNitroCronet.session : session
+      if onResponseStarted != nil || onData != nil || onProgress != nil {
+        (data, response) = try await NitroBufferedTaskDelegate.data(
+          for: urlRequest,
+          session: taskSession,
+          followRedirects: shouldFollowRedirects,
+          priority: req.priority,
+          onResponseStarted: onResponseStarted,
+          onData: onData,
+          onProgress: onProgress
+        )
+      } else {
+        (data, response) = try await taskSession.data(for: urlRequest, delegate: delegate)
+      }
     } catch {
       let failure = CertificatePinning.mapFailure(error, requestURL: urlRequest.url, cancelledByCaller: Task.isCancelled)
       #if DEBUG
@@ -254,8 +284,11 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     // Choose bodyString by default (matching Android’s first pass).
     // For binary responses that can’t be decoded as text, bridge the raw bytes
     // as an ArrayBuffer so arrayBuffer() / bytes() return them with no base64.
+    // A request for responseBytes gets the bytes as received.
     let charset = HybridNitroFetchClient.detectCharset(from: http) ?? String.Encoding.utf8
-    let bodyStr = String(data: data, encoding: charset) ?? String(data: data, encoding: .utf8)
+    let bodyStr = req.responseBytes == true
+      ? nil
+      : String(data: data, encoding: charset) ?? String(data: data, encoding: .utf8)
     var bodyBytesAb: ArrayBuffer? = nil
     if bodyStr == nil && !data.isEmpty {
       bodyBytesAb = try ArrayBuffer.copy(data: data)
@@ -345,6 +378,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     }
     var r = URLRequest(url: url)
     if let m = req.method?.rawValue { r.httpMethod = reqToHttpMethod(req) }
+    if let customMethod = req.customMethod { r.httpMethod = customMethod }
     if let headers = req.headers {
       // prefetchKey is an internal cache key, never sent on the server
       for h in headers where h.key.caseInsensitiveCompare("prefetchKey") != .orderedSame {

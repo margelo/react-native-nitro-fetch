@@ -18,10 +18,16 @@ public extension NitroRequest {
   /**
    * Create a new instance of `NitroRequest`.
    */
-  init(url: String, method: NitroRequestMethod?, headers: [NitroHeader]?, bodyString: String?, bodyBytes: ArrayBuffer?, bodyBytesBase64: String?, bodyFormData: [NitroFormDataPart]?, timeoutMs: Double?, followRedirects: Bool?, credentials: NitroRequestCredentials?, priority: NitroRequestPriority?, prefetchCacheTtlMs: Double?, requestId: String?) {
+  init(url: String, method: NitroRequestMethod?, customMethod: String?, headers: [NitroHeader]?, bodyString: String?, bodyBytes: ArrayBuffer?, bodyBytesBase64: String?, bodyFormData: [NitroFormDataPart]?, timeoutMs: Double?, followRedirects: Bool?, credentials: NitroRequestCredentials?, priority: NitroRequestPriority?, prefetchCacheTtlMs: Double?, requestId: String?, responseBytes: Bool?, separateConnections: Bool?) {
     self.init(std.string(url), { () -> bridge.std__optional_NitroRequestMethod_ in
       if let __unwrappedValue = method {
         return bridge.create_std__optional_NitroRequestMethod_(__unwrappedValue)
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_std__string_ in
+      if let __unwrappedValue = customMethod {
+        return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
       } else {
         return .init()
       }
@@ -103,6 +109,18 @@ public extension NitroRequest {
       } else {
         return .init()
       }
+    }(), { () -> bridge.std__optional_bool_ in
+      if let __unwrappedValue = responseBytes {
+        return bridge.create_std__optional_bool_(__unwrappedValue)
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_bool_ in
+      if let __unwrappedValue = separateConnections {
+        return bridge.create_std__optional_bool_(__unwrappedValue)
+      } else {
+        return .init()
+      }
     }())
   }
 
@@ -114,6 +132,18 @@ public extension NitroRequest {
   @inline(__always)
   var method: NitroRequestMethod? {
     return self.__method.value
+  }
+  
+  @inline(__always)
+  var customMethod: String? {
+    return { () -> String? in
+      if bridge.has_value_std__optional_std__string_(self.__customMethod) {
+        let __unwrapped = bridge.get_std__optional_std__string_(self.__customMethod)
+        return String(__unwrapped)
+      } else {
+        return nil
+      }
+    }()
   }
   
   @inline(__always)
@@ -246,6 +276,30 @@ public extension NitroRequest {
       if bridge.has_value_std__optional_std__string_(self.__requestId) {
         let __unwrapped = bridge.get_std__optional_std__string_(self.__requestId)
         return String(__unwrapped)
+      } else {
+        return nil
+      }
+    }()
+  }
+  
+  @inline(__always)
+  var responseBytes: Bool? {
+    return { () -> Bool? in
+      if bridge.has_value_std__optional_bool_(self.__responseBytes) {
+        let __unwrapped = bridge.get_std__optional_bool_(self.__responseBytes)
+        return __unwrapped
+      } else {
+        return nil
+      }
+    }()
+  }
+  
+  @inline(__always)
+  var separateConnections: Bool? {
+    return { () -> Bool? in
+      if bridge.has_value_std__optional_bool_(self.__separateConnections) {
+        let __unwrapped = bridge.get_std__optional_bool_(self.__separateConnections)
+        return __unwrapped
       } else {
         return nil
       }

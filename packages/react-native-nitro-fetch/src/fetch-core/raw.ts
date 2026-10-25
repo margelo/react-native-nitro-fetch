@@ -2,6 +2,7 @@ import type {
   NitroHeader,
   NitroResponse as NitroResponseNative,
 } from '../NitroFetch.nitro';
+import type { UrlResponseInfo } from '../NitroCronet.nitro';
 import { NetworkInspector } from '../NetworkInspector';
 import {
   NitroFetchHybrid,
@@ -14,9 +15,20 @@ import { isHttpUrl } from './url';
 import { createAbortError } from './errors';
 import { fetchLocalResource } from './local';
 
+// Set by the XMLHttpRequest polyfill. See NitroFetchClient.request() and
+// NitroRequest for what each one does.
+export type NitroRawInit = RequestInit & {
+  _onResponseStarted?: (info: UrlResponseInfo) => void;
+  _onData?: (chunk: ArrayBuffer) => void;
+  _onProgress?: (loaded: number, total: number) => void;
+  _responseBytes?: boolean;
+  _customMethod?: string;
+  _separateConnections?: boolean;
+};
+
 export async function nitroFetchRaw(
   input: RequestInfo | URL,
-  init?: RequestInit
+  init?: NitroRawInit
 ): Promise<NitroResponseNative> {
   const signal = init?.signal as AbortSignal | undefined | null;
 
@@ -60,6 +72,12 @@ export async function nitroFetchRaw(
   }
 
   const req = buildNitroRequest(input, init);
+  if (init?._responseBytes) req.responseBytes = true;
+  if (init?._customMethod) {
+    req.method = undefined;
+    req.customMethod = init._customMethod;
+  }
+  if (init?._separateConnections) req.separateConnections = true;
 
   // Route non-http(s) (data:/file://content://scheme-less) off the HTTP client.
   if (!isHttpUrl(req.url)) {
@@ -102,7 +120,12 @@ export async function nitroFetchRaw(
   }
 
   try {
-    const res: NitroResponseNative = await client.request(req);
+    const res: NitroResponseNative = await client.request(
+      req,
+      init?._onResponseStarted,
+      init?._onData,
+      init?._onProgress
+    );
     if (signal?.aborted) throw createAbortError(signal);
     if (inspectorId) {
       NetworkInspector._recordEnd(

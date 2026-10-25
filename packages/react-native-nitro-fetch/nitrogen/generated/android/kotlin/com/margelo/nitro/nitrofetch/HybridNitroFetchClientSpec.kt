@@ -12,6 +12,7 @@ import com.facebook.jni.HybridData
 import com.facebook.proguard.annotations.DoNotStrip
 import dalvik.annotation.optimization.FastNative
 import com.margelo.nitro.core.Promise
+import com.margelo.nitro.core.ArrayBuffer
 import com.margelo.nitro.core.HybridObject
 
 /**
@@ -30,9 +31,14 @@ abstract class HybridNitroFetchClientSpec: HybridObject() {
   
 
   // Methods
+  abstract fun request(req: NitroRequest, onResponseStarted: ((info: UrlResponseInfo) -> Unit)?, onData: ((chunk: ArrayBuffer) -> Unit)?, onProgress: ((loaded: Double, total: Double) -> Unit)?): Promise<NitroResponse>
+  
   @DoNotStrip
   @Keep
-  abstract fun request(req: NitroRequest): Promise<NitroResponse>
+  private fun request_cxx(req: NitroRequest, onResponseStarted: Func_void_UrlResponseInfo?, onData: Func_void_std__shared_ptr_ArrayBuffer_?, onProgress: Func_void_double_double?): Promise<NitroResponse> {
+    val __result = request(req, onResponseStarted?.let { it }, onData?.let { it }, onProgress?.let { it })
+    return __result
+  }
   
   @DoNotStrip
   @Keep

@@ -305,6 +305,7 @@ object AutoPrefetcher {
     return NitroRequest(
       url = url,
       method = method,
+      customMethod = null,
       headers = headerObjs,
       bodyString = bodyString,
       bodyBytes = null,
@@ -315,7 +316,9 @@ object AutoPrefetcher {
       credentials = credentials,
       priority = priority,
       prefetchCacheTtlMs = prefetchCacheTtlMs,
-      requestId = null
+      requestId = null,
+      responseBytes = null,
+      separateConnections = null
     )
   }
 

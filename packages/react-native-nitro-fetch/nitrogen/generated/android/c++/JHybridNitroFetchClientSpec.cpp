@@ -21,6 +21,10 @@ namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 namespace margelo::nitro::nitrofetch { enum class NitroRequestCredentials; }
 // Forward declaration of `NitroRequestPriority` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { enum class NitroRequestPriority; }
+// Forward declaration of `UrlResponseInfo` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
+// Forward declaration of `HttpHeader` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct HttpHeader; }
 
 #include "NitroResponse.hpp"
 #include <NitroModules/Promise.hpp>
@@ -44,6 +48,16 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestPriority; }
 #include "JNitroRequestCredentials.hpp"
 #include "NitroRequestPriority.hpp"
 #include "JNitroRequestPriority.hpp"
+#include "UrlResponseInfo.hpp"
+#include <functional>
+#include "JFunc_void_UrlResponseInfo.hpp"
+#include <NitroModules/JNICallable.hpp>
+#include "JUrlResponseInfo.hpp"
+#include <unordered_map>
+#include "HttpHeader.hpp"
+#include "JHttpHeader.hpp"
+#include "JFunc_void_std__shared_ptr_ArrayBuffer_.hpp"
+#include "JFunc_void_double_double.hpp"
 
 namespace margelo::nitro::nitrofetch {
 
@@ -78,9 +92,9 @@ namespace margelo::nitro::nitrofetch {
   
 
   // Methods
-  std::shared_ptr<Promise<NitroResponse>> JHybridNitroFetchClientSpec::request(const NitroRequest& req) {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<JNitroRequest> /* req */)>("request");
-    auto __result = method(_javaPart, JNitroRequest::fromCpp(req));
+  std::shared_ptr<Promise<NitroResponse>> JHybridNitroFetchClientSpec::request(const NitroRequest& req, const std::optional<std::function<void(const UrlResponseInfo& /* info */)>>& onResponseStarted, const std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>& onData, const std::optional<std::function<void(double /* loaded */, double /* total */)>>& onProgress) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<JNitroRequest> /* req */, jni::alias_ref<JFunc_void_UrlResponseInfo::javaobject> /* onResponseStarted */, jni::alias_ref<JFunc_void_std__shared_ptr_ArrayBuffer_::javaobject> /* onData */, jni::alias_ref<JFunc_void_double_double::javaobject> /* onProgress */)>("request_cxx");
+    auto __result = method(_javaPart, JNitroRequest::fromCpp(req), onResponseStarted.has_value() ? JFunc_void_UrlResponseInfo_cxx::fromCpp(onResponseStarted.value()) : nullptr, onData.has_value() ? JFunc_void_std__shared_ptr_ArrayBuffer__cxx::fromCpp(onData.value()) : nullptr, onProgress.has_value() ? JFunc_void_double_double_cxx::fromCpp(onProgress.value()) : nullptr);
     return [&]() {
       auto __promise = Promise<NitroResponse>::create();
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {

@@ -28,6 +28,10 @@ namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 namespace margelo::nitro::nitrofetch { enum class NitroRequestCredentials; }
 // Forward declaration of `NitroRequestPriority` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { enum class NitroRequestPriority; }
+// Forward declaration of `UrlResponseInfo` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
+// Forward declaration of `HttpHeader` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct HttpHeader; }
 
 #include "NitroResponse.hpp"
 #include <NitroModules/Promise.hpp>
@@ -42,6 +46,10 @@ namespace margelo::nitro::nitrofetch { enum class NitroRequestPriority; }
 #include "NitroFormDataPart.hpp"
 #include "NitroRequestCredentials.hpp"
 #include "NitroRequestPriority.hpp"
+#include "UrlResponseInfo.hpp"
+#include <functional>
+#include <unordered_map>
+#include "HttpHeader.hpp"
 
 #include "NitroFetch-Swift-Cxx-Umbrella.hpp"
 
@@ -93,8 +101,8 @@ namespace margelo::nitro::nitrofetch {
 
   public:
     // Methods
-    inline std::shared_ptr<Promise<NitroResponse>> request(const NitroRequest& req) override {
-      auto __result = _swiftPart.request(std::forward<decltype(req)>(req));
+    inline std::shared_ptr<Promise<NitroResponse>> request(const NitroRequest& req, const std::optional<std::function<void(const UrlResponseInfo& /* info */)>>& onResponseStarted, const std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>& onData, const std::optional<std::function<void(double /* loaded */, double /* total */)>>& onProgress) override {
+      auto __result = _swiftPart.request(std::forward<decltype(req)>(req), onResponseStarted, onData, onProgress);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

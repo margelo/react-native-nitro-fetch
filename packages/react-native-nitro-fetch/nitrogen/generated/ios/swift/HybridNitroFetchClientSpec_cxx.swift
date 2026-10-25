@@ -125,9 +125,45 @@ open class HybridNitroFetchClientSpec_cxx {
 
   // Methods
   @inline(__always)
-  public final func request(req: NitroRequest) -> bridge.Result_std__shared_ptr_Promise_NitroResponse___ {
+  public final func request(req: NitroRequest, onResponseStarted: bridge.std__optional_std__function_void_const_UrlResponseInfo_____info______, onData: bridge.std__optional_std__function_void_const_std__shared_ptr_ArrayBuffer______chunk______, onProgress: bridge.std__optional_std__function_void_double____loaded_____double____total______) -> bridge.Result_std__shared_ptr_Promise_NitroResponse___ {
     do {
-      let __result = try self.__implementation.request(req: req)
+      let __result = try self.__implementation.request(req: req, onResponseStarted: { () -> ((_ info: UrlResponseInfo) -> Void)? in
+        if bridge.has_value_std__optional_std__function_void_const_UrlResponseInfo_____info______(onResponseStarted) {
+          let __unwrapped = bridge.get_std__optional_std__function_void_const_UrlResponseInfo_____info______(onResponseStarted)
+          return { () -> (UrlResponseInfo) -> Void in
+            let __wrappedFunction = bridge.wrap_Func_void_UrlResponseInfo(__unwrapped)
+            return { (__info: UrlResponseInfo) -> Void in
+              __wrappedFunction.call(__info)
+            }
+          }()
+        } else {
+          return nil
+        }
+      }(), onData: { () -> ((_ chunk: ArrayBuffer) -> Void)? in
+        if bridge.has_value_std__optional_std__function_void_const_std__shared_ptr_ArrayBuffer______chunk______(onData) {
+          let __unwrapped = bridge.get_std__optional_std__function_void_const_std__shared_ptr_ArrayBuffer______chunk______(onData)
+          return { () -> (ArrayBuffer) -> Void in
+            let __wrappedFunction = bridge.wrap_Func_void_std__shared_ptr_ArrayBuffer_(__unwrapped)
+            return { (__chunk: ArrayBuffer) -> Void in
+              __wrappedFunction.call(__chunk)
+            }
+          }()
+        } else {
+          return nil
+        }
+      }(), onProgress: { () -> ((_ loaded: Double, _ total: Double) -> Void)? in
+        if bridge.has_value_std__optional_std__function_void_double____loaded_____double____total______(onProgress) {
+          let __unwrapped = bridge.get_std__optional_std__function_void_double____loaded_____double____total______(onProgress)
+          return { () -> (Double, Double) -> Void in
+            let __wrappedFunction = bridge.wrap_Func_void_double_double(__unwrapped)
+            return { (__loaded: Double, __total: Double) -> Void in
+              __wrappedFunction.call(__loaded, __total)
+            }
+          }()
+        } else {
+          return nil
+        }
+      }())
       let __resultCpp = { () -> bridge.std__shared_ptr_Promise_NitroResponse__ in
         let __promise = bridge.create_std__shared_ptr_Promise_NitroResponse__()
         let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_NitroResponse__(__promise)

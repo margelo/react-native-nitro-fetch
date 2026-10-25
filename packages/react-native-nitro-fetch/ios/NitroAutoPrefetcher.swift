@@ -280,6 +280,7 @@ public final class NitroAutoPrefetcher: NSObject {
     return NitroRequest(
       url: url,
       method: method,
+      customMethod: nil,
       headers: headers,
       bodyString: bodyString,
       bodyBytes: nil,
@@ -290,7 +291,9 @@ public final class NitroAutoPrefetcher: NSObject {
       credentials: credentials,
       priority: priority,
       prefetchCacheTtlMs: prefetchCacheTtlMs,
-      requestId: nil
+      requestId: nil,
+      responseBytes: nil,
+      separateConnections: nil
     )
   }
 

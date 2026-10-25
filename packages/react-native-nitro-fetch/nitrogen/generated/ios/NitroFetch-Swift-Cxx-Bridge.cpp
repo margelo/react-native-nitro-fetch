@@ -123,6 +123,22 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     };
   }
   
+  // pragma MARK: std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>
+  Func_void_std__shared_ptr_ArrayBuffer_ create_Func_void_std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_std__shared_ptr_ArrayBuffer_::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::shared_ptr<ArrayBuffer>& chunk) mutable -> void {
+      swiftClosure.call(ArrayBufferHolder(chunk));
+    };
+  }
+  
+  // pragma MARK: std::function<void(double /* loaded */, double /* total */)>
+  Func_void_double_double create_Func_void_double_double(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_double_double::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](double loaded, double total) mutable -> void {
+      swiftClosure.call(loaded, total);
+    };
+  }
+  
   // pragma MARK: std::function<void()>
   Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = NitroFetch::Func_void::fromUnsafe(swiftClosureWrapper);
