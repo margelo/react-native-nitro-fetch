@@ -95,12 +95,14 @@ enum NitroWSPinning {
     guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
       return .invalid("expected a JSON object keyed by hostname")
     }
+    let repeated = repeatedKeys(data)
     var domains: [String: DomainPins] = [:]
     for (key, value) in root {
       let host = normalizedHost(key)
       guard isHostname(host) else {
         return .invalid("\"\(key)\" is not a hostname (no scheme, port, path, wildcard or IP; use punycode for IDNs)")
       }
+      guard !repeated.contains(key) else { return .invalid("\"\(key)\" lists a host that is already in the file") }
       guard let entry = value as? [String: Any] else { return .invalid("\"\(key)\" must be an object") }
 
       guard let rawHashes = entry["publicKeyHashes"] as? [Any], !rawHashes.isEmpty else {
@@ -134,6 +136,47 @@ enum NitroWSPinning {
       domains[host] = DomainPins(hashes: hashes, includeSubdomains: includeSubdomains, expiration: expiration)
     }
     return domains.isEmpty ? .disabled : .enabled(domains)
+  }
+
+  /// The top-level keys that appear more than once. JSONSerialization keeps one value per key, so the
+  /// repeats are found in the raw text. `data` must already parse as a JSON object.
+  private static func repeatedKeys(_ data: Data) -> Set<String> {
+    let bytes = [UInt8](data)
+    var seen = Set<String>()
+    var repeated = Set<String>()
+    var depth = 0
+    var expectingKey = false
+    var i = 0
+    while i < bytes.count {
+      switch bytes[i] {
+      case UInt8(ascii: "\""):
+        let start = i
+        i += 1
+        while i < bytes.count, bytes[i] != UInt8(ascii: "\"") {
+          i += bytes[i] == UInt8(ascii: "\\") ? 2 : 1
+        }
+        if depth == 1, expectingKey, i < bytes.count {
+          // JSONSerialization only for keys with escapes: it is slow to call once per key.
+          let raw = bytes[start...i]
+          let key = raw.contains(UInt8(ascii: "\\"))
+            ? (try? JSONSerialization.jsonObject(with: Data(raw), options: .fragmentsAllowed)) as? String
+            : String(decoding: raw.dropFirst().dropLast(), as: UTF8.self)
+          if let key = key, !seen.insert(key).inserted { repeated.insert(key) }
+        }
+        expectingKey = false
+      case UInt8(ascii: "{"), UInt8(ascii: "["):
+        depth += 1
+        expectingKey = depth == 1
+      case UInt8(ascii: "}"), UInt8(ascii: "]"):
+        depth -= 1
+      case UInt8(ascii: ","):
+        expectingKey = depth == 1
+      default:
+        break
+      }
+      i += 1
+    }
+    return repeated
   }
 
   private static func isCanonicalHash(_ string: String) -> Bool {
