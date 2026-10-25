@@ -409,9 +409,11 @@ struct NWStreamWebSocketConnection::Impl {
   }
 
   // nitro-fetch-pinning.json applies to wss:// as it does to fetch. Pinned hosts get a verify
-  // block; for the others Network.framework evaluates trust as usual.
+  // block, which replaces Network.framework's trust evaluation; for the others it runs as usual.
+  // The pins are resolved once here, so the block checks the entry this decision was made with.
   nw_parameters_configure_protocol_block_t tlsConfiguration(NSString* host) {
-    if (![NitroWSPinningBridge isPinnedHost:host]) return NW_PARAMETERS_DEFAULT_CONFIGURATION;
+    NitroWSHostPins* pins = [NitroWSPinningBridge pinsForHost:host];
+    if (!pins) return NW_PARAMETERS_DEFAULT_CONFIGURATION;
     auto weak = weakSelf;
     dispatch_queue_t connectionQueue = queue;
     return ^(nw_protocol_options_t tlsOptions) {
@@ -420,7 +422,7 @@ struct NWStreamWebSocketConnection::Impl {
         ^(sec_protocol_metadata_t, sec_trust_t trustRef, sec_protocol_verify_complete_t complete) {
           SecTrustRef trust = sec_trust_copy_ref(trustRef);
           NSString* failure = nil;
-          const BOOL trusted = [NitroWSPinningBridge checkTrust:trust host:host failure:&failure];
+          const BOOL trusted = [pins checkTrust:trust failure:&failure];
           CFRelease(trust);
           if (failure) {
             NitroWSLog(@"[NitroWS] %@", failure);

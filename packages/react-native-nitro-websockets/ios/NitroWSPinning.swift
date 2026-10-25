@@ -163,42 +163,57 @@ enum NitroWSPinning {
   }
 }
 
-/// The pin check for the Objective-C++ transports and the token refresh.
-@objc(NitroWSPinningBridge)
-public final class NitroWSPinningBridge: NSObject {
-  /// Whether a TLS connection to `host` must pass `checkTrust` (every host, if the pin file is invalid).
-  @objc(isPinnedHost:)
-  public static func isPinned(_ host: String) -> Bool {
-    switch NitroWSPinning.config {
-    case .disabled: return false
-    case .invalid: return true
-    case .enabled(let domains): return NitroWSPinning.activePins(for: host, in: domains) != nil
-    }
+/// The pins of one host, resolved once when a connection to it starts, so the decision to check
+/// it and the check itself use the same entry.
+@objc(NitroWSHostPins)
+public final class NitroWSHostPins: NSObject {
+  private let host: String
+  private let hashes: Set<Data>
+  /// Set when the pin file is invalid, which fails every connection.
+  private let invalidReason: String?
+
+  fileprivate init(host: String, hashes: Set<Data>, invalidReason: String?) {
+    self.host = host
+    self.hashes = hashes
+    self.invalidReason = invalidReason
   }
 
-  /// Evaluates `trust` for `host` as the system does, then checks the pins. Returns false if the
-  /// connection must fail. `failure` then holds the pinning error, or stays nil for an untrusted
-  /// chain, which fails with the platform's own certificate error as with fetch.
-  @objc(checkTrust:host:failure:)
-  public static func check(_ trust: SecTrust, host: String, failure: AutoreleasingUnsafeMutablePointer<NSString?>) -> Bool {
-    let pins: NitroWSPinning.DomainPins
-    switch NitroWSPinning.config {
-    case .disabled:
-      return true
-    case .invalid(let reason):
+  /// Evaluates `trust` for the host as the system does, then checks the pins. Returns true only for
+  /// an evaluated, trusted chain that contains a pinned key. When it returns false, `failure` holds
+  /// the pinning error, or stays nil for an untrusted chain, which fails with the platform's own
+  /// certificate error as with fetch.
+  @objc(checkTrust:failure:)
+  public func check(_ trust: SecTrust, failure: AutoreleasingUnsafeMutablePointer<NSString?>) -> Bool {
+    if let reason = invalidReason {
       failure.pointee = "Certificate pinning failed for \(host): invalid \(NitroWSPinning.configFile): \(reason)" as NSString
       return false
-    case .enabled(let domains):
-      guard let active = NitroWSPinning.activePins(for: host, in: domains) else { return true }
-      pins = active
     }
     SecTrustSetPolicies(trust, SecPolicyCreateSSL(true, host as CFString))
     guard SecTrustEvaluateWithError(trust, nil) else { return false }
-    guard NitroWSPinning.chainMatches(trust, pins.hashes) else {
+    guard NitroWSPinning.chainMatches(trust, hashes) else {
       failure.pointee = "Certificate pinning failed for \(host) (\(NitroWSPinning.errorCode))" as NSString
       return false
     }
     return true
+  }
+}
+
+/// The pin check for the Objective-C++ transports and the token refresh.
+@objc(NitroWSPinningBridge)
+public final class NitroWSPinningBridge: NSObject {
+  /// The pins that apply to `host` now, or nil if it isn't pinned. Every host is pinned when the
+  /// pin file is invalid.
+  @objc(pinsForHost:)
+  public static func pins(for host: String) -> NitroWSHostPins? {
+    switch NitroWSPinning.config {
+    case .disabled:
+      return nil
+    case .invalid(let reason):
+      return NitroWSHostPins(host: host, hashes: [], invalidReason: reason)
+    case .enabled(let domains):
+      guard let pins = NitroWSPinning.activePins(for: host, in: domains) else { return nil }
+      return NitroWSHostPins(host: host, hashes: pins.hashes, invalidReason: nil)
+    }
   }
 
   /// Answers a server-trust challenge of a URLSession like nitro-fetch does. Returns the pinning
@@ -210,12 +225,12 @@ public final class NitroWSPinningBridge: NSObject {
   ) -> String? {
     let space = challenge.protectionSpace
     guard space.authenticationMethod == NSURLAuthenticationMethodServerTrust, let trust = space.serverTrust,
-          isPinned(space.host) else {
+          let pins = pins(for: space.host) else {
       completionHandler(.performDefaultHandling, nil)
       return nil
     }
     var failure: NSString?
-    if check(trust, host: space.host, failure: &failure) {
+    if pins.check(trust, failure: &failure) {
       completionHandler(.useCredential, URLCredential(trust: trust))
     } else if failure == nil {
       // Default handling rejects the untrusted chain with the system's own error.
