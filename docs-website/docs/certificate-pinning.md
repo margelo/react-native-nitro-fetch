@@ -82,4 +82,3 @@ Nothing else is needed. The file is read when the first request is made.
 - **Proxies / user-installed CAs:** they don't bypass pins. To inspect traffic with Charles or Proxyman, ship the file only in release builds, e.g. Android `src/release/assets/`.
 - **Hosts not in the file** use the platform's normal certificate validation.
 - **Android `HttpURLConnection` paths** (cold-start token refresh, FormData parts read from a URL): once a pin file exists, these use the system trust store, like Cronet does. A default `SSLSocketFactory` installed with `HttpsURLConnection.setDefaultSSLSocketFactory` isn't used for them. The WebSocket prewarm's token refresh is the exception: it keeps the default socket factory and checks a pinned host in its `HostnameVerifier`, before the request is sent.
-- **Android `wss://`:** apps that ship the file do a full TLS handshake on every connection, because a resumed TLS session doesn't carry the server's whole chain.

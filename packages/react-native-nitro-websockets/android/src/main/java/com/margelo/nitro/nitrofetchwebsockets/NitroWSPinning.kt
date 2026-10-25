@@ -47,6 +47,17 @@ internal object NitroWSPinning {
 
   private class DomainPins(val hashes: Set<ByteArray>, val includeSubdomains: Boolean, val expiration: Date)
 
+  /** A leaf certificate that passed the check, and the pin entry it passed under. */
+  private class VerifiedLeaf(val sha256: ByteArray, val pins: DomainPins)
+
+  // More than lws keeps TLS sessions (10), so a session lws can resume still has its leaf here.
+  private const val MAX_VERIFIED_LEAVES = 16
+
+  /** By "host:port", like lws's TLS session cache. Least recently used first. */
+  private val verifiedLeaves = object : LinkedHashMap<String, VerifiedLeaf>(MAX_VERIFIED_LEAVES, 0.75f, true) {
+    override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, VerifiedLeaf>) = size > MAX_VERIFIED_LEAVES
+  }
+
   /**
    * Set when the process starts by [NitroWSContextProvider], before Application.onCreate, where
    * React Native has no context yet. [NitroWebSocketAutoPrewarmer.prewarmOnStart] sets it too.
@@ -84,15 +95,36 @@ internal object NitroWSPinning {
   }
 
   /**
-   * Called by cpp-adapter.cpp for a pinned host once the TLS handshake of a wss:// connection is
-   * done, before the handshake request (and its headers) is sent. [chain] is the DER chain the
-   * server sent, leaf first. Returns null if the connection may proceed, or the error to fail it with.
+   * Called by cpp-adapter.cpp for a pinned host once the TLS handshake of a wss:// connection to
+   * [host]:[port] is done, before the handshake request (and its headers) is sent. [chain] is the DER
+   * chain the server sent, leaf first. Returns null if the connection may proceed, or the error to
+   * fail it with.
+   *
+   * A resumed TLS session hands over only the leaf certificate it was set up with, not a chain the
+   * platform can always verify. It passes when that exact leaf passed this check for [host]:[port]
+   * under the same pin entry, which must still apply. Otherwise the leaf alone goes through the full
+   * check, which fails unless the platform builds a trusted chain with a pinned key from it.
    */
   @DoNotStrip
   @JvmStatic
-  fun checkServerTrusted(host: String, chain: Array<ByteArray>): String? = check(host) {
-    val factory = CertificateFactory.getInstance("X.509")
-    chain.map { factory.generateCertificate(ByteArrayInputStream(it)) as X509Certificate }
+  fun checkServerTrusted(host: String, port: Int, chain: Array<ByteArray>): String? {
+    val pins = try {
+      activePins(host, domains()) ?: return null
+    } catch (e: Exception) {
+      return "Certificate pinning failed for $host: ${e.message}"
+    }
+    val key = "$host:$port"
+    val leaf = chain.firstOrNull()?.let { MessageDigest.getInstance("SHA-256").digest(it) }
+    if (chain.size == 1) {
+      val remembered = synchronized(verifiedLeaves) { verifiedLeaves[key] }
+      if (remembered != null && remembered.pins === pins && remembered.sha256.contentEquals(leaf)) return null
+    }
+    val error = verify(host, pins) {
+      val factory = CertificateFactory.getInstance("X.509")
+      chain.map { factory.generateCertificate(ByteArrayInputStream(it)) as X509Certificate }
+    }
+    if (error == null && leaf != null) synchronized(verifiedLeaves) { verifiedLeaves[key] = VerifiedLeaf(leaf, pins) }
+    return error
   }
 
   /** Pins the token refresh [connection] like nitro-fetch pins its own. Call before connecting. */
@@ -116,6 +148,10 @@ internal object NitroWSPinning {
     } catch (e: Exception) {
       return "Certificate pinning failed for $host: ${e.message}"
     }
+    return verify(host, pins, chain)
+  }
+
+  private fun verify(host: String, pins: DomainPins, chain: () -> List<X509Certificate>): String? {
     val verified = try {
       // TLS 1.3 has no key exchange in the cipher suite; Conscrypt passes "GENERIC" for it too.
       trustExtensions.checkServerTrusted(chain().toTypedArray(), "GENERIC", host)

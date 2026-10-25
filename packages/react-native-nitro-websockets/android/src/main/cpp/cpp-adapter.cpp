@@ -42,7 +42,7 @@ bool hasPins() {
   return pins;
 }
 
-std::optional<std::string> checkPinnedChain(const std::string& host,
+std::optional<std::string> checkPinnedChain(const std::string& host, int port,
                                             const std::function<std::vector<std::string_view>()>& chain) {
   if (!hasPins()) return std::nullopt;
   if (host.empty()) return std::string("Certificate pinning check failed: unknown host");
@@ -50,7 +50,8 @@ std::optional<std::string> checkPinnedChain(const std::string& host,
   try {
     const auto cls = JNitroWSPinning::javaClassStatic();
     static const auto isPinned = cls->getStaticMethod<jboolean(jstring)>("isPinned");
-    static const auto check = cls->getStaticMethod<jstring(jstring, jni::jtypeArray<jbyteArray>)>("checkServerTrusted");
+    static const auto check =
+      cls->getStaticMethod<jstring(jstring, jint, jni::jtypeArray<jbyteArray>)>("checkServerTrusted");
     const auto jhost = jni::make_jstring(host);
     if (!isPinned(cls, jhost.get())) return std::nullopt;
     const auto certs = chain();
@@ -61,7 +62,7 @@ std::optional<std::string> checkPinnedChain(const std::string& host,
       der->setRegion(0, static_cast<jsize>(certs[i].size()), reinterpret_cast<const jbyte*>(certs[i].data()));
       array->setElement(i, der.get());
     }
-    auto error = check(cls, jhost.get(), array.get());
+    auto error = check(cls, jhost.get(), static_cast<jint>(port), array.get());
     if (!error) return std::nullopt;
     return error->toStdString();
   } catch (const std::exception& e) {

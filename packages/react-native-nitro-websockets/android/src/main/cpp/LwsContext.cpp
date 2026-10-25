@@ -7,7 +7,6 @@
 
 #include "LwsContext.hpp"
 #include "CaBundle.hpp"
-#include "WebSocketConnection.hpp"
 
 #include <fbjni/fbjni.h>
 #include <libwebsockets.h>
@@ -36,9 +35,6 @@ LwsContext::LwsContext() {
   info.protocols = protocols;
   info.max_http_header_data = 32 * 1024;
   info.options  = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
-  // A resumed TLS session keeps only the server's leaf certificate, so the pin check would depend on
-  // the platform finding the rest of the chain. Apps with pins do a full handshake every time.
-  if (hasPins()) info.options |= LWS_SERVER_OPTION_DISABLE_TLS_SESSION_CACHE;
   info.gid      = -1;
   info.uid      = -1;
 

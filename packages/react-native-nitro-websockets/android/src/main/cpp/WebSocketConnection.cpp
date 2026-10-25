@@ -687,16 +687,18 @@ void WebSocketConnection::handleRedirect(const std::string& location) {
 bool WebSocketConnection::handleAppendHandshakeHeader(uint8_t** p, uint8_t* end, lws* wsi) {
   std::unordered_map<std::string, std::string> headers;
   std::string host;
+  int port = 0;
   {
     std::lock_guard<std::mutex> lock(_pendingConnectMu);
     if (_pendingConnect) {
       headers = _pendingConnect->headers;
       host = _pendingConnect->host;
+      port = _pendingConnect->port;
     }
   }
   // The TLS handshake is done and nothing is sent yet: check the pins before the headers go out.
   if (lws_is_ssl(wsi)) {
-    auto error = checkPinnedChain(host, [wsi] {
+    auto error = checkPinnedChain(host, port, [wsi] {
       std::vector<std::string_view> chain;
       for (const mbedtls_x509_crt* cert = nitro_ws_peer_chain(wsi); cert != nullptr && cert->raw.p != nullptr;
            cert = cert->next) {
