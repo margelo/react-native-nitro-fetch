@@ -448,9 +448,9 @@ describe('NitroXMLHttpRequest', () => {
     xhr.addEventListener('loadend', () => events.push('loadend'));
     xhr.open('GET', 'https://example.com/slow');
     xhr.send();
-    // Allowed until the response is LOADING.
-    xhr.responseType = 'json';
-    expect(xhr.responseType).toBe('json');
+    expect(() => {
+      xhr.responseType = 'json';
+    }).toThrow('response type cannot be set after the request has been sent');
     xhr.abort();
 
     expect(capturedSignal?.aborted).toBe(true);
@@ -521,35 +521,46 @@ describe('NitroXMLHttpRequest', () => {
     xhr.abort();
   });
 
-  it('allows setting responseType until LOADING', async () => {
+  it('allows setting responseType until send()', async () => {
     const encoder = new TextEncoder();
     mockNitroFetch.mockResolvedValue(makeResponse([encoder.encode('{"a":1}')]));
 
     const xhr = new NitroXMLHttpRequest();
     const errors: Array<[number, string]> = [];
     xhr.onreadystatechange = () => {
-      if (xhr.readyState === NitroXMLHttpRequest.HEADERS_RECEIVED) {
-        xhr.responseType = 'json';
-      }
-      if (xhr.readyState >= NitroXMLHttpRequest.LOADING) {
-        const name = errorName(() => {
-          xhr.responseType = 'text';
-        });
-        errors.push([xhr.readyState, name]);
-      }
+      if (xhr.readyState === NitroXMLHttpRequest.OPENED) return;
+      const name = errorName(() => {
+        xhr.responseType = 'text';
+      });
+      errors.push([xhr.readyState, name]);
     };
     xhr.open('GET', 'https://example.com/json');
+    xhr.responseType = 'json';
     const completed = waitForEvent(xhr, 'loadend');
     xhr.send();
-    xhr.responseType = 'text';
+    errors.push([
+      xhr.readyState,
+      errorName(() => {
+        xhr.responseType = 'text';
+      }),
+    ]);
     await completed;
 
+    // The transport is chosen at send(), so the type is fixed from then on.
     expect(errors).toEqual([
+      [NitroXMLHttpRequest.OPENED, 'InvalidStateError'],
+      [NitroXMLHttpRequest.HEADERS_RECEIVED, 'InvalidStateError'],
       [NitroXMLHttpRequest.LOADING, 'InvalidStateError'],
       [NitroXMLHttpRequest.DONE, 'InvalidStateError'],
     ]);
     expect(xhr.responseType).toBe('json');
     expect(xhr.response).toEqual({ a: 1 });
+
+    // A reopened request can change it again.
+    xhr.onreadystatechange = null;
+    xhr.open('GET', 'https://example.com/text');
+    xhr.responseType = 'text';
+    expect(xhr.responseType).toBe('text');
   });
 
   it.each(['CONNECT', 'connect', 'TRACE', 'trace', 'TRACK', 'Track'])(
@@ -629,6 +640,28 @@ describe('NitroXMLHttpRequest', () => {
       expect.objectContaining({ method: sent })
     );
   });
+
+  it.each<[string, boolean]>([
+    ['patch', false],
+    ['Delete', false],
+    ['propfind', true],
+  ])(
+    'picks the client for the method %p by its upper-case name, stream: %p',
+    async (method, stream) => {
+      mockNitroFetch.mockResolvedValue(makeResponse([]));
+      const xhr = new NitroXMLHttpRequest();
+      xhr.onload = () => {};
+      xhr.open(method, 'https://example.com/method');
+      const completed = waitForEvent(xhr, 'loadend');
+      xhr.send();
+      await completed;
+
+      expect(mockNitroFetch).toHaveBeenCalledWith(
+        'https://example.com/method',
+        expect.objectContaining({ stream })
+      );
+    }
+  );
 
   it('setRequestHeader() throws SyntaxError for an invalid name or value', async () => {
     mockNitroFetch.mockResolvedValue(makeResponse([]));
@@ -948,6 +981,27 @@ describe('NitroXMLHttpRequest', () => {
       expect(events).toContain('load');
       expect(events).not.toContain('timeout');
     });
+
+    it('converts the value like a browser', () => {
+      const signals = hangingFetch();
+      const xhr = new NitroXMLHttpRequest();
+      xhr.timeout = 'abc' as unknown as number;
+      expect(xhr.timeout).toBe(0);
+      xhr.timeout = 12.7;
+      expect(xhr.timeout).toBe(12);
+      // axios passes config.timeout on as given, which can be a string.
+      xhr.timeout = '50' as unknown as number;
+      expect(xhr.timeout).toBe(50);
+      xhr.open('GET', 'https://example.com/slow');
+      xhr.send();
+      const events = recordEvents(xhr);
+      jest.advanceTimersByTime(49);
+      expect(events).toEqual([]);
+      jest.advanceTimersByTime(1);
+
+      expect(events).toEqual(['readystatechange', 'timeout', 'loadend']);
+      expect(signals[0]?.aborted).toBe(true);
+    });
   });
 
   it('does not call a listener removed during dispatch', async () => {
@@ -970,6 +1024,68 @@ describe('NitroXMLHttpRequest', () => {
     await completed;
 
     expect(calls).toEqual(['first', 'last']);
+  });
+
+  it('fires no load or loadend for a request reopened at DONE', async () => {
+    const encoder = new TextEncoder();
+    mockNitroFetch.mockResolvedValueOnce(
+      makeResponse([encoder.encode('first')])
+    );
+    mockNitroFetch.mockResolvedValueOnce(
+      makeResponse([encoder.encode('second')])
+    );
+    const xhr = new NitroXMLHttpRequest();
+    const events: string[] = [];
+    let retried = false;
+    // A retry from the DONE readystatechange.
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState === NitroXMLHttpRequest.DONE && !retried) {
+        retried = true;
+        xhr.open('GET', 'https://example.com/second');
+        xhr.send();
+      }
+    };
+    for (const type of ['load', 'loadend']) {
+      xhr.addEventListener(type, () => {
+        events.push(`${type} ${xhr.readyState} ${xhr.responseText}`);
+      });
+    }
+    xhr.open('GET', 'https://example.com/first');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+    await completed;
+
+    expect(events).toEqual(['load 4 second', 'loadend 4 second']);
+  });
+
+  it('reports throwing listeners to ErrorUtils when React Native has it', async () => {
+    const globals = globalThis as { ErrorUtils?: unknown };
+    const reportError = jest.fn();
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    globals.ErrorUtils = { reportError };
+    try {
+      mockNitroFetch.mockResolvedValue(makeResponse([]));
+      const xhr = new NitroXMLHttpRequest();
+      const boom = new Error('boom');
+      const events: string[] = [];
+      xhr.addEventListener('load', () => {
+        throw boom;
+      });
+      xhr.addEventListener('load', () => events.push('load'));
+      xhr.addEventListener('loadend', () => events.push('loadend'));
+      xhr.open('GET', 'https://example.com/get');
+      const completed = waitForEvent(xhr, 'loadend');
+      xhr.send();
+      await completed;
+
+      expect(events).toEqual(['load', 'loadend']);
+      expect(reportError).toHaveBeenCalledTimes(1);
+      expect(reportError).toHaveBeenCalledWith(boom);
+      expect(errorSpy).not.toHaveBeenCalled();
+    } finally {
+      delete globals.ErrorUtils;
+      errorSpy.mockRestore();
+    }
   });
 
   it('reports throwing listeners with console.error and keeps dispatching', async () => {

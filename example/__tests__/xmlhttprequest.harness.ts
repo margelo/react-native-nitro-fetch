@@ -179,7 +179,7 @@ describe('XMLHttpRequest state and validation', () => {
     });
   });
 
-  it('allows setting responseType until LOADING', async () => {
+  it('allows setting responseType until send()', async () => {
     const xhr = new NitroXMLHttpRequest();
     const errors: Record<string, string> = {};
     xhr.onreadystatechange = () => {
@@ -198,6 +198,9 @@ describe('XMLHttpRequest state and validation', () => {
     // Download progress streams the body, so LOADING comes before the end.
     xhr.onprogress = () => {};
     xhr.open('GET', `${BASE}/drip?numbytes=4&duration=0.4`);
+    errors.beforeSend = errorName(() => {
+      xhr.responseType = 'text';
+    });
     const done = ended(xhr);
     xhr.send();
     errors.afterSend = errorName(() => {
@@ -205,11 +208,14 @@ describe('XMLHttpRequest state and validation', () => {
     });
     const outcome = await done;
 
+    // send() picks the transport from the response type, so it is fixed from
+    // then on.
     expect({ outcome, errors, responseText: xhr.responseText }).toEqual({
       outcome: 'load',
       errors: {
-        afterSend: 'no error',
-        headersReceived: 'no error',
+        beforeSend: 'no error',
+        afterSend: 'InvalidStateError',
+        headersReceived: 'InvalidStateError',
         loading: 'InvalidStateError',
         done: 'InvalidStateError',
       },
@@ -460,12 +466,16 @@ describe('XMLHttpRequest state and validation', () => {
     const start = Date.now();
     xhr.send();
     await sleep(600);
-    // 200 ms after this, not 800 ms.
+    const setAt = Date.now() - start;
+    // 800 ms after send(), not after this.
     xhr.timeout = 800;
     const outcome = await done;
     const elapsed = Date.now() - start;
 
-    expect({ outcome, fromSend: elapsed >= 700 && elapsed < 1200 }).toEqual({
+    expect({
+      outcome,
+      fromSend: elapsed >= 800 && elapsed < setAt + 800,
+    }).toEqual({
       outcome: 'timeout',
       fromSend: true,
     });
@@ -503,10 +513,16 @@ describe('XMLHttpRequest state and validation', () => {
   it('reports throwing listeners and keeps dispatching', async () => {
     const boom = new Error('listener failed');
     const reported: unknown[] = [];
-    const consoleError = console.error;
-    console.error = (error: unknown) => {
+    const report = (error: unknown) => {
       reported.push(error);
     };
+    // Throwing listeners go to ErrorUtils.reportError(), or console.error()
+    // without it.
+    const errorUtils = (globalThis as any).ErrorUtils;
+    const reportError = errorUtils?.reportError;
+    const consoleError = console.error;
+    if (errorUtils) errorUtils.reportError = report;
+    console.error = report;
     try {
       const xhr = new NitroXMLHttpRequest();
       const states: number[] = [];
@@ -541,6 +557,7 @@ describe('XMLHttpRequest state and validation', () => {
         reports: readyStateChanges + 1,
       });
     } finally {
+      if (errorUtils) errorUtils.reportError = reportError;
       console.error = consoleError;
     }
   });

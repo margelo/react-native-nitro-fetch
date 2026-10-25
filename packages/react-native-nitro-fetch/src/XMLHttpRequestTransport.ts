@@ -87,7 +87,8 @@ function shouldStream(request: XMLHttpRequestTransportRequest): boolean {
     request.incremental ||
     request.responseType === 'arraybuffer' ||
     request.responseType === 'blob' ||
-    !BUFFERED_METHODS.has(request.method)
+    // fetch-core sends the method upper-cased on either client.
+    !BUFFERED_METHODS.has(request.method.toUpperCase())
   );
 }
 

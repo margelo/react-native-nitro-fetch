@@ -71,11 +71,19 @@ class NitroProgressEvent {
   stopPropagation(): void {}
 }
 
-// Like a browser, a throwing listener does not stop the dispatch. Its error is
-// logged rather than rethrown from a timer, where React Native would treat it
-// as fatal.
+type ErrorReporter = { reportError?: (error: unknown) => void };
+
+// Like a browser, a throwing listener does not stop the dispatch. React
+// Native's ErrorUtils.reportError() hands the error to the global handler as
+// non-fatal, so crash reporters see it; rethrowing it from a timer would be
+// fatal.
 function reportListenerError(error: unknown): void {
-  console.error(error);
+  const errorUtils = (globalThis as { ErrorUtils?: ErrorReporter }).ErrorUtils;
+  if (typeof errorUtils?.reportError === 'function') {
+    errorUtils.reportError(error);
+  } else {
+    console.error(error);
+  }
 }
 
 class NitroEventTarget {
@@ -459,10 +467,12 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   }
 
   set responseType(responseType: ResponseType) {
-    if (this.readyState === LOADING || this.readyState === DONE) {
+    // The spec allows this until LOADING, but send() picks the transport and
+    // how the body is read from the response type.
+    if (this._sent || this.readyState === LOADING || this.readyState === DONE) {
       throw domException(
         "Failed to set the 'responseType' property on 'XMLHttpRequest': The " +
-          'response type cannot be set if the object state is LOADING or DONE.',
+          'response type cannot be set after the request has been sent.',
         'InvalidStateError'
       );
     }
@@ -492,7 +502,9 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   }
 
   set timeout(timeout: number) {
-    this._timeout = timeout;
+    // An unsigned long, as in a browser. A string such as '5000' works too.
+    // eslint-disable-next-line no-bitwise
+    this._timeout = Number(timeout) >>> 0;
     // A new value counts from send(), and 0 stops the timer.
     if (this._requestId != null) this._startTimeout(this._requestId);
   }
@@ -948,6 +960,9 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     } else if (hasError) {
       this._dispatch(timedOut ? 'timeout' : 'error');
     } else {
+      // Like Chromium, a listener that called open() or abort() ends the
+      // request without load and loadend.
+      if (this.readyState !== this.DONE) return;
       this._dispatch('load');
     }
     this._dispatch('loadend');
