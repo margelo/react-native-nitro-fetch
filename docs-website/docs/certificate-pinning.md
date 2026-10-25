@@ -8,9 +8,9 @@ sidebar_position: 13
 
 Optional public-key (SPKI) pinning for the requests `nitro-fetch` makes natively: `fetch`, `stream: true`, `prefetch` and auto-prefetch on app start, the cold-start token refresh, `callRefreshEndpoint`, and FormData parts read from a URL. Android's `network_security_config.xml` doesn't apply to Cronet, and TrustKit-style swizzling doesn't reach every session, so `nitro-fetch` reads its own pin file.
 
-Pinning is off unless the app ships the file.
+`react-native-nitro-websockets` applies the same file to `wss://` connections, prewarmed ones included, and to its own cold-start token refresh. On Android, a pinned `wss://` host must also pass the Android trust store, as with `fetch`.
 
-**Not covered:** `react-native-nitro-websockets`, including its own cold-start token refresh. If you register a refresh with `target: 'all'`, the WebSocket copy of that request is not pinned.
+Pinning is off unless the app ships the file.
 
 **Upgrading:** earlier versions sent `callRefreshEndpoint` through React Native's networking, so pins set up for it, such as a `<pin-set>` in Android's `network_security_config.xml` or `react-native-ssl-public-key-pinning`, covered it. It now uses `nitro-fetch`, which follows only `nitro-fetch-pinning.json`. Ship that file with the same pins to keep refreshes started from JS pinned.
 
@@ -78,7 +78,7 @@ Nothing else is needed. The file is read when the first request is made.
 
 - **Mismatch:** the request fails before any request bytes are sent, with an error whose message contains `ERR_SSL_PINNED_KEY_NOT_IN_CERT_CHAIN` on both platforms. On the streaming transport it fails as an error, not as an `AbortError`.
 - **Untrusted certificate:** an expired, self-signed or wrong-host certificate on a pinned host fails with the platform's usual certificate error, not the pinning error.
-- **Broken file:** if the file exists but is invalid, requests fail with the reason in the error message. A typo never silently turns pinning off. On iOS this affects HTTPS requests; on Android, `nitro-fetch` doesn't create its network client at all, so every request fails.
+- **Broken file:** if the file exists but is invalid, requests fail with the reason in the error message. A typo never silently turns pinning off. On iOS this affects HTTPS requests; on Android, `nitro-fetch` doesn't create its network client at all, so every request fails. Every `wss://` connection fails on both platforms.
 - **Proxies / user-installed CAs:** they don't bypass pins. To inspect traffic with Charles or Proxyman, ship the file only in release builds, e.g. Android `src/release/assets/`.
 - **Hosts not in the file** use the platform's normal certificate validation.
-- **Android `HttpURLConnection` paths** (cold-start token refresh, FormData parts read from a URL): once a pin file exists, these use the system trust store, like Cronet does. A default `SSLSocketFactory` installed with `HttpsURLConnection.setDefaultSSLSocketFactory` isn't used for them.
+- **Android `HttpURLConnection` paths** (cold-start token refresh, FormData parts read from a URL): once a pin file exists, these use the system trust store, like Cronet does. A default `SSLSocketFactory` installed with `HttpsURLConnection.setDefaultSSLSocketFactory` isn't used for them. The WebSocket prewarm's token refresh is the exception: it keeps the default socket factory and checks a pinned host in its `HostnameVerifier`, before the request is sent.

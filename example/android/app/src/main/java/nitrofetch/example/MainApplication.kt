@@ -8,6 +8,7 @@ import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.margelo.nitro.nitrofetch.AutoPrefetcher
 import com.margelo.nitro.nitrofetchwebsockets.NitroWebSocketAutoPrewarmer
+import com.margelo.nitro.nitrofetchwebsockets.NitroWebSocketPrewarmer
 
 class MainApplication : Application(), ReactApplication {
 
@@ -25,6 +26,9 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     NitroWebSocketAutoPrewarmer.prewarmOnStart(this)
+    // A host whose pins don't match: the pinning harness checks that this socket is never
+    // handed over open. It fails at the TLS handshake.
+    NitroWebSocketPrewarmer.preWarm("wss://www.gstatic.com/")
     // Native-side prefetch registration — fires on the very first cold launch.
     try {
       AutoPrefetcher.registerPrefetch(

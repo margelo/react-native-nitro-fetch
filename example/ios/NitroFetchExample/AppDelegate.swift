@@ -39,6 +39,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       prefetchCacheTtlMs: NSNumber(value: 300_000)
     )
 
+    // A host whose pins don't match: the pinning harness checks that this socket is never
+    // handed over open. It fails at the TLS handshake.
+    NitroWebSocketPrewarmer.preWarmURL("wss://www.gstatic.com/")
+
     return true
   }
 }

@@ -52,6 +52,9 @@ add_subdirectory(
   ${CMAKE_SOURCE_DIR}/../thirdparty/libwebsockets
   ${CMAKE_BINARY_DIR}/libwebsockets
 )
+# Reads the server's certificate chain for the pin check. It needs lws's
+# private headers, so it is compiled with lws's own flags.
+target_sources(websockets PRIVATE ${CMAKE_SOURCE_DIR}/src/main/cpp/LwsPeerChain.c)
 
 # ── Embed Mozilla CA bundle for TLS verification ──────────────────────────────
 # Generate a C++ source file that embeds cacert.pem as an in-memory byte array.

@@ -1,2 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application>
+    <!-- Gives the wss:// pin check the app's Context before Application.onCreate. -->
+    <provider
+      android:name="com.margelo.nitro.nitrofetchwebsockets.NitroWSContextProvider"
+      android:authorities="${applicationId}.nitrowebsockets.context"
+      android:exported="false" />
+  </application>
 </manifest>
