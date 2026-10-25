@@ -1566,6 +1566,84 @@ describe('NitroXMLHttpRequest', () => {
     ]);
   });
 
+  it('keeps sending when a progress listener throws', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      mockNitroFetch.mockResolvedValue(
+        makeResponse([new TextEncoder().encode('ok')])
+      );
+      const boom = new Error('boom');
+      const xhr = new NitroXMLHttpRequest();
+      const events = recordProgressEvents(xhr);
+      xhr.onloadstart = () => {
+        throw boom;
+      };
+      xhr.upload.onprogress = () => {
+        throw boom;
+      };
+      xhr.open('POST', 'https://example.com/upload');
+      const completed = waitForEvent(xhr, 'loadend');
+      expect(() => xhr.send('body')).not.toThrow();
+      await completed;
+
+      expect(xhr.status).toBe(200);
+      expect(eventNames(events)).toEqual([
+        'loadstart',
+        'upload.loadstart',
+        'upload.progress',
+        'upload.load',
+        'upload.loadend',
+        'progress',
+        'load',
+        'loadend',
+      ]);
+      expect(errorSpy).toHaveBeenCalledTimes(2);
+      expect(errorSpy).toHaveBeenCalledWith(boom);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('ends a failed upload when a readystatechange listener sends again', async () => {
+    mockNitroFetch.mockRejectedValueOnce(new Error('network failed'));
+    mockNitroFetch.mockResolvedValueOnce(
+      makeResponse([new TextEncoder().encode('ok')])
+    );
+    const xhr = new NitroXMLHttpRequest();
+    const events = recordProgressEvents(xhr);
+    let retried = false;
+    xhr.addEventListener('readystatechange', () => {
+      if (xhr.readyState !== NitroXMLHttpRequest.DONE || retried) return;
+      retried = true;
+      xhr.open('POST', 'https://example.com/second');
+      xhr.send('second');
+    });
+    xhr.open('POST', 'https://example.com/first');
+    const completed = new Promise((resolve) => {
+      xhr.addEventListener('load', resolve);
+    });
+    xhr.send('first');
+    await completed;
+
+    expect(eventNames(events)).toEqual([
+      'loadstart',
+      'upload.loadstart',
+      // The second request starts in the first one's readystatechange.
+      'loadstart',
+      'upload.loadstart',
+      'upload.error',
+      'upload.loadend',
+      'error',
+      'loadend',
+      'upload.progress',
+      'upload.load',
+      'upload.loadend',
+      'progress',
+      'load',
+      'loadend',
+    ]);
+  });
+
   it('fires no upload events without a request body', async () => {
     mockNitroFetch.mockResolvedValue(makeResponse([]));
     const xhr = new NitroXMLHttpRequest();

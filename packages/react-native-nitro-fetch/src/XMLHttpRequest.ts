@@ -1008,17 +1008,21 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     const aborted = this._aborted;
     const hasError = this._hasError;
     const timedOut = this._timedOut;
+    // An upload still due at DONE failed with the request. Taken now, since a
+    // listener may send another request with its own upload.
+    const uploadFailed = this._uploadTotal !== -1 && newState === this.DONE;
+    if (uploadFailed) this._uploadTotal = -1;
     this.readyState = newState;
     this._dispatch('readystatechange');
     if (newState !== this.DONE) return;
     // A failed request ends its upload first and reports no bytes.
     let progress = NO_PROGRESS;
     if (aborted) {
-      this._failUpload('abort');
+      if (uploadFailed) this._failUpload('abort');
       this._dispatch('abort');
     } else if (hasError) {
       const type = timedOut ? 'timeout' : 'error';
-      this._failUpload(type);
+      if (uploadFailed) this._failUpload(type);
       this._dispatch(type);
     } else {
       // Like Chromium, a listener that called open() or abort() ends the
@@ -1131,8 +1135,6 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   }
 
   private _failUpload(type: string): void {
-    if (this._uploadTotal === -1) return;
-    this._uploadTotal = -1;
     this.upload.dispatchProgress(type);
     this.upload.dispatchProgress('loadend');
   }
