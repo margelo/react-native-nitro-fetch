@@ -1183,6 +1183,32 @@ describe('XMLHttpRequest stream only when needed', () => {
     expect(lengths.some((length) => length > 0 && length < 8)).toBe(true);
   });
 
+  // A text body that a listener watches and that is larger than 256 KB
+  // streams, so JS decodes it while it downloads, as with React Native's
+  // XMLHttpRequest. Smaller ones arrive whole.
+  it('a readystatechange listener gets a text body over 256 KB as it arrives', async () => {
+    const size = 1024 * 1024;
+    const { lengths, responseText } = await send(
+      `${BASE}/text?phrase=0123456789abcdef&repeat=${size / 16}`,
+      watchStates
+    );
+    expect(responseText.length).toBe(size);
+    expect(lengths.length).toBeGreaterThan(1);
+    expect(lengths[lengths.length - 1]).toBe(size);
+    expect(lengths).toEqual([...lengths].sort((a, b) => a - b));
+  });
+
+  it('a readystatechange listener gets a text body under 256 KB in one piece', async () => {
+    const size = 128 * 1024;
+    const { lengths, responseText, states } = await send(
+      `${BASE}/text?phrase=0123456789abcdef&repeat=${size / 16}`,
+      watchStates
+    );
+    expect(responseText.length).toBe(size);
+    expect(states).toEqual([2, 3, 4]);
+    expect(lengths).toEqual([size]);
+  });
+
   // The response decides: a text/event-stream body streams even when the
   // request did not ask for one, as react-native-sse reads it.
   it('an event-stream response streams without any client hint', async () => {
