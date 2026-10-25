@@ -845,8 +845,8 @@ describe('XMLHttpRequest credentials and cleanup', () => {
 
   type Sent = {
     atLoadend: ReturnType<typeof stateOf>;
+    errorEvent: { message?: string; nitroError?: string } | undefined;
     events: string[];
-    message: string | undefined;
     xhr: NitroXHR;
   };
 
@@ -859,7 +859,7 @@ describe('XMLHttpRequest credentials and cleanup', () => {
     return new Promise((resolve, reject) => {
       const xhr = new NitroXMLHttpRequest();
       const events: string[] = [];
-      let message: string | undefined;
+      let errorEvent: Sent['errorEvent'];
       // Fail the case rather than stall the suite.
       const timer = setTimeout(() => {
         reject(
@@ -869,14 +869,12 @@ describe('XMLHttpRequest credentials and cleanup', () => {
       for (const type of ['load', 'error', 'timeout', 'abort']) {
         xhr.addEventListener(type, (event: unknown) => {
           events.push(type);
-          if (type === 'error') {
-            message = (event as { message?: string }).message;
-          }
+          if (type === 'error') errorEvent = event as Sent['errorEvent'];
         });
       }
       xhr.addEventListener('loadend', () => {
         clearTimeout(timer);
-        resolve({ atLoadend: stateOf(xhr), events, message, xhr });
+        resolve({ atLoadend: stateOf(xhr), errorEvent, events, xhr });
       });
       xhr.open(method, url);
       setUp(xhr);
@@ -905,6 +903,8 @@ describe('XMLHttpRequest credentials and cleanup', () => {
     xhr.withCredentials = false;
   };
 
+  // Android has no cookie jar unless the app enables cookie sync, which the
+  // example app does not.
   it('sends and stores cookies by default (iOS cookie jar)', async () => {
     if (Platform.OS !== 'ios') return;
     await send('GET', `${BASE}/cookies/set?xhrDefault=${RUN}`);
@@ -923,6 +923,7 @@ describe('XMLHttpRequest credentials and cleanup', () => {
     ],
   ] as const) {
     it(`withCredentials = false sends no cookies (${mode})`, async () => {
+      if (Platform.OS !== 'ios') return;
       await send('GET', `${BASE}/cookies/set?xhrOmitSend=${RUN}`);
       const cookies = await cookiesSent((xhr) => {
         withoutCredentials(xhr);
@@ -932,6 +933,7 @@ describe('XMLHttpRequest credentials and cleanup', () => {
     });
 
     it(`withCredentials = false stores no cookies (${mode})`, async () => {
+      if (Platform.OS !== 'ios') return;
       const name = `xhrOmitStore${mode}`;
       await send('GET', `${BASE}/cookies/set?${name}=${RUN}`, (xhr) => {
         withoutCredentials(xhr);
@@ -943,7 +945,7 @@ describe('XMLHttpRequest credentials and cleanup', () => {
   }
 
   it('clears the response after a network error', async () => {
-    const { atLoadend, events, message, xhr } = await send(
+    const { atLoadend, errorEvent, events, xhr } = await send(
       'GET',
       CLOSED_PORT_URL
     );
@@ -951,8 +953,10 @@ describe('XMLHttpRequest credentials and cleanup', () => {
     expect(atLoadend).toEqual(CLEARED);
     expect(stateOf(xhr)).toEqual(CLEARED);
     // Not in the spec: the cause, which responseText used to hold.
-    expect(typeof message).toBe('string');
-    expect(message?.length).toBeGreaterThan(0);
+    expect(typeof errorEvent?.nitroError).toBe('string');
+    expect(errorEvent?.nitroError?.length).toBeGreaterThan(0);
+    // axios reports a message, when set, instead of "Network Error".
+    expect(errorEvent?.message).toBe(undefined);
   });
 
   it('clears the response after a timeout', async () => {
@@ -983,11 +987,7 @@ describe('XMLHttpRequest credentials and cleanup', () => {
     expect(stateOf(xhr)).toEqual(CLEARED);
   });
 
-  it('has a responseXML property', () => {
-    expect('responseXML' in new NitroXMLHttpRequest()).toBe(true);
-  });
-
-  for (const responseType of ['', 'text', 'document'] as const) {
+  for (const responseType of ['', 'document'] as const) {
     it(`responseXML is null for responseType '${responseType}'`, async () => {
       const { events, xhr } = await send('GET', `${BASE}/get`, (request) => {
         request.responseType = responseType;
@@ -997,7 +997,7 @@ describe('XMLHttpRequest credentials and cleanup', () => {
     });
   }
 
-  for (const responseType of ['json', 'arraybuffer', 'blob'] as const) {
+  for (const responseType of ['text', 'json', 'arraybuffer', 'blob'] as const) {
     it(`responseXML throws InvalidStateError for responseType '${responseType}'`, async () => {
       const { events, xhr } = await send('GET', `${BASE}/get`, (request) => {
         request.responseType = responseType;

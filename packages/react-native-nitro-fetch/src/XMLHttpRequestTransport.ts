@@ -1,4 +1,4 @@
-import { isFormData, resolveBlobBody } from './fetch-core/body';
+import { isFormData } from './fetch-core/body';
 import { nitroFetch } from './fetch-core/fetch';
 import type { NitroStreamInit } from './fetch-core/stream';
 import type { NitroRequestMethod } from './NitroFetch.nitro';
@@ -118,25 +118,14 @@ export function sendXMLHttpRequest(
 
   const performRequest = async () => {
     try {
-      let requestBody = request.body as BodyInit | null;
-      let requestHeaders: HeadersInit = request.headers;
-      // Read a Blob body before the request starts, so an abort while it is
-      // read sends nothing.
-      if (typeof Blob !== 'undefined' && requestBody instanceof Blob) {
-        const resolved = await resolveBlobBody({
-          body: requestBody,
-          headers: requestHeaders,
-        });
-        if (completed) return;
-        requestBody = resolved?.body ?? null;
-        requestHeaders = resolved?.headers ?? requestHeaders;
-      }
-
       const stream = shouldStream(request);
+      const credentials: RequestCredentials = request.withCredentials
+        ? 'include'
+        : 'omit';
       const init: NitroRequestInit = {
-        body: requestBody,
-        credentials: request.withCredentials ? 'include' : 'omit',
-        headers: requestHeaders,
+        body: request.body as BodyInit | null,
+        credentials,
+        headers: request.headers,
         method: request.method,
         signal: abortController.signal,
         stream,

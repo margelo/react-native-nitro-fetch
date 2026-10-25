@@ -44,15 +44,26 @@ export function stringToUTF8(str: string): Uint8Array {
   return new _TextEncoder().encode(str);
 }
 
+const UTF8_LENGTH_SLICE = 0x10000;
+
 // The UTF-8 length of a string as it is sent. A lone surrogate is sent as
 // U+FFFD, 3 bytes, as TextEncoder would encode it.
 export function utf8Length(text: string): number {
   const encoder = _TextEncoder ? new _TextEncoder() : undefined;
   if (typeof encoder?.encodeInto === 'function') {
-    // Encoding natively is far faster than counting in JS. A UTF-16 unit
-    // takes at most 3 bytes.
-    const buffer = new Uint8Array(text.length * 3);
-    return encoder.encodeInto(text, buffer).written;
+    // Encoding natively is far faster than counting in JS. Slices keep the
+    // buffer small; a UTF-16 unit takes at most 3 bytes.
+    const buffer = new Uint8Array(Math.min(text.length, UTF8_LENGTH_SLICE) * 3);
+    let length = 0;
+    for (let start = 0; start < text.length; ) {
+      let end = Math.min(start + UTF8_LENGTH_SLICE, text.length);
+      // Keep a surrogate pair in one slice.
+      const last = text.charCodeAt(end - 1);
+      if (end < text.length && last >= 0xd800 && last <= 0xdbff) end--;
+      length += encoder.encodeInto(text.slice(start, end), buffer).written;
+      start = end;
+    }
+    return length;
   }
   let length = 0;
   for (let i = 0; i < text.length; i++) {

@@ -48,6 +48,10 @@ starts. Only the native client knows the size of a `FormData` body, so its
 upload fires `loadstart`, `load` and `loadend` with `lengthComputable: false`
 and no `progress`.
 
+After a network error, `responseText` is empty, as in browsers. The `error`
+event carries the native client's error text in a non-standard `nitroError`
+field.
+
 A request nothing watches while it loads (no `readystatechange` or `progress`
 listener) with a text response is buffered like a plain `fetch`. Other requests
 stream on the same native client, so they share its connections and HTTP cache.

@@ -36,8 +36,10 @@ class NitroProgressEvent {
   readonly isTrusted = false;
   readonly lengthComputable: boolean;
   readonly loaded: number;
-  // Set on a request's error event: why the client failed.
-  message?: string;
+  // Set on a request's error event: why the client failed. Not in the spec,
+  // and not named message, which axios would report instead of
+  // "Network Error".
+  nitroError?: string;
   readonly returnValue = true;
   readonly srcElement: EventTarget;
   readonly target: EventTarget;
@@ -567,14 +569,10 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   // Documents are not supported, so there is never an XML response.
   get responseXML(): null {
     const responseType = this._responseType;
-    if (
-      responseType !== '' &&
-      responseType !== 'text' &&
-      responseType !== 'document'
-    ) {
+    if (responseType !== '' && responseType !== 'document') {
       throw domException(
         "The 'responseXML' property is only available if 'responseType' " +
-          `is set to '', 'text' or 'document', but it is '${responseType}'.`,
+          `is set to '' or 'document', but it is '${responseType}'.`,
         'InvalidStateError'
       );
     }
@@ -716,7 +714,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     if (requestId !== this._requestId) return;
     if (error) {
       // A network error leaves no response behind, so responseText stays
-      // empty. The error event carries the client's message instead.
+      // empty. The error event's nitroError carries the client's error.
       this._reset();
       this._errorMessage = error;
       this._hasError = true;
@@ -1047,10 +1045,9 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
       if (timedOut) {
         this._dispatch(type);
       } else {
-        // Not in the spec: axios reports the message instead of "Network Error".
         const target = this as unknown as EventTarget;
         const event = new NitroProgressEvent(target, 'error');
-        event.message = this._errorMessage;
+        event.nitroError = this._errorMessage;
         this.dispatchEvent(event as unknown as Event);
       }
     } else {

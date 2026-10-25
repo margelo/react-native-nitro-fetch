@@ -229,33 +229,6 @@ const CLEARED_STATE = {
   statusText: '',
 };
 
-// Node has no FileReader. Like React Native's, this one reads a Blob
-// asynchronously.
-class MockFileReader {
-  error: unknown = null;
-  onerror: (() => void) | null = null;
-  onload: (() => void) | null = null;
-  result: ArrayBuffer | null = null;
-
-  readAsArrayBuffer(blob: Blob): void {
-    blob.arrayBuffer().then((bytes) => {
-      this.result = bytes;
-      this.onload?.();
-    });
-  }
-}
-
-async function withFileReader(run: () => Promise<void>): Promise<void> {
-  const globals = globalThis as { FileReader?: unknown };
-  const previous = globals.FileReader;
-  globals.FileReader = MockFileReader;
-  try {
-    await run();
-  } finally {
-    globals.FileReader = previous;
-  }
-}
-
 describe('NitroXMLHttpRequest', () => {
   beforeAll(async () => {
     // Bun does not hoist Jest-compatible module mocks. Load the implementation
@@ -1832,16 +1805,16 @@ describe('NitroXMLHttpRequest', () => {
     );
   });
 
-  it('clears the response after an error and puts the cause on the event', async () => {
+  it('clears the response after an error and puts the cause in nitroError', async () => {
     const { fail, response } = stalledResponse();
     mockNitroFetch.mockResolvedValue(response);
 
     const xhr = new NitroXMLHttpRequest();
     let atLoadend: ReturnType<typeof responseState> | undefined;
-    let message: string | undefined;
+    let errorEvent: { message?: string; nitroError?: string } | undefined;
     xhr.onprogress = () => fail(new Error('connection lost'));
     xhr.addEventListener('error', (event) => {
-      message = (event as ProgressEvent & { message?: string }).message;
+      errorEvent = event as unknown as typeof errorEvent;
     });
     xhr.addEventListener('loadend', () => {
       atLoadend = responseState(xhr);
@@ -1851,7 +1824,9 @@ describe('NitroXMLHttpRequest', () => {
     xhr.send();
     await completed;
 
-    expect(message).toBe('connection lost');
+    expect(errorEvent?.nitroError).toBe('connection lost');
+    // axios reports a message, when set, instead of "Network Error".
+    expect(errorEvent?.message).toBeUndefined();
     expect(atLoadend).toEqual(CLEARED_STATE);
     expect(responseState(xhr)).toEqual(CLEARED_STATE);
   });
@@ -1910,7 +1885,7 @@ describe('NitroXMLHttpRequest', () => {
     expect(responseState(xhr)).toEqual(CLEARED_STATE);
   });
 
-  it.each(['', 'text', 'document'] as const)(
+  it.each(['', 'document'] as const)(
     'returns a null responseXML for responseType %p',
     async (responseType) => {
       const encoder = new TextEncoder();
@@ -1932,7 +1907,7 @@ describe('NitroXMLHttpRequest', () => {
     }
   );
 
-  it.each(['json', 'arraybuffer', 'blob'] as const)(
+  it.each(['text', 'json', 'arraybuffer', 'blob'] as const)(
     'throws InvalidStateError from responseXML for responseType %p',
     (responseType) => {
       const xhr = new NitroXMLHttpRequest();
@@ -1949,16 +1924,7 @@ describe('NitroXMLHttpRequest', () => {
     }
   );
 
-  it.each([
-    ['a', 1],
-    ['é', 2],
-    ['日', 3],
-    ['🚀', 4],
-    ['\uD800', 3],
-    ['\uDC00', 3],
-    ['\uD800\uD800\uDC00', 7],
-    ['a\uD800b', 5],
-  ])('counts %p as %p bytes, like TextEncoder', async (text, length) => {
+  async function expectUTF8Length(text: string, length: number) {
     const { utf8Length } = await import('../utf8');
     expect(new TextEncoder().encode(text).byteLength).toBe(length);
     expect(utf8Length(text)).toBe(length);
@@ -1977,7 +1943,37 @@ describe('NitroXMLHttpRequest', () => {
         writable: true,
       });
     }
-  });
+  }
+
+  it.each([
+    ['a', 1],
+    ['é', 2],
+    ['日', 3],
+    ['\uD83D\uDE80', 4],
+    ['\uD800', 3],
+    ['\uDC00', 3],
+    ['\uD800\uD800\uDC00', 7],
+    ['a\uD800b', 5],
+  ])('counts %p as %p bytes, like TextEncoder', (text, length) =>
+    expectUTF8Length(text, length)
+  );
+
+  // utf8Length encodes 65536 UTF-16 units at a time.
+  it.each([
+    [
+      'a surrogate pair across a slice boundary',
+      'a'.repeat(0xffff) + '\uD83D\uDE80',
+      0xffff + 4,
+    ],
+    [
+      'a lone surrogate at a slice boundary',
+      'a'.repeat(0xffff) + '\uD800b',
+      0xffff + 4,
+    ],
+    ['several slices', 'é'.repeat(0x28000), 0x50000],
+  ])('counts %s like TextEncoder', (_name, text, length) =>
+    expectUTF8Length(text, length)
+  );
 
   it('sends a string body with a lone surrogate', async () => {
     // React Native's Blob measures a string with encodeURI, which throws on a
@@ -2041,35 +2037,23 @@ describe('NitroXMLHttpRequest', () => {
     }
   );
 
-  it('reads a Blob body before sending it', () =>
-    withFileReader(async () => {
-      mockNitroFetch.mockResolvedValue(makeResponse([]));
+  it('skips the upload progress of a body it cannot measure', async () => {
+    mockNitroFetch.mockResolvedValue(makeResponse([]));
 
-      const xhr = new NitroXMLHttpRequest();
-      xhr.open('POST', 'https://example.com/upload');
-      const completed = waitForEvent(xhr, 'loadend');
-      xhr.send(new Blob(['body'], { type: 'application/x-body' }));
-      await completed;
+    const body = new URLSearchParams('a=1');
+    jest.spyOn(body, 'toString').mockImplementation(() => {
+      throw new URIError('URI malformed');
+    });
+    const xhr = new NitroXMLHttpRequest();
+    const events: string[] = [];
+    xhr.addEventListener('load', () => events.push('load'));
+    xhr.addEventListener('error', () => events.push('error'));
+    xhr.upload.onprogress = () => events.push('upload.progress');
+    xhr.open('POST', 'https://example.com/post');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send(body);
+    await completed;
 
-      const init = mockNitroFetch.mock.calls[0]?.[1];
-      expect(new TextDecoder().decode(init?.body as ArrayBuffer)).toBe('body');
-      expect(new Headers(init?.headers).get('content-type')).toBe(
-        'application/x-body'
-      );
-    }));
-
-  it('sends nothing when aborted while a Blob body is read', () =>
-    withFileReader(async () => {
-      const xhr = new NitroXMLHttpRequest();
-      const events: string[] = [];
-      xhr.addEventListener('abort', () => events.push('abort'));
-      xhr.addEventListener('loadend', () => events.push('loadend'));
-      xhr.open('POST', 'https://example.com/upload');
-      xhr.send(new Blob(['body']));
-      xhr.abort();
-      await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(events).toEqual(['abort', 'loadend']);
-      expect(mockNitroFetch).not.toHaveBeenCalled();
-    }));
+    expect(events).toEqual(['load']);
+  });
 });
