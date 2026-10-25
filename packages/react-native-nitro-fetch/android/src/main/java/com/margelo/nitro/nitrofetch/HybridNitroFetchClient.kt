@@ -309,7 +309,9 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
 
   override fun cancelRequest(requestId: String) {
     // https://developer.android.com/develop/connectivity/cronet/reference/org/chromium/net/UrlRequest#cancel() 
-    activeRequests.remove(requestId)?.cancel()
+    val request = activeRequests.remove(requestId) ?: return
+    delayedReads.remove(request)?.run()
+    request.cancel()
   }
 
   private fun findPrefetchKey(req: NitroRequest): String? {
@@ -344,6 +346,10 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
     private val streamScheduler = java.util.concurrent.ScheduledThreadPoolExecutor(1) { r ->
       Thread(r, "NitroFetch-stream").apply { isDaemon = true }
     }.apply { removeOnCancelPolicy = true }
+    // The read each request waits to issue. A request cancelled without a read
+    // pending is drained by Cronet, which keeps its connection open until the
+    // body ends, so cancelRequest() issues the read first.
+    private val delayedReads = ConcurrentHashMap<UrlRequest, Runnable>()
     private val requestBodyHeaders = arrayOf("Content-Type", "Content-Encoding", "Content-Language", "Content-Location")
 
     @JvmStatic
@@ -740,7 +746,16 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           }
           if (next == null) return
           if (waits) {
-            streamScheduler.schedule({ request.read(next) }, SMALL_READ_DELAY_US, java.util.concurrent.TimeUnit.MICROSECONDS)
+            val issued = AtomicBoolean(false)
+            val issue = Runnable {
+              if (issued.compareAndSet(false, true)) {
+                delayedReads.remove(request)
+                // The request may have ended meanwhile.
+                try { request.read(next) } catch (_: IllegalStateException) {}
+              }
+            }
+            delayedReads[request] = issue
+            streamScheduler.schedule(issue, SMALL_READ_DELAY_US, java.util.concurrent.TimeUnit.MICROSECONDS)
           } else {
             request.read(next)
           }

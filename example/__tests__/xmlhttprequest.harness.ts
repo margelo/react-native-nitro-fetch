@@ -369,7 +369,9 @@ describe('XMLHttpRequest state and validation', () => {
     const loading = new Promise<void>((resolve) => {
       xhr.onprogress = () => resolve();
     });
-    xhr.open('GET', `${BASE}/drip?numbytes=30&duration=3&id=${id}`);
+    // 120 ms between bytes, so the abort does not land on the arrival of one
+    // while the 400 ms buffering window ends.
+    xhr.open('GET', `${BASE}/drip?numbytes=25&duration=3&id=${id}`);
     xhr.send();
     await loading;
     const stateBefore = xhr.readyState;
