@@ -464,6 +464,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   _timedOut = false;
   _trackingName: string | null = null;
   _incrementalEvents = false;
+  _progressEvents = false;
   _performanceLogger: XHRPerformanceLogger | null = null;
 
   private _requestHandle: XMLHttpRequestTransportHandle | null = null;
@@ -899,6 +900,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
       this.onreadystatechange != null ||
       this.onprogress != null;
     this._sendTime = Date.now();
+    const observesProgress = this._progressEvents || this.onprogress != null;
     const requestId = nextRequestId;
     nextRequestId += 1;
     this.__didCreateRequest(requestId);
@@ -938,6 +940,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
         headers: this._headers,
         incremental: incrementalEvents,
         method,
+        observesProgress,
         responseType: this._responseType,
         url,
         withCredentials: this.withCredentials,
@@ -972,7 +975,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
               this._responseType !== 'blob';
             if (receivesText) {
               const responseText = this._decodeText(null);
-              if (!incrementalEvents || this.readyState < this.LOADING) {
+              if (this.readyState < this.LOADING) {
                 this.__didReceiveData(requestId, bufferedText + responseText);
               } else {
                 this._response += responseText;
@@ -983,8 +986,14 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
           }
           this.__didCompleteResponse(requestId, error, false);
         },
+        onProgress: (loaded) => {
+          this.__didReceiveDataProgress(requestId, loaded, this._total);
+        },
         onResponse: (status, headers, responseURL) => {
           this.__didReceiveResponse(requestId, status, headers, responseURL);
+        },
+        onText: (text) => {
+          this.__didReceiveData(requestId, text);
         },
       }
     );
@@ -1078,6 +1087,9 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   ): void {
     if (type === 'readystatechange' || type === 'progress') {
       this._incrementalEvents = true;
+    }
+    if (type === 'progress') {
+      this._progressEvents = true;
     }
     super.addEventListener(type, listener, options);
   }

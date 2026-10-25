@@ -7,6 +7,8 @@ jest.mock('../fetch-core/fetch', () => ({
 }));
 
 type NitroFetchFunction = typeof import('../fetch-core/fetch').nitroFetch;
+type NitroRawInit = import('../fetch-core/raw').NitroRawInit;
+type UrlResponseInfo = import('../NitroCronet.nitro').UrlResponseInfo;
 type NitroXMLHttpRequestConstructor =
   typeof import('../XMLHttpRequest').NitroXMLHttpRequest;
 type NitroXMLHttpRequestInstance = InstanceType<NitroXMLHttpRequestConstructor>;
@@ -14,12 +16,15 @@ type NitroXMLHttpRequestInstance = InstanceType<NitroXMLHttpRequestConstructor>;
 let mockNitroFetch: jest.MockedFunction<NitroFetchFunction>;
 let NitroXMLHttpRequest: NitroXMLHttpRequestConstructor;
 
+// `text` stands in for the text the buffered client decoded natively. It
+// defaults to the chunks decoded as UTF-8.
 function makeResponse(
   chunks: Uint8Array[],
   init: {
     headers?: Record<string, string>;
     status?: number;
     statusText?: string;
+    text?: string;
     url?: string;
   } = {}
 ): Response {
@@ -31,13 +36,63 @@ function makeResponse(
       controller.close();
     },
   });
+  const bytes = Buffer.concat(chunks);
   return {
     body: stream,
     headers: new Headers(init.headers),
     status: init.status ?? 200,
     statusText: init.statusText ?? 'OK',
     url: init.url ?? 'https://example.com/result',
-  } as Response;
+    async arrayBuffer() {
+      return bytes.buffer.slice(
+        bytes.byteOffset,
+        bytes.byteOffset + bytes.byteLength
+      );
+    },
+    async text() {
+      return init.text ?? new TextDecoder().decode(bytes);
+    },
+  } as unknown as Response;
+}
+
+function responseInfo(
+  headers: Record<string, string>,
+  init: { status?: number; url?: string } = {}
+): UrlResponseInfo {
+  const url = init.url ?? 'https://example.com/result';
+  return {
+    url,
+    httpStatusCode: init.status ?? 200,
+    httpStatusText: 'OK',
+    allHeaders: headers,
+    allHeadersAsList: Object.entries(headers).map(([key, value]) => ({
+      key,
+      value,
+    })),
+    urlChain: [url],
+    negotiatedProtocol: '',
+    proxyServer: '',
+    receivedByteCount: 0,
+    wasCached: false,
+  };
+}
+
+// What the XHR asked the native client for.
+function sentInit(): NitroRawInit & { stream?: boolean } {
+  return mockNitroFetch.mock.calls[0]![1] as NitroRawInit;
+}
+
+// Plays what the native client reports while the request loads, then
+// resolves with `response`.
+function mockNative(
+  response: Response,
+  whileLoading: (init: NitroRawInit) => void = () => {}
+): void {
+  mockNitroFetch.mockImplementation(async (_input, init) => {
+    await Promise.resolve();
+    whileLoading(init as NitroRawInit);
+    return response;
+  });
 }
 
 function waitForEvent(
@@ -245,17 +300,17 @@ describe('NitroXMLHttpRequest', () => {
     mockNitroFetch.mockReset();
   });
 
-  it('streams response state, headers, text, and download progress', async () => {
+  it('streams an event-stream response state, headers, text, and download progress', async () => {
     const encoder = new TextEncoder();
-    const firstChunk = encoder.encode('{"ok":');
-    const secondChunk = encoder.encode('true}');
-    const response = makeResponse([firstChunk, secondChunk], {
-      headers: {
-        'content-length': '11',
-        'content-type': 'application/json',
-      },
+    const headers = {
+      'content-length': '11',
+      'content-type': 'text/event-stream',
+    };
+    mockNative(makeResponse([], { headers }), (init) => {
+      init._onResponseStarted?.(responseInfo(headers));
+      init._onData?.(encoder.encode('{"ok":').buffer);
+      init._onData?.(encoder.encode('true}').buffer);
     });
-    mockNitroFetch.mockResolvedValue(response);
 
     const xhr = new NitroXMLHttpRequest();
     const states: number[] = [];
@@ -280,18 +335,18 @@ describe('NitroXMLHttpRequest', () => {
     expect(xhr.status).toBe(200);
     expect(xhr.statusText).toBe('');
     expect(xhr.responseText).toBe('{"ok":true}');
-    expect(xhr.getResponseHeader('Content-Type')).toBe('application/json');
+    expect(xhr.getResponseHeader('Content-Type')).toBe('text/event-stream');
     expect(xhr.getAllResponseHeaders()).toContain(
-      'content-type: application/json\r\n'
+      'content-type: text/event-stream\r\n'
     );
     expect(mockNitroFetch).toHaveBeenCalledWith(
       'https://example.com/source',
       expect.objectContaining({
         credentials: 'include',
         method: 'GET',
-        stream: true,
       })
     );
+    expect(sentInit().stream).toBeUndefined();
   });
 
   it.each([
@@ -388,8 +443,9 @@ describe('NitroXMLHttpRequest', () => {
 
     expect(mockNitroFetch).toHaveBeenCalledWith(
       'https://example.com/upload',
-      expect.objectContaining({ body: form, method: 'POST', stream: false })
+      expect.objectContaining({ body: form, method: 'POST' })
     );
+    expect(sentInit().stream).toBeUndefined();
   });
 
   it.each(['', 'text', 'json'] as const)(
@@ -413,8 +469,15 @@ describe('NitroXMLHttpRequest', () => {
       );
       expect(mockNitroFetch).toHaveBeenCalledWith(
         'https://example.com/plain',
-        expect.objectContaining({ body: 'body', stream: false })
+        expect.objectContaining({
+          body: 'body',
+          _onResponseStarted: undefined,
+          _onData: undefined,
+          _onProgress: undefined,
+          _responseBytes: false,
+        })
       );
+      expect(sentInit().stream).toBeUndefined();
     }
   );
 
@@ -427,50 +490,319 @@ describe('NitroXMLHttpRequest', () => {
       },
     ],
     [
-      'onprogress is set',
+      'a readystatechange listener is added',
       'GET',
+      (xhr) => {
+        xhr.addEventListener('readystatechange', () => {});
+      },
+    ],
+    [
+      // SuperAgent adds a readystatechange listener to every request.
+      'SuperAgent sends a JSON body',
+      'POST',
+      (xhr) => {
+        xhr.addEventListener('readystatechange', () => {});
+        xhr.setRequestHeader('Content-Type', 'application/json');
+      },
+    ],
+  ])(
+    'asks for the head and event streams early, buffered, when %s',
+    async (_reason, method, setUp) => {
+      const encoder = new TextEncoder();
+      mockNitroFetch.mockResolvedValue(makeResponse([encoder.encode('ok')]));
+
+      const xhr = new NitroXMLHttpRequest();
+      xhr.open(method, 'https://example.com/watched');
+      setUp(xhr);
+      const completed = waitForEvent(xhr, 'loadend');
+      xhr.send(method === 'POST' ? '{}' : null);
+      await completed;
+
+      expect(xhr.responseText).toBe('ok');
+      expect(mockNitroFetch).toHaveBeenCalledWith(
+        'https://example.com/watched',
+        expect.objectContaining({
+          method,
+          _onResponseStarted: expect.any(Function),
+          _onData: expect.any(Function),
+          _onProgress: undefined,
+          _separateConnections: false,
+        })
+      );
+      expect(sentInit().stream).toBeUndefined();
+    }
+  );
+
+  it.each<[string, (xhr: NitroXMLHttpRequestInstance) => void]>([
+    [
+      'onprogress is set',
       (xhr) => {
         xhr.onprogress = () => {};
       },
     ],
     [
       'a progress listener is added',
-      'GET',
       (xhr) => {
         xhr.addEventListener('progress', () => {});
       },
     ],
     [
-      'the response is an arraybuffer',
-      'GET',
+      // axios' XHR adapter, with onDownloadProgress.
+      'axios observes download progress',
       (xhr) => {
-        xhr.responseType = 'arraybuffer';
+        xhr.onloadend = () => {};
+        xhr.addEventListener('progress', () => {});
       },
     ],
     [
-      'the response is a blob',
-      'GET',
+      // SuperAgent's .on('progress').
+      'SuperAgent observes progress',
       (xhr) => {
-        xhr.responseType = 'blob';
+        xhr.addEventListener('readystatechange', () => {});
+        xhr.addEventListener('progress', () => {});
+        xhr.upload.addEventListener('progress', () => {});
       },
     ],
-    ['the buffered client cannot send the method', 'PROPFIND', () => {}],
-  ])('streams when %s', async (_reason, method, setUp) => {
+  ])('asks for progress, buffered, when %s', async (_reason, setUp) => {
     const encoder = new TextEncoder();
-    const response = makeResponse([encoder.encode('ok')]);
-    mockNitroFetch.mockResolvedValue(response);
+    mockNitroFetch.mockResolvedValue(makeResponse([encoder.encode('ok')]));
 
     const xhr = new NitroXMLHttpRequest();
-    xhr.open(method, 'https://example.com/streamed');
+    xhr.open('GET', 'https://example.com/progress');
     setUp(xhr);
     const completed = waitForEvent(xhr, 'loadend');
     xhr.send();
     await completed;
 
     expect(mockNitroFetch).toHaveBeenCalledWith(
-      'https://example.com/streamed',
-      expect.objectContaining({ method, stream: true, _useDefaultClient: true })
+      'https://example.com/progress',
+      expect.objectContaining({
+        _onResponseStarted: expect.any(Function),
+        _onData: expect.any(Function),
+        _onProgress: expect.any(Function),
+      })
     );
+    expect(sentInit().stream).toBeUndefined();
+  });
+
+  it('asks only for the whole response when axios observes the end and upload progress', async () => {
+    const encoder = new TextEncoder();
+    mockNitroFetch.mockResolvedValue(makeResponse([encoder.encode('ok')]));
+
+    const xhr = new NitroXMLHttpRequest();
+    xhr.open('POST', 'https://example.com/axios');
+    xhr.onloadend = () => {};
+    xhr.onabort = () => {};
+    xhr.onerror = () => {};
+    xhr.ontimeout = () => {};
+    xhr.upload.addEventListener('progress', () => {});
+    xhr.upload.addEventListener('loadend', () => {});
+    xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send('{}');
+    await completed;
+
+    expect(xhr.responseText).toBe('ok');
+    expect(mockNitroFetch).toHaveBeenCalledWith(
+      'https://example.com/axios',
+      expect.objectContaining({
+        _onResponseStarted: undefined,
+        _onData: undefined,
+        _onProgress: undefined,
+        _separateConnections: false,
+      })
+    );
+  });
+
+  it.each(['arraybuffer', 'blob'] as const)(
+    'uses the buffered transport for a %p response, asking for its bytes as received',
+    async (responseType) => {
+      const bytes = [0x63, 0x61, 0x66, 0xe9];
+      mockNitroFetch.mockResolvedValue(makeResponse([Uint8Array.from(bytes)]));
+
+      const xhr = new NitroXMLHttpRequest();
+      xhr.addEventListener('readystatechange', () => {});
+      xhr.open('GET', 'https://example.com/bytes');
+      xhr.responseType = responseType;
+      const completed = waitForEvent(xhr, 'loadend');
+      xhr.send();
+      await completed;
+
+      if (responseType === 'arraybuffer') {
+        expect(Array.from(new Uint8Array(xhr.response as ArrayBuffer))).toEqual(
+          bytes
+        );
+      }
+      expect(mockNitroFetch).toHaveBeenCalledWith(
+        'https://example.com/bytes',
+        expect.objectContaining({ _responseBytes: true })
+      );
+      expect(sentInit().stream).toBeUndefined();
+    }
+  );
+
+  it('sends a method the buffered client has no enum value for as a custom method', async () => {
+    mockNitroFetch.mockResolvedValue(
+      makeResponse([new TextEncoder().encode('ok')])
+    );
+
+    const xhr = new NitroXMLHttpRequest();
+    xhr.open('PROPFIND', 'https://example.com/dav');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+    await completed;
+
+    expect(mockNitroFetch).toHaveBeenCalledWith(
+      'https://example.com/dav',
+      expect.objectContaining({
+        method: 'PROPFIND',
+        _customMethod: 'PROPFIND',
+      })
+    );
+    expect(sentInit().stream).toBeUndefined();
+  });
+
+  it('reports the head of a buffered response before its body', async () => {
+    let init: NitroRawInit = {};
+    let resolveResponse: (response: Response) => void = () => {};
+    mockNitroFetch.mockImplementation((_input, requestInit) => {
+      init = requestInit as NitroRawInit;
+      return new Promise((resolve) => {
+        resolveResponse = resolve;
+      });
+    });
+
+    const xhr = new NitroXMLHttpRequest();
+    const seen: Array<[number, number, string]> = [];
+    xhr.addEventListener('readystatechange', () => {
+      seen.push([xhr.readyState, xhr.status, xhr.responseText]);
+    });
+    xhr.open('GET', 'https://example.com/slow');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+
+    init._onResponseStarted?.(
+      responseInfo(
+        { 'Content-Type': 'text/plain' },
+        { status: 201, url: 'https://example.com/final' }
+      )
+    );
+    expect(xhr.readyState).toBe(NitroXMLHttpRequest.HEADERS_RECEIVED);
+    expect(xhr.status).toBe(201);
+    expect(xhr.responseURL).toBe('https://example.com/final');
+    expect(xhr.getResponseHeader('content-type')).toBe('text/plain');
+
+    resolveResponse(
+      makeResponse([new TextEncoder().encode('done')], {
+        headers: { 'content-type': 'text/plain' },
+        status: 201,
+        url: 'https://example.com/final',
+      })
+    );
+    await completed;
+
+    expect(seen).toEqual([
+      [1, 0, ''],
+      [2, 201, ''],
+      [3, 201, 'done'],
+      [4, 201, 'done'],
+    ]);
+  });
+
+  it('fires readystatechange for each state of a buffered response', async () => {
+    const encoder = new TextEncoder();
+    const response = makeResponse(
+      [encoder.encode('{"ok":'), encoder.encode('true}')],
+      { headers: { 'content-length': '11' } }
+    );
+    mockNitroFetch.mockResolvedValue(response);
+
+    const xhr = new NitroXMLHttpRequest();
+    const seen: Array<[number, string]> = [];
+    xhr.addEventListener('readystatechange', () => {
+      seen.push([xhr.readyState, xhr.responseText]);
+    });
+    xhr.open('GET', 'https://example.com/buffered');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+    await completed;
+
+    expect(seen).toEqual([
+      [1, ''],
+      [2, ''],
+      [3, '{"ok":true}'],
+      [4, '{"ok":true}'],
+    ]);
+  });
+
+  it('uses the text the buffered client decoded', async () => {
+    // "café" in ISO-8859-1. The buffered client decodes it with the charset.
+    const response = makeResponse([Uint8Array.of(0x63, 0x61, 0x66, 0xe9)], {
+      headers: { 'content-type': 'text/plain; charset=iso-8859-1' },
+      text: 'café',
+    });
+    mockNitroFetch.mockResolvedValue(response);
+
+    const xhr = new NitroXMLHttpRequest();
+    xhr.onreadystatechange = () => {};
+    xhr.open('GET', 'https://example.com/latin1');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+    await completed;
+
+    expect(xhr.responseText).toBe('café');
+  });
+
+  it('reports progress from native without partial responseText', async () => {
+    const headers = { 'content-length': '10' };
+    mockNative(makeResponse([], { headers, text: 'abcdefghij' }), (init) => {
+      init._onResponseStarted?.(responseInfo(headers));
+      init._onProgress?.(3, 10);
+      init._onProgress?.(10, 10);
+    });
+
+    const xhr = new NitroXMLHttpRequest();
+    const progress: Array<[number, number, string]> = [];
+    xhr.onprogress = (event) => {
+      progress.push([event.loaded, event.total, xhr.responseText]);
+    };
+    xhr.open('GET', 'https://example.com/download');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+    await completed;
+
+    expect(progress).toEqual([
+      [3, 10, ''],
+      [10, 10, ''],
+    ]);
+    expect(xhr.responseText).toBe('abcdefghij');
+  });
+
+  it('reports progress that came with the whole body after the head', async () => {
+    mockNative(makeResponse([new TextEncoder().encode('abcd')]), (init) => {
+      init._onProgress?.(4, 4);
+    });
+
+    const xhr = new NitroXMLHttpRequest();
+    const events: string[] = [];
+    xhr.addEventListener('readystatechange', () => {
+      events.push(`readystatechange.${xhr.readyState}`);
+    });
+    xhr.addEventListener('progress', (event) => {
+      events.push(`progress.${(event as ProgressEvent).loaded}`);
+    });
+    xhr.open('GET', 'https://example.com/small');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+    await completed;
+
+    expect(events).toEqual([
+      'readystatechange.1',
+      'readystatechange.2',
+      'progress.4',
+      'readystatechange.3',
+      'readystatechange.4',
+    ]);
   });
 
   it.each<[string, boolean]>([
@@ -481,8 +813,8 @@ describe('NitroXMLHttpRequest', () => {
     ['application/json, text/plain, */*', false],
     ['text/event-streams', false],
   ])(
-    'with Accept %p, streams on the stream client: %p',
-    async (accept, streamClient) => {
+    'with Accept %p, uses the stream client connections: %p',
+    async (accept, separateConnections) => {
       const encoder = new TextEncoder();
       const response = makeResponse([encoder.encode('data: ok\n\n')]);
       mockNitroFetch.mockResolvedValue(response);
@@ -498,10 +830,10 @@ describe('NitroXMLHttpRequest', () => {
       expect(mockNitroFetch).toHaveBeenCalledWith(
         'https://example.com/events',
         expect.objectContaining({
-          stream: true,
-          _useDefaultClient: !streamClient,
+          _separateConnections: separateConnections,
         })
       );
+      expect(sentInit().stream).toBeUndefined();
     }
   );
 

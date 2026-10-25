@@ -52,8 +52,7 @@ const sendXMLHttpRequest = (
   return { xhr, done };
 };
 
-// SuperAgent adds this listener to every request, so its XMLHttpRequests
-// stream.
+// SuperAgent adds this listener to every request.
 const watchLikeSuperAgent = (xhr: NitroXMLHttpRequestInstance) => {
   xhr.addEventListener('readystatechange', () => {});
 };
@@ -624,8 +623,8 @@ describe('NitroFetch - HTTP cache', () => {
     expect(await cacheReport(id)).toEqual({ requests: 2, conditional: 1 });
   });
 
-  // A watched XMLHttpRequest streams, but on the default client, so the two
-  // share one cache.
+  // A watched XMLHttpRequest runs on the default client, so the two share one
+  // cache.
   it('a watched XMLHttpRequest is served from what the default transport cached', async () => {
     const id = cacheId();
     const url = `${BASE}/cache/${id}?maxAge=60`;
@@ -1269,7 +1268,7 @@ describe('NitroFetch - XMLHttpRequest event streams', () => {
   it('streams the body as it arrives', async () => {
     const lengths: number[] = [];
     const { xhr, done } = sendXMLHttpRequest(
-      `${BASE}/drip?duration=1&numbytes=4`,
+      `${BASE}/sse?count=4&interval=250`,
       (request) => {
         acceptEventStream(request);
         request.addEventListener('progress', () => {
@@ -1278,8 +1277,11 @@ describe('NitroFetch - XMLHttpRequest event streams', () => {
       }
     );
     await done;
-    expect(xhr.responseText).toBe('****');
-    expect(lengths.some((length) => length > 0 && length < 4)).toBe(true);
+    const full = 'data: 0\n\ndata: 1\n\ndata: 2\n\ndata: 3\n\n';
+    expect(xhr.responseText).toBe(full);
+    expect(lengths.some((length) => length > 0 && length < full.length)).toBe(
+      true
+    );
   });
 
   // Over HTTP/1.1, Cronet and URLSession open at most 6 connections per host.

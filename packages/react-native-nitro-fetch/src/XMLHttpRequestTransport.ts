@@ -1,6 +1,7 @@
-import { isFormData } from './fetch-core/body';
 import { nitroFetch } from './fetch-core/fetch';
-import type { NitroStreamInit } from './fetch-core/stream';
+import type { NitroRawInit } from './fetch-core/raw';
+import { NitroHeaders } from './Headers';
+import type { UrlResponseInfo } from './NitroCronet.nitro';
 import type { NitroRequestMethod } from './NitroFetch.nitro';
 import { utf8Length } from './utf8';
 
@@ -11,6 +12,8 @@ export type XMLHttpRequestTransportRequest = {
   // incrementalUpdates.
   incremental: boolean;
   method: string;
+  // The caller listens for download progress.
+  observesProgress: boolean;
   responseType: XMLHttpRequestResponseType;
   url: string;
   withCredentials: boolean;
@@ -19,22 +22,26 @@ export type XMLHttpRequestTransportRequest = {
 export type XMLHttpRequestTransportCallbacks = {
   onChunk(chunk: Uint8Array<ArrayBuffer>, loaded: number): void;
   onComplete(error: string): void;
+  // Bytes received so far, while a buffered body loads.
+  onProgress(loaded: number): void;
   onResponse(
     status: number,
     headers: Record<string, string>,
     responseURL: string
   ): void;
+  // A buffered text body, decoded natively.
+  onText(text: string): void;
 };
 
 export type XMLHttpRequestTransportHandle = {
   abort(): void;
 };
 
-type NitroRequestInit = NitroStreamInit & { stream?: boolean };
-
-function responseHeaders(response: Response): Record<string, string> {
+function responseHeaders(
+  headerList: Headers | NitroHeaders
+): Record<string, string> {
   const headers: Record<string, string> = {};
-  response.headers.forEach((value, name) => {
+  headerList.forEach((value, name) => {
     headers[name] = value;
   });
   return headers;
@@ -68,29 +75,16 @@ const BUFFERED_METHODS = new Set<string>([
   'OPTIONS',
 ] satisfies NitroRequestMethod[]);
 
-// A text response nobody watches arrives in one native-to-JS hop on the
-// buffered client. Everything else streams: the caller watches the body
-// arrive, the buffered client would hand binary bodies back decoded as text
-// and hold them whole on the Java heap, or it cannot send the method.
-function shouldStream(request: XMLHttpRequestTransportRequest): boolean {
-  if (isFormData(request.body)) return false;
-  return (
-    request.incremental ||
-    request.responseType === 'arraybuffer' ||
-    request.responseType === 'blob' ||
-    // fetch-core sends the method upper-cased on either client.
-    !BUFFERED_METHODS.has(request.method.toUpperCase())
-  );
+function isBinaryResponse(responseType: XMLHttpRequestResponseType): boolean {
+  return responseType === 'arraybuffer' || responseType === 'blob';
 }
 
 const EVENT_STREAM = /(?:^|,)\s*text\/event-stream\s*(?:[;,]|$)/i;
 
-// Streamed XHRs run on the default client's engine, sharing its connections
-// and HTTP cache: whether the server streams is only known from the response
-// headers, after the engine is picked. A request for an event stream
-// (EventSource clients send this Accept header by spec) keeps the stream
-// client's own engine, so long-lived streams can't hold the default client's
-// connections.
+// A request for an event stream (EventSource clients send this Accept header
+// by spec) runs on the stream client's connections, so long-lived streams
+// can't hold the default client's: the engine is picked before the response
+// says whether it streams.
 function acceptsEventStream(headers: Record<string, string>): boolean {
   return Object.entries(headers).some(
     ([name, value]) =>
@@ -116,48 +110,124 @@ export function sendXMLHttpRequest(
     callbacks.onComplete(error);
   };
 
+  const fail = (error: unknown) => {
+    if (completed) return;
+    const message = error instanceof Error ? error.message : String(error);
+    complete(message);
+  };
+
+  // The response head comes before the body when native reports it early,
+  // otherwise with the body.
+  let responded = false;
+  const respond = (
+    status: number,
+    headers: Record<string, string>,
+    responseURL: string
+  ) => {
+    responded = true;
+    callbacks.onResponse(status, headers, responseURL);
+  };
+
+  // Native calls these while the request loads. A listener that throws fails
+  // the request, as it would while the response is handled below.
+  const whileLoading =
+    <Args extends unknown[]>(handler: (...args: Args) => void) =>
+    (...args: Args) => {
+      if (completed) return;
+      try {
+        handler(...args);
+      } catch (error) {
+        abortController.abort();
+        fail(error);
+      }
+    };
+
+  // Only a caller that watches the request while it loads hears about the
+  // head before the body, or gets an event stream as it arrives. Everyone
+  // else gets the whole response in one native-to-JS hop.
+  const onResponseStarted = whileLoading((info: UrlResponseInfo) => {
+    respond(
+      info.httpStatusCode,
+      responseHeaders(new NitroHeaders(info.allHeadersAsList)),
+      info.url
+    );
+  });
+
+  let streamed = false;
+  let loaded = 0;
+  const onData = whileLoading((chunk: ArrayBuffer) => {
+    streamed = true;
+    loaded += chunk.byteLength;
+    callbacks.onChunk(new Uint8Array(chunk), loaded);
+  });
+
+  // Progress can come before the head when the whole body arrived with it.
+  let pendingProgress: number | null = null;
+  const onProgress = whileLoading((received: number) => {
+    if (!responded) {
+      pendingProgress = received;
+      return;
+    }
+    callbacks.onProgress(received);
+  });
+
   const performRequest = async () => {
     try {
-      const stream = shouldStream(request);
       const credentials: RequestCredentials = request.withCredentials
         ? 'include'
         : 'omit';
-      const init: NitroRequestInit = {
+      const init: NitroRawInit = {
         body: request.body as BodyInit | null,
         credentials,
         headers: request.headers,
         method: request.method,
         signal: abortController.signal,
-        stream,
-        _useDefaultClient: stream && !acceptsEventStream(request.headers),
+        _onResponseStarted: request.incremental ? onResponseStarted : undefined,
+        _onData: request.incremental ? onData : undefined,
+        _onProgress: request.observesProgress ? onProgress : undefined,
+        // The buffered client decodes text natively, so it would hand binary
+        // bodies back changed.
+        _responseBytes: isBinaryResponse(request.responseType),
+        _customMethod: BUFFERED_METHODS.has(request.method)
+          ? undefined
+          : request.method,
+        _separateConnections: acceptsEventStream(request.headers),
       };
       const response = await nitroFetch(request.url, init);
       if (completed) return;
 
-      const headers = responseHeaders(response);
-      callbacks.onResponse(response.status, headers, response.url);
-      if (completed) return;
+      if (!responded) {
+        respond(
+          response.status,
+          responseHeaders(response.headers),
+          response.url
+        );
+        if (completed) return;
+      }
+      if (pendingProgress != null) {
+        callbacks.onProgress(pendingProgress);
+        pendingProgress = null;
+        if (completed) return;
+      }
 
-      const body = response.body;
-      if (body != null) {
-        const reader = body.getReader();
-        let loaded = 0;
-        while (true) {
-          const result = await reader.read();
-          if (completed) return;
-          if (result.done) break;
-          if (result.value == null) continue;
-          const chunk = result.value.slice();
-          loaded += chunk.byteLength;
-          callbacks.onChunk(chunk, loaded);
-        }
+      if (streamed) {
+        // The body already arrived through onData.
+        complete('');
+        return;
+      }
+      if (isBinaryResponse(request.responseType)) {
+        const bytes = new Uint8Array(await response.arrayBuffer());
+        if (completed) return;
+        callbacks.onChunk(bytes, bytes.byteLength);
+      } else {
+        const text = await response.text();
+        if (completed) return;
+        callbacks.onText(text);
       }
 
       complete('');
     } catch (error) {
-      if (completed) return;
-      const message = error instanceof Error ? error.message : String(error);
-      complete(message);
+      fail(error);
     }
   };
 
