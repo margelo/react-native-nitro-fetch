@@ -71,6 +71,21 @@ class NitroProgressEvent {
   stopPropagation(): void {}
 }
 
+type ErrorReporter = { reportError?: (error: unknown) => void };
+
+// Like a browser, a throwing listener does not stop the dispatch. React
+// Native's ErrorUtils.reportError() hands the error to the global handler as
+// non-fatal, so crash reporters see it; rethrowing it from a timer would be
+// fatal.
+function reportListenerError(error: unknown): void {
+  const errorUtils = (globalThis as { ErrorUtils?: ErrorReporter }).ErrorUtils;
+  if (typeof errorUtils?.reportError === 'function') {
+    errorUtils.reportError(error);
+  } else {
+    console.error(error);
+  }
+}
+
 class NitroEventTarget {
   private readonly _listeners = new Map<string, Set<Listener>>();
 
@@ -103,17 +118,27 @@ class NitroEventTarget {
     const target = this as unknown as Record<string, unknown>;
     const handler = target[propertyName];
     if (typeof handler === 'function') {
-      handler.call(this, event);
+      try {
+        handler.call(this, event);
+      } catch (error) {
+        reportListenerError(error);
+      }
     }
 
     const listeners = this._listeners.get(event.type);
     if (listeners == null) return true;
     const snapshot = Array.from(listeners);
     for (const listener of snapshot) {
-      if (typeof listener === 'function') {
-        listener.call(this, event);
-      } else {
-        listener.handleEvent(event);
+      // A listener removed earlier in this dispatch does not run.
+      if (!listeners.has(listener)) continue;
+      try {
+        if (typeof listener === 'function') {
+          listener.call(this, event);
+        } else {
+          listener.handleEvent(event);
+        }
+      } catch (error) {
+        reportListenerError(error);
       }
     }
     return !event.defaultPrevented;
@@ -180,6 +205,32 @@ const SUPPORTED_RESPONSE_TYPES: Record<ResponseType, boolean> = {
   '': true,
 };
 
+// HTTP token characters, for methods and header names. In Hermes, one
+// regular expression test costs less than a loop over the characters.
+const TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+const FORBIDDEN_METHODS = new Set(['CONNECT', 'TRACE', 'TRACK']);
+// The methods XMLHttpRequest upper-cases. Others are sent as given.
+const NORMALIZED_METHODS = new Set([
+  'DELETE',
+  'GET',
+  'HEAD',
+  'OPTIONS',
+  'POST',
+  'PUT',
+]);
+// The usual origin of a URL: http(s)://host[:port] with a plain host and a
+// port up to 59999. isValidURL() accepts it without the full check.
+const SIMPLE_HTTP_ORIGIN =
+  /https?:\/\/[a-z0-9.-]+(?::[0-5]?\d{0,4})?(?=[/?#]|$)/iy;
+// The last origin SIMPLE_HTTP_ORIGIN matched. Requests mostly go to an
+// origin that was just checked.
+let lastSimpleOrigin = '';
+const INVALID_HEADER_VALUE = /[\0\n\r]/;
+// Lower-case keys of valid header names. Apps send the same few names, and a
+// Map lookup costs less than the token check and toLowerCase().
+const MAX_HEADER_KEYS = 256;
+const headerKeys = new Map<string, string>();
+
 let nextRequestId = 1;
 
 // The length of the bytes that end on a whole UTF-8 sequence. A sequence cut
@@ -196,6 +247,127 @@ function completeUTF8Length(bytes: Uint8Array): number {
     }
   }
   return length;
+}
+
+// A DOMException where the runtime has one, else an Error with the same name.
+function domException(message: string, name: string): Error {
+  if (typeof DOMException === 'function') {
+    return new DOMException(message, name);
+  }
+  const error = new Error(message);
+  error.name = name;
+  return error;
+}
+
+function normalizeMethod(method: string): string {
+  if (NORMALIZED_METHODS.has(method)) return method;
+  if (!TOKEN.test(method)) {
+    throw domException(
+      `'${method}' is not a valid HTTP method.`,
+      'SyntaxError'
+    );
+  }
+  const upperCaseMethod = method.toUpperCase();
+  if (FORBIDDEN_METHODS.has(upperCaseMethod)) {
+    throw domException(
+      `'${method}' HTTP method is unsupported.`,
+      'SecurityError'
+    );
+  }
+  return NORMALIZED_METHODS.has(upperCaseMethod) ? upperCaseMethod : method;
+}
+
+// The forbidden host code points that can be part of a host here: the others
+// end the authority, and the host starts after the last '@'.
+function isForbiddenHostCode(code: number): boolean {
+  return (
+    code <= 0x20 ||
+    code === 0x3c || // <
+    code === 0x3e || // >
+    code === 0x5b || // [
+    code === 0x5d || // ]
+    code === 0x5e || // ^
+    code === 0x7c || // |
+    code === 0x7f
+  );
+}
+
+// The URL parser rejects an http(s) URL whose host is empty or has a
+// forbidden character, or whose port is invalid. Paths and other schemes are
+// left to the client.
+function isValidURL(url: string): boolean {
+  const origin = lastSimpleOrigin;
+  if (origin !== '' && url.startsWith(origin)) {
+    // The origin has to end there: a path, a query, a fragment or the end.
+    if (url.length === origin.length) return true;
+    const next = url.charCodeAt(origin.length);
+    if (next === 0x2f || next === 0x3f || next === 0x23) return true;
+  }
+  SIMPLE_HTTP_ORIGIN.lastIndex = 0;
+  if (SIMPLE_HTTP_ORIGIN.test(url)) {
+    lastSimpleOrigin = url.slice(0, SIMPLE_HTTP_ORIGIN.lastIndex);
+    return true;
+  }
+  let start = 0;
+  let end = url.length;
+  while (start < end && url.charCodeAt(start) <= 0x20) start++;
+  while (end > start && url.charCodeAt(end - 1) <= 0x20) end--;
+  const input = url.slice(start, end).replace(/[\t\n\r]/g, '');
+  const match = /^https?:[/\\]*([^/\\?#]*)/i.exec(input);
+  if (match == null) return true;
+  const authority = match[1] ?? '';
+  const hostAndPort = authority.slice(authority.lastIndexOf('@') + 1);
+  let port: string;
+  const ipv6 = /^\[[0-9A-Fa-f:.]+\](.*)$/.exec(hostAndPort);
+  if (ipv6 != null) {
+    const rest = ipv6[1] ?? '';
+    if (rest !== '' && !rest.startsWith(':')) return false;
+    port = rest.slice(1);
+  } else {
+    const colon = hostAndPort.indexOf(':');
+    const hostEnd = colon < 0 ? hostAndPort.length : colon;
+    if (hostEnd === 0) return false;
+    for (let i = 0; i < hostEnd; i++) {
+      if (isForbiddenHostCode(hostAndPort.charCodeAt(i))) return false;
+    }
+    port = colon < 0 ? '' : hostAndPort.slice(colon + 1);
+  }
+  return port === '' || (/^\d+$/.test(port) && Number(port) <= 65535);
+}
+
+// The lower-case key for a valid header name, or null.
+function headerKey(name: string): string | null {
+  let key = headerKeys.get(name);
+  if (key === undefined) {
+    if (!TOKEN.test(name)) return null;
+    key = name.toLowerCase();
+    if (headerKeys.size >= MAX_HEADER_KEYS) headerKeys.clear();
+    headerKeys.set(name, key);
+  }
+  return key;
+}
+
+// Whether a header value has no CR, LF or NUL. JSON.stringify() escapes those,
+// other control characters, quotes and backslashes, so when it only adds the
+// enclosing quotes there is none. In Hermes this native pass costs less than
+// the regular expression, which then only checks values JSON had to escape.
+function isValidHeaderValue(value: string): boolean {
+  return (
+    JSON.stringify(value).length === value.length + 2 ||
+    !INVALID_HEADER_VALUE.test(value)
+  );
+}
+
+// Leading and trailing HTTP whitespace is dropped, as in a browser.
+function normalizeHeaderValue(value: string): string {
+  const length = value.length;
+  if (
+    length === 0 ||
+    (value.charCodeAt(0) > 0x20 && value.charCodeAt(length - 1) > 0x20)
+  ) {
+    return value;
+  }
+  return value.replace(/^[\t\n\r ]+|[\t\n\r ]+$/g, '');
 }
 
 /**
@@ -234,7 +406,6 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   responseHeaders: Record<string, string> | null | undefined;
   status = 0;
   statusText = '';
-  timeout = 0;
   responseURL = '';
   withCredentials = true;
 
@@ -261,6 +432,9 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   private _loaded = 0;
   // The start of a UTF-8 sequence that continues in the next chunk.
   private _pendingText: Uint8Array | null = null;
+  private _sendTime = 0;
+  private _timeout = 0;
+  private _timeoutTimer: ReturnType<typeof setTimeout> | null = null;
 
   static __setInterceptor_DO_NOT_USE(interceptor: XHRInterceptor | null): void {
     NitroXMLHttpRequest._interceptor = interceptor;
@@ -271,20 +445,16 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     this._reset();
   }
 
+  // Clears the response. open() and abort() keep the request settings, such
+  // as responseType.
   _reset(): void {
-    this.readyState = this.UNSENT;
     this.responseHeaders = undefined;
     this.status = 0;
     this.statusText = '';
     this.responseURL = '';
-    this._requestId = null;
-    this._requestHandle = null;
     this._cachedResponse = undefined;
     this._hasError = false;
-    this._headers = {};
     this._response = '';
-    this._responseType = '';
-    this._sent = false;
     this._lowerCaseResponseHeaders = {};
     this._timedOut = false;
     this._chunks = [];
@@ -297,10 +467,13 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   }
 
   set responseType(responseType: ResponseType) {
-    if (this._sent) {
-      throw new Error(
+    // The spec allows this until LOADING, but send() picks the transport and
+    // how the body is read from the response type.
+    if (this._sent || this.readyState === LOADING || this.readyState === DONE) {
+      throw domException(
         "Failed to set the 'responseType' property on 'XMLHttpRequest': The " +
-          'response type cannot be set after the request has been sent.'
+          'response type cannot be set after the request has been sent.',
+        'InvalidStateError'
       );
     }
     const isSupported = Object.prototype.hasOwnProperty.call(
@@ -324,11 +497,24 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     this._responseType = responseType;
   }
 
+  get timeout(): number {
+    return this._timeout;
+  }
+
+  set timeout(timeout: number) {
+    // An unsigned long, as in a browser. A string such as '5000' works too.
+    // eslint-disable-next-line no-bitwise
+    this._timeout = Number(timeout) >>> 0;
+    // A new value counts from send(), and 0 stops the timer.
+    if (this._requestId != null) this._startTimeout(this._requestId);
+  }
+
   get responseText(): string {
     if (this._responseType !== '' && this._responseType !== 'text') {
-      throw new Error(
+      throw domException(
         "The 'responseText' property is only available if 'responseType' " +
-          `is set to '' or 'text', but it is '${this._responseType}'.`
+          `is set to '' or 'text', but it is '${this._responseType}'.`,
+        'InvalidStateError'
       );
     }
     if (this.readyState < LOADING) return '';
@@ -413,6 +599,8 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     this.status = status;
     this.setResponseHeaders(responseHeaders);
     this.setReadyState(this.HEADERS_RECEIVED);
+    // A listener may have called abort() or open().
+    if (requestId !== this._requestId) return;
     this.responseURL = responseURL ?? '';
 
     const interceptor = NitroXMLHttpRequest._interceptor;
@@ -482,6 +670,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     }
     this._requestHandle = null;
     this._requestId = null;
+    this._clearTimeout();
     this.setReadyState(this.DONE);
 
     const interceptor = NitroXMLHttpRequest._interceptor;
@@ -539,12 +728,31 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   }
 
   setRequestHeader(header: string, value: unknown): void {
-    if (this.readyState !== this.OPENED) {
-      throw new Error('Request has not been opened');
+    if (this.readyState !== this.OPENED || this._sent) {
+      throw domException(
+        "Failed to execute 'setRequestHeader' on 'XMLHttpRequest': The " +
+          "object's state must be OPENED.",
+        'InvalidStateError'
+      );
     }
-    const key = header.toLowerCase();
+    const name = typeof header === 'string' ? header : String(header);
+    const key = headerKey(name);
+    if (key == null) {
+      throw domException(
+        `'${name}' is not a valid HTTP header field name.`,
+        'SyntaxError'
+      );
+    }
+    const stringValue = normalizeHeaderValue(
+      typeof value === 'string' ? value : String(value)
+    );
+    if (!isValidHeaderValue(stringValue)) {
+      throw domException(
+        `'${stringValue}' is not a valid HTTP header field value.`,
+        'SyntaxError'
+      );
+    }
     const existing = this._headers[key];
-    const stringValue = String(value);
     this._headers[key] =
       existing !== undefined ? `${existing}, ${stringValue}` : stringValue;
   }
@@ -568,34 +776,50 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     _username?: string | null,
     _password?: string | null
   ): void {
-    if (this.readyState !== this.UNSENT) {
-      throw new Error('Cannot open, already sending');
-    }
     if (async !== undefined && !async) {
       throw new Error('Synchronous http requests are not supported');
     }
-    const requestURL = String(url);
+    const requestMethod = normalizeMethod(
+      typeof method === 'string' ? method : String(method)
+    );
+    const requestURL = typeof url === 'string' ? url : String(url);
     if (!requestURL) {
-      throw new Error('Cannot load an empty url');
+      throw domException('Cannot load an empty url', 'SyntaxError');
     }
-    this._method = method.toUpperCase();
+    if (!isValidURL(requestURL)) {
+      throw domException(`Invalid URL: '${requestURL}'`, 'SyntaxError');
+    }
+    // Like a browser, open() stops a request in flight without events and
+    // reuses the object. A new object has nothing to reset.
+    if (this._method != null) {
+      this._terminate();
+      this._sent = false;
+      this._headers = {};
+      this._reset();
+    }
+    this._method = requestMethod;
     this._url = requestURL;
     this._aborted = false;
-    this.setReadyState(this.OPENED);
+    if (this.readyState !== this.OPENED) {
+      this.setReadyState(this.OPENED);
+    }
   }
 
   overrideMimeType(_mime: string): void {
     if (this.readyState === this.LOADING || this.readyState === this.DONE) {
-      throw new Error('overrideMimeType() cannot be called while loading');
+      throw domException(
+        'overrideMimeType() cannot be called while loading',
+        'InvalidStateError'
+      );
     }
   }
 
   send(data: Document | XMLHttpRequestBodyInit | null = null): void {
     if (this.readyState !== this.OPENED) {
-      throw new Error('Request has not been opened');
+      throw domException('Request has not been opened', 'InvalidStateError');
     }
     if (this._sent) {
-      throw new Error('Request has already been sent');
+      throw domException('Request has already been sent', 'InvalidStateError');
     }
     this._sent = true;
 
@@ -622,9 +846,11 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
       this._incrementalEvents ||
       this.onreadystatechange != null ||
       this.onprogress != null;
+    this._sendTime = Date.now();
     const requestId = nextRequestId;
     nextRequestId += 1;
     this.__didCreateRequest(requestId);
+    if (this._timeout > 0) this._startTimeout(requestId);
     // The text of a response nothing watches, delivered when it completes.
     let bufferedText = '';
 
@@ -635,7 +861,6 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
         incremental: incrementalEvents,
         method,
         responseType: this._responseType,
-        timeout: this.timeout,
         url,
         withCredentials: this.withCredentials,
       },
@@ -661,7 +886,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
             this.__didReceiveDataProgress(requestId, loaded, total);
           }
         },
-        onComplete: (error, timedOut) => {
+        onComplete: (error) => {
           if (requestId !== this._requestId) return;
           if (!error) {
             const receivesText =
@@ -678,7 +903,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
               this.setReadyState(this.LOADING);
             }
           }
-          this.__didCompleteResponse(requestId, error, timedOut);
+          this.__didCompleteResponse(requestId, error, false);
         },
         onResponse: (status, headers, responseURL) => {
           this.__didReceiveResponse(requestId, status, headers, responseURL);
@@ -691,10 +916,8 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   }
 
   abort(): void {
-    this._aborted = true;
-    const requestHandle = this._requestHandle;
-    this._requestHandle = null;
-    requestHandle?.abort();
+    this._terminate();
+    // Before send() the request stays OPENED, and send() still works.
     if (
       !(
         this.readyState === this.UNSENT ||
@@ -702,10 +925,15 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
         this.readyState === this.DONE
       )
     ) {
+      this._aborted = true;
+      this._sent = false;
       this._reset();
       this.setReadyState(this.DONE);
     }
-    this._reset();
+    if (this.readyState === this.DONE) {
+      this.readyState = this.UNSENT;
+      this._reset();
+    }
   }
 
   setResponseHeaders(responseHeaders: Record<string, string> | null): void {
@@ -720,14 +948,21 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   }
 
   setReadyState(newState: number): void {
+    // Read before the listeners run, since one may call open().
+    const aborted = this._aborted;
+    const hasError = this._hasError;
+    const timedOut = this._timedOut;
     this.readyState = newState;
     this._dispatch('readystatechange');
     if (newState !== this.DONE) return;
-    if (this._aborted) {
+    if (aborted) {
       this._dispatch('abort');
-    } else if (this._hasError) {
-      this._dispatch(this._timedOut ? 'timeout' : 'error');
+    } else if (hasError) {
+      this._dispatch(timedOut ? 'timeout' : 'error');
     } else {
+      // Like Chromium, a listener that called open() or abort() ends the
+      // request without load and loadend.
+      if (this.readyState !== this.DONE) return;
       this._dispatch('load');
     }
     this._dispatch('loadend');
@@ -774,6 +1009,35 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     }
     if (start === end) return marks;
     return marks + utf8ToString(bytes.subarray(start, end));
+  }
+
+  // Stops the native request. Its callbacks are ignored from here on.
+  private _terminate(): void {
+    const requestHandle = this._requestHandle;
+    this._requestHandle = null;
+    this._requestId = null;
+    this._clearTimeout();
+    requestHandle?.abort();
+  }
+
+  private _startTimeout(requestId: number): void {
+    this._clearTimeout();
+    if (!(this._timeout > 0)) return;
+    const delay = Math.max(0, this._sendTime + this._timeout - Date.now());
+    this._timeoutTimer = setTimeout(() => {
+      this._timeoutTimer = null;
+      if (requestId !== this._requestId) return;
+      const requestHandle = this._requestHandle;
+      this._requestHandle = null;
+      requestHandle?.abort();
+      this.__didCompleteResponse(requestId, 'Request timed out', true);
+    }, delay);
+  }
+
+  private _clearTimeout(): void {
+    if (this._timeoutTimer == null) return;
+    clearTimeout(this._timeoutTimer);
+    this._timeoutTimer = null;
   }
 
   private _mergeChunks(): Uint8Array<ArrayBuffer> {

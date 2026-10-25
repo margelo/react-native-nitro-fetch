@@ -290,6 +290,22 @@ app.get('/cache-report/:id', (req, res) => {
   res.json(cacheReports.get(req.params.id) ?? { requests: 0, conditional: 0 });
 });
 
+// Records the method of every request to /hits/:id, so tests can assert that
+// a request never reached the server.
+const hits = new Map();
+
+app.all('/hits/:id', (req, res) => {
+  const methods = hits.get(req.params.id) ?? [];
+  methods.push(req.method);
+  hits.set(req.params.id, methods);
+  res.json({ methods });
+});
+
+app.get('/hits-report/:id', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ methods: hits.get(req.params.id) ?? [] });
+});
+
 app.all('/delay/:n', (req, res) => {
   const n = Math.min(60, Math.max(0, parseInt(req.params.n, 10) || 0));
   const timer = setTimeout(() => res.json(baseInfo(req)), n * 1000);
