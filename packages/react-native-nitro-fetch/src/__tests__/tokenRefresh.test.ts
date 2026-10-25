@@ -1,6 +1,4 @@
-// Dynamic imports do not mark this file as a TypeScript module. Keep generated
-// test declarations module-scoped so they cannot collide with the source file.
-export {};
+import { NitroResponse } from '../Response';
 
 jest.mock('../fetch-core/fetch', () => ({
   nitroFetch: jest.fn(),
@@ -14,8 +12,6 @@ type CallRefreshEndpoint = typeof import('../tokenRefresh').callRefreshEndpoint;
 
 let mockNitroFetch: jest.MockedFunction<NitroFetchFunction>;
 let callRefreshEndpoint: CallRefreshEndpoint;
-
-const PIN_ERROR = 'ERR_SSL_PINNED_KEY_NOT_IN_CERT_CHAIN';
 
 describe('callRefreshEndpoint', () => {
   const globalFetch = globalThis.fetch;
@@ -41,10 +37,11 @@ describe('callRefreshEndpoint', () => {
   });
 
   it('sends the refresh with the nitro client, which applies the pin file', async () => {
-    mockNitroFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ token: 'abc' }),
-    } as unknown as Response);
+    mockNitroFetch.mockResolvedValue(
+      new NitroResponse('{"token":"abc"}', {
+        status: 200,
+      }) as unknown as Response
+    );
 
     const headers = await callRefreshEndpoint({
       url: 'https://auth.example.com/refresh',
@@ -71,16 +68,24 @@ describe('callRefreshEndpoint', () => {
     expect(headers).toEqual({ Authorization: 'Bearer abc' });
   });
 
-  it('rejects with the pin error of the nitro client', async () => {
-    mockNitroFetch.mockRejectedValue(
-      new TypeError(
-        `Certificate pinning failed for www.gstatic.com (${PIN_ERROR})`
-      )
-    );
-
-    await expect(
-      callRefreshEndpoint({ url: 'https://www.gstatic.com/generate_204' })
-    ).rejects.toThrow(PIN_ERROR);
-    expect(globalThis.fetch).not.toHaveBeenCalled();
+  it('rejects an empty JSON body, as React Native fetch and the native refresh do', async () => {
+    for (const response of [
+      new NitroResponse('', { status: 200 }),
+      new NitroResponse(null, { status: 204 }),
+    ]) {
+      mockNitroFetch.mockResolvedValueOnce(response as unknown as Response);
+      await expect(
+        callRefreshEndpoint({
+          url: 'https://auth.example.com/refresh',
+          compositeHeaders: [
+            {
+              header: 'Authorization',
+              template: 'Bearer {{token}}',
+              paths: { token: 'token' },
+            },
+          ],
+        })
+      ).rejects.toThrow(SyntaxError);
+    }
   });
 });

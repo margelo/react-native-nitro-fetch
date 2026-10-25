@@ -209,5 +209,13 @@ const stored = getStoredTokenRefreshConfig('fetch');
 ```
 
 :::note
+`callRefreshEndpoint` sends the request with `nitro-fetch`, not the global `fetch`. In earlier versions it used React Native's networking. So:
+
+- `nitro-fetch-pinning.json` applies to it, and pins set up only for React Native's networking don't. See [Certificate Pinning](./certificate-pinning.md).
+- On Android it sends and stores cookies through `CookieManager`, React Native's cookie jar, only when [cookie sync](./cookie-sync.md) is enabled.
+- A network failure rejects with `nitro-fetch`'s error, which carries the platform's message, instead of React Native's `TypeError: Network request failed`.
+:::
+
+:::note
 The refresh config and header caches are stored with **platform secure storage** (Android Keystore + encrypted values in `SharedPreferences`, iOS Keychain-backed encryption).
 :::

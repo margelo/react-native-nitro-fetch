@@ -12,6 +12,8 @@ Pinning is off unless the app ships the file.
 
 **Not covered:** `react-native-nitro-websockets`, including its own cold-start token refresh. If you register a refresh with `target: 'all'`, the WebSocket copy of that request is not pinned.
 
+**Upgrading:** earlier versions sent `callRefreshEndpoint` through React Native's networking, so pins set up for it, such as a `<pin-set>` in Android's `network_security_config.xml` or `react-native-ssl-public-key-pinning`, covered it. It now uses `nitro-fetch`, which follows only `nitro-fetch-pinning.json`. Ship that file with the same pins to keep refreshes started from JS pinned.
+
 ## 1. Write the pin file
 
 `nitro-fetch-pinning.json` maps each hostname to the SHA-256 hashes of the public keys you trust:

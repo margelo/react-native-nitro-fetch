@@ -36,6 +36,7 @@ export function validatePinningConfig(json: string): void {
   if (!pins || typeof pins !== 'object' || Array.isArray(pins)) {
     throw new Error('expected a JSON object keyed by hostname');
   }
+  const repeated = repeatedKeys(json);
   const hosts = new Set<string>();
   for (const [key, entry] of Object.entries<any>(pins)) {
     const host = key.toLowerCase().replace(/\.$/, '');
@@ -44,7 +45,7 @@ export function validatePinningConfig(json: string): void {
         `"${key}" is not a hostname (no scheme, port, path, wildcard or IP; use punycode for IDNs)`
       );
     }
-    if (hosts.has(host)) {
+    if (hosts.has(host) || repeated.has(key)) {
       throw new Error(`"${key}" lists a host that is already in the file`);
     }
     hosts.add(host);
@@ -75,6 +76,40 @@ export function validatePinningConfig(json: string): void {
       throw new Error(`"${key}".expirationDate must be yyyy-MM-dd`);
     }
   }
+}
+
+/**
+ * The top-level keys that appear more than once. JSON.parse keeps one value per key, so the repeats
+ * are found in the raw text. `json` must already parse as a JSON object.
+ */
+function repeatedKeys(json: string): Set<string> {
+  const seen = new Set<string>();
+  const repeated = new Set<string>();
+  let depth = 0;
+  let expectingKey = false;
+  for (let i = 0; i < json.length; i++) {
+    const c = json[i];
+    if (c === '"') {
+      const start = i;
+      for (i++; i < json.length && json[i] !== '"'; i++) {
+        if (json[i] === '\\') i++;
+      }
+      if (depth === 1 && expectingKey) {
+        const key: string = JSON.parse(json.slice(start, i + 1));
+        if (seen.has(key)) repeated.add(key);
+        seen.add(key);
+      }
+      expectingKey = false;
+    } else if (c === '{' || c === '[') {
+      depth++;
+      expectingKey = depth === 1;
+    } else if (c === '}' || c === ']') {
+      depth--;
+    } else if (c === ',') {
+      expectingKey = depth === 1;
+    }
+  }
+  return repeated;
 }
 
 /** Resolves the pin file from the project root and validates it, so mistakes fail `expo prebuild`. */

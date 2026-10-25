@@ -6,7 +6,7 @@ sidebar_position: 12
 
 # Cookie Sync (Android)
 
-Bridges Android's WebView [`CookieManager`](https://developer.android.com/reference/android/webkit/CookieManager) with `nitro-fetch`'s Cronet client and the cold-start token-refresh path. Useful when your auth flow stores the session cookie in the WebView cookie jar (e.g. SAML, OAuth login pages rendered in a WebView) and you need subsequent native fetches to send it.
+Bridges Android's WebView [`CookieManager`](https://developer.android.com/reference/android/webkit/CookieManager) with `nitro-fetch`'s Cronet client (including `callRefreshEndpoint`) and the cold-start token-refresh path. Useful when your auth flow stores the session cookie in the WebView cookie jar (e.g. SAML, OAuth login pages rendered in a WebView) and you need subsequent native fetches to send it.
 
 When enabled:
 
@@ -32,7 +32,7 @@ class MainApplication : Application(), ReactApplication {
 }
 ```
 
-That's it — both the Cronet client (`fetch`) and the `HttpURLConnection` token-refresh path will start syncing cookies on the next request.
+That's it — both the Cronet client (`fetch`, `callRefreshEndpoint`) and the `HttpURLConnection` token-refresh path will start syncing cookies on the next request.
 
 ## Notes
 
