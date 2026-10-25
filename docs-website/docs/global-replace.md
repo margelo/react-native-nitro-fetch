@@ -52,14 +52,28 @@ After a network error, `responseText` is empty, as in browsers. The `error`
 event carries the native client's error text in a non-standard `nitroError`
 field.
 
-A request nothing watches while it loads (no `readystatechange` or `progress`
-listener) with a text response is buffered like a plain `fetch`. Other requests
-stream on the same native client, so they share its connections and HTTP cache.
-A request that sends `Accept: text/event-stream`, as EventSource clients do,
-uses the separate streaming client instead, so long-lived event streams can't
-take the default client's connections. Other long-lived responses, such as long
-polling, count toward the default client's HTTP/1.1 limit of connections per
-host, as they do with React Native's `XMLHttpRequest`.
+Every request runs on the buffered native client, like a plain `fetch`, and the
+response decides whether it streams. When the request has a `readystatechange`
+or `progress` listener, `responseText` grows as the body arrives for:
+
+- `text/event-stream`, NDJSON, JSON Lines and `multipart/x-mixed-replace`
+  bodies, at once;
+- any other body without an exact length, once it is still loading after 400 ms
+  or passes 8 MB;
+- any text body larger than 256 KB, so JS decodes it while it downloads, as with
+  React Native's `XMLHttpRequest`.
+
+Any other body arrives at once. A request with a `readystatechange` or `progress`
+listener reaches HEADERS_RECEIVED when the response headers arrive, as with
+React Native's `XMLHttpRequest`, and a `progress` listener gets the bytes
+received while the body loads. `arraybuffer` and `blob` responses get the body
+bytes as received.
+
+Requests share the default client's connections and HTTP cache. A request that
+sends `Accept: text/event-stream`, as EventSource clients do, uses the streaming
+client's connections instead, so long-lived event streams can't take the default
+client's. Other long-lived responses count toward the default client's HTTP/1.1
+limit of connections per host, as they do with React Native's `XMLHttpRequest`.
 
 ## WebSocket
 

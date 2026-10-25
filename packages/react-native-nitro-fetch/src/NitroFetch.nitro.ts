@@ -1,4 +1,5 @@
 import type { HybridObject } from 'react-native-nitro-modules';
+import type { UrlResponseInfo } from './NitroCronet.nitro';
 
 // Minimal request/response types to model WHATWG fetch without streaming.
 export type NitroRequestMethod =
@@ -51,6 +52,20 @@ export interface NitroRequest {
   requestId?: string;
 }
 
+// How requestWithEvents() sends a request and returns its body.
+export interface NitroRequestOptions {
+  // Return the body as bodyBytes, exactly as received, instead of decoding it
+  // as text.
+  responseBytes?: boolean;
+  // A method NitroRequestMethod does not cover, such as PROPFIND. Sent instead
+  // of the request's method.
+  customMethod?: string;
+  // Run on the stream client's connections (its own Cronet engine on Android,
+  // its own URLSession on iOS), so a long-lived response cannot hold the
+  // default client's.
+  separateConnections?: boolean;
+}
+
 export interface NitroResponse {
   url: string; // final URL after redirects
   status: number;
@@ -68,6 +83,28 @@ export interface NitroFetchClient extends HybridObject<{
 }> {
   // Client-binded request that uses the env configured at creation.
   request(req: NitroRequest): Promise<NitroResponse>;
+  // request(), for the XMLHttpRequest polyfill. The callbacks report the
+  // response while it loads:
+  // - onResponseStarted gets the status, headers and final URL before the
+  //   body, unless the whole body arrives with them.
+  // - onData gets the body as it arrives when the server streams it, and the
+  //   response then resolves without a body: at once for text/event-stream,
+  //   NDJSON and multipart/x-mixed-replace, from 400 ms or 8 MB for a body
+  //   without an exact length (or a text body with onProgress), and for a
+  //   text body larger than 256 KB, so JS decodes it while it downloads.
+  //   Native
+  //   sends the next chunk once JS has returned from this one, and joins what
+  //   arrives meanwhile into chunks of up to 64 KB. JS returns false once it
+  //   no longer wants the body, such as after an abort.
+  // - onProgress gets the bytes received so far and the exact length (-1 if
+  //   unknown), at most every 50 ms and once at the end.
+  requestWithEvents(
+    req: NitroRequest,
+    options: NitroRequestOptions,
+    onResponseStarted?: (info: UrlResponseInfo) => void,
+    onData?: (chunk: ArrayBuffer) => boolean,
+    onProgress?: (loaded: number, total: number) => void
+  ): Promise<NitroResponse>;
   // Start a prefetch for a given request; expects a header `prefetchKey`.
   prefetch(req: NitroRequest): Promise<void>;
 

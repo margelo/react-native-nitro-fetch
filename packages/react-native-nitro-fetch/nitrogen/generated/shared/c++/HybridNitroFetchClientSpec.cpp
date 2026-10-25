@@ -15,6 +15,7 @@ namespace margelo::nitro::nitrofetch {
     // load custom methods/properties
     registerHybrids(this, [](Prototype& prototype) {
       prototype.registerHybridMethod("request", &HybridNitroFetchClientSpec::request);
+      prototype.registerHybridMethod("requestWithEvents", &HybridNitroFetchClientSpec::requestWithEvents);
       prototype.registerHybridMethod("prefetch", &HybridNitroFetchClientSpec::prefetch);
       prototype.registerHybridMethod("requestSync", &HybridNitroFetchClientSpec::requestSync);
       prototype.registerHybridMethod("cancelRequest", &HybridNitroFetchClientSpec::cancelRequest);

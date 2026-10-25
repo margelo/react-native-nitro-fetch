@@ -2,8 +2,9 @@ import Foundation
 import NitroModules
 
 class HybridNitroCronet: HybridNitroCronetSpec {
-  // Shared URLSession for all streaming requests
-  private static let session: URLSession = {
+  // Shared URLSession for all streaming requests, and for buffered requests
+  // with separateConnections
+  static let session: URLSession = {
     let config = URLSessionConfiguration.default
     config.requestCachePolicy = .useProtocolCachePolicy
     config.urlCache = NitroURLCache.shared

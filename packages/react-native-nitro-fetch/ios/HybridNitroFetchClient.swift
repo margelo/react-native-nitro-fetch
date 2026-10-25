@@ -76,6 +76,47 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     os_unfair_lock_unlock(&_lock)
     return promise
   }
+
+  // request() for the XMLHttpRequest polyfill. A separate method, so request()
+  // does no extra work for fetch().
+  func requestWithEvents(
+    req: NitroRequest,
+    options: NitroRequestOptions,
+    onResponseStarted: ((_ info: UrlResponseInfo) -> Void)?,
+    onData: ((_ chunk: ArrayBuffer) -> Promise<Bool>)?,
+    onProgress: ((_ loaded: Double, _ total: Double) -> Void)?
+  ) throws -> Promise<NitroResponse> {
+    let promise = Promise<NitroResponse>.init()
+    let requestId = req.requestId
+    let bodyData = HybridNitroFetchClient.uploadData(from: req)
+
+    os_unfair_lock_lock(&_lock)
+    let task = Task { [weak self] in
+      defer {
+        if let rid = requestId {
+          self?.removeTask(forKey: rid)
+        }
+      }
+      do {
+        let response = try await HybridNitroFetchClient.requestStatic(
+          req,
+          bodyData: bodyData,
+          options: options,
+          onResponseStarted: onResponseStarted,
+          onData: onData,
+          onProgress: onProgress
+        )
+        promise.resolve(withResult: response)
+      } catch {
+        promise.reject(withError: error)
+      }
+    }
+    if let rid = requestId {
+      activeTasks[rid] = task
+    }
+    os_unfair_lock_unlock(&_lock)
+    return promise
+  }
   
   func prefetch(req: NitroRequest) throws -> Promise<Void> {
     let promise = Promise<Void>.init()
@@ -126,7 +167,14 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     return Data(base64Encoded: b64, options: .ignoreUnknownCharacters)
   }
 
-  public class func requestStatic(_ req: NitroRequest, bodyData: Data? = nil) async throws -> NitroResponse {
+  public class func requestStatic(
+    _ req: NitroRequest,
+    bodyData: Data? = nil,
+    options: NitroRequestOptions? = nil,
+    onResponseStarted: ((UrlResponseInfo) -> Void)? = nil,
+    onData: ((ArrayBuffer) -> Promise<Bool>)? = nil,
+    onProgress: ((Double, Double) -> Void)? = nil
+  ) async throws -> NitroResponse {
     // Local resources (file://, scheme-less paths) aren't HTTP; read off disk -> 200.
     if !isHttpURL(req.url) {
       return try makeLocalFileResponse(req)
@@ -177,7 +225,8 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
       }
     }
 
-    let (urlRequest, finalURL) = try await buildURLRequest(req, bodyData: bodyData)
+    let (urlRequest, finalURL) = try await buildURLRequest(req, bodyData: bodyData, customMethod: options?.customMethod)
+    let responseBytes = options?.responseBytes == true
     let shouldFollowRedirects = req.followRedirects ?? true
     let delegate = NitroTaskDelegate.make(followRedirects: shouldFollowRedirects, priority: req.priority)
 
@@ -200,8 +249,23 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
 
     let data: Data
     let response: URLResponse
+    var receivedBytes: ArrayBuffer? = nil
     do {
-      (data, response) = try await session.data(for: urlRequest, delegate: delegate)
+      let taskSession = options?.separateConnections == true ? HybridNitroCronet.session : session
+      if onResponseStarted != nil || onData != nil || onProgress != nil || responseBytes {
+        (data, response, receivedBytes) = try await NitroBufferedTaskDelegate.data(
+          for: urlRequest,
+          session: taskSession,
+          followRedirects: shouldFollowRedirects,
+          priority: req.priority,
+          responseBytes: responseBytes,
+          onResponseStarted: onResponseStarted,
+          onData: onData,
+          onProgress: onProgress
+        )
+      } else {
+        (data, response) = try await taskSession.data(for: urlRequest, delegate: delegate)
+      }
     } catch {
       let failure = CertificatePinning.mapFailure(error, requestURL: urlRequest.url, cancelledByCaller: Task.isCancelled)
       #if DEBUG
@@ -228,6 +292,8 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
 
     #if DEBUG
     if NitroDevToolsReporter.isDebuggingEnabled() {
+      // A responseBytes body is in receivedBytes.
+      let data = receivedBytes?.toData(copyIfNeeded: false) ?? data
       var headerDict: [String: String] = [:]
       for h in headersPairs { headerDict[h.key] = h.value }
       NitroDevToolsReporter.reportResponseStart(
@@ -254,10 +320,13 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     // Choose bodyString by default (matching Android’s first pass).
     // For binary responses that can’t be decoded as text, bridge the raw bytes
     // as an ArrayBuffer so arrayBuffer() / bytes() return them with no base64.
+    // A request for responseBytes gets the bytes as received.
     let charset = HybridNitroFetchClient.detectCharset(from: http) ?? String.Encoding.utf8
-    let bodyStr = String(data: data, encoding: charset) ?? String(data: data, encoding: .utf8)
-    var bodyBytesAb: ArrayBuffer? = nil
-    if bodyStr == nil && !data.isEmpty {
+    let bodyStr = responseBytes
+      ? nil
+      : String(data: data, encoding: charset) ?? String(data: data, encoding: .utf8)
+    var bodyBytesAb: ArrayBuffer? = receivedBytes
+    if bodyStr == nil && bodyBytesAb == nil && !data.isEmpty {
       bodyBytesAb = try ArrayBuffer.copy(data: data)
     }
 
@@ -339,12 +408,17 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     return req.method?.stringValue
   }
 
-  private static func buildURLRequest(_ req: NitroRequest, bodyData: Data? = nil) async throws -> (URLRequest, URL?) {
+  private static func buildURLRequest(
+    _ req: NitroRequest,
+    bodyData: Data? = nil,
+    customMethod: String? = nil
+  ) async throws -> (URLRequest, URL?) {
     guard let url = URL(string: req.url) else {
       throw NSError(domain: "NitroFetch", code: -3, userInfo: [NSLocalizedDescriptionKey: "Invalid URL: \(req.url)"])
     }
     var r = URLRequest(url: url)
     if let m = req.method?.rawValue { r.httpMethod = reqToHttpMethod(req) }
+    if let customMethod = customMethod { r.httpMethod = customMethod }
     if let headers = req.headers {
       // prefetchKey is an internal cache key, never sent on the server
       for h in headers where h.key.caseInsensitiveCompare("prefetchKey") != .orderedSame {

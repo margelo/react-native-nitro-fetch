@@ -13,7 +13,7 @@ iOS does **not** use Chromium Cronet. The iOS client is built entirely on Apple'
 
 ## Streaming
 
-`HybridNitroCronet.swift` (the iOS side of the `NitroCronet` spec) is also URLSession-backed. `newUrlRequestBuilder(url)` returns a builder whose response/read callbacks feed the `ReadableStream` used by `fetch(url, { stream: true })`. These requests use their own `URLSession`, which shares the client's `URLCache` but not its connections, unless the builder's `useDefaultClient()` moves them to the client's session. The `XMLHttpRequest` polyfill does that for every request except those that send `Accept: text/event-stream`.
+`HybridNitroCronet.swift` (the iOS side of the `NitroCronet` spec) is also URLSession-backed. `newUrlRequestBuilder(url)` returns a builder whose response/read callbacks feed the `ReadableStream` used by `fetch(url, { stream: true })`. These requests use their own `URLSession`, which shares the client's `URLCache` but not its connections, unless the builder's `useDefaultClient()` moves them to the client's session. The `XMLHttpRequest` polyfill uses the buffered client instead, on this `URLSession` for requests that send `Accept: text/event-stream` (`separateConnections`).
 
 ## Auto-prefetch
 

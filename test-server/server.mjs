@@ -199,7 +199,7 @@ app.get('/text', (req, res) => {
   const latin1 = /^"?iso-8859-1"?$/i.test(charset);
   let body = Buffer.from(phrase.repeat(repeat), latin1 ? 'latin1' : 'utf8');
   if (req.query.invalid) body = Buffer.concat([body, Buffer.from(String(req.query.invalid), 'hex')]);
-  res.set('Content-Type', `text/plain; charset=${charset}`).set('Cache-Control', 'no-store');
+  res.set('Content-Type', String(req.query.type ?? `text/plain; charset=${charset}`)).set('Cache-Control', 'no-store');
   if (req.query.gzip) return res.set('Content-Encoding', 'gzip').send(gzipSync(body));
   if (req.query.chunked) {
     for (let i = 0; i < body.length; i += 16384) res.write(body.subarray(i, i + 16384));
@@ -269,6 +269,40 @@ app.get('/drip', (req, res) => {
 
 app.get('/drip-report/:id', (req, res) => {
   res.json(dripReports.get(req.params.id) ?? { missing: true });
+});
+
+// Server-sent events: ?count=N events (default 4), one every ?interval=ms
+// (default 250), then the end of the body. ?type= sets another Content-Type,
+// such as application/x-ndjson.
+app.get('/sse', (req, res) => {
+  const count = Math.max(0, parseInt(req.query.count ?? '4', 10) || 0);
+  const interval = Math.max(1, parseInt(req.query.interval ?? '250', 10) || 1);
+  const type = String(req.query.type ?? 'text/event-stream');
+  res.set({ 'Content-Type': type, 'Cache-Control': 'no-store' });
+  res.flushHeaders();
+  let sent = 0;
+  let closed = false;
+  req.on('close', () => {
+    closed = true;
+  });
+  const tick = () => {
+    if (closed) return;
+    if (sent >= count) return res.end();
+    res.write(`data: ${sent}\n\n`);
+    sent++;
+    setTimeout(tick, interval);
+  };
+  tick();
+});
+
+// Sends the headers at once and the body (?body=, default "ok") after
+// ?delay=ms (default 500).
+app.get('/delayed-body', (req, res) => {
+  const delay = Math.max(0, parseInt(req.query.delay ?? '500', 10) || 0);
+  res.set({ 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
+  res.flushHeaders();
+  const timer = setTimeout(() => res.end(String(req.query.body ?? 'ok')), delay);
+  req.on('close', () => clearTimeout(timer));
 });
 
 const cacheReports = new Map();

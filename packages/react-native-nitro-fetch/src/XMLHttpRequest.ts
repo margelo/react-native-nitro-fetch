@@ -16,7 +16,7 @@ import {
   sendXMLHttpRequest,
   type XMLHttpRequestTransportHandle,
 } from './XMLHttpRequestTransport';
-import { utf8ToString } from './utf8';
+import { utf8Length, utf8ToString } from './utf8';
 
 type Listener = EventListenerOrEventListenerObject;
 
@@ -472,6 +472,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   private _loaded = 0;
   // The start of a UTF-8 sequence that continues in the next chunk.
   private _pendingText: Uint8Array | null = null;
+  private _progressLoaded = -1;
   private _sendTime = 0;
   private _timeout = 0;
   private _timeoutTimer: ReturnType<typeof setTimeout> | null = null;
@@ -504,6 +505,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     this._chunks = [];
     this._loaded = 0;
     this._pendingText = null;
+    this._progressLoaded = -1;
     this._total = 0;
   }
 
@@ -699,6 +701,9 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     total: number
   ): void {
     if (requestId !== this._requestId) return;
+    // Native reports the end of a buffered body, and so does the body itself.
+    if (loaded === this._progressLoaded) return;
+    this._progressLoaded = loaded;
     this._dispatch('progress', {
       lengthComputable: total > 0,
       loaded,
@@ -899,6 +904,8 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
       this.onreadystatechange != null ||
       this.onprogress != null;
     this._sendTime = Date.now();
+    const observesProgress =
+      this.onprogress != null || this._listeners.has('progress');
     const requestId = nextRequestId;
     nextRequestId += 1;
     this.__didCreateRequest(requestId);
@@ -938,6 +945,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
         headers: this._headers,
         incremental: incrementalEvents,
         method,
+        observesProgress,
         responseType: this._responseType,
         url,
         withCredentials: this.withCredentials,
@@ -972,7 +980,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
               this._responseType !== 'blob';
             if (receivesText) {
               const responseText = this._decodeText(null);
-              if (!incrementalEvents || this.readyState < this.LOADING) {
+              if (this.readyState < this.LOADING) {
                 this.__didReceiveData(requestId, bufferedText + responseText);
               } else {
                 this._response += responseText;
@@ -983,8 +991,27 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
           }
           this.__didCompleteResponse(requestId, error, false);
         },
+        onProgress: (loaded) => {
+          // A binary body counts its own bytes as they arrive.
+          if (
+            this._responseType !== 'arraybuffer' &&
+            this._responseType !== 'blob'
+          ) {
+            this._loaded = loaded;
+          }
+          this.__didReceiveDataProgress(requestId, loaded, this._total);
+        },
         onResponse: (status, headers, responseURL) => {
           this.__didReceiveResponse(requestId, status, headers, responseURL);
+        },
+        onText: (text) => {
+          // The load and loadend events report the bytes received, which a
+          // text body does not count. Native counts them for a progress
+          // listener.
+          if (!observesProgress && this._observesEnd()) {
+            this._loaded = this._textLength(text);
+          }
+          this.__didReceiveData(requestId, text);
         },
       }
     );
@@ -1054,12 +1081,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
       // Like Chromium, a listener that called open() or abort() ends the
       // request without load and loadend.
       if (this.readyState !== this.DONE) return;
-      if (
-        this.onload != null ||
-        this.onloadend != null ||
-        this._listeners.has('load') ||
-        this._listeners.has('loadend')
-      ) {
+      if (this._observesEnd()) {
         progress = {
           lengthComputable: this._total > 0,
           loaded: this._loaded,
@@ -1163,6 +1185,24 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   private _failUpload(type: string): void {
     this.upload.dispatchProgress(type);
     this.upload.dispatchProgress('loadend');
+  }
+
+  // Whether anything listens for the end of the request, which reports the
+  // bytes received.
+  private _observesEnd(): boolean {
+    return (
+      this.onload != null ||
+      this.onloadend != null ||
+      this._listeners.has('load') ||
+      this._listeners.has('loadend')
+    );
+  }
+
+  // The bytes of a text body that arrived whole. The Content-Length gives them
+  // when it is exact.
+  private _textLength(text: string): number {
+    if (text.length === 0) return 0;
+    return this._total > 0 ? this._total : utf8Length(text);
   }
 
   private _mergeChunks(): Uint8Array<ArrayBuffer> {

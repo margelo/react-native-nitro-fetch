@@ -27,6 +27,19 @@ extension HTTPURLResponse {
       wasCached: false
     )
   }
+
+  // The Content-Type is a format whose body arrives over time: server-sent
+  // events, newline-delimited JSON, or a multipart stream.
+  var startsStreaming: Bool {
+    guard let contentType = value(forHTTPHeaderField: "Content-Type") else { return false }
+    let mimeType = contentType.split(separator: ";", maxSplits: 1).first ?? ""
+    switch mimeType.trimmingCharacters(in: .whitespaces).lowercased() {
+    case "text/event-stream", "application/x-ndjson", "application/jsonl", "multipart/x-mixed-replace":
+      return true
+    default:
+      return false
+    }
+  }
 }
 
 extension Error {

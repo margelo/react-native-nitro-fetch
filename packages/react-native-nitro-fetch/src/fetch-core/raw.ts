@@ -1,7 +1,9 @@
 import type {
   NitroHeader,
+  NitroRequestOptions,
   NitroResponse as NitroResponseNative,
 } from '../NitroFetch.nitro';
+import type { UrlResponseInfo } from '../NitroCronet.nitro';
 import { NetworkInspector } from '../NetworkInspector';
 import {
   NitroFetchHybrid,
@@ -14,9 +16,24 @@ import { isHttpUrl } from './url';
 import { createAbortError } from './errors';
 import { fetchLocalResource } from './local';
 
+// What the XMLHttpRequest polyfill asks the client for besides the response.
+// See NitroFetchClient.requestWithEvents().
+export type NitroRequestWithEvents = {
+  options: NitroRequestOptions;
+  onResponseStarted?: (info: UrlResponseInfo) => void;
+  onData?: (chunk: ArrayBuffer) => boolean;
+  onProgress?: (loaded: number, total: number) => void;
+};
+
+export type NitroRawInit = RequestInit & {
+  // Set by the XMLHttpRequest polyfill. Without it, a request does nothing
+  // more than a plain fetch.
+  _withEvents?: NitroRequestWithEvents;
+};
+
 export async function nitroFetchRaw(
   input: RequestInfo | URL,
-  init?: RequestInit
+  init?: NitroRawInit
 ): Promise<NitroResponseNative> {
   const signal = init?.signal as AbortSignal | undefined | null;
 
@@ -60,6 +77,9 @@ export async function nitroFetchRaw(
   }
 
   const req = buildNitroRequest(input, init);
+  const withEvents = init?._withEvents;
+  // A method NitroRequestMethod does not cover goes in the options instead.
+  if (withEvents?.options.customMethod != null) req.method = undefined;
 
   // Route non-http(s) (data:/file://content://scheme-less) off the HTTP client.
   if (!isHttpUrl(req.url)) {
@@ -73,7 +93,7 @@ export async function nitroFetchRaw(
     NetworkInspector._recordStart(
       inspectorId,
       req.url,
-      req.method ?? 'GET',
+      withEvents?.options.customMethod ?? req.method ?? 'GET',
       req.headers ?? [],
       req.bodyString
     );
@@ -102,7 +122,15 @@ export async function nitroFetchRaw(
   }
 
   try {
-    const res: NitroResponseNative = await client.request(req);
+    const res: NitroResponseNative = await (withEvents
+      ? client.requestWithEvents(
+          req,
+          withEvents.options,
+          withEvents.onResponseStarted,
+          withEvents.onData,
+          withEvents.onProgress
+        )
+      : client.request(req));
     if (signal?.aborted) throw createAbortError(signal);
     if (inspectorId) {
       NetworkInspector._recordEnd(

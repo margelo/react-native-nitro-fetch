@@ -15,8 +15,10 @@ describe('XMLHttpRequest streamed responseText', () => {
   // Below this, timer noise in the 2 MB time would decide the result.
   const MIN_LIMIT_MS = 500;
 
+  // Typed as NDJSON, which the client streams at once. A text body that ends
+  // within a few hundred milliseconds arrives whole instead.
   const textUrl = (repeat: number) =>
-    `${BASE}/text?chunked=1&phrase=${encodeURIComponent(
+    `${BASE}/text?chunked=1&type=application/x-ndjson&phrase=${encodeURIComponent(
       PHRASE
     )}&repeat=${repeat}`;
 
@@ -367,7 +369,9 @@ describe('XMLHttpRequest state and validation', () => {
     const loading = new Promise<void>((resolve) => {
       xhr.onprogress = () => resolve();
     });
-    xhr.open('GET', `${BASE}/drip?numbytes=30&duration=3&id=${id}`);
+    // 120 ms between bytes, so the abort does not land on the arrival of one
+    // while the 400 ms buffering window ends.
+    xhr.open('GET', `${BASE}/drip?numbytes=25&duration=3&id=${id}`);
     xhr.send();
     await loading;
     const stateBefore = xhr.readyState;
@@ -1047,5 +1051,372 @@ describe('XMLHttpRequest credentials and cleanup', () => {
     const sent = await send('POST', `${BASE}/hits/${id}-sent`, undefined, blob);
     expect(sent.events).toEqual(['load']);
     expect(await hits(`${id}-sent`)).toBe(1);
+  });
+});
+
+type NitroXMLHttpRequestInstance = InstanceType<typeof NitroXMLHttpRequest>;
+
+describe('XMLHttpRequest stream only when needed', () => {
+  // Four bytes as application/octet-stream, without a Content-Length. A body
+  // like this is buffered for 400 ms and streams if it is still loading then.
+  // SHORT_BODY ends within that window, SLOW_BODY outlives it.
+  const SHORT_BODY = `${BASE}/drip?duration=0.2&numbytes=4`;
+  const SLOW_BODY = `${BASE}/drip?duration=1&numbytes=4`;
+
+  type Observed = {
+    // Milliseconds from send() to the first HEADERS_RECEIVED and LOADING, and
+    // to loadend.
+    doneAt: number;
+    headersAt: number;
+    loadingAt: number;
+    lengths: number[];
+    responseText: string;
+    states: number[];
+  };
+
+  // Sends a GET and resolves on loadend. `watch` runs between open() and
+  // send() and calls `record` from the handlers under test. `record` keeps the
+  // readyState, and the responseText length while LOADING.
+  const send = (
+    url: string,
+    watch: (xhr: NitroXMLHttpRequestInstance, record: () => void) => void
+  ) =>
+    new Promise<Observed>((resolve, reject) => {
+      const xhr = new NitroXMLHttpRequest();
+      const lengths: number[] = [];
+      const states: number[] = [];
+      let start = 0;
+      let headersAt = -1;
+      let loadingAt = -1;
+      const record = () => {
+        states.push(xhr.readyState);
+        if (
+          xhr.readyState === NitroXMLHttpRequest.HEADERS_RECEIVED &&
+          headersAt < 0
+        ) {
+          headersAt = Date.now() - start;
+        }
+        if (xhr.readyState === NitroXMLHttpRequest.LOADING) {
+          if (loadingAt < 0) loadingAt = Date.now() - start;
+          lengths.push(xhr.responseText.length);
+        }
+      };
+      xhr.onloadend = () => {
+        resolve({
+          doneAt: Date.now() - start,
+          headersAt,
+          loadingAt,
+          lengths,
+          responseText: xhr.responseText,
+          states,
+        });
+      };
+      xhr.onerror = () => reject(new Error('XMLHttpRequest failed'));
+      xhr.open('GET', url);
+      watch(xhr, record);
+      start = Date.now();
+      xhr.send();
+    });
+
+  const watchStates = (
+    xhr: NitroXMLHttpRequestInstance,
+    record: () => void
+  ) => {
+    xhr.addEventListener('readystatechange', record);
+  };
+
+  // SuperAgent adds a readystatechange listener to every request.
+  it('a readystatechange listener gets a short body in one piece', async () => {
+    const { lengths, responseText, states } = await send(
+      SHORT_BODY,
+      watchStates
+    );
+    expect(responseText).toBe('****');
+    expect(states).toEqual([2, 3, 4]);
+    expect(lengths).toEqual([4]);
+  });
+
+  it('onreadystatechange gets a short body in one piece', async () => {
+    const { lengths, responseText, states } = await send(
+      SHORT_BODY,
+      (xhr, record) => {
+        xhr.onreadystatechange = record;
+      }
+    );
+    expect(responseText).toBe('****');
+    expect(states).toEqual([2, 3, 4]);
+    expect(lengths).toEqual([4]);
+  });
+
+  // SuperAgent's response timeout ends at HEADERS_RECEIVED.
+  it('a readystatechange listener sees HEADERS_RECEIVED when the headers arrive', async () => {
+    const { doneAt, headersAt, responseText } = await send(
+      SLOW_BODY,
+      watchStates
+    );
+    expect(responseText).toBe('****');
+    expect(headersAt).toBeGreaterThanOrEqual(0);
+    expect(doneAt - headersAt).toBeGreaterThan(400);
+  });
+
+  it('a readystatechange listener sees HEADERS_RECEIVED before a delayed body', async () => {
+    const { doneAt, headersAt, lengths, responseText } = await send(
+      `${BASE}/delayed-body?delay=300`,
+      watchStates
+    );
+    expect(responseText).toBe('ok');
+    expect(lengths).toEqual([2]);
+    // URLSession reports a response only with its first body bytes, so on iOS
+    // HEADERS_RECEIVED comes with the body, as with React Native's own
+    // XMLHttpRequest.
+    if (Platform.OS === 'android') {
+      expect(doneAt - headersAt).toBeGreaterThan(200);
+    }
+  });
+
+  // A body without a known length that keeps loading streams, so feeds that
+  // never end, such as Kubernetes or CouchDB watches, reach JS.
+  it('a long body without a length streams once it outlives the buffering window', async () => {
+    const { lengths, responseText } = await send(
+      `${BASE}/drip?duration=2&numbytes=8`,
+      watchStates
+    );
+    expect(responseText).toBe('********');
+    expect(lengths.some((length) => length > 0 && length < 8)).toBe(true);
+  });
+
+  // A text body that a listener watches and that is larger than 256 KB
+  // streams, so JS decodes it while it downloads, as with React Native's
+  // XMLHttpRequest. Smaller ones arrive whole.
+  it('a readystatechange listener gets a text body over 256 KB as it arrives', async () => {
+    const size = 1024 * 1024;
+    const { lengths, responseText } = await send(
+      `${BASE}/text?phrase=0123456789abcdef&repeat=${size / 16}`,
+      watchStates
+    );
+    expect(responseText.length).toBe(size);
+    expect(lengths.length).toBeGreaterThan(1);
+    expect(lengths[lengths.length - 1]).toBe(size);
+    expect(lengths).toEqual([...lengths].sort((a, b) => a - b));
+  });
+
+  it('a readystatechange listener gets a text body under 256 KB in one piece', async () => {
+    const size = 128 * 1024;
+    const { lengths, responseText, states } = await send(
+      `${BASE}/text?phrase=0123456789abcdef&repeat=${size / 16}`,
+      watchStates
+    );
+    expect(responseText.length).toBe(size);
+    expect(states).toEqual([2, 3, 4]);
+    expect(lengths).toEqual([size]);
+  });
+
+  // The response decides: a text/event-stream body streams even when the
+  // request did not ask for one, as react-native-sse reads it.
+  it('an event-stream response streams without any client hint', async () => {
+    const { lengths, responseText } = await send(
+      `${BASE}/sse?count=4&interval=250`,
+      watchStates
+    );
+    const full = 'data: 0\n\ndata: 1\n\ndata: 2\n\ndata: 3\n\n';
+    expect(responseText).toBe(full);
+    expect(lengths.some((length) => length > 0 && length < full.length)).toBe(
+      true
+    );
+  });
+
+  it('an NDJSON response streams from its first line', async () => {
+    const { loadingAt, lengths, responseText } = await send(
+      `${BASE}/sse?count=3&interval=800&type=application%2Fx-ndjson`,
+      watchStates
+    );
+    expect(responseText).toBe('data: 0\n\ndata: 1\n\ndata: 2\n\n');
+    expect(lengths[0]).toBe(9);
+    // Before the buffering window would end.
+    expect(loadingAt).toBeLessThan(350);
+  });
+
+  // Progress on text comes with the text received so far, never at
+  // HEADERS_RECEIVED with an empty responseText.
+  const watchProgress = (
+    url: string,
+    responseType: XMLHttpRequestResponseType,
+    addListener: (
+      xhr: NitroXMLHttpRequestInstance,
+      listener: (event: ProgressEvent) => void
+    ) => void
+  ) =>
+    new Promise<{
+      events: Array<{ loaded: number; readyState: number; text: number }>;
+      xhr: NitroXMLHttpRequestInstance;
+    }>((resolve, reject) => {
+      const xhr = new NitroXMLHttpRequest();
+      const events: Array<{
+        loaded: number;
+        readyState: number;
+        text: number;
+      }> = [];
+      addListener(xhr, (event) => {
+        events.push({
+          loaded: event.loaded,
+          readyState: xhr.readyState,
+          text: responseType === '' ? xhr.responseText.length : -1,
+        });
+      });
+      xhr.onloadend = () => resolve({ events, xhr });
+      xhr.onerror = () => reject(new Error('XMLHttpRequest failed'));
+      xhr.open('GET', url);
+      xhr.responseType = responseType;
+      xhr.send();
+    });
+
+  it('onprogress on a slow text body comes with the text received so far', async () => {
+    const { events, xhr } = await watchProgress(
+      SLOW_BODY,
+      '',
+      (x, listener) => {
+        x.onprogress = listener;
+      }
+    );
+    expect(xhr.responseText).toBe('****');
+    expect(events.some(({ loaded }) => loaded > 0 && loaded < 4)).toBe(true);
+    for (const { loaded, readyState, text } of events) {
+      expect(readyState).toBe(NitroXMLHttpRequest.LOADING);
+      expect(text).toBe(loaded);
+    }
+  });
+
+  it('a progress listener on a slow text body gets the text received so far', async () => {
+    const { events, xhr } = await watchProgress(
+      SLOW_BODY,
+      '',
+      (x, listener) => {
+        x.addEventListener('progress', (event: Event) => {
+          listener(event as ProgressEvent);
+        });
+      }
+    );
+    expect(xhr.responseText).toBe('****');
+    expect(events.some(({ loaded }) => loaded > 0 && loaded < 4)).toBe(true);
+    for (const { loaded, readyState, text } of events) {
+      expect(readyState).toBe(NitroXMLHttpRequest.LOADING);
+      expect(text).toBe(loaded);
+    }
+  });
+
+  // A binary body stays buffered, with progress counts while it loads, as
+  // React Native's own XMLHttpRequest reports them.
+  it('onprogress on a slow arraybuffer body counts the bytes before the end, once each', async () => {
+    const { events, xhr } = await watchProgress(
+      SLOW_BODY,
+      'arraybuffer',
+      (x, listener) => {
+        x.onprogress = listener;
+      }
+    );
+    expect((xhr.response as ArrayBuffer).byteLength).toBe(4);
+    const loaded = events.map((event) => event.loaded);
+    expect(loaded.some((count) => count > 0 && count < 4)).toBe(true);
+    expect(loaded[loaded.length - 1]).toBe(4);
+    expect(new Set(loaded).size).toBe(loaded.length);
+  });
+
+  for (const value of ['iso-8859-1', 'ISO-8859-1', '"iso-8859-1"']) {
+    it(`a readystatechange listener gets text decoded as charset=${value}`, async () => {
+      const { responseText } = await send(
+        `${BASE}/charset/${encodeURIComponent(value)}`,
+        watchStates
+      );
+      expect(responseText).toBe('café crème');
+    });
+  }
+
+  // Android's native decoding keeps a byte order mark that JSON.parse rejects.
+  it('a readystatechange listener gets text without a leading byte order mark', async () => {
+    const { responseText } = await send(
+      `${BASE}/text?phrase=${encodeURIComponent('﻿{"a":1}')}`,
+      watchStates
+    );
+    expect(JSON.parse(responseText)).toEqual({ a: 1 });
+  });
+
+  const getArrayBuffer = (url: string, watched: boolean) =>
+    new Promise<ArrayBuffer>((resolve, reject) => {
+      const xhr = new NitroXMLHttpRequest();
+      xhr.onload = () => resolve(xhr.response as ArrayBuffer);
+      xhr.onerror = () => reject(new Error('XMLHttpRequest failed'));
+      xhr.open('GET', url);
+      xhr.responseType = 'arraybuffer';
+      if (watched) xhr.addEventListener('readystatechange', () => {});
+      xhr.send();
+    });
+
+  // The buffered client returns binary bodies as received, not decoded as
+  // text and re-encoded as UTF-8.
+  for (const watched of [false, true]) {
+    it(`a buffered arraybuffer response keeps the bytes as sent (watched: ${watched})`, async () => {
+      const bytes = new Uint8Array(
+        await getArrayBuffer(`${BASE}/charset/iso-8859-1`, watched)
+      );
+      expect(bytes.byteLength).toBe(10);
+      expect(bytes[3]).toBe(0xe9);
+    });
+  }
+
+  // Without an exact length the native buffer grows as the body arrives.
+  for (const encoding of ['gzip', 'chunked']) {
+    it(`a ${encoding} arraybuffer response larger than one read has every byte`, async () => {
+      const bytes = new Uint8Array(
+        await getArrayBuffer(
+          `${BASE}/text?phrase=xy&repeat=100000&${encoding}=1`,
+          false
+        )
+      );
+      expect(bytes.byteLength).toBe(200000);
+      expect(bytes[0]).toBe(0x78);
+      expect(bytes[199999]).toBe(0x79);
+    });
+  }
+
+  // Native callbacks reach JS through the RuntimeScheduler at
+  // ImmediatePriority, in the order native queues them, so a task queued at
+  // that priority runs after every callback native queued before it.
+  const runQueuedNativeCallbacks = () =>
+    new Promise<void>((resolve) => {
+      const scheduler = (globalThis as any).nativeRuntimeScheduler;
+      scheduler.unstable_scheduleCallback(
+        scheduler.unstable_ImmediatePriority,
+        () => resolve()
+      );
+    });
+
+  // Native reads the body while JavaScript is busy, also when it reports
+  // progress.
+  it('a request with a progress listener reads the body while JavaScript is blocked', async () => {
+    const SIZE = 16 * 1024;
+    const url = `${BASE}/text?phrase=x&repeat=${SIZE}`;
+    const sendWatched = () => {
+      const xhr = new NitroXMLHttpRequest();
+      const done = new Promise<void>((resolve, reject) => {
+        xhr.onload = () => resolve();
+        xhr.onerror = () => reject(new Error('XMLHttpRequest failed'));
+      });
+      xhr.open('GET', url);
+      xhr.addEventListener('progress', () => {});
+      xhr.send();
+      return { xhr, done };
+    };
+    // The first request may open a new connection, which can take longer
+    // than the block on an emulator.
+    await sendWatched().done;
+    const { xhr, done } = sendWatched();
+    await runQueuedNativeCallbacks();
+    const until = Date.now() + 1_000;
+    while (Date.now() < until) {}
+    await runQueuedNativeCallbacks();
+    const readyStateWhenUnblocked = xhr.readyState;
+    await done;
+    expect(xhr.responseText.length).toBe(SIZE);
+    expect(readyStateWhenUnblocked).toBe(NitroXMLHttpRequest.DONE);
   });
 });

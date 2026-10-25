@@ -1,12 +1,14 @@
 package com.margelo.nitro.nitrofetch
 
 import android.net.Uri
+import android.os.SystemClock
 import android.os.Trace
 import android.util.Log
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.ArrayBuffer
 import com.margelo.nitro.core.Promise
+import com.margelo.nitro.nitrofetch.UrlResponseInfo as NitroUrlResponseInfo
 import org.chromium.net.CronetEngine
 import org.chromium.net.CronetException
 import org.chromium.net.UrlRequest
@@ -157,6 +159,85 @@ private class ResponseBody(capacity: Int) {
   }
 }
 
+private fun headerValue(info: UrlResponseInfo, name: String): String? =
+  info.allHeadersAsList.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
+
+// The declared body length, or -1. Cronet decodes gzip and Brotli bodies, so
+// the length is only exact for identity-encoded ones.
+private fun contentLength(info: UrlResponseInfo): Long =
+  headerValue(info, "Content-Length")?.trim()?.toLongOrNull()?.takeIf { it >= 0 } ?: -1L
+
+private fun isIdentityEncoded(info: UrlResponseInfo): Boolean =
+  headerValue(info, "Content-Encoding")?.trim()?.equals("identity", ignoreCase = true) ?: true
+
+private val streamingContentTypes =
+  setOf("text/event-stream", "application/x-ndjson", "application/jsonl", "multipart/x-mixed-replace")
+
+private fun mimeType(info: UrlResponseInfo): String? =
+  headerValue(info, "Content-Type")?.substringBefore(';')?.trim()?.lowercase()
+
+// The Content-Type is a format whose body arrives over time: server-sent
+// events, newline-delimited JSON, or a multipart stream.
+private fun startsStreaming(info: UrlResponseInfo): Boolean =
+  mimeType(info) in streamingContentTypes
+
+/**
+ * A body returned as bytes, in a direct buffer that becomes the ArrayBuffer. With an exact
+ * Content-Length, Cronet can read straight into it, so the body is never copied.
+ */
+private class ResponseBytes(capacity: Int, private val declared: Long) {
+  private var buffer: ByteBuffer = ByteBuffer.allocateDirect(capacity)
+  val size: Int get() = buffer.position()
+
+  // Where the next read goes: this buffer while it has room, otherwise [scratch].
+  fun readTarget(scratch: ByteBuffer): ByteBuffer = if (buffer.hasRemaining()) buffer else scratch
+
+  fun isReadTarget(target: ByteBuffer): Boolean = target === buffer
+
+  // Grows by doubling, but not past an exact declared length.
+  fun append(src: ByteBuffer) {
+    val n = src.remaining()
+    val needed = buffer.position().toLong() + n
+    if (needed > buffer.capacity()) {
+      if (needed > MAX_ARRAY_SIZE) throw OutOfMemoryError("Response body too large")
+      var capacity = maxOf(needed, minOf(buffer.capacity() * 2L, MAX_ARRAY_SIZE.toLong()))
+      if (declared >= needed) capacity = minOf(capacity, declared)
+      val grown = ByteBuffer.allocateDirect(capacity.toInt())
+      buffer.flip()
+      grown.put(buffer)
+      buffer = grown
+    }
+    buffer.put(src)
+  }
+
+  // A buffer much larger than its bytes is trimmed, so the ArrayBuffer does not
+  // keep the spare capacity alive.
+  fun toArrayBuffer(): ArrayBuffer? {
+    val size = buffer.position()
+    if (size == 0) return null
+    buffer.flip()
+    if (buffer.capacity() - size > size / 2) {
+      val trimmed = ByteBuffer.allocateDirect(size)
+      trimmed.put(buffer)
+      return ArrayBuffer.wrap(trimmed)
+    }
+    return ArrayBuffer.wrap(buffer.slice())
+  }
+
+  companion object {
+    private const val MAX_PRESIZE = 32 * 1024 * 1024
+    private const val MAX_ARRAY_SIZE = Int.MAX_VALUE - 8
+
+    fun forResponse(info: UrlResponseInfo, isHead: Boolean): ResponseBytes {
+      val status = info.httpStatusCode
+      if (isHead || status == 204 || status == 205 || status == 304) return ResponseBytes(0, 0)
+      val declared = if (isIdentityEncoded(info)) contentLength(info) else -1L
+      if (declared in 0..MAX_PRESIZE) return ResponseBytes(declared.toInt(), declared)
+      return ResponseBytes(64 * 1024, declared)
+    }
+  }
+}
+
 /**
  * Idle timeout for one Cronet request. It matches URLRequest.timeoutInterval on iOS: the
  * request fails after [timeoutMs] without a callback from Cronet, and the timer restarts
@@ -228,7 +309,9 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
 
   override fun cancelRequest(requestId: String) {
     // https://developer.android.com/develop/connectivity/cronet/reference/org/chromium/net/UrlRequest#cancel() 
-    activeRequests.remove(requestId)?.cancel()
+    val request = activeRequests.remove(requestId) ?: return
+    delayedReads.remove(request)?.run()
+    request.cancel()
   }
 
   private fun findPrefetchKey(req: NitroRequest): String? {
@@ -243,6 +326,30 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
 
   companion object {
     private val directExecutor = Executor(Runnable::run)
+    private const val PROGRESS_INTERVAL_MS = 50L
+    // A body that may still stream is buffered for this long, or up to this size.
+    private const val BUFFER_WINDOW_MS = 400L
+    private const val BUFFER_WINDOW_BYTES = 8L * 1024 * 1024
+    // A watched text body streams past this size, so JS decodes it while it
+    // downloads, as React Native does. Smaller ones arrive whole.
+    private const val STREAM_TEXT_BYTES = 256L * 1024
+    // A body declared larger than this streams from the start.
+    private const val MAX_BUFFERED_LENGTH = 32L * 1024 * 1024
+    // A streamed body goes to JS in chunks of up to this size, and reading
+    // pauses while this many chunks wait for JS, as on the stream client.
+    private const val STREAM_CHUNK_SIZE = 64 * 1024
+    private const val MAX_PENDING_CHUNKS = 16
+    // After a streamed read smaller than this, the next read waits a moment, so
+    // a fast body comes in fewer, larger reads. Event streams read at once.
+    private const val SMALL_READ = 32 * 1024
+    private const val SMALL_READ_DELAY_US = 1000L
+    private val streamScheduler = java.util.concurrent.ScheduledThreadPoolExecutor(1) { r ->
+      Thread(r, "NitroFetch-stream").apply { isDaemon = true }
+    }.apply { removeOnCancelPolicy = true }
+    // The read each request waits to issue. A request cancelled without a read
+    // pending is drained by Cronet, which keeps its connection open until the
+    // body ends, so cancelRequest() issues the read first.
+    private val delayedReads = ConcurrentHashMap<UrlRequest, Runnable>()
     private val requestBodyHeaders = arrayOf("Content-Type", "Content-Encoding", "Content-Language", "Content-Location")
 
     @JvmStatic
@@ -251,7 +358,11 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       req: NitroRequest,
       onSuccess: (NitroResponse) -> Unit,
       onFail: (Throwable) -> Unit,
-      onRestarted: ((UrlRequest, UrlRequest) -> Unit)? = null
+      onRestarted: ((UrlRequest, UrlRequest) -> Unit)? = null,
+      options: NitroRequestOptions? = null,
+      onResponseStarted: ((NitroUrlResponseInfo) -> Unit)? = null,
+      onData: ((ArrayBuffer) -> Promise<Boolean>)? = null,
+      onProgress: ((Double, Double) -> Unit)? = null
     ): UrlRequest? {
       return try {
         // Local resources (file://, content://, scheme-less paths) aren't HTTP; read off disk -> 200.
@@ -260,11 +371,15 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           return null
         }
         if (hostHasWhitespace(req.url)) throw invalidUrlException(req.url)
-        val engine = HybridNitroFetch.getEngine()
-        val executor = HybridNitroFetch.ioExecutor
+        val separate = options?.separateConnections == true
+        val engine = if (separate) HybridNitroCronet.getOrCreateCronetEngine() else HybridNitroFetch.getEngine()
+        val executor = if (separate) HybridNitroCronet.ioExecutor else HybridNitroFetch.ioExecutor
         val formParts = req.bodyFormData
         val multipart = if (formParts != null && formParts.isNotEmpty()) buildMultipartBody(formParts) else null
-        startCronet(engine, executor, req, multipart?.first ?: uploadBytes(req), multipart?.second, onSuccess, onFail, onRestarted)
+        startCronet(
+          engine, executor, req, multipart?.first ?: uploadBytes(req), multipart?.second,
+          onSuccess, onFail, onRestarted, options, onResponseStarted, onData, onProgress
+        )
       } catch (t: Throwable) {
         onFail(t)
         null
@@ -281,10 +396,9 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
     private fun hasAuthorization(req: NitroRequest): Boolean =
       req.headers?.any { it.key.equals("Authorization", ignoreCase = true) } == true
 
-    private fun crossOriginRedirectWithoutAuthorization(req: NitroRequest, status: Int, location: String): NitroRequest {
-      val method = req.method ?: NitroRequestMethod.GET
-      val dropBody = ((status == 301 || status == 302) && method == NitroRequestMethod.POST) ||
-        (status == 303 && method != NitroRequestMethod.GET && method != NitroRequestMethod.HEAD)
+    private fun crossOriginRedirectWithoutAuthorization(req: NitroRequest, method: String, status: Int, location: String): NitroRequest {
+      val dropBody = ((status == 301 || status == 302) && method == "POST") ||
+        (status == 303 && method != "GET" && method != "HEAD")
       val headers = req.headers?.filterNot { header ->
         header.key.equals("Authorization", ignoreCase = true) ||
           (dropBody && requestBodyHeaders.any { header.key.equals(it, ignoreCase = true) })
@@ -304,7 +418,11 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       uploadContentType: String?,
       onSuccess: (NitroResponse) -> Unit,
       onFail: (Throwable) -> Unit,
-      onRestarted: ((UrlRequest, UrlRequest) -> Unit)?
+      onRestarted: ((UrlRequest, UrlRequest) -> Unit)?,
+      options: NitroRequestOptions?,
+      onResponseStarted: ((NitroUrlResponseInfo) -> Unit)?,
+      onData: ((ArrayBuffer) -> Promise<Boolean>)?,
+      onProgress: ((Double, Double) -> Unit)?
     ): UrlRequest {
       val url = req.url
       val shouldFollowRedirects = req.followRedirects ?: true
@@ -327,7 +445,9 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         !BuildConfig.NITRO_FETCH_DISABLE_DEVTOOLS_REPORTING &&
         DevToolsReporter.isDebuggingEnabled()
       val devToolsRequestId = if (devToolsEnabled) (req.requestId ?: UUID.randomUUID().toString()) else ""
-      val inline = !devToolsEnabled
+      // A body that may stream is read on the executor, as the stream client
+      // reads it. On Cronet's network thread every small read reaches JS alone.
+      val inline = !devToolsEnabled && onData == null
       val callbackExecutor = if (inline) directExecutor else executor
       fun complete(block: () -> Unit) {
         if (inline) executor.execute(block) else block()
@@ -335,6 +455,35 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       val callback = object : UrlRequest.Callback() {
         private val buffer = ByteBuffer.allocateDirect(64 * 1024)
         private var body = ResponseBody(0)
+        // Set for responseBytes: the body is returned as received.
+        private var bytesBody: ResponseBytes? = null
+        // A streamed body goes to onData as it arrives. One that may stream is
+        // buffered first, until the window timer or the size threshold ends it.
+        // The timer runs on another thread, so these fields and the body are
+        // guarded by [lock] from the response on.
+        private val lock = Any()
+        private var streaming = false
+        private var pacesReads = false
+        private var mayStream = false
+        private var streamAfterBytes = BUFFER_WINDOW_BYTES
+        private var finished = false
+        private var bufferWindow: java.util.concurrent.ScheduledFuture<*>? = null
+        // A streamed body is joined into chunks: one goes to JS once JS has
+        // returned from the last, when it is full, or at the end. [filling]
+        // is the chunk being joined. A chunk's memory is reused once JS has
+        // returned from it, so a body does not allocate one buffer per chunk
+        // for the garbage collector to free later. [chunkPool] holds the
+        // buffers not in use: at most as many as JS has had at once, which
+        // MAX_PENDING_CHUNKS bounds.
+        private var filling: ByteBuffer? = null
+        private val chunkPool = ArrayList<ByteBuffer>()
+        private var pendingChunks = 0
+        private var refused = false
+        private var pausedRequest: UrlRequest? = null
+        private var received = 0L
+        private var total = -1L
+        private var reportedProgress = -1L
+        private var lastProgressAt = 0L
         private val stopped = AtomicBoolean(false)
         private var restarting = false
         /** True if a redirect response applied at least one `Set-Cookie` (in memory, not yet flushed). */
@@ -354,8 +503,11 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
               if (!stopped.compareAndSet(false, true)) return@complete
               restarting = true
               request.cancel()
-              val next = crossOriginRedirectWithoutAuthorization(req, info.httpStatusCode, newLocationUrl)
+              val method = options?.customMethod ?: req.method?.name ?: "GET"
+              val next = crossOriginRedirectWithoutAuthorization(req, method, info.httpStatusCode, newLocationUrl)
               val keepBody = next.method == req.method
+              // A redirect that drops the body becomes a GET, custom method included.
+              val nextOptions = if (keepBody) options else options?.copy(customMethod = null)
               try {
                 val restarted = startCronet(
                   engine,
@@ -365,7 +517,11 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
                   if (keepBody) uploadContentType else null,
                   { res -> onSuccess(res.copy(redirected = true)) },
                   onFail,
-                  onRestarted
+                  onRestarted,
+                  nextOptions,
+                  onResponseStarted,
+                  onData,
+                  onProgress
                 )
                 onRestarted?.invoke(request, restarted)
               } catch (t: Throwable) {
@@ -413,25 +569,196 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
               -1L
             )
           }
-          body = ResponseBody.forResponse(info, isHead)
+          onResponseStarted?.invoke(info.toNitro())
+          val exact = isIdentityEncoded(info) && contentLength(info) >= 0
+          total = if (exact) contentLength(info) else -1L
+          val responseBytes = options?.responseBytes == true
+          val next = synchronized(lock) {
+            if (responseBytes) {
+              bytesBody = ResponseBytes.forResponse(info, isHead)
+            } else {
+              body = ResponseBody.forResponse(info, isHead)
+            }
+            if (onData != null) {
+              pacesReads = mimeType(info) != "text/event-stream"
+              if (!responseBytes) streamAfterBytes = STREAM_TEXT_BYTES
+              val streamsAtOnce = startsStreaming(info) ||
+                (exact && total > MAX_BUFFERED_LENGTH) ||
+                (exact && !responseBytes && total > STREAM_TEXT_BYTES)
+              if (streamsAtOnce) {
+                startStreaming()
+              } else if (!exact || (onProgress != null && !responseBytes)) {
+                // The server may be streaming: a body that outlives the window streams.
+                mayStream = true
+                bufferWindow = streamScheduler.schedule(
+                  { synchronized(lock) { startStreaming() } },
+                  BUFFER_WINDOW_MS,
+                  java.util.concurrent.TimeUnit.MILLISECONDS
+                )
+              }
+            }
+            nextReadTarget()
+          }
           buffer.clear()
-          request.read(buffer)
+          request.read(next)
+        }
+
+        // Cronet reads straight into a bytes body only when it cannot switch to
+        // streaming midway.
+        private fun nextReadTarget(): ByteBuffer {
+          if (streaming || mayStream) return buffer
+          return bytesBody?.readTarget(buffer) ?: buffer
+        }
+
+        // Hands what was buffered to onData, which then gets the rest as it arrives.
+        private fun startStreaming() {
+          if (streaming || finished) return
+          streaming = true
+          val buffered = bytesBody?.toArrayBuffer()
+            ?: if (body.size > 0) body.bytes.toArrayBuffer(body.size) else null
+          bytesBody = null
+          body = ResponseBody(0)
+          if (buffered != null) sendChunk(buffered)
+        }
+
+        // Under lock. [memory] is the pooled buffer behind [chunk], if any.
+        private fun sendChunk(chunk: ArrayBuffer, memory: ByteBuffer? = null) {
+          val send = onData
+          if (send == null || refused) {
+            memory?.let { chunkPool.add(it) }
+            return
+          }
+          pendingChunks++
+          // The promise resolves on the JS thread, which must not wait for
+          // [lock]: a thread holding it may be waiting on the promise.
+          send(chunk)
+            .then { wanted -> executor.execute { chunkHandled(wanted, memory) } }
+            .catch { executor.execute { chunkHandled(false, memory) } }
+        }
+
+        // Runs on the executor once JS has returned from a chunk.
+        private fun chunkHandled(wanted: Boolean, memory: ByteBuffer?) {
+          synchronized(lock) {
+            pendingChunks--
+            if (!wanted) refused = true
+            memory?.let { chunkPool.add(it) }
+            if (finished) return
+            if (pendingChunks == 0) sendFilling()
+            val request = pausedRequest ?: return
+            if (pendingChunks >= MAX_PENDING_CHUNKS) return
+            pausedRequest = null
+            buffer.clear()
+            request.read(buffer)
+          }
+        }
+
+        // Under lock.
+        private fun sendFilling() {
+          val bytes = filling ?: return
+          if (bytes.position() == 0) return
+          filling = null
+          bytes.flip()
+          // JS reads the memory of the buffer without a copy, and only until it
+          // returns from the chunk.
+          sendChunk(ArrayBuffer.wrap(bytes.slice()), bytes)
+        }
+
+        // Under lock.
+        private fun takeChunkBuffer(): ByteBuffer {
+          val pooled = chunkPool.removeLastOrNull()
+          if (pooled == null) return ByteBuffer.allocateDirect(STREAM_CHUNK_SIZE)
+          pooled.clear()
+          return pooled
+        }
+
+        // Under lock. Copies a streamed read into chunks, sending each one it fills.
+        private fun appendStreamed(read: ByteBuffer) {
+          while (read.hasRemaining()) {
+            val bytes = filling ?: takeChunkBuffer().also { filling = it }
+            val end = read.limit()
+            read.limit(read.position() + minOf(read.remaining(), bytes.remaining()))
+            bytes.put(read)
+            read.limit(end)
+            if (!bytes.hasRemaining()) sendFilling()
+          }
+          if (pendingChunks == 0) sendFilling()
+        }
+
+        private fun reportProgress(final: Boolean) {
+          val callback = onProgress ?: return
+          if (received == reportedProgress) return
+          val now = SystemClock.elapsedRealtime()
+          if (!final && now - lastProgressAt < PROGRESS_INTERVAL_MS) return
+          lastProgressAt = now
+          reportedProgress = received
+          callback(received.toDouble(), total.toDouble())
         }
 
         override fun onReadCompleted(request: UrlRequest, info: UrlResponseInfo, byteBuffer: ByteBuffer) {
-          byteBuffer.flip()
-          val start = body.size
-          body.append(byteBuffer)
-          if (devToolsEnabled) {
-            val read = body.size - start
-            devToolsBytes += read
-            DevToolsReporter.reportDataReceived(devToolsRequestId, read)
-            if (devToolsTextual) {
-              DevToolsReporter.storeResponseBodyIncremental(devToolsRequestId, String(body.bytes, start, read, Charsets.UTF_8))
+          var waits = false
+          val next: ByteBuffer? = try {
+            synchronized(lock) {
+              val bytes = bytesBody
+              val read: Int
+              if (bytes != null && bytes.isReadTarget(byteBuffer)) {
+                // Cronet wrote straight into the body.
+                read = bytes.size - received.toInt()
+              } else {
+                byteBuffer.flip()
+                read = byteBuffer.remaining()
+                if (streaming) {
+                  waits = pacesReads && read < SMALL_READ
+                  appendStreamed(byteBuffer)
+                } else if (bytes != null) {
+                  bytes.append(byteBuffer)
+                } else {
+                  val start = body.size
+                  body.append(byteBuffer)
+                  if (devToolsEnabled && devToolsTextual) {
+                    DevToolsReporter.storeResponseBodyIncremental(devToolsRequestId, String(body.bytes, start, read, Charsets.UTF_8))
+                  }
+                }
+                byteBuffer.clear()
+              }
+              received += read
+              if (devToolsEnabled) {
+                devToolsBytes += read
+                DevToolsReporter.reportDataReceived(devToolsRequestId, read)
+              }
+              if (mayStream && received > streamAfterBytes) startStreaming()
+              if (!streaming) reportProgress(final = false)
+              if (streaming && pendingChunks >= MAX_PENDING_CHUNKS) {
+                // JS is behind: read again once it catches up.
+                pausedRequest = request
+                null
+              } else {
+                nextReadTarget()
+              }
             }
+          } catch (t: Throwable) {
+            // Running out of memory here must fail the request, not take down
+            // the process from Cronet's network thread.
+            if (stopped.compareAndSet(false, true)) {
+              request.cancel()
+              complete { onFail(t) }
+            }
+            return
           }
-          byteBuffer.clear()
-          request.read(byteBuffer)
+          if (next == null) return
+          if (waits) {
+            val issued = AtomicBoolean(false)
+            val issue = Runnable {
+              if (issued.compareAndSet(false, true)) {
+                delayedReads.remove(request)
+                // The request may have ended meanwhile.
+                try { request.read(next) } catch (_: IllegalStateException) {}
+              }
+            }
+            delayedReads[request] = issue
+            streamScheduler.schedule(issue, SMALL_READ_DELAY_US, java.util.concurrent.TimeUnit.MICROSECONDS)
+          } else {
+            request.read(next)
+          }
         }
 
         override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) = complete {
@@ -440,6 +767,12 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           }
           if (devToolsEnabled) {
             DevToolsReporter.reportResponseEnd(devToolsRequestId, devToolsBytes.toLong())
+          }
+          synchronized(lock) {
+            if (streaming) sendFilling()
+            finished = true
+            bufferWindow?.cancel(false)
+            if (!streaming) reportProgress(final = true)
           }
           try {
             val storedOnFinal = !omitCredentials &&
@@ -454,12 +787,17 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
             val length = body.size
             val contentType = info.allHeaders["Content-Type"] ?: info.allHeaders["content-type"]
             val charset = charsetOf((contentType ?: "").toString())
+            val bytesResult = bytesBody
             // Strict-decode the body as text. If it fails the response is binary,
             // so we bridge the raw bytes as an ArrayBuffer instead — no base64.
-            val bodyStr: String? = try {
+            // A request for responseBytes gets the bytes as received, and a
+            // streamed body has already gone to onData.
+            val bodyStr: String? = if (bytesResult != null) null else try {
               decodeText(bytes, length, charset)
             } catch (_: Throwable) { null }
-            val bodyBytesAb: ArrayBuffer? = if (bodyStr == null && length > 0)
+            val bodyBytesAb: ArrayBuffer? = if (bytesResult != null)
+              bytesResult.toArrayBuffer()
+            else if (bodyStr == null && length > 0)
               bytes.toArrayBuffer(length)
             else null
             val res = NitroResponse(
@@ -485,6 +823,10 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           if (devToolsEnabled && !restarting) {
             DevToolsReporter.reportRequestFailed(devToolsRequestId, false)
           }
+          synchronized(lock) {
+            finished = true
+            bufferWindow?.cancel(false)
+          }
           if (stopped.compareAndSet(false, true)) {
             onFail(if (error.isInvalidUrl) invalidUrlException(url) else RuntimeException("Cronet failed: ${error.message}", error))
           }
@@ -497,6 +839,10 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           if (devToolsEnabled && !restarting) {
             DevToolsReporter.reportRequestFailed(devToolsRequestId, true)
           }
+          synchronized(lock) {
+            finished = true
+            bufferWindow?.cancel(false)
+          }
           if (stopped.compareAndSet(false, true)) {
             onFail(RuntimeException("Cronet canceled"))
           }
@@ -507,7 +853,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         ?.let { IdleTimeoutCallback(callback, it) }
       val builder = engine.newUrlRequestBuilder(url, timeoutCallback ?: callback, callbackExecutor)
       if (inline) builder.allowDirectExecutor()
-      val method = req.method?.name ?: "GET"
+      val method = options?.customMethod ?: req.method?.name ?: "GET"
       builder.setHttpMethod(method)
       req.priority?.let { builder.setPriority(it.cronetPriority) }
       // prefetchKey is an internal cache key, never sent on the server
@@ -720,7 +1066,24 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
     return result!!
   }
 
-  override fun request(req: NitroRequest): Promise<NitroResponse> {
+  override fun request(req: NitroRequest): Promise<NitroResponse> =
+    start(req, null, null, null, null)
+
+  override fun requestWithEvents(
+    req: NitroRequest,
+    options: NitroRequestOptions,
+    onResponseStarted: ((info: NitroUrlResponseInfo) -> Unit)?,
+    onData: ((chunk: ArrayBuffer) -> Promise<Boolean>)?,
+    onProgress: ((loaded: Double, total: Double) -> Unit)?
+  ): Promise<NitroResponse> = start(req, options, onResponseStarted, onData, onProgress)
+
+  private fun start(
+    req: NitroRequest,
+    options: NitroRequestOptions?,
+    onResponseStarted: ((NitroUrlResponseInfo) -> Unit)?,
+    onData: ((ArrayBuffer) -> Promise<Boolean>)?,
+    onProgress: ((Double, Double) -> Unit)?
+  ): Promise<NitroResponse> {
     val promise = Promise<NitroResponse>()
     // Try to serve from prefetch cache/pending first
     val key = findPrefetchKey(req)
@@ -764,7 +1127,11 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           if (!finished.get() && (cur === old || !stored.get())) restarted else cur
         }
         if (current !== restarted) restarted.cancel()
-      }
+      },
+      options = options,
+      onResponseStarted = onResponseStarted,
+      onData = onData,
+      onProgress = onProgress
     )
     // Store after start() — if cancelRequest races and misses, the JS
     // catch block checks signal.aborted and throws AbortError anyway.
