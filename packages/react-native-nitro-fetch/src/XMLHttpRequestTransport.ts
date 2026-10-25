@@ -2,6 +2,7 @@ import { isFormData } from './fetch-core/body';
 import { nitroFetch } from './fetch-core/fetch';
 import type { NitroStreamInit } from './fetch-core/stream';
 import type { NitroRequestMethod } from './NitroFetch.nitro';
+import { utf8Length } from './utf8';
 
 export type XMLHttpRequestTransportRequest = {
   body: Document | XMLHttpRequestBodyInit | null;
@@ -43,9 +44,8 @@ export function bodySize(
   body: Document | XMLHttpRequestBodyInit | null
 ): number | undefined {
   if (body == null) return 0;
-  if (typeof body === 'string') {
-    return new Blob([body]).size;
-  }
+  // React Native's Blob throws on a string with a lone surrogate.
+  if (typeof body === 'string') return utf8Length(body);
   if (body instanceof ArrayBuffer) return body.byteLength;
   if (ArrayBuffer.isView(body)) return body.byteLength;
   if (typeof Blob !== 'undefined' && body instanceof Blob) return body.size;
@@ -53,8 +53,7 @@ export function bodySize(
     typeof URLSearchParams !== 'undefined' &&
     body instanceof URLSearchParams
   ) {
-    const serialized = body.toString();
-    return new Blob([serialized]).size;
+    return utf8Length(body.toString());
   }
   return undefined;
 }
@@ -122,7 +121,7 @@ export function sendXMLHttpRequest(
       const stream = shouldStream(request);
       const credentials: RequestCredentials = request.withCredentials
         ? 'include'
-        : 'same-origin';
+        : 'omit';
       const init: NitroRequestInit = {
         body: request.body as BodyInit | null,
         credentials,

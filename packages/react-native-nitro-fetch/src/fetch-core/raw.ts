@@ -28,10 +28,13 @@ export async function nitroFetchRaw(
   // Extract body from standard Request when init.body is absent (ky/undici pattern)
   if (typeof input !== 'string' && !(input instanceof URL)) {
     init = await resolveRequestBody(input, init);
+    // An abort while a body is read sends nothing.
+    if (signal?.aborted) throw createAbortError(signal);
   }
   // Resolve Blob body to string before passing to sync buildNitroRequest
   if (typeof Blob !== 'undefined' && init?.body instanceof Blob) {
     init = await resolveBlobBody(init);
+    if (signal?.aborted) throw createAbortError(signal);
   }
 
   const hasNative =

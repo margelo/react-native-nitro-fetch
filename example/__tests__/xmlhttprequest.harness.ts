@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'react-native-harness';
+import { Platform } from 'react-native';
 import { XMLHttpRequest as NitroXMLHttpRequest } from 'react-native-nitro-fetch';
 import { BASE } from '../test-utils/server';
 
@@ -808,5 +809,243 @@ describe('XMLHttpRequest progress events', () => {
     });
 
     expect(delivered.pop()).toEqual({ loaded: 100000, total: 100000 });
+  });
+});
+
+describe('XMLHttpRequest credentials and cleanup', () => {
+  type NitroXHR = InstanceType<typeof NitroXMLHttpRequest>;
+
+  const RUN = String(Date.now());
+  // Nothing listens on port 1, so the connection is refused.
+  const CLOSED_PORT_URL = BASE.replace(/:\d+$/, ':1/');
+
+  function stateOf(xhr: NitroXHR) {
+    return {
+      allHeaders: xhr.getAllResponseHeaders(),
+      contentType: xhr.getResponseHeader('content-type'),
+      // responseText throws for the other response types.
+      responseText:
+        xhr.responseType === '' || xhr.responseType === 'text'
+          ? xhr.responseText
+          : undefined,
+      responseURL: xhr.responseURL,
+      status: xhr.status,
+      statusText: xhr.statusText,
+    };
+  }
+
+  const CLEARED = {
+    allHeaders: '',
+    contentType: null,
+    responseText: '',
+    responseURL: '',
+    status: 0,
+    statusText: '',
+  };
+
+  type Sent = {
+    atLoadend: ReturnType<typeof stateOf>;
+    errorEvent: { message?: string; nitroError?: string } | undefined;
+    events: string[];
+    xhr: NitroXHR;
+  };
+
+  function send(
+    method: string,
+    url: string,
+    setUp: (xhr: NitroXHR) => void = () => {},
+    body: Parameters<NitroXHR['send']>[0] = null
+  ): Promise<Sent> {
+    return new Promise((resolve, reject) => {
+      const xhr = new NitroXMLHttpRequest();
+      const events: string[] = [];
+      let errorEvent: Sent['errorEvent'];
+      // Fail the case rather than stall the suite.
+      const timer = setTimeout(() => {
+        reject(
+          new Error(`${method} ${url}: no loadend after 10 s (${events})`)
+        );
+      }, 10000);
+      for (const type of ['load', 'error', 'timeout', 'abort']) {
+        xhr.addEventListener(type, (event: unknown) => {
+          events.push(type);
+          if (type === 'error') errorEvent = event as Sent['errorEvent'];
+        });
+      }
+      xhr.addEventListener('loadend', () => {
+        clearTimeout(timer);
+        resolve({ atLoadend: stateOf(xhr), errorEvent, events, xhr });
+      });
+      xhr.open(method, url);
+      setUp(xhr);
+      xhr.send(body);
+    });
+  }
+
+  async function cookiesSent(
+    setUp?: (xhr: NitroXHR) => void
+  ): Promise<Record<string, string>> {
+    const { xhr } = await send('GET', `${BASE}/cookies`, setUp);
+    return JSON.parse(xhr.responseText).cookies;
+  }
+
+  // The number of requests that reached /hits/:id.
+  async function hits(id: string): Promise<number> {
+    const { xhr } = await send('GET', `${BASE}/hits-report/${id}`);
+    return JSON.parse(xhr.responseText).methods.length;
+  }
+
+  function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  const withoutCredentials = (xhr: NitroXHR) => {
+    xhr.withCredentials = false;
+  };
+
+  // Android has no cookie jar unless the app enables cookie sync, which the
+  // example app does not.
+  it('sends and stores cookies by default (iOS cookie jar)', async () => {
+    if (Platform.OS !== 'ios') return;
+    await send('GET', `${BASE}/cookies/set?xhrDefault=${RUN}`);
+    const cookies = await cookiesSent();
+    expect(cookies.xhrDefault).toBe(RUN);
+  });
+
+  // onprogress makes the request stream, so both native clients are covered.
+  for (const [mode, observe] of [
+    ['buffered', () => {}],
+    [
+      'streamed',
+      (xhr: NitroXHR) => {
+        xhr.onprogress = () => {};
+      },
+    ],
+  ] as const) {
+    it(`withCredentials = false sends no cookies (${mode})`, async () => {
+      if (Platform.OS !== 'ios') return;
+      await send('GET', `${BASE}/cookies/set?xhrOmitSend=${RUN}`);
+      const cookies = await cookiesSent((xhr) => {
+        withoutCredentials(xhr);
+        observe(xhr);
+      });
+      expect('xhrOmitSend' in cookies).toBe(false);
+    });
+
+    it(`withCredentials = false stores no cookies (${mode})`, async () => {
+      if (Platform.OS !== 'ios') return;
+      const name = `xhrOmitStore${mode}`;
+      await send('GET', `${BASE}/cookies/set?${name}=${RUN}`, (xhr) => {
+        withoutCredentials(xhr);
+        observe(xhr);
+      });
+      const cookies = await cookiesSent();
+      expect(cookies[name]).not.toBe(RUN);
+    });
+  }
+
+  it('clears the response after a network error', async () => {
+    const { atLoadend, errorEvent, events, xhr } = await send(
+      'GET',
+      CLOSED_PORT_URL
+    );
+    expect(events).toEqual(['error']);
+    expect(atLoadend).toEqual(CLEARED);
+    expect(stateOf(xhr)).toEqual(CLEARED);
+    // Not in the spec: the cause, which responseText used to hold.
+    expect(typeof errorEvent?.nitroError).toBe('string');
+    expect(errorEvent?.nitroError?.length).toBeGreaterThan(0);
+    // axios reports a message, when set, instead of "Network Error".
+    expect(errorEvent?.message).toBe(undefined);
+  });
+
+  it('clears the response after a timeout', async () => {
+    const { atLoadend, events, xhr } = await send(
+      'GET',
+      `${BASE}/drip?numbytes=20&duration=5`,
+      (request) => {
+        // Streamed, so the headers arrive before the timeout.
+        request.onprogress = () => {};
+        request.timeout = 500;
+      }
+    );
+    expect(events).toEqual(['timeout']);
+    expect(atLoadend).toEqual(CLEARED);
+    expect(stateOf(xhr)).toEqual(CLEARED);
+  });
+
+  it('clears the response when aborted while loading', async () => {
+    const { atLoadend, events, xhr } = await send(
+      'GET',
+      `${BASE}/drip?numbytes=20&duration=3`,
+      (request) => {
+        request.onprogress = () => request.abort();
+      }
+    );
+    expect(events).toEqual(['abort']);
+    expect(atLoadend).toEqual(CLEARED);
+    expect(stateOf(xhr)).toEqual(CLEARED);
+  });
+
+  for (const responseType of ['', 'document'] as const) {
+    it(`responseXML is null for responseType '${responseType}'`, async () => {
+      const { events, xhr } = await send('GET', `${BASE}/get`, (request) => {
+        request.responseType = responseType;
+      });
+      expect(events).toEqual(['load']);
+      expect(xhr.responseXML).toBe(null);
+    });
+  }
+
+  for (const responseType of ['text', 'json', 'arraybuffer', 'blob'] as const) {
+    it(`responseXML throws InvalidStateError for responseType '${responseType}'`, async () => {
+      const { events, xhr } = await send('GET', `${BASE}/get`, (request) => {
+        request.responseType = responseType;
+      });
+      expect(events).toEqual(['load']);
+      let error: unknown;
+      try {
+        xhr.responseXML;
+      } catch (caught) {
+        error = caught;
+      }
+      expect((error as Error | undefined)?.name).toBe('InvalidStateError');
+    });
+  }
+
+  it('sends a string with a lone surrogate as U+FFFD', async () => {
+    const uploaded: number[] = [];
+    const { events, xhr } = await send(
+      'POST',
+      `${BASE}/post`,
+      (request) => {
+        request.upload.onprogress = (event) => uploaded.push(event.total);
+      },
+      'a\uD800b'
+    );
+    expect(events).toEqual(['load']);
+    expect(xhr.status).toBe(200);
+    // a, EF BF BD, b
+    expect(JSON.parse(xhr.responseText).dataBase64).toBe('Ye+/vWI=');
+    expect(uploaded).toEqual([5]);
+  });
+
+  it('sends nothing when aborted while a Blob body is read', async () => {
+    const blob = new Blob(['b'.repeat(1024 * 1024)]);
+    const id = `xhr-blob-abort-${RUN}`;
+    const events: string[] = [];
+    const xhr = new NitroXMLHttpRequest();
+    xhr.addEventListener('abort', () => events.push('abort'));
+    xhr.open('POST', `${BASE}/hits/${id}`);
+    xhr.send(blob);
+    xhr.abort();
+    expect(events).toEqual(['abort']);
+    await sleep(1000);
+    expect(await hits(id)).toBe(0);
+
+    // Control: the same body, not aborted, does reach the server.
+    const sent = await send('POST', `${BASE}/hits/${id}-sent`, undefined, blob);
+    expect(sent.events).toEqual(['load']);
+    expect(await hits(`${id}-sent`)).toBe(1);
   });
 });
