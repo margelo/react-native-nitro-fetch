@@ -6,8 +6,22 @@ jest.mock('../fetch-core/fetch', () => ({
   nitroFetch: jest.fn(),
 }));
 
+// The native client nitroFetchRaw talks to.
+const mockClient = {
+  request: jest.fn(),
+  requestWithEvents: jest.fn(),
+  cancelRequest: jest.fn(),
+};
+jest.mock('../fetch-core/client', () => ({
+  NitroFetchHybrid: { createClient: () => mockClient },
+  ensureClient: () => mockClient,
+  clientUnavailableError: () => new Error('NitroFetch client not available'),
+}));
+
 type NitroFetchFunction = typeof import('../fetch-core/fetch').nitroFetch;
 type NitroRawInit = import('../fetch-core/raw').NitroRawInit;
+type NitroRequestWithEvents =
+  import('../fetch-core/raw').NitroRequestWithEvents;
 type UrlResponseInfo = import('../NitroCronet.nitro').UrlResponseInfo;
 type NitroXMLHttpRequestConstructor =
   typeof import('../XMLHttpRequest').NitroXMLHttpRequest;
@@ -82,17 +96,43 @@ function sentInit(): NitroRawInit & { stream?: boolean } {
   return mockNitroFetch.mock.calls[0]![1] as NitroRawInit;
 }
 
+// What the XHR asked the native client to report while the request loads.
+function sentEvents(): NitroRequestWithEvents {
+  return sentInit()._withEvents!;
+}
+
 // Plays what the native client reports while the request loads, then
 // resolves with `response`.
 function mockNative(
   response: Response,
-  whileLoading: (init: NitroRawInit) => void = () => {}
+  whileLoading: (events: NitroRequestWithEvents) => void = () => {}
 ): void {
   mockNitroFetch.mockImplementation(async (_input, init) => {
     await Promise.resolve();
-    whileLoading(init as NitroRawInit);
+    whileLoading((init as NitroRawInit)._withEvents!);
     return response;
   });
+}
+
+// The native client buffers the body, and reports the bytes received to a
+// request that asked for progress.
+function buffered(
+  chunks: Uint8Array[],
+  init: Parameters<typeof makeResponse>[1] = {}
+): NitroFetchFunction {
+  const bytes = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  return async (_input, requestInit) => {
+    await Promise.resolve();
+    (requestInit as NitroRawInit)._withEvents?.onProgress?.(bytes, -1);
+    return makeResponse(chunks, init);
+  };
+}
+
+function mockBuffered(
+  chunks: Uint8Array[],
+  init: Parameters<typeof makeResponse>[1] = {}
+): void {
+  mockNitroFetch.mockImplementation(buffered(chunks, init));
 }
 
 function waitForEvent(
@@ -123,7 +163,17 @@ async function receiveText(
   chunks: Uint8Array[],
   watched: boolean
 ): Promise<{ responseText: string; texts: string[] }> {
-  mockNitroFetch.mockResolvedValue(makeResponse(chunks));
+  if (watched) {
+    // The native client streams what a watched request has asked for.
+    mockNative(makeResponse([]), (events) => {
+      events.onResponseStarted?.(responseInfo({}));
+      for (const chunk of chunks) {
+        if (chunk.byteLength > 0) events.onData?.(chunk.slice().buffer);
+      }
+    });
+  } else {
+    mockNitroFetch.mockResolvedValue(makeResponse(chunks));
+  }
   const xhr = new NitroXMLHttpRequest();
   const texts: string[] = [];
   if (watched) {
@@ -153,19 +203,27 @@ function hangingFetch(): AbortSignal[] {
   return signals;
 }
 
-// A response whose body sends the chunks and then stays open.
-function openResponse(chunks: Uint8Array[]): Response {
-  const response = makeResponse([]);
-  Object.defineProperty(response, 'body', {
-    value: new ReadableStream<Uint8Array>({
-      start(controller) {
-        for (const chunk of chunks) {
-          controller.enqueue(chunk);
-        }
-      },
-    }),
+// A request whose body the native client streams: it reports the chunks and
+// then stays open until it is aborted. Returns the signals it was sent with.
+function openNative(
+  chunks: Uint8Array[],
+  headers: Record<string, string> = {}
+): AbortSignal[] {
+  const signals: AbortSignal[] = [];
+  mockNitroFetch.mockImplementationOnce(async (_input, init) => {
+    await Promise.resolve();
+    const signal = init?.signal ?? undefined;
+    if (signal) signals.push(signal);
+    const events = (init as NitroRawInit)._withEvents!;
+    events.onResponseStarted?.(responseInfo(headers));
+    for (const chunk of chunks) events.onData?.(chunk.slice().buffer);
+    return new Promise<Response>((_resolve, reject) => {
+      signal?.addEventListener('abort', () => {
+        reject(new Error('aborted'));
+      });
+    });
   });
-  return response;
+  return signals;
 }
 
 function recordEvents(xhr: NitroXMLHttpRequestInstance): string[] {
@@ -242,26 +300,28 @@ function eventNames(events: RecordedEvent[]): string[] {
   return events.map((event) => event.name);
 }
 
-// A response that sends 'partial' and then waits until `fail` is called.
-function stalledResponse(): {
-  fail(error: Error): void;
-  response: Response;
-} {
-  let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
-  const body = new ReadableStream<Uint8Array>({
-    start(streamController) {
-      controller = streamController;
-      streamController.enqueue(new TextEncoder().encode('partial'));
-    },
+// A request the native client streams: it reports 'partial' and then waits
+// until `fail` is called.
+function stalledNative(): { fail(error: Error): void } {
+  let rejectRequest: (error: Error) => void = () => {};
+  const request = new Promise<Response>((_resolve, reject) => {
+    rejectRequest = reject;
   });
-  const response = Object.assign(
-    makeResponse([], {
-      headers: { 'content-type': 'text/plain' },
-      url: 'https://example.com/final',
-    }),
-    { body }
-  );
-  return { fail: (error) => controller?.error(error), response };
+  // fail() may come before the request is awaited.
+  request.catch(() => {});
+  mockNitroFetch.mockImplementationOnce(async (_input, init) => {
+    await Promise.resolve();
+    const events = (init as NitroRawInit)._withEvents!;
+    events.onResponseStarted?.(
+      responseInfo(
+        { 'content-type': 'text/plain' },
+        { url: 'https://example.com/final' }
+      )
+    );
+    events.onData?.(new TextEncoder().encode('partial').buffer);
+    return request;
+  });
+  return { fail: (error) => rejectRequest(error) };
 }
 
 function responseState(xhr: NitroXMLHttpRequestInstance) {
@@ -306,10 +366,10 @@ describe('NitroXMLHttpRequest', () => {
       'content-length': '11',
       'content-type': 'text/event-stream',
     };
-    mockNative(makeResponse([], { headers }), (init) => {
-      init._onResponseStarted?.(responseInfo(headers));
-      init._onData?.(encoder.encode('{"ok":').buffer);
-      init._onData?.(encoder.encode('true}').buffer);
+    mockNative(makeResponse([], { headers }), (events) => {
+      events.onResponseStarted?.(responseInfo(headers));
+      events.onData?.(encoder.encode('{"ok":').buffer);
+      events.onData?.(encoder.encode('true}').buffer);
     });
 
     const xhr = new NitroXMLHttpRequest();
@@ -469,14 +529,14 @@ describe('NitroXMLHttpRequest', () => {
       );
       expect(mockNitroFetch).toHaveBeenCalledWith(
         'https://example.com/plain',
-        expect.objectContaining({
-          body: 'body',
-          _onResponseStarted: undefined,
-          _onData: undefined,
-          _onProgress: undefined,
-          _responseBytes: false,
-        })
+        expect.objectContaining({ body: 'body' })
       );
+      expect(sentEvents()).toEqual({
+        options: expect.objectContaining({ responseBytes: false }),
+        onResponseStarted: undefined,
+        onData: undefined,
+        onProgress: undefined,
+      });
       expect(sentInit().stream).toBeUndefined();
     }
   );
@@ -521,14 +581,14 @@ describe('NitroXMLHttpRequest', () => {
       expect(xhr.responseText).toBe('ok');
       expect(mockNitroFetch).toHaveBeenCalledWith(
         'https://example.com/watched',
-        expect.objectContaining({
-          method,
-          _onResponseStarted: expect.any(Function),
-          _onData: expect.any(Function),
-          _onProgress: undefined,
-          _separateConnections: false,
-        })
+        expect.objectContaining({ method })
       );
+      expect(sentEvents()).toEqual({
+        options: expect.objectContaining({ separateConnections: false }),
+        onResponseStarted: expect.any(Function),
+        onData: expect.any(Function),
+        onProgress: undefined,
+      });
       expect(sentInit().stream).toBeUndefined();
     }
   );
@@ -576,10 +636,13 @@ describe('NitroXMLHttpRequest', () => {
 
     expect(mockNitroFetch).toHaveBeenCalledWith(
       'https://example.com/progress',
+      expect.anything()
+    );
+    expect(sentEvents()).toEqual(
       expect.objectContaining({
-        _onResponseStarted: expect.any(Function),
-        _onData: expect.any(Function),
-        _onProgress: expect.any(Function),
+        onResponseStarted: expect.any(Function),
+        onData: expect.any(Function),
+        onProgress: expect.any(Function),
       })
     );
     expect(sentInit().stream).toBeUndefined();
@@ -605,13 +668,14 @@ describe('NitroXMLHttpRequest', () => {
     expect(xhr.responseText).toBe('ok');
     expect(mockNitroFetch).toHaveBeenCalledWith(
       'https://example.com/axios',
-      expect.objectContaining({
-        _onResponseStarted: undefined,
-        _onData: undefined,
-        _onProgress: undefined,
-        _separateConnections: false,
-      })
+      expect.anything()
     );
+    expect(sentEvents()).toEqual({
+      options: expect.objectContaining({ separateConnections: false }),
+      onResponseStarted: undefined,
+      onData: undefined,
+      onProgress: undefined,
+    });
   });
 
   it.each(['arraybuffer', 'blob'] as const)(
@@ -635,8 +699,9 @@ describe('NitroXMLHttpRequest', () => {
       }
       expect(mockNitroFetch).toHaveBeenCalledWith(
         'https://example.com/bytes',
-        expect.objectContaining({ _responseBytes: true })
+        expect.anything()
       );
+      expect(sentEvents().options.responseBytes).toBe(true);
       expect(sentInit().stream).toBeUndefined();
     }
   );
@@ -654,11 +719,9 @@ describe('NitroXMLHttpRequest', () => {
 
     expect(mockNitroFetch).toHaveBeenCalledWith(
       'https://example.com/dav',
-      expect.objectContaining({
-        method: 'PROPFIND',
-        _customMethod: 'PROPFIND',
-      })
+      expect.objectContaining({ method: 'PROPFIND' })
     );
+    expect(sentEvents().options.customMethod).toBe('PROPFIND');
     expect(sentInit().stream).toBeUndefined();
   });
 
@@ -681,7 +744,7 @@ describe('NitroXMLHttpRequest', () => {
     const completed = waitForEvent(xhr, 'loadend');
     xhr.send();
 
-    init._onResponseStarted?.(
+    init._withEvents?.onResponseStarted?.(
       responseInfo(
         { 'Content-Type': 'text/plain' },
         { status: 201, url: 'https://example.com/final' }
@@ -753,12 +816,12 @@ describe('NitroXMLHttpRequest', () => {
     expect(xhr.responseText).toBe('café');
   });
 
-  it('reports progress from native without partial responseText', async () => {
+  it('holds native progress on a text body until the text arrives', async () => {
     const headers = { 'content-length': '10' };
-    mockNative(makeResponse([], { headers, text: 'abcdefghij' }), (init) => {
-      init._onResponseStarted?.(responseInfo(headers));
-      init._onProgress?.(3, 10);
-      init._onProgress?.(10, 10);
+    mockNative(makeResponse([], { headers, text: 'abcdefghij' }), (events) => {
+      events.onResponseStarted?.(responseInfo(headers));
+      events.onProgress?.(3, 10);
+      events.onProgress?.(10, 10);
     });
 
     const xhr = new NitroXMLHttpRequest();
@@ -771,16 +834,125 @@ describe('NitroXMLHttpRequest', () => {
     xhr.send();
     await completed;
 
-    expect(progress).toEqual([
-      [3, 10, ''],
-      [10, 10, ''],
-    ]);
+    expect(progress).toEqual([[10, 10, 'abcdefghij']]);
     expect(xhr.responseText).toBe('abcdefghij');
   });
 
+  it('reports native progress on a binary body while it loads, once each', async () => {
+    const headers = { 'content-length': '4' };
+    mockNative(
+      makeResponse([Uint8Array.of(1, 2, 3, 4)], { headers }),
+      (events) => {
+        events.onResponseStarted?.(responseInfo(headers));
+        events.onProgress?.(2, 4);
+        events.onProgress?.(4, 4);
+      }
+    );
+
+    const xhr = new NitroXMLHttpRequest();
+    const progress: Array<[number, number]> = [];
+    xhr.onprogress = (event) => {
+      progress.push([event.loaded, xhr.readyState]);
+    };
+    xhr.open('GET', 'https://example.com/bytes');
+    xhr.responseType = 'arraybuffer';
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+    await completed;
+
+    expect(progress).toEqual([
+      [2, NitroXMLHttpRequest.HEADERS_RECEIVED],
+      [4, NitroXMLHttpRequest.HEADERS_RECEIVED],
+    ]);
+    expect((xhr.response as ArrayBuffer).byteLength).toBe(4);
+  });
+
+  it('reports no total for a compressed stream', async () => {
+    const headers = {
+      'content-encoding': 'gzip',
+      'content-length': '3',
+      'content-type': 'text/event-stream',
+    };
+    mockNative(makeResponse([], { headers }), (events) => {
+      events.onResponseStarted?.(responseInfo(headers));
+      events.onData?.(new TextEncoder().encode('data: x\n\n').buffer);
+    });
+
+    const xhr = new NitroXMLHttpRequest();
+    const progress: Array<[number, number, boolean]> = [];
+    xhr.onprogress = (event) => {
+      progress.push([event.loaded, event.total, event.lengthComputable]);
+    };
+    xhr.open('GET', 'https://example.com/gzip');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+    await completed;
+
+    expect(progress).toEqual([[9, 0, false]]);
+  });
+
+  it('drops a leading byte order mark from a buffered text body', async () => {
+    mockNitroFetch.mockResolvedValue(
+      makeResponse([], { text: '\uFEFF{"a":1}' })
+    );
+
+    const xhr = new NitroXMLHttpRequest();
+    xhr.onreadystatechange = () => {};
+    xhr.open('GET', 'https://example.com/bom');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+    await completed;
+
+    expect(xhr.responseText).toBe('{"a":1}');
+  });
+
+  it('ignores what native reports after an abort or the end', async () => {
+    let init: NitroRawInit = {};
+    mockNitroFetch.mockImplementation((_input, requestInit) => {
+      init = requestInit as NitroRawInit;
+      return new Promise(() => {});
+    });
+    const headers = { 'content-type': 'text/event-stream' };
+
+    const aborted = new NitroXMLHttpRequest();
+    const abortedEvents: string[] = [];
+    aborted.onreadystatechange = () => abortedEvents.push('readystatechange');
+    aborted.onprogress = () => abortedEvents.push('progress');
+    aborted.open('GET', 'https://example.com/aborted');
+    aborted.send();
+    aborted.abort();
+    abortedEvents.length = 0;
+    init._withEvents?.onResponseStarted?.(responseInfo(headers));
+    init._withEvents?.onData?.(new TextEncoder().encode('late').buffer);
+    init._withEvents?.onProgress?.(4, 4);
+    expect(abortedEvents).toEqual([]);
+    expect(aborted.readyState).toBe(NitroXMLHttpRequest.UNSENT);
+
+    mockNative(makeResponse([new TextEncoder().encode('done')]), (events) => {
+      init = { _withEvents: events };
+    });
+    const done = new NitroXMLHttpRequest();
+    done.onreadystatechange = () => {};
+    done.onprogress = () => {};
+    done.open('GET', 'https://example.com/done');
+    const completed = waitForEvent(done, 'loadend');
+    done.send();
+    await completed;
+    const doneEvents: string[] = [];
+    done.addEventListener('readystatechange', () =>
+      doneEvents.push('readystatechange')
+    );
+    done.addEventListener('progress', () => doneEvents.push('progress'));
+    init._withEvents?.onResponseStarted?.(responseInfo(headers));
+    init._withEvents?.onData?.(new TextEncoder().encode('late').buffer);
+    init._withEvents?.onProgress?.(8, 8);
+    expect(doneEvents).toEqual([]);
+    expect(done.responseText).toBe('done');
+  });
+
   it('reports progress that came with the whole body after the head', async () => {
-    mockNative(makeResponse([new TextEncoder().encode('abcd')]), (init) => {
-      init._onProgress?.(4, 4);
+    mockNative(makeResponse([new TextEncoder().encode('abcd')]), (events) => {
+      events.onProgress?.(4, 4);
     });
 
     const xhr = new NitroXMLHttpRequest();
@@ -799,8 +971,8 @@ describe('NitroXMLHttpRequest', () => {
     expect(events).toEqual([
       'readystatechange.1',
       'readystatechange.2',
-      'progress.4',
       'readystatechange.3',
+      'progress.4',
       'readystatechange.4',
     ]);
   });
@@ -829,9 +1001,10 @@ describe('NitroXMLHttpRequest', () => {
 
       expect(mockNitroFetch).toHaveBeenCalledWith(
         'https://example.com/events',
-        expect.objectContaining({
-          _separateConnections: separateConnections,
-        })
+        expect.anything()
+      );
+      expect(sentEvents().options.separateConnections).toBe(
+        separateConnections
       );
       expect(sentInit().stream).toBeUndefined();
     }
@@ -1062,13 +1235,13 @@ describe('NitroXMLHttpRequest', () => {
     );
   });
 
-  it.each<[string, boolean]>([
-    ['patch', false],
-    ['Delete', false],
-    ['propfind', true],
+  it.each<[string, string | undefined]>([
+    ['patch', undefined],
+    ['Delete', undefined],
+    ['propfind', 'PROPFIND'],
   ])(
-    'picks the client for the method %p by its upper-case name, stream: %p',
-    async (method, stream) => {
+    'asks the client for the method %p by its upper-case name: %p',
+    async (method, customMethod) => {
       mockNitroFetch.mockResolvedValue(makeResponse([]));
       const xhr = new NitroXMLHttpRequest();
       xhr.onload = () => {};
@@ -1077,10 +1250,7 @@ describe('NitroXMLHttpRequest', () => {
       xhr.send();
       await completed;
 
-      expect(mockNitroFetch).toHaveBeenCalledWith(
-        'https://example.com/method',
-        expect.objectContaining({ stream })
-      );
+      expect(sentEvents().options.customMethod).toBe(customMethod);
     }
   );
 
@@ -1208,11 +1378,7 @@ describe('NitroXMLHttpRequest', () => {
 
   it('open() stops a LOADING request without events and reuses the object', async () => {
     const encoder = new TextEncoder();
-    const signals: AbortSignal[] = [];
-    mockNitroFetch.mockImplementationOnce(async (_input, init) => {
-      if (init?.signal) signals.push(init.signal);
-      return openResponse([encoder.encode('partial')]);
-    });
+    const signals = openNative([encoder.encode('partial')]);
 
     const xhr = new NitroXMLHttpRequest();
     const events = recordEvents(xhr);
@@ -1555,11 +1721,9 @@ describe('NitroXMLHttpRequest', () => {
   it.each([true, false])(
     'fires loadstart in send() and ends with the bytes received (progress listener: %p)',
     async (observesProgress) => {
-      const response = makeResponse(
-        [new Uint8Array(512), new Uint8Array(512)],
-        { headers: { 'content-length': '1024' } }
-      );
-      mockNitroFetch.mockResolvedValue(response);
+      mockBuffered([new Uint8Array(1024)], {
+        headers: { 'content-length': '1024' },
+      });
 
       const xhr = new NitroXMLHttpRequest();
       const events = recordProgressEvents(
@@ -1584,10 +1748,7 @@ describe('NitroXMLHttpRequest', () => {
           lengthComputable: false,
         },
         ...(observesProgress
-          ? [
-              { name: 'progress', readyState: 3, ...done, loaded: 512 },
-              { name: 'progress', readyState: 3, ...done },
-            ]
+          ? [{ name: 'progress', readyState: 3, ...done }]
           : []),
         { name: 'load', readyState: 4, ...done },
         { name: 'loadend', readyState: 4, ...done },
@@ -1605,8 +1766,7 @@ describe('NitroXMLHttpRequest', () => {
     ['for a hexadecimal Content-Length', { 'content-length': '0x64' }],
     ['for a negative Content-Length', { 'content-length': '-100' }],
   ])('reports no download total %s', async (_reason, headers) => {
-    const response = makeResponse([new Uint8Array(100)], { headers });
-    mockNitroFetch.mockResolvedValue(response);
+    mockBuffered([new Uint8Array(100)], { headers });
 
     const xhr = new NitroXMLHttpRequest();
     const events = recordProgressEvents(xhr);
@@ -1624,9 +1784,7 @@ describe('NitroXMLHttpRequest', () => {
   });
 
   it('fires upload events between loadstart and the response headers', async () => {
-    mockNitroFetch.mockResolvedValue(
-      makeResponse([new TextEncoder().encode('ok')])
-    );
+    mockBuffered([new TextEncoder().encode('ok')]);
     const xhr = new NitroXMLHttpRequest();
     const events = recordProgressEvents(xhr);
     xhr.open('POST', 'https://example.com/upload');
@@ -1735,7 +1893,8 @@ describe('NitroXMLHttpRequest', () => {
       await completed;
 
       expect(blobs).toBe(0);
-      expect(eventNames(events)).toEqual(['progress', 'load', 'loadend']);
+      // A listener added after send() is too late to ask for progress.
+      expect(eventNames(events)).toEqual(['load', 'loadend']);
     } finally {
       globals.Blob = NodeBlob;
     }
@@ -1898,9 +2057,7 @@ describe('NitroXMLHttpRequest', () => {
   });
 
   it('fires the upload loadstart once when a loadstart listener sends again', async () => {
-    mockNitroFetch.mockResolvedValue(
-      makeResponse([new TextEncoder().encode('ok')])
-    );
+    mockBuffered([new TextEncoder().encode('ok')]);
     const xhr = new NitroXMLHttpRequest();
     const events = recordProgressEvents(xhr);
     let restarted = false;
@@ -1943,9 +2100,7 @@ describe('NitroXMLHttpRequest', () => {
   it('keeps sending when a progress listener throws', async () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     try {
-      mockNitroFetch.mockResolvedValue(
-        makeResponse([new TextEncoder().encode('ok')])
-      );
+      mockBuffered([new TextEncoder().encode('ok')]);
       const boom = new Error('boom');
       const xhr = new NitroXMLHttpRequest();
       const events = recordProgressEvents(xhr);
@@ -1980,8 +2135,8 @@ describe('NitroXMLHttpRequest', () => {
 
   it('ends a failed upload when a readystatechange listener sends again', async () => {
     mockNitroFetch.mockRejectedValueOnce(new Error('network failed'));
-    mockNitroFetch.mockResolvedValueOnce(
-      makeResponse([new TextEncoder().encode('ok')])
+    mockNitroFetch.mockImplementationOnce(
+      buffered([new TextEncoder().encode('ok')])
     );
     const xhr = new NitroXMLHttpRequest();
     const events = recordProgressEvents(xhr);
@@ -2072,15 +2227,7 @@ describe('NitroXMLHttpRequest', () => {
   );
 
   it('does not end a finished upload again when the request is aborted', async () => {
-    const response = makeResponse([]);
-    Object.defineProperty(response, 'body', {
-      value: new ReadableStream({
-        start(controller) {
-          controller.enqueue(new TextEncoder().encode('partial'));
-        },
-      }),
-    });
-    mockNitroFetch.mockResolvedValue(response);
+    openNative([new TextEncoder().encode('partial')]);
 
     const xhr = new NitroXMLHttpRequest();
     const events = recordProgressEvents(xhr);
@@ -2138,8 +2285,7 @@ describe('NitroXMLHttpRequest', () => {
   });
 
   it('clears the response after an error and puts the cause in nitroError', async () => {
-    const { fail, response } = stalledResponse();
-    mockNitroFetch.mockResolvedValue(response);
+    const { fail } = stalledNative();
 
     const xhr = new NitroXMLHttpRequest();
     let atLoadend: ReturnType<typeof responseState> | undefined;
@@ -2164,8 +2310,7 @@ describe('NitroXMLHttpRequest', () => {
   });
 
   it('has no binary response after an error', async () => {
-    const { fail, response } = stalledResponse();
-    mockNitroFetch.mockResolvedValue(response);
+    const { fail } = stalledNative();
 
     const xhr = new NitroXMLHttpRequest();
     xhr.onprogress = () => fail(new Error('connection lost'));
@@ -2179,11 +2324,13 @@ describe('NitroXMLHttpRequest', () => {
   });
 
   it('clears the response after a timeout', async () => {
-    mockNitroFetch.mockResolvedValue(stalledResponse().response);
+    stalledNative();
 
     const xhr = new NitroXMLHttpRequest();
     const events: string[] = [];
     let atLoadend: ReturnType<typeof responseState> | undefined;
+    // Watching the request gets it the head and the partial body.
+    xhr.onreadystatechange = () => {};
     xhr.addEventListener('timeout', () => events.push('timeout'));
     xhr.addEventListener('loadend', () => {
       atLoadend = responseState(xhr);
@@ -2200,7 +2347,7 @@ describe('NitroXMLHttpRequest', () => {
   });
 
   it('clears the response when aborted after the headers', async () => {
-    mockNitroFetch.mockResolvedValue(stalledResponse().response);
+    stalledNative();
 
     const xhr = new NitroXMLHttpRequest();
     let atLoadend: ReturnType<typeof responseState> | undefined;
@@ -2387,5 +2534,54 @@ describe('NitroXMLHttpRequest', () => {
     await completed;
 
     expect(events).toEqual(['load']);
+  });
+});
+
+describe('nitroFetchRaw', () => {
+  let nitroFetchRaw: typeof import('../fetch-core/raw').nitroFetchRaw;
+  const nativeResponse = {
+    url: 'https://example.com/',
+    status: 200,
+    statusText: '',
+    ok: true,
+    redirected: false,
+    headers: [],
+    bodyString: 'ok',
+  };
+
+  beforeAll(async () => {
+    ({ nitroFetchRaw } = await import('../fetch-core/raw'));
+  });
+
+  beforeEach(() => {
+    mockClient.request.mockReset();
+    mockClient.request.mockResolvedValue(nativeResponse);
+    mockClient.requestWithEvents.mockReset();
+    mockClient.requestWithEvents.mockResolvedValue(nativeResponse);
+  });
+
+  it('sends a plain fetch with request() and nothing else', async () => {
+    await nitroFetchRaw('https://example.com/', { method: 'POST', body: 'x' });
+
+    expect(mockClient.request).toHaveBeenCalledTimes(1);
+    expect(mockClient.request.mock.calls[0]).toHaveLength(1);
+    expect(mockClient.requestWithEvents).not.toHaveBeenCalled();
+  });
+
+  it('sends what the XMLHttpRequest polyfill asks for with requestWithEvents()', async () => {
+    const onData = () => {};
+    await nitroFetchRaw('https://example.com/', {
+      method: 'PROPFIND',
+      _withEvents: { options: { customMethod: 'PROPFIND' }, onData },
+    } as RequestInit);
+
+    expect(mockClient.request).not.toHaveBeenCalled();
+    const [req, options, onResponseStarted, data, onProgress] =
+      mockClient.requestWithEvents.mock.calls[0];
+    expect(req.method).toBeUndefined();
+    expect(options).toEqual({ customMethod: 'PROPFIND' });
+    expect(onResponseStarted).toBeUndefined();
+    expect(data).toBe(onData);
+    expect(onProgress).toBeUndefined();
   });
 });

@@ -1055,14 +1055,18 @@ describe('XMLHttpRequest credentials and cleanup', () => {
 type NitroXMLHttpRequestInstance = InstanceType<typeof NitroXMLHttpRequest>;
 
 describe('XMLHttpRequest stream only when needed', () => {
-  // Four bytes, one every 250 ms, as application/octet-stream. Buffered: the
-  // body arrives at once, after about a second.
+  // Four bytes as application/octet-stream, without a Content-Length. A body
+  // like this is buffered for 400 ms and streams if it is still loading then.
+  // SHORT_BODY ends within that window, SLOW_BODY outlives it.
+  const SHORT_BODY = `${BASE}/drip?duration=0.2&numbytes=4`;
   const SLOW_BODY = `${BASE}/drip?duration=1&numbytes=4`;
 
   type Observed = {
-    // Milliseconds from send() to HEADERS_RECEIVED and to loadend.
+    // Milliseconds from send() to the first HEADERS_RECEIVED and LOADING, and
+    // to loadend.
     doneAt: number;
     headersAt: number;
+    loadingAt: number;
     lengths: number[];
     responseText: string;
     states: number[];
@@ -1081,12 +1085,17 @@ describe('XMLHttpRequest stream only when needed', () => {
       const states: number[] = [];
       let start = 0;
       let headersAt = -1;
+      let loadingAt = -1;
       const record = () => {
         states.push(xhr.readyState);
-        if (xhr.readyState === NitroXMLHttpRequest.HEADERS_RECEIVED) {
+        if (
+          xhr.readyState === NitroXMLHttpRequest.HEADERS_RECEIVED &&
+          headersAt < 0
+        ) {
           headersAt = Date.now() - start;
         }
         if (xhr.readyState === NitroXMLHttpRequest.LOADING) {
+          if (loadingAt < 0) loadingAt = Date.now() - start;
           lengths.push(xhr.responseText.length);
         }
       };
@@ -1094,6 +1103,7 @@ describe('XMLHttpRequest stream only when needed', () => {
         resolve({
           doneAt: Date.now() - start,
           headersAt,
+          loadingAt,
           lengths,
           responseText: xhr.responseText,
           states,
@@ -1106,25 +1116,27 @@ describe('XMLHttpRequest stream only when needed', () => {
       xhr.send();
     });
 
-  // SuperAgent adds a readystatechange listener to every request. Like React
-  // Native's XMLHttpRequest, it sees HEADERS_RECEIVED when the headers arrive,
-  // then the whole body at once.
-  it('a readystatechange listener alone sees the headers early and the body in one piece', async () => {
-    const { doneAt, headersAt, lengths, responseText, states } = await send(
-      SLOW_BODY,
-      (xhr, record) => {
-        xhr.addEventListener('readystatechange', record);
-      }
+  const watchStates = (
+    xhr: NitroXMLHttpRequestInstance,
+    record: () => void
+  ) => {
+    xhr.addEventListener('readystatechange', record);
+  };
+
+  // SuperAgent adds a readystatechange listener to every request.
+  it('a readystatechange listener gets a short body in one piece', async () => {
+    const { lengths, responseText, states } = await send(
+      SHORT_BODY,
+      watchStates
     );
     expect(responseText).toBe('****');
     expect(states).toEqual([2, 3, 4]);
     expect(lengths).toEqual([4]);
-    expect(doneAt - headersAt).toBeGreaterThan(400);
   });
 
-  it('onreadystatechange alone gets the body in one piece', async () => {
+  it('onreadystatechange gets a short body in one piece', async () => {
     const { lengths, responseText, states } = await send(
-      SLOW_BODY,
+      SHORT_BODY,
       (xhr, record) => {
         xhr.onreadystatechange = record;
       }
@@ -1134,54 +1146,41 @@ describe('XMLHttpRequest stream only when needed', () => {
     expect(lengths).toEqual([4]);
   });
 
-  // Progress reports the bytes received while the body loads, but the body
-  // itself still arrives at once.
-  const watchProgress = (
-    addListener: (
-      xhr: NitroXMLHttpRequestInstance,
-      listener: (event: ProgressEvent) => void
-    ) => void
-  ) =>
-    new Promise<{ loaded: number[]; responseText: string; texts: string[] }>(
-      (resolve, reject) => {
-        const xhr = new NitroXMLHttpRequest();
-        const loaded: number[] = [];
-        const texts: string[] = [];
-        addListener(xhr, (event) => {
-          loaded.push(event.loaded);
-          texts.push(xhr.responseText);
-        });
-        xhr.onloadend = () => {
-          resolve({ loaded, responseText: xhr.responseText, texts });
-        };
-        xhr.onerror = () => reject(new Error('XMLHttpRequest failed'));
-        xhr.open('GET', SLOW_BODY);
-        xhr.send();
-      }
-    );
-
-  it('onprogress gets the bytes received before the end, and no partial responseText', async () => {
-    const { loaded, responseText, texts } = await watchProgress(
-      (xhr, listener) => {
-        xhr.onprogress = listener;
-      }
+  // SuperAgent's response timeout ends at HEADERS_RECEIVED.
+  it('a readystatechange listener sees HEADERS_RECEIVED when the headers arrive', async () => {
+    const { doneAt, headersAt, responseText } = await send(
+      SLOW_BODY,
+      watchStates
     );
     expect(responseText).toBe('****');
-    expect(loaded.some((count) => count > 0 && count < 4)).toBe(true);
-    expect(texts.every((text) => text === '')).toBe(true);
+    expect(headersAt).toBeGreaterThanOrEqual(0);
+    expect(doneAt - headersAt).toBeGreaterThan(400);
   });
 
-  it('a progress listener gets the bytes received before the end, and no partial responseText', async () => {
-    const { loaded, responseText, texts } = await watchProgress(
-      (xhr, listener) => {
-        xhr.addEventListener('progress', (event: Event) => {
-          listener(event as ProgressEvent);
-        });
-      }
+  it('a readystatechange listener sees HEADERS_RECEIVED before a delayed body', async () => {
+    const { doneAt, headersAt, lengths, responseText } = await send(
+      `${BASE}/delayed-body?delay=300`,
+      watchStates
     );
-    expect(responseText).toBe('****');
-    expect(loaded.some((count) => count > 0 && count < 4)).toBe(true);
-    expect(texts.every((text) => text === '')).toBe(true);
+    expect(responseText).toBe('ok');
+    expect(lengths).toEqual([2]);
+    // URLSession reports a response only with its first body bytes, so on iOS
+    // HEADERS_RECEIVED comes with the body, as with React Native's own
+    // XMLHttpRequest.
+    if (Platform.OS === 'android') {
+      expect(doneAt - headersAt).toBeGreaterThan(200);
+    }
+  });
+
+  // A body without a known length that keeps loading streams, so feeds that
+  // never end, such as Kubernetes or CouchDB watches, reach JS.
+  it('a long body without a length streams once it outlives the buffering window', async () => {
+    const { lengths, responseText } = await send(
+      `${BASE}/drip?duration=2&numbytes=8`,
+      watchStates
+    );
+    expect(responseText).toBe('********');
+    expect(lengths.some((length) => length > 0 && length < 8)).toBe(true);
   });
 
   // The response decides: a text/event-stream body streams even when the
@@ -1189,9 +1188,7 @@ describe('XMLHttpRequest stream only when needed', () => {
   it('an event-stream response streams without any client hint', async () => {
     const { lengths, responseText } = await send(
       `${BASE}/sse?count=4&interval=250`,
-      (xhr, record) => {
-        xhr.addEventListener('readystatechange', record);
-      }
+      watchStates
     );
     const full = 'data: 0\n\ndata: 1\n\ndata: 2\n\ndata: 3\n\n';
     expect(responseText).toBe(full);
@@ -1200,56 +1197,156 @@ describe('XMLHttpRequest stream only when needed', () => {
     );
   });
 
+  it('an NDJSON response streams from its first line', async () => {
+    const { loadingAt, lengths, responseText } = await send(
+      `${BASE}/sse?count=3&interval=800&type=application%2Fx-ndjson`,
+      watchStates
+    );
+    expect(responseText).toBe('data: 0\n\ndata: 1\n\ndata: 2\n\n');
+    expect(lengths[0]).toBe(9);
+    // Before the buffering window would end.
+    expect(loadingAt).toBeLessThan(350);
+  });
+
+  // Progress on text comes with the text received so far, never at
+  // HEADERS_RECEIVED with an empty responseText.
+  const watchProgress = (
+    url: string,
+    responseType: XMLHttpRequestResponseType,
+    addListener: (
+      xhr: NitroXMLHttpRequestInstance,
+      listener: (event: ProgressEvent) => void
+    ) => void
+  ) =>
+    new Promise<{
+      events: Array<{ loaded: number; readyState: number; text: number }>;
+      xhr: NitroXMLHttpRequestInstance;
+    }>((resolve, reject) => {
+      const xhr = new NitroXMLHttpRequest();
+      const events: Array<{
+        loaded: number;
+        readyState: number;
+        text: number;
+      }> = [];
+      addListener(xhr, (event) => {
+        events.push({
+          loaded: event.loaded,
+          readyState: xhr.readyState,
+          text: responseType === '' ? xhr.responseText.length : -1,
+        });
+      });
+      xhr.onloadend = () => resolve({ events, xhr });
+      xhr.onerror = () => reject(new Error('XMLHttpRequest failed'));
+      xhr.open('GET', url);
+      xhr.responseType = responseType;
+      xhr.send();
+    });
+
+  it('onprogress on a slow text body comes with the text received so far', async () => {
+    const { events, xhr } = await watchProgress(
+      SLOW_BODY,
+      '',
+      (x, listener) => {
+        x.onprogress = listener;
+      }
+    );
+    expect(xhr.responseText).toBe('****');
+    expect(events.some(({ loaded }) => loaded > 0 && loaded < 4)).toBe(true);
+    for (const { loaded, readyState, text } of events) {
+      expect(readyState).toBe(NitroXMLHttpRequest.LOADING);
+      expect(text).toBe(loaded);
+    }
+  });
+
+  it('a progress listener on a slow text body gets the text received so far', async () => {
+    const { events, xhr } = await watchProgress(
+      SLOW_BODY,
+      '',
+      (x, listener) => {
+        x.addEventListener('progress', (event: Event) => {
+          listener(event as ProgressEvent);
+        });
+      }
+    );
+    expect(xhr.responseText).toBe('****');
+    expect(events.some(({ loaded }) => loaded > 0 && loaded < 4)).toBe(true);
+    for (const { loaded, readyState, text } of events) {
+      expect(readyState).toBe(NitroXMLHttpRequest.LOADING);
+      expect(text).toBe(loaded);
+    }
+  });
+
+  // A binary body stays buffered, with progress counts while it loads, as
+  // React Native's own XMLHttpRequest reports them.
+  it('onprogress on a slow arraybuffer body counts the bytes before the end, once each', async () => {
+    const { events, xhr } = await watchProgress(
+      SLOW_BODY,
+      'arraybuffer',
+      (x, listener) => {
+        x.onprogress = listener;
+      }
+    );
+    expect((xhr.response as ArrayBuffer).byteLength).toBe(4);
+    const loaded = events.map((event) => event.loaded);
+    expect(loaded.some((count) => count > 0 && count < 4)).toBe(true);
+    expect(loaded[loaded.length - 1]).toBe(4);
+    expect(new Set(loaded).size).toBe(loaded.length);
+  });
+
   for (const value of ['iso-8859-1', 'ISO-8859-1', '"iso-8859-1"']) {
     it(`a readystatechange listener gets text decoded as charset=${value}`, async () => {
       const { responseText } = await send(
         `${BASE}/charset/${encodeURIComponent(value)}`,
-        (xhr, record) => {
-          xhr.addEventListener('readystatechange', record);
-        }
+        watchStates
       );
       expect(responseText).toBe('café crème');
     });
   }
 
-  // SuperAgent's response timeout ends at HEADERS_RECEIVED.
-  it('a readystatechange listener sees HEADERS_RECEIVED when the headers arrive', async () => {
-    const xhr = new NitroXMLHttpRequest();
-    const start = Date.now();
-    let headersAt = -1;
-    const doneAt = await new Promise<number>((resolve, reject) => {
-      xhr.addEventListener('readystatechange', () => {
-        if (xhr.readyState === NitroXMLHttpRequest.HEADERS_RECEIVED) {
-          headersAt = Date.now() - start;
-        }
-      });
-      xhr.onloadend = () => resolve(Date.now() - start);
+  // Android's native decoding keeps a byte order mark that JSON.parse rejects.
+  it('a readystatechange listener gets text without a leading byte order mark', async () => {
+    const { responseText } = await send(
+      `${BASE}/text?phrase=${encodeURIComponent('﻿{"a":1}')}`,
+      watchStates
+    );
+    expect(JSON.parse(responseText)).toEqual({ a: 1 });
+  });
+
+  const getArrayBuffer = (url: string, watched: boolean) =>
+    new Promise<ArrayBuffer>((resolve, reject) => {
+      const xhr = new NitroXMLHttpRequest();
+      xhr.onload = () => resolve(xhr.response as ArrayBuffer);
       xhr.onerror = () => reject(new Error('XMLHttpRequest failed'));
-      xhr.open('GET', SLOW_BODY);
+      xhr.open('GET', url);
+      xhr.responseType = 'arraybuffer';
+      if (watched) xhr.addEventListener('readystatechange', () => {});
       xhr.send();
     });
-    expect(xhr.responseText).toBe('****');
-    expect(headersAt).toBeGreaterThanOrEqual(0);
-    expect(doneAt - headersAt).toBeGreaterThan(400);
-  });
 
   // The buffered client returns binary bodies as received, not decoded as
   // text and re-encoded as UTF-8.
   for (const watched of [false, true]) {
     it(`a buffered arraybuffer response keeps the bytes as sent (watched: ${watched})`, async () => {
-      const xhr = new NitroXMLHttpRequest();
-      const done = new Promise<void>((resolve, reject) => {
-        xhr.onload = () => resolve();
-        xhr.onerror = () => reject(new Error('XMLHttpRequest failed'));
-      });
-      xhr.open('GET', `${BASE}/charset/iso-8859-1`);
-      xhr.responseType = 'arraybuffer';
-      if (watched) xhr.addEventListener('readystatechange', () => {});
-      xhr.send();
-      await done;
-      const bytes = new Uint8Array(xhr.response as ArrayBuffer);
+      const bytes = new Uint8Array(
+        await getArrayBuffer(`${BASE}/charset/iso-8859-1`, watched)
+      );
       expect(bytes.byteLength).toBe(10);
       expect(bytes[3]).toBe(0xe9);
+    });
+  }
+
+  // Without an exact length the native buffer grows as the body arrives.
+  for (const encoding of ['gzip', 'chunked']) {
+    it(`a ${encoding} arraybuffer response larger than one read has every byte`, async () => {
+      const bytes = new Uint8Array(
+        await getArrayBuffer(
+          `${BASE}/text?phrase=xy&repeat=100000&${encoding}=1`,
+          false
+        )
+      );
+      expect(bytes.byteLength).toBe(200000);
+      expect(bytes[0]).toBe(0x78);
+      expect(bytes[199999]).toBe(0x79);
     });
   }
 

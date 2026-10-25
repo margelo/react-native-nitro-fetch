@@ -31,9 +31,6 @@ export interface NitroFormDataPart {
 export interface NitroRequest {
   url: string;
   method?: NitroRequestMethod;
-  // A method NitroRequestMethod does not cover, such as PROPFIND. Sent instead
-  // of method.
-  customMethod?: string;
   // Flattened list to keep bridging simple and deterministic
   headers?: NitroHeader[];
   // Body as either UTF-8 string or raw bytes.
@@ -53,9 +50,16 @@ export interface NitroRequest {
   prefetchCacheTtlMs?: number;
   // Optional ID used for cancellation via cancelRequest()
   requestId?: string;
+}
+
+// How requestWithEvents() sends a request and returns its body.
+export interface NitroRequestOptions {
   // Return the body as bodyBytes, exactly as received, instead of decoding it
   // as text.
   responseBytes?: boolean;
+  // A method NitroRequestMethod does not cover, such as PROPFIND. Sent instead
+  // of the request's method.
+  customMethod?: string;
   // Run on the stream client's connections (its own Cronet engine on Android,
   // its own URLSession on iOS), so a long-lived response cannot hold the
   // default client's.
@@ -78,14 +82,22 @@ export interface NitroFetchClient extends HybridObject<{
   android: 'kotlin';
 }> {
   // Client-binded request that uses the env configured at creation.
+  request(req: NitroRequest): Promise<NitroResponse>;
+  // request(), for the XMLHttpRequest polyfill. The callbacks report the
+  // response while it loads:
   // - onResponseStarted gets the status, headers and final URL before the
   //   body, unless the whole body arrives with them.
-  // - onData, if the response is a text/event-stream, gets the body as it
-  //   arrives, and the response then resolves without a body.
-  // - onProgress gets the bytes received so far and the Content-Length (-1 if
-  //   unknown), at most every 50 ms and once at the end.
-  request(
+  // - onData gets the body as it arrives when the server streams it: at once
+  //   for text/event-stream, application/x-ndjson, application/jsonl and
+  //   multipart/x-mixed-replace, or for a declared length over 32 MB; otherwise
+  //   once a body without an exact length (or a text body with onProgress) is
+  //   still loading after 400 ms or passes 8 MB. What was buffered comes first,
+  //   and the response then resolves without a body.
+  // - onProgress gets the bytes received so far and the Content-Length (-1
+  //   unless the length is exact), at most every 50 ms and once at the end.
+  requestWithEvents(
     req: NitroRequest,
+    options: NitroRequestOptions,
     onResponseStarted?: (info: UrlResponseInfo) => void,
     onData?: (chunk: ArrayBuffer) => void,
     onProgress?: (loaded: number, total: number) => void

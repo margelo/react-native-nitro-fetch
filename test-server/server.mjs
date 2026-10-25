@@ -272,11 +272,13 @@ app.get('/drip-report/:id', (req, res) => {
 });
 
 // Server-sent events: ?count=N events (default 4), one every ?interval=ms
-// (default 250), then the end of the body.
+// (default 250), then the end of the body. ?type= sets another Content-Type,
+// such as application/x-ndjson.
 app.get('/sse', (req, res) => {
   const count = Math.max(0, parseInt(req.query.count ?? '4', 10) || 0);
   const interval = Math.max(1, parseInt(req.query.interval ?? '250', 10) || 1);
-  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store' });
+  const type = String(req.query.type ?? 'text/event-stream');
+  res.set({ 'Content-Type': type, 'Cache-Control': 'no-store' });
   res.flushHeaders();
   let sent = 0;
   let closed = false;
@@ -291,6 +293,16 @@ app.get('/sse', (req, res) => {
     setTimeout(tick, interval);
   };
   tick();
+});
+
+// Sends the headers at once and the body (?body=, default "ok") after
+// ?delay=ms (default 500).
+app.get('/delayed-body', (req, res) => {
+  const delay = Math.max(0, parseInt(req.query.delay ?? '500', 10) || 0);
+  res.set({ 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' });
+  res.flushHeaders();
+  const timer = setTimeout(() => res.end(String(req.query.body ?? 'ok')), delay);
+  req.on('close', () => clearTimeout(timer));
 });
 
 const cacheReports = new Map();

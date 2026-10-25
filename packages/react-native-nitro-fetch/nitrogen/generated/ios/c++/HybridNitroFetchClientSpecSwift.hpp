@@ -28,6 +28,8 @@ namespace margelo::nitro::nitrofetch { struct NitroFormDataPart; }
 namespace margelo::nitro::nitrofetch { enum class NitroRequestCredentials; }
 // Forward declaration of `NitroRequestPriority` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { enum class NitroRequestPriority; }
+// Forward declaration of `NitroRequestOptions` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct NitroRequestOptions; }
 // Forward declaration of `UrlResponseInfo` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 // Forward declaration of `HttpHeader` to properly resolve imports.
@@ -46,6 +48,7 @@ namespace margelo::nitro::nitrofetch { struct HttpHeader; }
 #include "NitroFormDataPart.hpp"
 #include "NitroRequestCredentials.hpp"
 #include "NitroRequestPriority.hpp"
+#include "NitroRequestOptions.hpp"
 #include "UrlResponseInfo.hpp"
 #include <functional>
 #include <unordered_map>
@@ -101,8 +104,16 @@ namespace margelo::nitro::nitrofetch {
 
   public:
     // Methods
-    inline std::shared_ptr<Promise<NitroResponse>> request(const NitroRequest& req, const std::optional<std::function<void(const UrlResponseInfo& /* info */)>>& onResponseStarted, const std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>& onData, const std::optional<std::function<void(double /* loaded */, double /* total */)>>& onProgress) override {
-      auto __result = _swiftPart.request(std::forward<decltype(req)>(req), onResponseStarted, onData, onProgress);
+    inline std::shared_ptr<Promise<NitroResponse>> request(const NitroRequest& req) override {
+      auto __result = _swiftPart.request(std::forward<decltype(req)>(req));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<NitroResponse>> requestWithEvents(const NitroRequest& req, const NitroRequestOptions& options, const std::optional<std::function<void(const UrlResponseInfo& /* info */)>>& onResponseStarted, const std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>& onData, const std::optional<std::function<void(double /* loaded */, double /* total */)>>& onProgress) override {
+      auto __result = _swiftPart.requestWithEvents(std::forward<decltype(req)>(req), std::forward<decltype(options)>(options), onResponseStarted, onData, onProgress);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

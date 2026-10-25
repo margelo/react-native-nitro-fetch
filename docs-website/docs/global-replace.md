@@ -53,10 +53,11 @@ event carries the native client's error text in a non-standard `nitroError`
 field.
 
 Every request runs on the buffered native client, like a plain `fetch`, and the
-response decides whether it streams: a `text/event-stream` body reaches
-`responseText` as it arrives when the request has a `readystatechange` or
-`progress` listener. Any other body arrives at once, so `responseText` is never
-partial. A request with a `readystatechange` or `progress` listener reaches
+response decides whether it streams. When the request has a `readystatechange`
+or `progress` listener, a body the server streams reaches `responseText` as it
+arrives: `text/event-stream`, NDJSON, JSON Lines and `multipart/x-mixed-replace`
+at once, and any other body without an exact length once it is still loading
+after 400 ms or passes 8 MB. A body that completes sooner arrives at once. A request with a `readystatechange` or `progress` listener reaches
 HEADERS_RECEIVED when the response headers arrive, as with React Native's
 `XMLHttpRequest`, and a `progress` listener gets the bytes received while the
 body loads. `arraybuffer` and `blob` responses get the body bytes as received.

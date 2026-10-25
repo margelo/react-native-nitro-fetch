@@ -49,8 +49,6 @@ namespace margelo::nitro::nitrofetch {
       jni::local_ref<jni::JString> url = this->getFieldValue(fieldUrl);
       static const auto fieldMethod = clazz->getField<JNitroRequestMethod>("method");
       jni::local_ref<JNitroRequestMethod> method = this->getFieldValue(fieldMethod);
-      static const auto fieldCustomMethod = clazz->getField<jni::JString>("customMethod");
-      jni::local_ref<jni::JString> customMethod = this->getFieldValue(fieldCustomMethod);
       static const auto fieldHeaders = clazz->getField<jni::JArrayClass<JNitroHeader>>("headers");
       jni::local_ref<jni::JArrayClass<JNitroHeader>> headers = this->getFieldValue(fieldHeaders);
       static const auto fieldBodyString = clazz->getField<jni::JString>("bodyString");
@@ -73,14 +71,9 @@ namespace margelo::nitro::nitrofetch {
       jni::local_ref<jni::JDouble> prefetchCacheTtlMs = this->getFieldValue(fieldPrefetchCacheTtlMs);
       static const auto fieldRequestId = clazz->getField<jni::JString>("requestId");
       jni::local_ref<jni::JString> requestId = this->getFieldValue(fieldRequestId);
-      static const auto fieldResponseBytes = clazz->getField<jni::JBoolean>("responseBytes");
-      jni::local_ref<jni::JBoolean> responseBytes = this->getFieldValue(fieldResponseBytes);
-      static const auto fieldSeparateConnections = clazz->getField<jni::JBoolean>("separateConnections");
-      jni::local_ref<jni::JBoolean> separateConnections = this->getFieldValue(fieldSeparateConnections);
       return NitroRequest(
         url->toStdString(),
         method != nullptr ? std::make_optional(method->toCpp()) : std::nullopt,
-        customMethod != nullptr ? std::make_optional(customMethod->toStdString()) : std::nullopt,
         headers != nullptr ? std::make_optional([&](auto&& __input) {
           size_t __size = __input->size();
           std::vector<NitroHeader> __vector;
@@ -109,9 +102,7 @@ namespace margelo::nitro::nitrofetch {
         credentials != nullptr ? std::make_optional(credentials->toCpp()) : std::nullopt,
         priority != nullptr ? std::make_optional(priority->toCpp()) : std::nullopt,
         prefetchCacheTtlMs != nullptr ? std::make_optional(prefetchCacheTtlMs->value()) : std::nullopt,
-        requestId != nullptr ? std::make_optional(requestId->toStdString()) : std::nullopt,
-        responseBytes != nullptr ? std::make_optional(static_cast<bool>(responseBytes->value())) : std::nullopt,
-        separateConnections != nullptr ? std::make_optional(static_cast<bool>(separateConnections->value())) : std::nullopt
+        requestId != nullptr ? std::make_optional(requestId->toStdString()) : std::nullopt
       );
     }
 
@@ -121,14 +112,13 @@ namespace margelo::nitro::nitrofetch {
      */
     [[maybe_unused]]
     static jni::local_ref<JNitroRequest::javaobject> fromCpp(const NitroRequest& value) {
-      using JSignature = JNitroRequest(jni::alias_ref<jni::JString>, jni::alias_ref<JNitroRequestMethod>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JArrayClass<JNitroHeader>>, jni::alias_ref<jni::JString>, jni::alias_ref<JArrayBuffer::javaobject>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JArrayClass<JNitroFormDataPart>>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JBoolean>, jni::alias_ref<JNitroRequestCredentials>, jni::alias_ref<JNitroRequestPriority>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JBoolean>, jni::alias_ref<jni::JBoolean>);
+      using JSignature = JNitroRequest(jni::alias_ref<jni::JString>, jni::alias_ref<JNitroRequestMethod>, jni::alias_ref<jni::JArrayClass<JNitroHeader>>, jni::alias_ref<jni::JString>, jni::alias_ref<JArrayBuffer::javaobject>, jni::alias_ref<jni::JString>, jni::alias_ref<jni::JArrayClass<JNitroFormDataPart>>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JBoolean>, jni::alias_ref<JNitroRequestCredentials>, jni::alias_ref<JNitroRequestPriority>, jni::alias_ref<jni::JDouble>, jni::alias_ref<jni::JString>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
         clazz,
         jni::make_jstring(value.url),
         value.method.has_value() ? JNitroRequestMethod::fromCpp(value.method.value()) : nullptr,
-        value.customMethod.has_value() ? jni::make_jstring(value.customMethod.value()) : nullptr,
         value.headers.has_value() ? [&](auto&& __input) {
           size_t __size = __input.size();
           jni::local_ref<jni::JArrayClass<JNitroHeader>> __array = jni::JArrayClass<JNitroHeader>::newArray(__size);
@@ -157,9 +147,7 @@ namespace margelo::nitro::nitrofetch {
         value.credentials.has_value() ? JNitroRequestCredentials::fromCpp(value.credentials.value()) : nullptr,
         value.priority.has_value() ? JNitroRequestPriority::fromCpp(value.priority.value()) : nullptr,
         value.prefetchCacheTtlMs.has_value() ? jni::JDouble::valueOf(value.prefetchCacheTtlMs.value()) : nullptr,
-        value.requestId.has_value() ? jni::make_jstring(value.requestId.value()) : nullptr,
-        value.responseBytes.has_value() ? jni::JBoolean::valueOf(value.responseBytes.value()) : nullptr,
-        value.separateConnections.has_value() ? jni::JBoolean::valueOf(value.separateConnections.value()) : nullptr
+        value.requestId.has_value() ? jni::make_jstring(value.requestId.value()) : nullptr
       );
     }
   };

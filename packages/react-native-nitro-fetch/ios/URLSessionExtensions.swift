@@ -28,11 +28,17 @@ extension HTTPURLResponse {
     )
   }
 
-  // The response says it is a text/event-stream, so its body arrives over time.
-  var isEventStream: Bool {
+  // The Content-Type is a format whose body arrives over time: server-sent
+  // events, newline-delimited JSON, or a multipart stream.
+  var startsStreaming: Bool {
     guard let contentType = value(forHTTPHeaderField: "Content-Type") else { return false }
     let mimeType = contentType.split(separator: ";", maxSplits: 1).first ?? ""
-    return mimeType.trimmingCharacters(in: .whitespaces).lowercased() == "text/event-stream"
+    switch mimeType.trimmingCharacters(in: .whitespaces).lowercased() {
+    case "text/event-stream", "application/x-ndjson", "application/jsonl", "multipart/x-mixed-replace":
+      return true
+    default:
+      return false
+    }
   }
 }
 

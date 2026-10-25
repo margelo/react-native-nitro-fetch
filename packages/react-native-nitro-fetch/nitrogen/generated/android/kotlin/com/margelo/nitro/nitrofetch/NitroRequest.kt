@@ -26,9 +26,6 @@ data class NitroRequest(
   val method: NitroRequestMethod?,
   @DoNotStrip
   @Keep
-  val customMethod: String?,
-  @DoNotStrip
-  @Keep
   val headers: Array<NitroHeader>?,
   @DoNotStrip
   @Keep
@@ -59,13 +56,7 @@ data class NitroRequest(
   val prefetchCacheTtlMs: Double?,
   @DoNotStrip
   @Keep
-  val requestId: String?,
-  @DoNotStrip
-  @Keep
-  val responseBytes: Boolean?,
-  @DoNotStrip
-  @Keep
-  val separateConnections: Boolean?
+  val requestId: String?
 ) {
   /* primary constructor */
 
@@ -74,7 +65,6 @@ data class NitroRequest(
     if (other !is NitroRequest) return false
     return Objects.deepEquals(this.url, other.url)
       && Objects.deepEquals(this.method, other.method)
-      && Objects.deepEquals(this.customMethod, other.customMethod)
       && Objects.deepEquals(this.headers, other.headers)
       && Objects.deepEquals(this.bodyString, other.bodyString)
       && Objects.deepEquals(this.bodyBytes, other.bodyBytes)
@@ -86,15 +76,12 @@ data class NitroRequest(
       && Objects.deepEquals(this.priority, other.priority)
       && Objects.deepEquals(this.prefetchCacheTtlMs, other.prefetchCacheTtlMs)
       && Objects.deepEquals(this.requestId, other.requestId)
-      && Objects.deepEquals(this.responseBytes, other.responseBytes)
-      && Objects.deepEquals(this.separateConnections, other.separateConnections)
   }
 
   override fun hashCode(): Int {
     return arrayOf<Any?>(
       url,
       method,
-      customMethod,
       headers,
       bodyString,
       bodyBytes,
@@ -105,9 +92,7 @@ data class NitroRequest(
       credentials,
       priority,
       prefetchCacheTtlMs,
-      requestId,
-      responseBytes,
-      separateConnections
+      requestId
     ).contentDeepHashCode()
   }
 
@@ -119,8 +104,8 @@ data class NitroRequest(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(url: String, method: NitroRequestMethod?, customMethod: String?, headers: Array<NitroHeader>?, bodyString: String?, bodyBytes: ArrayBuffer?, bodyBytesBase64: String?, bodyFormData: Array<NitroFormDataPart>?, timeoutMs: Double?, followRedirects: Boolean?, credentials: NitroRequestCredentials?, priority: NitroRequestPriority?, prefetchCacheTtlMs: Double?, requestId: String?, responseBytes: Boolean?, separateConnections: Boolean?): NitroRequest {
-      return NitroRequest(url, method, customMethod, headers, bodyString, bodyBytes, bodyBytesBase64, bodyFormData, timeoutMs, followRedirects, credentials, priority, prefetchCacheTtlMs, requestId, responseBytes, separateConnections)
+    private fun fromCpp(url: String, method: NitroRequestMethod?, headers: Array<NitroHeader>?, bodyString: String?, bodyBytes: ArrayBuffer?, bodyBytesBase64: String?, bodyFormData: Array<NitroFormDataPart>?, timeoutMs: Double?, followRedirects: Boolean?, credentials: NitroRequestCredentials?, priority: NitroRequestPriority?, prefetchCacheTtlMs: Double?, requestId: String?): NitroRequest {
+      return NitroRequest(url, method, headers, bodyString, bodyBytes, bodyBytesBase64, bodyFormData, timeoutMs, followRedirects, credentials, priority, prefetchCacheTtlMs, requestId)
     }
   }
 }

@@ -17,12 +17,15 @@
 namespace margelo::nitro::nitrofetch { struct NitroResponse; }
 // Forward declaration of `NitroRequest` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct NitroRequest; }
+// Forward declaration of `NitroRequestOptions` to properly resolve imports.
+namespace margelo::nitro::nitrofetch { struct NitroRequestOptions; }
 // Forward declaration of `UrlResponseInfo` to properly resolve imports.
 namespace margelo::nitro::nitrofetch { struct UrlResponseInfo; }
 
 #include "NitroResponse.hpp"
 #include <NitroModules/Promise.hpp>
 #include "NitroRequest.hpp"
+#include "NitroRequestOptions.hpp"
 #include "UrlResponseInfo.hpp"
 #include <functional>
 #include <optional>
@@ -60,7 +63,8 @@ namespace margelo::nitro::nitrofetch {
 
     public:
       // Methods
-      virtual std::shared_ptr<Promise<NitroResponse>> request(const NitroRequest& req, const std::optional<std::function<void(const UrlResponseInfo& /* info */)>>& onResponseStarted, const std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>& onData, const std::optional<std::function<void(double /* loaded */, double /* total */)>>& onProgress) = 0;
+      virtual std::shared_ptr<Promise<NitroResponse>> request(const NitroRequest& req) = 0;
+      virtual std::shared_ptr<Promise<NitroResponse>> requestWithEvents(const NitroRequest& req, const NitroRequestOptions& options, const std::optional<std::function<void(const UrlResponseInfo& /* info */)>>& onResponseStarted, const std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>& onData, const std::optional<std::function<void(double /* loaded */, double /* total */)>>& onProgress) = 0;
       virtual std::shared_ptr<Promise<void>> prefetch(const NitroRequest& req) = 0;
       virtual NitroResponse requestSync(const NitroRequest& req) = 0;
       virtual void cancelRequest(const std::string& requestId) = 0;

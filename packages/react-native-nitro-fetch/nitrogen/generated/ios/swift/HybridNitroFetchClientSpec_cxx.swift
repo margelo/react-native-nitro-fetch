@@ -125,9 +125,28 @@ open class HybridNitroFetchClientSpec_cxx {
 
   // Methods
   @inline(__always)
-  public final func request(req: NitroRequest, onResponseStarted: bridge.std__optional_std__function_void_const_UrlResponseInfo_____info______, onData: bridge.std__optional_std__function_void_const_std__shared_ptr_ArrayBuffer______chunk______, onProgress: bridge.std__optional_std__function_void_double____loaded_____double____total______) -> bridge.Result_std__shared_ptr_Promise_NitroResponse___ {
+  public final func request(req: NitroRequest) -> bridge.Result_std__shared_ptr_Promise_NitroResponse___ {
     do {
-      let __result = try self.__implementation.request(req: req, onResponseStarted: { () -> ((_ info: UrlResponseInfo) -> Void)? in
+      let __result = try self.__implementation.request(req: req)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_NitroResponse__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_NitroResponse__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_NitroResponse__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_NitroResponse___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_NitroResponse___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func requestWithEvents(req: NitroRequest, options: NitroRequestOptions, onResponseStarted: bridge.std__optional_std__function_void_const_UrlResponseInfo_____info______, onData: bridge.std__optional_std__function_void_const_std__shared_ptr_ArrayBuffer______chunk______, onProgress: bridge.std__optional_std__function_void_double____loaded_____double____total______) -> bridge.Result_std__shared_ptr_Promise_NitroResponse___ {
+    do {
+      let __result = try self.__implementation.requestWithEvents(req: req, options: options, onResponseStarted: { () -> ((_ info: UrlResponseInfo) -> Void)? in
         if bridge.has_value_std__optional_std__function_void_const_UrlResponseInfo_____info______(onResponseStarted) {
           let __unwrapped = bridge.get_std__optional_std__function_void_const_UrlResponseInfo_____info______(onResponseStarted)
           return { () -> (UrlResponseInfo) -> Void in

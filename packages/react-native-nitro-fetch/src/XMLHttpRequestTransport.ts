@@ -12,7 +12,8 @@ export type XMLHttpRequestTransportRequest = {
   // incrementalUpdates.
   incremental: boolean;
   method: string;
-  // The caller listens for download progress.
+  // The caller listens for download progress or the end of the request, and
+  // wants the bytes received.
   observesProgress: boolean;
   responseType: XMLHttpRequestResponseType;
   url: string;
@@ -143,8 +144,8 @@ export function sendXMLHttpRequest(
     };
 
   // Only a caller that watches the request while it loads hears about the
-  // head before the body, or gets an event stream as it arrives. Everyone
-  // else gets the whole response in one native-to-JS hop.
+  // head before the body, or gets a body the server streams as it arrives.
+  // Everyone else gets the whole response in one native-to-JS hop.
   const onResponseStarted = whileLoading((info: UrlResponseInfo) => {
     respond(
       info.httpStatusCode,
@@ -153,23 +154,36 @@ export function sendXMLHttpRequest(
     );
   });
 
-  let streamed = false;
-  let loaded = 0;
-  const onData = whileLoading((chunk: ArrayBuffer) => {
-    streamed = true;
-    loaded += chunk.byteLength;
-    callbacks.onChunk(new Uint8Array(chunk), loaded);
-  });
-
-  // Progress can come before the head when the whole body arrived with it.
+  // Progress on a text body waits for the text, so it never comes at
+  // HEADERS_RECEIVED with an empty responseText. Progress can also come before
+  // the head, when the whole body arrived with it. Only the latest is kept.
   let pendingProgress: number | null = null;
+  const holdsProgress = !isBinaryResponse(request.responseType);
+  const flushProgress = () => {
+    if (pendingProgress == null) return;
+    const received = pendingProgress;
+    pendingProgress = null;
+    callbacks.onProgress(received);
+  };
   const onProgress = whileLoading((received: number) => {
-    if (!responded) {
+    if (!responded || holdsProgress) {
       pendingProgress = received;
       return;
     }
     callbacks.onProgress(received);
   });
+
+  let streamed = false;
+  let loaded = 0;
+  const onData = whileLoading((chunk: ArrayBuffer) => {
+    // Each chunk reports its own progress.
+    pendingProgress = null;
+    streamed = true;
+    loaded += chunk.byteLength;
+    callbacks.onChunk(new Uint8Array(chunk), loaded);
+  });
+
+  const upperCaseMethod = request.method.toUpperCase();
 
   const performRequest = async () => {
     try {
@@ -182,16 +196,23 @@ export function sendXMLHttpRequest(
         headers: request.headers,
         method: request.method,
         signal: abortController.signal,
-        _onResponseStarted: request.incremental ? onResponseStarted : undefined,
-        _onData: request.incremental ? onData : undefined,
-        _onProgress: request.observesProgress ? onProgress : undefined,
-        // The buffered client decodes text natively, so it would hand binary
-        // bodies back changed.
-        _responseBytes: isBinaryResponse(request.responseType),
-        _customMethod: BUFFERED_METHODS.has(request.method)
-          ? undefined
-          : request.method,
-        _separateConnections: acceptsEventStream(request.headers),
+        _withEvents: {
+          options: {
+            // The buffered client decodes text natively, so it would hand
+            // binary bodies back changed.
+            responseBytes: isBinaryResponse(request.responseType),
+            // fetch-core sends the method upper-cased on either client.
+            customMethod: BUFFERED_METHODS.has(upperCaseMethod)
+              ? undefined
+              : upperCaseMethod,
+            separateConnections: acceptsEventStream(request.headers),
+          },
+          onResponseStarted: request.incremental
+            ? onResponseStarted
+            : undefined,
+          onData: request.incremental ? onData : undefined,
+          onProgress: request.observesProgress ? onProgress : undefined,
+        },
       };
       const response = await nitroFetch(request.url, init);
       if (completed) return;
@@ -204,25 +225,24 @@ export function sendXMLHttpRequest(
         );
         if (completed) return;
       }
-      if (pendingProgress != null) {
-        callbacks.onProgress(pendingProgress);
-        pendingProgress = null;
-        if (completed) return;
-      }
-
       if (streamed) {
         // The body already arrived through onData.
         complete('');
         return;
       }
       if (isBinaryResponse(request.responseType)) {
+        flushProgress();
         const bytes = new Uint8Array(await response.arrayBuffer());
         if (completed) return;
         callbacks.onChunk(bytes, bytes.byteLength);
       } else {
         const text = await response.text();
         if (completed) return;
-        callbacks.onText(text);
+        // Like TextDecoder, drop a leading byte order mark, which Android's
+        // native decoding keeps.
+        callbacks.onText(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
+        if (completed) return;
+        flushProgress();
       }
 
       complete('');

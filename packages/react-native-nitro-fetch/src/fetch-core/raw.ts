@@ -1,5 +1,6 @@
 import type {
   NitroHeader,
+  NitroRequestOptions,
   NitroResponse as NitroResponseNative,
 } from '../NitroFetch.nitro';
 import type { UrlResponseInfo } from '../NitroCronet.nitro';
@@ -15,15 +16,19 @@ import { isHttpUrl } from './url';
 import { createAbortError } from './errors';
 import { fetchLocalResource } from './local';
 
-// Set by the XMLHttpRequest polyfill. See NitroFetchClient.request() and
-// NitroRequest for what each one does.
+// What the XMLHttpRequest polyfill asks the client for besides the response.
+// See NitroFetchClient.requestWithEvents().
+export type NitroRequestWithEvents = {
+  options: NitroRequestOptions;
+  onResponseStarted?: (info: UrlResponseInfo) => void;
+  onData?: (chunk: ArrayBuffer) => void;
+  onProgress?: (loaded: number, total: number) => void;
+};
+
 export type NitroRawInit = RequestInit & {
-  _onResponseStarted?: (info: UrlResponseInfo) => void;
-  _onData?: (chunk: ArrayBuffer) => void;
-  _onProgress?: (loaded: number, total: number) => void;
-  _responseBytes?: boolean;
-  _customMethod?: string;
-  _separateConnections?: boolean;
+  // Set by the XMLHttpRequest polyfill. Without it, a request does nothing
+  // more than a plain fetch.
+  _withEvents?: NitroRequestWithEvents;
 };
 
 export async function nitroFetchRaw(
@@ -72,12 +77,9 @@ export async function nitroFetchRaw(
   }
 
   const req = buildNitroRequest(input, init);
-  if (init?._responseBytes) req.responseBytes = true;
-  if (init?._customMethod) {
-    req.method = undefined;
-    req.customMethod = init._customMethod;
-  }
-  if (init?._separateConnections) req.separateConnections = true;
+  const withEvents = init?._withEvents;
+  // A method NitroRequestMethod does not cover goes in the options instead.
+  if (withEvents?.options.customMethod != null) req.method = undefined;
 
   // Route non-http(s) (data:/file://content://scheme-less) off the HTTP client.
   if (!isHttpUrl(req.url)) {
@@ -91,7 +93,7 @@ export async function nitroFetchRaw(
     NetworkInspector._recordStart(
       inspectorId,
       req.url,
-      req.method ?? 'GET',
+      withEvents?.options.customMethod ?? req.method ?? 'GET',
       req.headers ?? [],
       req.bodyString
     );
@@ -120,12 +122,15 @@ export async function nitroFetchRaw(
   }
 
   try {
-    const res: NitroResponseNative = await client.request(
-      req,
-      init?._onResponseStarted,
-      init?._onData,
-      init?._onProgress
-    );
+    const res: NitroResponseNative = await (withEvents
+      ? client.requestWithEvents(
+          req,
+          withEvents.options,
+          withEvents.onResponseStarted,
+          withEvents.onData,
+          withEvents.onProgress
+        )
+      : client.request(req));
     if (signal?.aborted) throw createAbortError(signal);
     if (inspectorId) {
       NetworkInspector._recordEnd(
