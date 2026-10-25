@@ -328,6 +328,9 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
     // A body that may still stream is buffered for this long, or up to this size.
     private const val BUFFER_WINDOW_MS = 400L
     private const val BUFFER_WINDOW_BYTES = 8L * 1024 * 1024
+    // A watched text body streams past this size, so JS decodes it while it
+    // downloads, as React Native does. Smaller ones arrive whole.
+    private const val STREAM_TEXT_BYTES = 256L * 1024
     // A body declared larger than this streams from the start.
     private const val MAX_BUFFERED_LENGTH = 32L * 1024 * 1024
     // A streamed body goes to JS in chunks of up to this size, and reading
@@ -456,6 +459,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         private var streaming = false
         private var pacesReads = false
         private var mayStream = false
+        private var streamAfterBytes = BUFFER_WINDOW_BYTES
         private var finished = false
         private var bufferWindow: java.util.concurrent.ScheduledFuture<*>? = null
         // A streamed body is joined into chunks: one goes to JS once JS has
@@ -571,7 +575,11 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
             }
             if (onData != null) {
               pacesReads = mimeType(info) != "text/event-stream"
-              if (startsStreaming(info) || (exact && total > MAX_BUFFERED_LENGTH)) {
+              if (!responseBytes) streamAfterBytes = STREAM_TEXT_BYTES
+              val streamsAtOnce = startsStreaming(info) ||
+                (exact && total > MAX_BUFFERED_LENGTH) ||
+                (exact && !responseBytes && total > STREAM_TEXT_BYTES)
+              if (streamsAtOnce) {
                 startStreaming()
               } else if (!exact || (onProgress != null && !responseBytes)) {
                 // The server may be streaming: a body that outlives the window streams.
@@ -711,7 +719,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
                 devToolsBytes += read
                 DevToolsReporter.reportDataReceived(devToolsRequestId, read)
               }
-              if (mayStream && received > BUFFER_WINDOW_BYTES) startStreaming()
+              if (mayStream && received > streamAfterBytes) startStreaming()
               if (!streaming) reportProgress(final = false)
               if (streaming && pendingChunks >= MAX_PENDING_CHUNKS) {
                 // JS is behind: read again once it catches up.

@@ -16,6 +16,9 @@ final class NitroBufferedTaskDelegate: NSObject, URLSessionDataDelegate {
   // A body that may still stream is buffered for this long, or up to this size.
   private static let bufferWindowSeconds = 0.4
   private static let bufferWindowBytes = 8 * 1024 * 1024
+  // A watched text body streams past this size, so JS decodes it while it
+  // downloads, as React Native does. Smaller ones arrive whole.
+  private static let streamTextBytes = 256 * 1024
   // A body declared larger than this streams from the start.
   private static let maxBufferedLength: Int64 = 32 * 1024 * 1024
   // A streamed body goes to JS once JS has returned from the last chunk, or
@@ -38,6 +41,7 @@ final class NitroBufferedTaskDelegate: NSObject, URLSessionDataDelegate {
   private var refused = false
   private var delegateQueue: OperationQueue?
   private var mayStream = false
+  private var streamAfterBytes = NitroBufferedTaskDelegate.bufferWindowBytes
   private var finished = false
   private var reportedResponse = false
   private var expectedLength: Int64 = -1
@@ -192,7 +196,9 @@ final class NitroBufferedTaskDelegate: NSObject, URLSessionDataDelegate {
         body.reserveCapacity(Int(min(expectedLength, 1 << 20)))
       }
       if onData != nil {
-        if http.startsStreaming || (lengthIsExact && expectedLength > NitroBufferedTaskDelegate.maxBufferedLength) {
+        if !responseBytes { streamAfterBytes = NitroBufferedTaskDelegate.streamTextBytes }
+        let streamAbove = responseBytes ? NitroBufferedTaskDelegate.maxBufferedLength : Int64(NitroBufferedTaskDelegate.streamTextBytes)
+        if http.startsStreaming || (lengthIsExact && expectedLength > streamAbove) {
           startStreaming()
         } else if !lengthIsExact || (onProgress != nil && !responseBytes) {
           // The server may be streaming: a body that outlives the window streams.
@@ -230,7 +236,7 @@ final class NitroBufferedTaskDelegate: NSObject, URLSessionDataDelegate {
     if !(lengthIsExact && received >= expectedLength) {
       reportResponse()
     }
-    if mayStream && received > NitroBufferedTaskDelegate.bufferWindowBytes {
+    if mayStream && received > streamAfterBytes {
       startStreaming()
       return
     }

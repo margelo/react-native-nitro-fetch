@@ -89,8 +89,10 @@ export interface NitroFetchClient extends HybridObject<{
   //   body, unless the whole body arrives with them.
   // - onData gets the body as it arrives when the server streams it, and the
   //   response then resolves without a body: at once for text/event-stream,
-  //   NDJSON and multipart/x-mixed-replace, and from 400 ms or 8 MB for a
-  //   body without an exact length (or a text body with onProgress). Native
+  //   NDJSON and multipart/x-mixed-replace, from 400 ms or 8 MB for a body
+  //   without an exact length (or a text body with onProgress), and for a
+  //   text body larger than 256 KB, so JS decodes it while it downloads.
+  //   Native
   //   sends the next chunk once JS has returned from this one, and joins what
   //   arrives meanwhile into chunks of up to 64 KB. JS returns false once it
   //   no longer wants the body, such as after an abort.
