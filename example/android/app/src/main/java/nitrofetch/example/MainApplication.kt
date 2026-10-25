@@ -27,8 +27,8 @@ class MainApplication : Application(), ReactApplication {
     super.onCreate()
     NitroWebSocketAutoPrewarmer.prewarmOnStart(this)
     // A host whose pins don't match: the pinning harness checks that this socket is never
-    // handed over open.
-    NitroWebSocketPrewarmer.preWarm("wss://ws.postman-echo.com:443/raw")
+    // handed over open. It fails at the TLS handshake.
+    NitroWebSocketPrewarmer.preWarm("wss://www.gstatic.com/")
     // Native-side prefetch registration — fires on the very first cold launch.
     try {
       AutoPrefetcher.registerPrefetch(

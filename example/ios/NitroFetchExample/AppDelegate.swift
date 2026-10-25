@@ -40,8 +40,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     )
 
     // A host whose pins don't match: the pinning harness checks that this socket is never
-    // handed over open.
-    NitroWebSocketPrewarmer.preWarmURL("wss://ws.postman-echo.com:443/raw")
+    // handed over open. It fails at the TLS handshake.
+    NitroWebSocketPrewarmer.preWarmURL("wss://www.gstatic.com/")
 
     return true
   }

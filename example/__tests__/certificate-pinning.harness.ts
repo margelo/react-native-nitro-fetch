@@ -16,10 +16,10 @@ import { NitroWebSocket } from 'react-native-nitro-websockets';
 //     entry has expired, falls back to amazon.com and fails.
 //   - expired.badssl.com is pinned too, but its certificate has expired, so it must fail with the
 //     platform's certificate error rather than the pinning error.
-//   - wss://: ws.ifelse.io is pinned to the Google Trust Services roots, so it connects, and
-//     ws.postman-echo.com to the key no chain contains, so it fails. AppDelegate.swift and
-//     MainApplication.kt prewarm WSS_PREWARMED_MISMATCH on every launch.
-// No other suite uses these hosts. example.com and echo.websocket.org are not in the file.
+//   - wss:// uses the same hosts. None of them runs a WebSocket server, so a connection that
+//     passes the pin check fails at the upgrade instead. AppDelegate.swift and MainApplication.kt
+//     prewarm wss://www.gstatic.com/ on every launch.
+// No other suite uses these hosts. example.com is not in the file.
 const PINNED_OK = 'https://aws.amazon.com/robots.txt';
 const PINNED_MISMATCH = 'https://www.gstatic.com/generate_204';
 const SUBDOMAIN_OF_EXACT_PIN = 'https://www.google.com/generate_204';
@@ -177,46 +177,87 @@ describe('Certificate pinning: callRefreshEndpoint', () => {
   });
 });
 
-const WSS_PINNED_OK = 'wss://ws.ifelse.io/';
-const WSS_PINNED_MISMATCH = 'wss://ws.postman-echo.com/raw';
-// Spelled differently from WSS_PINNED_MISMATCH so only this test adopts the prewarmed socket.
-const WSS_PREWARMED_MISMATCH = 'wss://ws.postman-echo.com:443/raw';
+const WSS_PINNED_MISMATCH = 'wss://www.gstatic.com/generate_204';
+// AppDelegate.swift and MainApplication.kt prewarm this URL on every launch.
+const WSS_PREWARMED_MISMATCH = 'wss://www.gstatic.com/';
+const WSS_EXPIRED_UNDER_PINNED_PARENT = 'wss://www.amazon.com/';
+const WSS_SUBDOMAIN_OF_EXACT_PIN = 'wss://www.google.com/';
+const WSS_PINNED_OK = 'wss://aws.amazon.com/';
 const WSS_EXPIRED_CERTIFICATE = 'wss://expired.badssl.com/';
-const WSS_UNPINNED = 'wss://echo.websocket.org';
+const WSS_UNPINNED = 'wss://example.com/';
+const WSS_TIMEOUT_MS = 15_000;
+// The error of a connection that got through TLS and the pin check to a server that doesn't
+// speak WebSocket (iOS, Android).
+const UPGRADE_FAILED = /bad response from the server|not 101/;
+// A certificate error (iOS, Android), so DNS failures or no network can't pass for one.
+const CERTIFICATE_ERROR = /certificate|\bcert\b/i;
 
 // Resolves with 'open', or with the error the connection failed with.
-function wsOutcome(url: string): Promise<string> {
-  return new Promise((resolve) => {
-    const ws = new NitroWebSocket(url);
+function wsOutcome(ws: NitroWebSocket): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(
+        new Error(
+          `Timeout: ${ws.url} did not open or fail in ${WSS_TIMEOUT_MS} ms`
+        )
+      );
+      ws.close();
+    }, WSS_TIMEOUT_MS);
+    const settle = (outcome: string) => {
+      clearTimeout(timer);
+      resolve(outcome);
+    };
     ws.onopen = () => {
-      resolve('open');
+      settle('open');
       ws.close();
     };
-    ws.onerror = (error) => resolve(String(error));
-    ws.onclose = (event) => resolve(`closed with ${event.code}`);
+    ws.onerror = (error) => settle(String(error));
+    ws.onclose = (event) => settle(`closed with ${event.code}`);
   });
 }
 
 describe('Certificate pinning: wss://', () => {
-  it('connects when the chain contains a pinned root', async () => {
-    expect(await wsOutcome(WSS_PINNED_OK)).toBe('open');
-  });
-
   it('fails when the chain has no pinned key', async () => {
-    expect(await wsOutcome(WSS_PINNED_MISMATCH)).toContain(PIN_ERROR);
+    const outcome = await wsOutcome(new NitroWebSocket(WSS_PINNED_MISMATCH));
+    expect(outcome).toContain(PIN_ERROR);
   });
 
   it('does not hand over a prewarmed socket whose pins do not match', async () => {
-    expect(await wsOutcome(WSS_PREWARMED_MISMATCH)).toContain(PIN_ERROR);
+    const ws = new NitroWebSocket(WSS_PREWARMED_MISMATCH);
+    // The adopted prewarm has already failed; a new connection would still be CONNECTING.
+    expect(ws.readyState).toBe('CLOSED');
+    expect(await wsOutcome(ws)).toContain(PIN_ERROR);
+  });
+
+  it('falls back to the parent entry when the exact entry has expired', async () => {
+    const outcome = await wsOutcome(
+      new NitroWebSocket(WSS_EXPIRED_UNDER_PINNED_PARENT)
+    );
+    expect(outcome).toContain(PIN_ERROR);
+  });
+
+  it('passes the pin check when the chain contains a pinned root', async () => {
+    const outcome = await wsOutcome(new NitroWebSocket(WSS_PINNED_OK));
+    expect(outcome).toMatch(UPGRADE_FAILED);
+  });
+
+  it('does not apply an exact-host pin to its subdomains', async () => {
+    const outcome = await wsOutcome(
+      new NitroWebSocket(WSS_SUBDOMAIN_OF_EXACT_PIN)
+    );
+    expect(outcome).toMatch(UPGRADE_FAILED);
   });
 
   it('reports an untrusted certificate on a pinned host as a certificate error', async () => {
-    const outcome = await wsOutcome(WSS_EXPIRED_CERTIFICATE);
-    expect(outcome).not.toBe('open');
+    const outcome = await wsOutcome(
+      new NitroWebSocket(WSS_EXPIRED_CERTIFICATE)
+    );
+    expect(outcome).toMatch(CERTIFICATE_ERROR);
     expect(outcome).not.toContain(PIN_ERROR);
   });
 
-  it('connects to a host that is not in the pin file', async () => {
-    expect(await wsOutcome(WSS_UNPINNED)).toBe('open');
+  it('does not check a host that is not in the pin file', async () => {
+    const outcome = await wsOutcome(new NitroWebSocket(WSS_UNPINNED));
+    expect(outcome).toMatch(UPGRADE_FAILED);
   });
 });
