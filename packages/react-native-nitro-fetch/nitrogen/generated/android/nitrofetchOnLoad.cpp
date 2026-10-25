@@ -24,7 +24,7 @@
 #include "JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double.hpp"
 #include "JHybridNitroCronetSpec.hpp"
 #include "JHybridNitroFetchClientSpec.hpp"
-#include "JFunc_void_std__shared_ptr_ArrayBuffer_.hpp"
+#include "JFunc_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer_.hpp"
 #include "JFunc_void_double_double.hpp"
 #include "JHybridNitroFetchSpec.hpp"
 #include "JHybridNativeStorageSpec.hpp"
@@ -85,7 +85,7 @@ void registerAllNatives() {
   margelo::nitro::nitrofetch::JFunc_void_UrlResponseInfo_std__shared_ptr_ArrayBuffer__double_cxx::registerNatives();
   margelo::nitro::nitrofetch::JHybridNitroCronetSpec::CxxPart::registerNatives();
   margelo::nitro::nitrofetch::JHybridNitroFetchClientSpec::CxxPart::registerNatives();
-  margelo::nitro::nitrofetch::JFunc_void_std__shared_ptr_ArrayBuffer__cxx::registerNatives();
+  margelo::nitro::nitrofetch::JFunc_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer__cxx::registerNatives();
   margelo::nitro::nitrofetch::JFunc_void_double_double_cxx::registerNatives();
   margelo::nitro::nitrofetch::JHybridNitroFetchSpec::CxxPart::registerNatives();
   margelo::nitro::nitrofetch::JHybridNativeStorageSpec::CxxPart::registerNatives();

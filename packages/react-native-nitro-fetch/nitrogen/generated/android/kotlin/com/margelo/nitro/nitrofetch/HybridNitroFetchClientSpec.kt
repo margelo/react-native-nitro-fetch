@@ -35,11 +35,11 @@ abstract class HybridNitroFetchClientSpec: HybridObject() {
   @Keep
   abstract fun request(req: NitroRequest): Promise<NitroResponse>
   
-  abstract fun requestWithEvents(req: NitroRequest, options: NitroRequestOptions, onResponseStarted: ((info: UrlResponseInfo) -> Unit)?, onData: ((chunk: ArrayBuffer) -> Unit)?, onProgress: ((loaded: Double, total: Double) -> Unit)?): Promise<NitroResponse>
+  abstract fun requestWithEvents(req: NitroRequest, options: NitroRequestOptions, onResponseStarted: ((info: UrlResponseInfo) -> Unit)?, onData: ((chunk: ArrayBuffer) -> Promise<Boolean>)?, onProgress: ((loaded: Double, total: Double) -> Unit)?): Promise<NitroResponse>
   
   @DoNotStrip
   @Keep
-  private fun requestWithEvents_cxx(req: NitroRequest, options: NitroRequestOptions, onResponseStarted: Func_void_UrlResponseInfo?, onData: Func_void_std__shared_ptr_ArrayBuffer_?, onProgress: Func_void_double_double?): Promise<NitroResponse> {
+  private fun requestWithEvents_cxx(req: NitroRequest, options: NitroRequestOptions, onResponseStarted: Func_void_UrlResponseInfo?, onData: Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer_?, onProgress: Func_void_double_double?): Promise<NitroResponse> {
     val __result = requestWithEvents(req, options, onResponseStarted?.let { it }, onData?.let { it }, onProgress?.let { it })
     return __result
   }

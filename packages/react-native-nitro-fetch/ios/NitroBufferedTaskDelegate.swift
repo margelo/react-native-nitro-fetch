@@ -18,11 +18,14 @@ final class NitroBufferedTaskDelegate: NSObject, URLSessionDataDelegate {
   private static let bufferWindowBytes = 8 * 1024 * 1024
   // A body declared larger than this streams from the start.
   private static let maxBufferedLength: Int64 = 32 * 1024 * 1024
+  // A streamed body goes to JS once JS has returned from the last chunk, or
+  // once this much has arrived meanwhile.
+  private static let streamChunkSize = 64 * 1024
 
   private let followRedirects: Bool
   private let responseBytes: Bool
   private let onResponseStarted: ((UrlResponseInfo) -> Void)?
-  private let onData: ((ArrayBuffer) -> Void)?
+  private let onData: ((ArrayBuffer) -> Promise<Bool>)?
   private let onProgress: ((Double, Double) -> Void)?
 
   // Used only on the session's delegate queue.
@@ -30,6 +33,10 @@ final class NitroBufferedTaskDelegate: NSObject, URLSessionDataDelegate {
   private var body = Data()
   private var bytes: NitroResponseBytes?
   private var streaming = false
+  private var filling = Data()
+  private var pendingChunks = 0
+  private var refused = false
+  private var delegateQueue: OperationQueue?
   private var mayStream = false
   private var finished = false
   private var reportedResponse = false
@@ -49,7 +56,7 @@ final class NitroBufferedTaskDelegate: NSObject, URLSessionDataDelegate {
     followRedirects: Bool,
     responseBytes: Bool,
     onResponseStarted: ((UrlResponseInfo) -> Void)?,
-    onData: ((ArrayBuffer) -> Void)?,
+    onData: ((ArrayBuffer) -> Promise<Bool>)?,
     onProgress: ((Double, Double) -> Void)?
   ) {
     self.followRedirects = followRedirects
@@ -66,7 +73,7 @@ final class NitroBufferedTaskDelegate: NSObject, URLSessionDataDelegate {
     priority: NitroRequestPriority?,
     responseBytes: Bool,
     onResponseStarted: ((UrlResponseInfo) -> Void)?,
-    onData: ((ArrayBuffer) -> Void)?,
+    onData: ((ArrayBuffer) -> Promise<Bool>)?,
     onProgress: ((Double, Double) -> Void)?
   ) async throws -> Loaded {
     let delegate = NitroBufferedTaskDelegate(
@@ -129,16 +136,40 @@ final class NitroBufferedTaskDelegate: NSObject, URLSessionDataDelegate {
 
   // Hands what was buffered to onData, which then gets the rest as it arrives.
   private func startStreaming() {
-    guard !streaming, !finished, let onData = onData else { return }
+    guard !streaming, !finished, onData != nil else { return }
     streaming = true
     reportResponse()
     if let buffered = bytes?.toArrayBuffer() {
-      onData(buffered)
-    } else if !body.isEmpty, let buffered = try? ArrayBuffer.copy(data: body) {
-      onData(buffered)
+      sendChunk(buffered)
+    } else if !body.isEmpty {
+      filling = body
+      sendFilling()
     }
     bytes = nil
     body = Data()
+  }
+
+  private func sendChunk(_ chunk: ArrayBuffer) {
+    guard let onData = onData, !refused else { return }
+    pendingChunks += 1
+    let queue = delegateQueue
+    onData(chunk)
+      .then { [weak self] wanted in queue?.addOperation { self?.chunkHandled(wanted) } }
+      .catch { [weak self] _ in queue?.addOperation { self?.chunkHandled(false) } }
+  }
+
+  // Runs once JS has returned from a chunk.
+  private func chunkHandled(_ wanted: Bool) {
+    pendingChunks -= 1
+    if !wanted { refused = true }
+    if pendingChunks == 0 && !finished { sendFilling() }
+  }
+
+  private func sendFilling() {
+    guard !filling.isEmpty else { return }
+    let data = filling
+    filling = Data()
+    if let chunk = try? ArrayBuffer.copy(data: data) { sendChunk(chunk) }
   }
 
   func urlSession(
@@ -149,6 +180,7 @@ final class NitroBufferedTaskDelegate: NSObject, URLSessionDataDelegate {
   ) {
     if let http = response as? HTTPURLResponse {
       self.response = http
+      delegateQueue = session.delegateQueue
       expectedLength = http.expectedContentLength
       let encoding = http.value(forHTTPHeaderField: "Content-Encoding")?.lowercased() ?? "identity"
       lengthIsExact = expectedLength >= 0 && encoding == "identity"
@@ -177,12 +209,10 @@ final class NitroBufferedTaskDelegate: NSObject, URLSessionDataDelegate {
 
   func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
     received += Int64(data.count)
-    if streaming, let onData = onData {
-      do {
-        onData(try ArrayBuffer.copy(data: data))
-      } catch {
-        finish(.failure(error))
-        dataTask.cancel()
+    if streaming {
+      filling.append(data)
+      if pendingChunks == 0 || filling.count >= NitroBufferedTaskDelegate.streamChunkSize {
+        sendFilling()
       }
       return
     }
@@ -218,6 +248,7 @@ final class NitroBufferedTaskDelegate: NSObject, URLSessionDataDelegate {
   }
 
   func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    if streaming && error == nil { sendFilling() }
     finished = true
     if let error = error {
       finish(.failure(error))

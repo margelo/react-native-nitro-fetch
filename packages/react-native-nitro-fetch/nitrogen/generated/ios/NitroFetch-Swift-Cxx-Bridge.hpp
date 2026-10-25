@@ -604,40 +604,75 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return optional.value();
   }
   
-  // pragma MARK: std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>
+  // pragma MARK: std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>
   /**
-   * Specialized version of `std::function<void(const std::shared_ptr<ArrayBuffer>&)>`.
+   * Specialized version of `std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>&)>`.
    */
-  using Func_void_std__shared_ptr_ArrayBuffer_ = std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>;
+  using Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer_ = std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>;
   /**
-   * Wrapper class for a `std::function<void(const std::shared_ptr<ArrayBuffer>& / * chunk * /)>`, this can be used from Swift.
+   * Wrapper class for a `std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& / * chunk * /)>`, this can be used from Swift.
    */
-  class Func_void_std__shared_ptr_ArrayBuffer__Wrapper final {
+  class Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer__Wrapper final {
   public:
-    explicit Func_void_std__shared_ptr_ArrayBuffer__Wrapper(std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>&& func): _function(std::make_unique<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>(std::move(func))) {}
-    inline void call(ArrayBufferHolder chunk) const noexcept {
-      _function->operator()(chunk.getArrayBuffer());
+    explicit Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer__Wrapper(std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>&& func): _function(std::make_unique<std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>(std::move(func))) {}
+    inline std::shared_ptr<Promise<bool>> call(ArrayBufferHolder chunk) const noexcept {
+      auto __result = _function->operator()(chunk.getArrayBuffer());
+      return __result;
     }
   private:
-    std::unique_ptr<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>> _function;
+    std::unique_ptr<std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>> _function;
   } SWIFT_NONCOPYABLE;
-  Func_void_std__shared_ptr_ArrayBuffer_ create_Func_void_std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept;
-  inline Func_void_std__shared_ptr_ArrayBuffer__Wrapper wrap_Func_void_std__shared_ptr_ArrayBuffer_(Func_void_std__shared_ptr_ArrayBuffer_ value) noexcept {
-    return Func_void_std__shared_ptr_ArrayBuffer__Wrapper(std::move(value));
+  Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer_ create_Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer__Wrapper wrap_Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer_(Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer_ value) noexcept {
+    return Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer__Wrapper(std::move(value));
   }
   
-  // pragma MARK: std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>
+  // pragma MARK: std::shared_ptr<Promise<bool>>
   /**
-   * Specialized version of `std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& / * chunk * /)>>`.
+   * Specialized version of `std::shared_ptr<Promise<bool>>`.
    */
-  using std__optional_std__function_void_const_std__shared_ptr_ArrayBuffer______chunk______ = std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>;
-  inline std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>> create_std__optional_std__function_void_const_std__shared_ptr_ArrayBuffer______chunk______(const std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>& value) noexcept {
-    return std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>(value);
+  using std__shared_ptr_Promise_bool__ = std::shared_ptr<Promise<bool>>;
+  inline std::shared_ptr<Promise<bool>> create_std__shared_ptr_Promise_bool__() noexcept {
+    return Promise<bool>::create();
   }
-  inline bool has_value_std__optional_std__function_void_const_std__shared_ptr_ArrayBuffer______chunk______(const std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>& optional) noexcept {
+  inline PromiseHolder<bool> wrap_std__shared_ptr_Promise_bool__(std::shared_ptr<Promise<bool>> promise) noexcept {
+    return PromiseHolder<bool>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(bool /* result */)>
+  /**
+   * Specialized version of `std::function<void(bool)>`.
+   */
+  using Func_void_bool = std::function<void(bool /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(bool / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_bool_Wrapper final {
+  public:
+    explicit Func_void_bool_Wrapper(std::function<void(bool /* result */)>&& func): _function(std::make_unique<std::function<void(bool /* result */)>>(std::move(func))) {}
+    inline void call(bool result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(bool /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_bool create_Func_void_bool(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_bool_Wrapper wrap_Func_void_bool(Func_void_bool value) noexcept {
+    return Func_void_bool_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::optional<std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>
+  /**
+   * Specialized version of `std::optional<std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& / * chunk * /)>>`.
+   */
+  using std__optional_std__function_std__shared_ptr_Promise_bool___const_std__shared_ptr_ArrayBuffer______chunk______ = std::optional<std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>;
+  inline std::optional<std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>> create_std__optional_std__function_std__shared_ptr_Promise_bool___const_std__shared_ptr_ArrayBuffer______chunk______(const std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>& value) noexcept {
+    return std::optional<std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>(value);
+  }
+  inline bool has_value_std__optional_std__function_std__shared_ptr_Promise_bool___const_std__shared_ptr_ArrayBuffer______chunk______(const std::optional<std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>& optional) noexcept {
     return optional.has_value();
   }
-  inline std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)> get_std__optional_std__function_void_const_std__shared_ptr_ArrayBuffer______chunk______(const std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>& optional) noexcept {
+  inline std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)> get_std__optional_std__function_std__shared_ptr_Promise_bool___const_std__shared_ptr_ArrayBuffer______chunk______(const std::optional<std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>& optional) noexcept {
     return optional.value();
   }
   

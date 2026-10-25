@@ -112,7 +112,7 @@ namespace margelo::nitro::nitrofetch {
       auto __value = std::move(__result.value());
       return __value;
     }
-    inline std::shared_ptr<Promise<NitroResponse>> requestWithEvents(const NitroRequest& req, const NitroRequestOptions& options, const std::optional<std::function<void(const UrlResponseInfo& /* info */)>>& onResponseStarted, const std::optional<std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>& onData, const std::optional<std::function<void(double /* loaded */, double /* total */)>>& onProgress) override {
+    inline std::shared_ptr<Promise<NitroResponse>> requestWithEvents(const NitroRequest& req, const NitroRequestOptions& options, const std::optional<std::function<void(const UrlResponseInfo& /* info */)>>& onResponseStarted, const std::optional<std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>& onData, const std::optional<std::function<void(double /* loaded */, double /* total */)>>& onProgress) override {
       auto __result = _swiftPart.requestWithEvents(std::forward<decltype(req)>(req), std::forward<decltype(options)>(options), onResponseStarted, onData, onProgress);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());

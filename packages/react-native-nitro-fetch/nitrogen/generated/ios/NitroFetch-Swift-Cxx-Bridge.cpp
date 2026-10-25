@@ -123,11 +123,20 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     };
   }
   
-  // pragma MARK: std::function<void(const std::shared_ptr<ArrayBuffer>& /* chunk */)>
-  Func_void_std__shared_ptr_ArrayBuffer_ create_Func_void_std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = NitroFetch::Func_void_std__shared_ptr_ArrayBuffer_::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)](const std::shared_ptr<ArrayBuffer>& chunk) mutable -> void {
-      swiftClosure.call(ArrayBufferHolder(chunk));
+  // pragma MARK: std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>
+  Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer_ create_Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer_::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::shared_ptr<ArrayBuffer>& chunk) mutable -> std::shared_ptr<Promise<bool>> {
+      auto __result = swiftClosure.call(ArrayBufferHolder(chunk));
+      return __result;
+    };
+  }
+  
+  // pragma MARK: std::function<void(bool /* result */)>
+  Func_void_bool create_Func_void_bool(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_bool::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](bool result) mutable -> void {
+      swiftClosure.call(result);
     };
   }
   

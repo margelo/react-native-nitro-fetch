@@ -83,7 +83,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     req: NitroRequest,
     options: NitroRequestOptions,
     onResponseStarted: ((_ info: UrlResponseInfo) -> Void)?,
-    onData: ((_ chunk: ArrayBuffer) -> Void)?,
+    onData: ((_ chunk: ArrayBuffer) -> Promise<Bool>)?,
     onProgress: ((_ loaded: Double, _ total: Double) -> Void)?
   ) throws -> Promise<NitroResponse> {
     let promise = Promise<NitroResponse>.init()
@@ -172,7 +172,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     bodyData: Data? = nil,
     options: NitroRequestOptions? = nil,
     onResponseStarted: ((UrlResponseInfo) -> Void)? = nil,
-    onData: ((ArrayBuffer) -> Void)? = nil,
+    onData: ((ArrayBuffer) -> Promise<Bool>)? = nil,
     onProgress: ((Double, Double) -> Void)? = nil
   ) async throws -> NitroResponse {
     // Local resources (file://, scheme-less paths) aren't HTTP; read off disk -> 200.

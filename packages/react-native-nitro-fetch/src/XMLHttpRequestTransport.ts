@@ -175,13 +175,18 @@ export function sendXMLHttpRequest(
 
   let streamed = false;
   let loaded = 0;
-  const onData = whileLoading((chunk: ArrayBuffer) => {
+  const handleData = whileLoading((chunk: ArrayBuffer) => {
     // Each chunk reports its own progress.
     pendingProgress = null;
     streamed = true;
     loaded += chunk.byteLength;
     callbacks.onChunk(new Uint8Array(chunk), loaded);
   });
+  // Native sends the next chunk once this returns, and none after false.
+  const onData = (chunk: ArrayBuffer): boolean => {
+    handleData(chunk);
+    return !completed;
+  };
 
   const upperCaseMethod = request.method.toUpperCase();
 

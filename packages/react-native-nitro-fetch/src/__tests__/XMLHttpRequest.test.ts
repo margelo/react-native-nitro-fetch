@@ -923,7 +923,9 @@ describe('NitroXMLHttpRequest', () => {
     aborted.abort();
     abortedEvents.length = 0;
     init._withEvents?.onResponseStarted?.(responseInfo(headers));
-    init._withEvents?.onData?.(new TextEncoder().encode('late').buffer);
+    expect(
+      init._withEvents?.onData?.(new TextEncoder().encode('late').buffer)
+    ).toBe(false);
     init._withEvents?.onProgress?.(4, 4);
     expect(abortedEvents).toEqual([]);
     expect(aborted.readyState).toBe(NitroXMLHttpRequest.UNSENT);

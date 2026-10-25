@@ -87,19 +87,20 @@ export interface NitroFetchClient extends HybridObject<{
   // response while it loads:
   // - onResponseStarted gets the status, headers and final URL before the
   //   body, unless the whole body arrives with them.
-  // - onData gets the body as it arrives when the server streams it: at once
-  //   for text/event-stream, application/x-ndjson, application/jsonl and
-  //   multipart/x-mixed-replace, or for a declared length over 32 MB; otherwise
-  //   once a body without an exact length (or a text body with onProgress) is
-  //   still loading after 400 ms or passes 8 MB. What was buffered comes first,
-  //   and the response then resolves without a body.
-  // - onProgress gets the bytes received so far and the Content-Length (-1
-  //   unless the length is exact), at most every 50 ms and once at the end.
+  // - onData gets the body as it arrives when the server streams it, and the
+  //   response then resolves without a body: at once for text/event-stream,
+  //   NDJSON and multipart/x-mixed-replace, and from 400 ms or 8 MB for a
+  //   body without an exact length (or a text body with onProgress). Native
+  //   sends the next chunk once JS has returned from this one, and joins what
+  //   arrives meanwhile into chunks of up to 64 KB. JS returns false once it
+  //   no longer wants the body, such as after an abort.
+  // - onProgress gets the bytes received so far and the exact length (-1 if
+  //   unknown), at most every 50 ms and once at the end.
   requestWithEvents(
     req: NitroRequest,
     options: NitroRequestOptions,
     onResponseStarted?: (info: UrlResponseInfo) => void,
-    onData?: (chunk: ArrayBuffer) => void,
+    onData?: (chunk: ArrayBuffer) => boolean,
     onProgress?: (loaded: number, total: number) => void
   ): Promise<NitroResponse>;
   // Start a prefetch for a given request; expects a header `prefetchKey`.

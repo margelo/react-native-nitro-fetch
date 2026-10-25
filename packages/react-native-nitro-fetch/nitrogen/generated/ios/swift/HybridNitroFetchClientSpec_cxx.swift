@@ -144,7 +144,7 @@ open class HybridNitroFetchClientSpec_cxx {
   }
   
   @inline(__always)
-  public final func requestWithEvents(req: NitroRequest, options: NitroRequestOptions, onResponseStarted: bridge.std__optional_std__function_void_const_UrlResponseInfo_____info______, onData: bridge.std__optional_std__function_void_const_std__shared_ptr_ArrayBuffer______chunk______, onProgress: bridge.std__optional_std__function_void_double____loaded_____double____total______) -> bridge.Result_std__shared_ptr_Promise_NitroResponse___ {
+  public final func requestWithEvents(req: NitroRequest, options: NitroRequestOptions, onResponseStarted: bridge.std__optional_std__function_void_const_UrlResponseInfo_____info______, onData: bridge.std__optional_std__function_std__shared_ptr_Promise_bool___const_std__shared_ptr_ArrayBuffer______chunk______, onProgress: bridge.std__optional_std__function_void_double____loaded_____double____total______) -> bridge.Result_std__shared_ptr_Promise_NitroResponse___ {
     do {
       let __result = try self.__implementation.requestWithEvents(req: req, options: options, onResponseStarted: { () -> ((_ info: UrlResponseInfo) -> Void)? in
         if bridge.has_value_std__optional_std__function_void_const_UrlResponseInfo_____info______(onResponseStarted) {
@@ -158,13 +158,34 @@ open class HybridNitroFetchClientSpec_cxx {
         } else {
           return nil
         }
-      }(), onData: { () -> ((_ chunk: ArrayBuffer) -> Void)? in
-        if bridge.has_value_std__optional_std__function_void_const_std__shared_ptr_ArrayBuffer______chunk______(onData) {
-          let __unwrapped = bridge.get_std__optional_std__function_void_const_std__shared_ptr_ArrayBuffer______chunk______(onData)
-          return { () -> (ArrayBuffer) -> Void in
-            let __wrappedFunction = bridge.wrap_Func_void_std__shared_ptr_ArrayBuffer_(__unwrapped)
-            return { (__chunk: ArrayBuffer) -> Void in
-              __wrappedFunction.call(__chunk)
+      }(), onData: { () -> ((_ chunk: ArrayBuffer) -> Promise<Bool>)? in
+        if bridge.has_value_std__optional_std__function_std__shared_ptr_Promise_bool___const_std__shared_ptr_ArrayBuffer______chunk______(onData) {
+          let __unwrapped = bridge.get_std__optional_std__function_std__shared_ptr_Promise_bool___const_std__shared_ptr_ArrayBuffer______chunk______(onData)
+          return { () -> (ArrayBuffer) -> Promise<Bool> in
+            let __wrappedFunction = bridge.wrap_Func_std__shared_ptr_Promise_bool___std__shared_ptr_ArrayBuffer_(__unwrapped)
+            return { (__chunk: ArrayBuffer) -> Promise<Bool> in
+              let __result = __wrappedFunction.call(__chunk)
+              return { () -> Promise<Bool> in
+                let __promise = Promise<Bool>()
+                let __resolver = { (__result: Bool) in
+                  __promise.resolve(withResult: __result)
+                }
+                let __rejecter = { (__error: Error) in
+                  __promise.reject(withError: __error)
+                }
+                let __resolverCpp = { () -> bridge.Func_void_bool in
+                  let __closureWrapper = Func_void_bool(__resolver)
+                  return bridge.create_Func_void_bool(__closureWrapper.toUnsafe())
+                }()
+                let __rejecterCpp = { () -> bridge.Func_void_std__exception_ptr in
+                  let __closureWrapper = Func_void_std__exception_ptr(__rejecter)
+                  return bridge.create_Func_void_std__exception_ptr(__closureWrapper.toUnsafe())
+                }()
+                let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_bool__(__result)
+                __promiseHolder.addOnResolvedListenerCopy(__resolverCpp)
+                __promiseHolder.addOnRejectedListener(__rejecterCpp)
+                return __promise
+              }()
             }
           }()
         } else {

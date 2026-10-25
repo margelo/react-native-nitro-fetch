@@ -21,7 +21,7 @@ import { fetchLocalResource } from './local';
 export type NitroRequestWithEvents = {
   options: NitroRequestOptions;
   onResponseStarted?: (info: UrlResponseInfo) => void;
-  onData?: (chunk: ArrayBuffer) => void;
+  onData?: (chunk: ArrayBuffer) => boolean;
   onProgress?: (loaded: number, total: number) => void;
 };
 
