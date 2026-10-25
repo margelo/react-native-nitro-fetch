@@ -173,10 +173,13 @@ private fun isIdentityEncoded(info: UrlResponseInfo): Boolean =
 private val streamingContentTypes =
   setOf("text/event-stream", "application/x-ndjson", "application/jsonl", "multipart/x-mixed-replace")
 
+private fun mimeType(info: UrlResponseInfo): String? =
+  headerValue(info, "Content-Type")?.substringBefore(';')?.trim()?.lowercase()
+
 // The Content-Type is a format whose body arrives over time: server-sent
 // events, newline-delimited JSON, or a multipart stream.
 private fun startsStreaming(info: UrlResponseInfo): Boolean =
-  headerValue(info, "Content-Type")?.substringBefore(';')?.trim()?.lowercase() in streamingContentTypes
+  mimeType(info) in streamingContentTypes
 
 /**
  * A body returned as bytes, in a direct buffer that becomes the ArrayBuffer. With an exact
@@ -331,8 +334,12 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
     // pauses while this many chunks wait for JS, as on the stream client.
     private const val STREAM_CHUNK_SIZE = 64 * 1024
     private const val MAX_PENDING_CHUNKS = 16
-    private val bufferWindowScheduler = java.util.concurrent.ScheduledThreadPoolExecutor(1) { r ->
-      Thread(r, "NitroFetch-buffer-window").apply { isDaemon = true }
+    // After a streamed read smaller than this, the next read waits a moment, so
+    // a fast body comes in fewer, larger reads. Event streams read at once.
+    private const val SMALL_READ = 32 * 1024
+    private const val SMALL_READ_DELAY_US = 1000L
+    private val streamScheduler = java.util.concurrent.ScheduledThreadPoolExecutor(1) { r ->
+      Thread(r, "NitroFetch-stream").apply { isDaemon = true }
     }.apply { removeOnCancelPolicy = true }
     private val requestBodyHeaders = arrayOf("Content-Type", "Content-Encoding", "Content-Language", "Content-Location")
 
@@ -447,6 +454,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         // guarded by [lock] from the response on.
         private val lock = Any()
         private var streaming = false
+        private var pacesReads = false
         private var mayStream = false
         private var finished = false
         private var bufferWindow: java.util.concurrent.ScheduledFuture<*>? = null
@@ -557,12 +565,13 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
               body = ResponseBody.forResponse(info, isHead)
             }
             if (onData != null) {
+              pacesReads = mimeType(info) != "text/event-stream"
               if (startsStreaming(info) || (exact && total > MAX_BUFFERED_LENGTH)) {
                 startStreaming()
               } else if (!exact || (onProgress != null && !responseBytes)) {
                 // The server may be streaming: a body that outlives the window streams.
                 mayStream = true
-                bufferWindow = bufferWindowScheduler.schedule(
+                bufferWindow = streamScheduler.schedule(
                   { synchronized(lock) { startStreaming() } },
                   BUFFER_WINDOW_MS,
                   java.util.concurrent.TimeUnit.MILLISECONDS
@@ -659,6 +668,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         }
 
         override fun onReadCompleted(request: UrlRequest, info: UrlResponseInfo, byteBuffer: ByteBuffer) {
+          var waits = false
           val next: ByteBuffer? = try {
             synchronized(lock) {
               val bytes = bytesBody
@@ -670,6 +680,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
                 byteBuffer.flip()
                 read = byteBuffer.remaining()
                 if (streaming) {
+                  waits = pacesReads && read < SMALL_READ
                   appendStreamed(byteBuffer)
                 } else if (bytes != null) {
                   bytes.append(byteBuffer)
@@ -706,7 +717,12 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
             }
             return
           }
-          if (next != null) request.read(next)
+          if (next == null) return
+          if (waits) {
+            streamScheduler.schedule({ request.read(next) }, SMALL_READ_DELAY_US, java.util.concurrent.TimeUnit.MICROSECONDS)
+          } else {
+            request.read(next)
+          }
         }
 
         override fun onSucceeded(request: UrlRequest, info: UrlResponseInfo) = complete {
