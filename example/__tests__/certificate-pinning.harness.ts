@@ -4,6 +4,7 @@ import {
   fetch as nitroFetch,
   prefetch,
 } from 'react-native-nitro-fetch';
+import { NitroWebSocket } from 'react-native-nitro-websockets';
 
 // The example app bundles nitro-fetch-pinning.json (android/app/src/main/assets and the iOS app target):
 //   - aws.amazon.com is pinned to the Amazon Trust Services roots its chain ends at, so it connects.
@@ -15,7 +16,10 @@ import {
 //     entry has expired, falls back to amazon.com and fails.
 //   - expired.badssl.com is pinned too, but its certificate has expired, so it must fail with the
 //     platform's certificate error rather than the pinning error.
-// No other suite uses these hosts. example.com is not in the file.
+//   - wss://: ws.ifelse.io is pinned to the Google Trust Services roots, so it connects, and
+//     ws.postman-echo.com to the key no chain contains, so it fails. AppDelegate.swift and
+//     MainApplication.kt prewarm WSS_PREWARMED_MISMATCH on every launch.
+// No other suite uses these hosts. example.com and echo.websocket.org are not in the file.
 const PINNED_OK = 'https://aws.amazon.com/robots.txt';
 const PINNED_MISMATCH = 'https://www.gstatic.com/generate_204';
 const SUBDOMAIN_OF_EXACT_PIN = 'https://www.google.com/generate_204';
@@ -170,5 +174,49 @@ describe('Certificate pinning: callRefreshEndpoint', () => {
       textHeader: 'x-refreshed',
     });
     expect(typeof headers['x-refreshed']).toBe('string');
+  });
+});
+
+const WSS_PINNED_OK = 'wss://ws.ifelse.io/';
+const WSS_PINNED_MISMATCH = 'wss://ws.postman-echo.com/raw';
+// Spelled differently from WSS_PINNED_MISMATCH so only this test adopts the prewarmed socket.
+const WSS_PREWARMED_MISMATCH = 'wss://ws.postman-echo.com:443/raw';
+const WSS_EXPIRED_CERTIFICATE = 'wss://expired.badssl.com/';
+const WSS_UNPINNED = 'wss://echo.websocket.org';
+
+// Resolves with 'open', or with the error the connection failed with.
+function wsOutcome(url: string): Promise<string> {
+  return new Promise((resolve) => {
+    const ws = new NitroWebSocket(url);
+    ws.onopen = () => {
+      resolve('open');
+      ws.close();
+    };
+    ws.onerror = (error) => resolve(String(error));
+    ws.onclose = (event) => resolve(`closed with ${event.code}`);
+  });
+}
+
+describe('Certificate pinning: wss://', () => {
+  it('connects when the chain contains a pinned root', async () => {
+    expect(await wsOutcome(WSS_PINNED_OK)).toBe('open');
+  });
+
+  it('fails when the chain has no pinned key', async () => {
+    expect(await wsOutcome(WSS_PINNED_MISMATCH)).toContain(PIN_ERROR);
+  });
+
+  it('does not hand over a prewarmed socket whose pins do not match', async () => {
+    expect(await wsOutcome(WSS_PREWARMED_MISMATCH)).toContain(PIN_ERROR);
+  });
+
+  it('reports an untrusted certificate on a pinned host as a certificate error', async () => {
+    const outcome = await wsOutcome(WSS_EXPIRED_CERTIFICATE);
+    expect(outcome).not.toBe('open');
+    expect(outcome).not.toContain(PIN_ERROR);
+  });
+
+  it('connects to a host that is not in the pin file', async () => {
+    expect(await wsOutcome(WSS_UNPINNED)).toBe('open');
   });
 });
