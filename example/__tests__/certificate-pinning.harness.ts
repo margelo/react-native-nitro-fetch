@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'react-native-harness';
-import { fetch as nitroFetch, prefetch } from 'react-native-nitro-fetch';
+import {
+  callRefreshEndpoint,
+  fetch as nitroFetch,
+  prefetch,
+} from 'react-native-nitro-fetch';
 
 // The example app bundles nitro-fetch-pinning.json (android/app/src/main/assets and the iOS app target):
 //   - aws.amazon.com is pinned to the Amazon Trust Services roots its chain ends at, so it connects.
@@ -142,5 +146,29 @@ describe('Certificate pinning: hosts without pins', () => {
   it('fetches a FormData file part from a host that is not in the pin file', async () => {
     const res = await uploadPartFrom(UNPINNED);
     expect(typeof res.status).toBe('number');
+  });
+});
+
+describe('Certificate pinning: callRefreshEndpoint', () => {
+  it('rejects a refresh from a host whose pins do not match', async () => {
+    const error = await failureOf(() =>
+      callRefreshEndpoint({
+        url: PINNED_MISMATCH,
+        method: 'GET',
+        responseType: 'text',
+      })
+    );
+    expect(error).toBeDefined();
+    expect(String(error?.message)).toContain(PIN_ERROR);
+  });
+
+  it('refreshes from a host whose pins match', async () => {
+    const headers = await callRefreshEndpoint({
+      url: `${PINNED_OK}?refresh=1`,
+      method: 'GET',
+      responseType: 'text',
+      textHeader: 'x-refreshed',
+    });
+    expect(headers['x-refreshed']).toContain('User-agent');
   });
 });

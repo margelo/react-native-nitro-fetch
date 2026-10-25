@@ -1,4 +1,5 @@
 import { NativeStorage as NativeStorageSingleton } from './NitroInstances';
+import { nitroFetch } from './fetch-core/fetch';
 
 // Storage keys
 const KEY_WS = 'nitro_token_refresh_websocket';
@@ -85,7 +86,8 @@ export async function callRefreshEndpoint(
   config: TokenRefreshConfig
 ): Promise<Record<string, string>> {
   const method = config.method ?? 'POST';
-  const response = await fetch(config.url, {
+  // The nitro client, so nitro-fetch-pinning.json applies as on native refreshes.
+  const response = await nitroFetch(config.url, {
     method,
     headers: config.headers,
     body: config.body,

@@ -6,11 +6,11 @@ sidebar_position: 13
 
 # Certificate Pinning
 
-Optional public-key (SPKI) pinning for the requests `nitro-fetch` makes natively: `fetch`, `stream: true`, `prefetch` and auto-prefetch on app start, the cold-start token refresh, and FormData parts read from a URL. Android's `network_security_config.xml` doesn't apply to Cronet, and TrustKit-style swizzling doesn't reach every session, so `nitro-fetch` reads its own pin file.
+Optional public-key (SPKI) pinning for the requests `nitro-fetch` makes natively: `fetch`, `stream: true`, `prefetch` and auto-prefetch on app start, the cold-start token refresh, `callRefreshEndpoint`, and FormData parts read from a URL. Android's `network_security_config.xml` doesn't apply to Cronet, and TrustKit-style swizzling doesn't reach every session, so `nitro-fetch` reads its own pin file.
 
 Pinning is off unless the app ships the file.
 
-**Not covered:** `react-native-nitro-websockets`, including its own cold-start token refresh, and `callRefreshEndpoint`, which uses the global `fetch`. If you register a refresh with `target: 'all'`, the WebSocket copy of that request is not pinned.
+**Not covered:** `react-native-nitro-websockets`, including its own cold-start token refresh. If you register a refresh with `target: 'all'`, the WebSocket copy of that request is not pinned.
 
 ## 1. Write the pin file
 
