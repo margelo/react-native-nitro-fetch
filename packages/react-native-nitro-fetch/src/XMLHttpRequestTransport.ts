@@ -180,7 +180,14 @@ export function sendXMLHttpRequest(
     pendingProgress = null;
     streamed = true;
     loaded += chunk.byteLength;
-    callbacks.onChunk(new Uint8Array(chunk), loaded);
+    // Native reuses the chunk's memory once this returns, so a binary body,
+    // which keeps its chunks, copies them. Text is decoded from the chunk.
+    callbacks.onChunk(
+      new Uint8Array(
+        isBinaryResponse(request.responseType) ? chunk.slice(0) : chunk
+      ),
+      loaded
+    );
   });
   // Native sends the next chunk once this returns, and none after false.
   const onData = (chunk: ArrayBuffer): boolean => {

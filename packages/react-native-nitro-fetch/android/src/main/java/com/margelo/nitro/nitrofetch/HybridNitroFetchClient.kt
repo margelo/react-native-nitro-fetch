@@ -460,8 +460,13 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         private var bufferWindow: java.util.concurrent.ScheduledFuture<*>? = null
         // A streamed body is joined into chunks: one goes to JS once JS has
         // returned from the last, when it is full, or at the end. [filling]
-        // stages a chunk and is reused; JS gets a copy of what it holds.
+        // is the chunk being joined. A chunk's memory is reused once JS has
+        // returned from it, so a body does not allocate one buffer per chunk
+        // for the garbage collector to free later. [chunkPool] holds the
+        // buffers not in use: at most as many as JS has had at once, which
+        // MAX_PENDING_CHUNKS bounds.
         private var filling: ByteBuffer? = null
+        private val chunkPool = ArrayList<ByteBuffer>()
         private var pendingChunks = 0
         private var refused = false
         private var pausedRequest: UrlRequest? = null
@@ -602,23 +607,27 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
           if (buffered != null) sendChunk(buffered)
         }
 
-        // Under lock.
-        private fun sendChunk(chunk: ArrayBuffer) {
-          val send = onData ?: return
-          if (refused) return
+        // Under lock. [memory] is the pooled buffer behind [chunk], if any.
+        private fun sendChunk(chunk: ArrayBuffer, memory: ByteBuffer? = null) {
+          val send = onData
+          if (send == null || refused) {
+            memory?.let { chunkPool.add(it) }
+            return
+          }
           pendingChunks++
           // The promise resolves on the JS thread, which must not wait for
           // [lock]: a thread holding it may be waiting on the promise.
           send(chunk)
-            .then { wanted -> executor.execute { chunkHandled(wanted) } }
-            .catch { executor.execute { chunkHandled(false) } }
+            .then { wanted -> executor.execute { chunkHandled(wanted, memory) } }
+            .catch { executor.execute { chunkHandled(false, memory) } }
         }
 
         // Runs on the executor once JS has returned from a chunk.
-        private fun chunkHandled(wanted: Boolean) {
+        private fun chunkHandled(wanted: Boolean, memory: ByteBuffer?) {
           synchronized(lock) {
             pendingChunks--
             if (!wanted) refused = true
+            memory?.let { chunkPool.add(it) }
             if (finished) return
             if (pendingChunks == 0) sendFilling()
             val request = pausedRequest ?: return
@@ -633,21 +642,25 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
         private fun sendFilling() {
           val bytes = filling ?: return
           if (bytes.position() == 0) return
+          filling = null
           bytes.flip()
-          sendChunk(ArrayBuffer.copy(bytes))
-          bytes.clear()
+          // JS reads the memory of the buffer without a copy, and only until it
+          // returns from the chunk.
+          sendChunk(ArrayBuffer.wrap(bytes.slice()), bytes)
+        }
+
+        // Under lock.
+        private fun takeChunkBuffer(): ByteBuffer {
+          val pooled = chunkPool.removeLastOrNull()
+          if (pooled == null) return ByteBuffer.allocateDirect(STREAM_CHUNK_SIZE)
+          pooled.clear()
+          return pooled
         }
 
         // Under lock. Copies a streamed read into chunks, sending each one it fills.
         private fun appendStreamed(read: ByteBuffer) {
-          if (pendingChunks == 0 && (filling?.position() ?: 0) == 0) {
-            // JS is waiting: the read goes to it as it is.
-            sendChunk(ArrayBuffer.copy(read))
-            read.position(read.limit())
-            return
-          }
           while (read.hasRemaining()) {
-            val bytes = filling ?: ByteBuffer.allocateDirect(STREAM_CHUNK_SIZE).also { filling = it }
+            val bytes = filling ?: takeChunkBuffer().also { filling = it }
             val end = read.limit()
             read.limit(read.position() + minOf(read.remaining(), bytes.remaining()))
             bytes.put(read)

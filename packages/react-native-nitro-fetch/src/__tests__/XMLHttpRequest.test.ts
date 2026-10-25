@@ -906,6 +906,50 @@ describe('NitroXMLHttpRequest', () => {
     expect(xhr.responseText).toBe('{"a":1}');
   });
 
+  // Native writes the next chunk into the memory of the last one once onData
+  // returns.
+  it('copies the streamed chunks of a binary response', async () => {
+    const memory = new Uint8Array([1, 2, 3, 4]);
+    mockNative(makeResponse([]), (events) => {
+      events.onResponseStarted?.(responseInfo({}));
+      events.onData?.(memory.buffer);
+      memory.set([5, 6, 7, 8]);
+      events.onData?.(memory.buffer);
+    });
+
+    const xhr = new NitroXMLHttpRequest();
+    xhr.onreadystatechange = () => {};
+    xhr.open('GET', 'https://example.com/binary');
+    xhr.responseType = 'arraybuffer';
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+    await completed;
+
+    expect(Array.from(new Uint8Array(xhr.response as ArrayBuffer))).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8,
+    ]);
+  });
+
+  it('decodes streamed text from memory native reuses', async () => {
+    const memory = new Uint8Array([0x61, 0xe2, 0x82]);
+    mockNative(makeResponse([]), (events) => {
+      events.onResponseStarted?.(responseInfo({}));
+      events.onData?.(memory.buffer);
+      // The euro sign is cut off at the end of the first chunk.
+      memory.set([0xac, 0x62, 0x63]);
+      events.onData?.(memory.buffer);
+    });
+
+    const xhr = new NitroXMLHttpRequest();
+    xhr.onreadystatechange = () => {};
+    xhr.open('GET', 'https://example.com/text');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send();
+    await completed;
+
+    expect(xhr.responseText).toBe('a\u20acbc');
+  });
+
   it('ignores what native reports after an abort or the end', async () => {
     let init: NitroRawInit = {};
     mockNitroFetch.mockImplementation((_input, requestInit) => {
