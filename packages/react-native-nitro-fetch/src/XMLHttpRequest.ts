@@ -36,6 +36,8 @@ class NitroProgressEvent {
   readonly isTrusted = false;
   readonly lengthComputable: boolean;
   readonly loaded: number;
+  // Set on a request's error event: why the client failed.
+  message?: string;
   readonly returnValue = true;
   readonly srcElement: EventTarget;
   readonly target: EventTarget;
@@ -446,6 +448,8 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   _requestId: number | null = null;
   _aborted = false;
   _cachedResponse: unknown;
+  // Read only while _hasError is set.
+  _errorMessage: string | undefined;
   _hasError = false;
   _headers: Record<string, string> = {};
   _lowerCaseResponseHeaders: Record<string, string> = {};
@@ -560,6 +564,23 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     return this._response;
   }
 
+  // Documents are not supported, so there is never an XML response.
+  get responseXML(): null {
+    const responseType = this._responseType;
+    if (
+      responseType !== '' &&
+      responseType !== 'text' &&
+      responseType !== 'document'
+    ) {
+      throw domException(
+        "The 'responseXML' property is only available if 'responseType' " +
+          `is set to '', 'text' or 'document', but it is '${responseType}'.`,
+        'InvalidStateError'
+      );
+    }
+    return null;
+  }
+
   get response(): unknown {
     const responseType = this.responseType;
     if (responseType === '' || responseType === 'text') {
@@ -567,7 +588,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
       return this._response;
     }
 
-    if (this.readyState !== DONE) return null;
+    if (this.readyState !== DONE || this._hasError) return null;
     if (this._cachedResponse !== undefined) return this._cachedResponse;
 
     if (responseType === 'document') {
@@ -694,9 +715,10 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   ): void {
     if (requestId !== this._requestId) return;
     if (error) {
-      if (this._responseType === '' || this._responseType === 'text') {
-        this._response = error;
-      }
+      // A network error leaves no response behind, so responseText stays
+      // empty. The error event carries the client's message instead.
+      this._reset();
+      this._errorMessage = error;
       this._hasError = true;
       this._timedOut = timeOutError;
     }
@@ -714,8 +736,8 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     }
   }
 
-  getAllResponseHeaders(): string | null {
-    if (!this.responseHeaders) return null;
+  getAllResponseHeaders(): string {
+    if (!this.responseHeaders) return '';
 
     const unsortedHeaders = new Map<
       string,
@@ -894,8 +916,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
       try {
         size = bodySize(data);
       } catch {
-        // React Native's Blob, which counts a string's UTF-8 bytes, throws on
-        // a lone surrogate. The size is then unknown; the body is still sent.
+        // The size is then unknown; the body is still sent.
       }
       this._uploadTotal = size ?? -2;
     }
@@ -1023,7 +1044,15 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     } else if (hasError) {
       const type = timedOut ? 'timeout' : 'error';
       if (uploadFailed) this._failUpload(type);
-      this._dispatch(type);
+      if (timedOut) {
+        this._dispatch(type);
+      } else {
+        // Not in the spec: axios reports the message instead of "Network Error".
+        const target = this as unknown as EventTarget;
+        const event = new NitroProgressEvent(target, 'error');
+        event.message = this._errorMessage;
+        this.dispatchEvent(event as unknown as Event);
+      }
     } else {
       // Like Chromium, a listener that called open() or abort() ends the
       // request without load and loadend.

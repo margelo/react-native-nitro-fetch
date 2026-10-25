@@ -44,6 +44,38 @@ export function stringToUTF8(str: string): Uint8Array {
   return new _TextEncoder().encode(str);
 }
 
+// The UTF-8 length of a string as it is sent. A lone surrogate is sent as
+// U+FFFD, 3 bytes, as TextEncoder would encode it.
+export function utf8Length(text: string): number {
+  const encoder = _TextEncoder ? new _TextEncoder() : undefined;
+  if (typeof encoder?.encodeInto === 'function') {
+    // Encoding natively is far faster than counting in JS. A UTF-16 unit
+    // takes at most 3 bytes.
+    const buffer = new Uint8Array(text.length * 3);
+    return encoder.encodeInto(text, buffer).written;
+  }
+  let length = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code < 0x80) {
+      length += 1;
+    } else if (code < 0x800) {
+      length += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      const next = text.charCodeAt(i + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        length += 4;
+        i++;
+      } else {
+        length += 3;
+      }
+    } else {
+      length += 3;
+    }
+  }
+  return length;
+}
+
 export function utf8ToString(bytes: Uint8Array): string {
   if (!_TextDecoder) {
     console.warn(

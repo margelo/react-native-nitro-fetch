@@ -1,7 +1,8 @@
-import { isFormData } from './fetch-core/body';
+import { isFormData, resolveBlobBody } from './fetch-core/body';
 import { nitroFetch } from './fetch-core/fetch';
 import type { NitroStreamInit } from './fetch-core/stream';
 import type { NitroRequestMethod } from './NitroFetch.nitro';
+import { utf8Length } from './utf8';
 
 export type XMLHttpRequestTransportRequest = {
   body: Document | XMLHttpRequestBodyInit | null;
@@ -43,9 +44,8 @@ export function bodySize(
   body: Document | XMLHttpRequestBodyInit | null
 ): number | undefined {
   if (body == null) return 0;
-  if (typeof body === 'string') {
-    return new Blob([body]).size;
-  }
+  // React Native's Blob throws on a string with a lone surrogate.
+  if (typeof body === 'string') return utf8Length(body);
   if (body instanceof ArrayBuffer) return body.byteLength;
   if (ArrayBuffer.isView(body)) return body.byteLength;
   if (typeof Blob !== 'undefined' && body instanceof Blob) return body.size;
@@ -53,8 +53,7 @@ export function bodySize(
     typeof URLSearchParams !== 'undefined' &&
     body instanceof URLSearchParams
   ) {
-    const serialized = body.toString();
-    return new Blob([serialized]).size;
+    return utf8Length(body.toString());
   }
   return undefined;
 }
@@ -119,14 +118,25 @@ export function sendXMLHttpRequest(
 
   const performRequest = async () => {
     try {
+      let requestBody = request.body as BodyInit | null;
+      let requestHeaders: HeadersInit = request.headers;
+      // Read a Blob body before the request starts, so an abort while it is
+      // read sends nothing.
+      if (typeof Blob !== 'undefined' && requestBody instanceof Blob) {
+        const resolved = await resolveBlobBody({
+          body: requestBody,
+          headers: requestHeaders,
+        });
+        if (completed) return;
+        requestBody = resolved?.body ?? null;
+        requestHeaders = resolved?.headers ?? requestHeaders;
+      }
+
       const stream = shouldStream(request);
-      const credentials: RequestCredentials = request.withCredentials
-        ? 'include'
-        : 'same-origin';
       const init: NitroRequestInit = {
-        body: request.body as BodyInit | null,
-        credentials,
-        headers: request.headers,
+        body: requestBody,
+        credentials: request.withCredentials ? 'include' : 'omit',
+        headers: requestHeaders,
         method: request.method,
         signal: abortController.signal,
         stream,
