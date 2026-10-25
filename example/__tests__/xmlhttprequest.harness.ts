@@ -562,3 +562,251 @@ describe('XMLHttpRequest state and validation', () => {
     }
   });
 });
+
+describe('XMLHttpRequest progress events', () => {
+  type NitroXHR = InstanceType<typeof NitroXMLHttpRequest>;
+  type Body = Parameters<NitroXHR['send']>[0];
+  type Recorded = {
+    name: string;
+    readyState: number;
+    loaded: number;
+    total: number;
+    lengthComputable: boolean;
+  };
+
+  const ALL_TYPES = [
+    'loadstart',
+    'progress',
+    'load',
+    'error',
+    'abort',
+    'timeout',
+    'loadend',
+  ];
+  // Nothing listens on port 1, so the connection is refused.
+  const CLOSED_PORT_URL = BASE.replace(/:\d+$/, ':1/');
+  const NONE = { loaded: 0, total: 0, lengthComputable: false };
+
+  // Sends a request and resolves on loadend with the progress events of the
+  // request and its upload, in order. `setUp` runs between open() and send().
+  const record = (
+    method: string,
+    url: string,
+    body: Body,
+    setUp: (xhr: NitroXHR) => void = () => {},
+    types = ALL_TYPES
+  ) =>
+    new Promise<{ duringSend: string[]; events: Recorded[]; xhr: NitroXHR }>(
+      (resolve) => {
+        const xhr = new NitroXMLHttpRequest();
+        const events: Recorded[] = [];
+        let duringSend: string[] = [];
+        const listen = (target: EventTarget, prefix: string, type: string) => {
+          target.addEventListener(type, (event) => {
+            const { loaded, total, lengthComputable } = event as ProgressEvent;
+            events.push({
+              name: `${prefix}${type}`,
+              readyState: xhr.readyState,
+              loaded,
+              total,
+              lengthComputable,
+            });
+          });
+        };
+        for (const type of types) {
+          listen(xhr as unknown as EventTarget, '', type);
+          listen(xhr.upload as unknown as EventTarget, 'upload.', type);
+        }
+        xhr.addEventListener('loadend', () => {
+          resolve({ duringSend, events, xhr });
+        });
+        xhr.open(method, url);
+        setUp(xhr);
+        xhr.send(body);
+        duringSend = events.map((event) => event.name);
+      }
+    );
+
+  const fieldsOf = (events: Recorded[], name: string) =>
+    events
+      .filter((event) => event.name === name)
+      .map(({ loaded, total, lengthComputable }) => ({
+        loaded,
+        total,
+        lengthComputable,
+      }));
+
+  const namesOn = (events: Recorded[], prefix: '' | 'upload.') =>
+    events
+      .filter((event) => event.name.startsWith('upload.') === (prefix !== ''))
+      .map((event) => event.name.slice(prefix.length));
+
+  it('fires loadstart, progress, load and loadend with the bytes received', async () => {
+    const { duringSend, events } = await record(
+      'GET',
+      `${BASE}/bytes/1024`,
+      null
+    );
+    const done = { loaded: 1024, total: 1024, lengthComputable: true };
+
+    expect(duringSend).toEqual(['loadstart']);
+    expect([...new Set(namesOn(events, ''))]).toEqual([
+      'loadstart',
+      'progress',
+      'load',
+      'loadend',
+    ]);
+    expect(fieldsOf(events, 'loadstart')).toEqual([NONE]);
+    expect(fieldsOf(events, 'progress').pop()).toEqual(done);
+    expect(fieldsOf(events, 'load')).toEqual([done]);
+    expect(fieldsOf(events, 'loadend')).toEqual([done]);
+    expect(namesOn(events, 'upload.')).toEqual([]);
+  });
+
+  it('reports the bytes received on load and loadend without a progress listener', async () => {
+    const { events } = await record(
+      'GET',
+      `${BASE}/bytes/1024`,
+      null,
+      undefined,
+      ['load', 'loadend']
+    );
+    const done = { loaded: 1024, total: 1024, lengthComputable: true };
+
+    expect(fieldsOf(events, 'load')).toEqual([done]);
+    expect(fieldsOf(events, 'loadend')).toEqual([done]);
+  });
+
+  it('reports no total for a gzip body the client decompressed', async () => {
+    const { events, xhr } = await record(
+      'GET',
+      `${BASE}/text?gzip=1&phrase=a&repeat=200000`,
+      null
+    );
+    const progress = fieldsOf(events, 'progress');
+    const done = { loaded: 200000, total: 0, lengthComputable: false };
+
+    expect(xhr.responseText.length).toBe(200000);
+    expect(progress.length).toBeGreaterThan(0);
+    expect(progress.filter((event) => event.lengthComputable)).toEqual([]);
+    expect(progress.pop()).toEqual(done);
+    expect(fieldsOf(events, 'load')).toEqual([done]);
+    expect(fieldsOf(events, 'loadend')).toEqual([done]);
+  });
+
+  it('fires upload events for a string body before the response headers', async () => {
+    // 2 UTF-8 bytes per character.
+    const body = 'é'.repeat(32 * 1024);
+    const size = 64 * 1024;
+    const { events, xhr } = await record('POST', `${BASE}/post`, body);
+    const upload = events.filter((event) => event.name.startsWith('upload.'));
+    const sent = { loaded: size, total: size, lengthComputable: true };
+
+    expect(JSON.parse(xhr.responseText).dataLength).toBe(size);
+    expect(namesOn(events, 'upload.')).toEqual([
+      'loadstart',
+      'progress',
+      'load',
+      'loadend',
+    ]);
+    expect(upload.map((event) => event.readyState)).toEqual([1, 1, 1, 1]);
+    expect(fieldsOf(events, 'upload.loadstart')).toEqual([
+      { ...sent, loaded: 0 },
+    ]);
+    expect(fieldsOf(events, 'upload.progress')).toEqual([sent]);
+    expect(fieldsOf(events, 'upload.load')).toEqual([sent]);
+    expect(fieldsOf(events, 'upload.loadend')).toEqual([sent]);
+  });
+
+  it('fires upload events for a FormData body before the response headers', async () => {
+    const form = new FormData();
+    form.append('message', 'hello');
+    const { events, xhr } = await record('POST', `${BASE}/post`, form);
+    const upload = events.filter((event) => event.name.startsWith('upload.'));
+
+    expect(JSON.parse(xhr.responseText).form.message).toBe('hello');
+    // Only the native client knows the size of a multipart body, so there is
+    // no progress to report.
+    expect(namesOn(events, 'upload.')).toEqual([
+      'loadstart',
+      'load',
+      'loadend',
+    ]);
+    expect(upload.map((event) => event.readyState)).toEqual([1, 1, 1]);
+    expect(fieldsOf(events, 'upload.loadend')).toEqual([NONE]);
+  });
+
+  it('fires upload events for a string with a lone surrogate', async () => {
+    const { events, xhr } = await record('POST', `${BASE}/post`, 'a\uD800b');
+
+    expect(xhr.status).toBe(200);
+    expect([...new Set(namesOn(events, ''))]).toEqual([
+      'loadstart',
+      'progress',
+      'load',
+      'loadend',
+    ]);
+    // Progress depends on whether the string's size can be counted.
+    expect(
+      namesOn(events, 'upload.').filter((name) => name !== 'progress')
+    ).toEqual(['loadstart', 'load', 'loadend']);
+  });
+
+  for (const [type, url, setUp] of [
+    [
+      'abort',
+      `${BASE}/delay/3`,
+      (xhr: NitroXHR) => {
+        setTimeout(() => xhr.abort(), 300);
+      },
+    ],
+    ['error', CLOSED_PORT_URL, () => {}],
+    [
+      'timeout',
+      `${BASE}/delay/3`,
+      (xhr: NitroXHR) => {
+        xhr.timeout = 500;
+      },
+    ],
+  ] as const) {
+    it(`ends the upload, then the request, on ${type}`, async () => {
+      const { events } = await record('POST', url, 'body', setUp);
+
+      expect(namesOn(events, 'upload.')).toEqual([
+        'loadstart',
+        type,
+        'loadend',
+      ]);
+      expect(namesOn(events, '')).toEqual(['loadstart', type, 'loadend']);
+      expect(events.slice(2).map((event) => event.name)).toEqual([
+        `upload.${type}`,
+        'upload.loadend',
+        type,
+        'loadend',
+      ]);
+      expect(fieldsOf(events, `upload.${type}`)).toEqual([NONE]);
+      expect(fieldsOf(events, type)).toEqual([NONE]);
+    });
+  }
+
+  it("ends axios' onDownloadProgress at the bytes received", async () => {
+    // axios 1.20's XHR adapter passes progress events to onDownloadProgress
+    // through a throttle, and flushes it with the loadend event.
+    const delivered: Array<{ loaded: number; total?: number }> = [];
+    const onDownloadProgress = (event: ProgressEvent) => {
+      const total = event.lengthComputable ? event.total : undefined;
+      const loaded =
+        total != null ? Math.min(event.loaded, total) : event.loaded;
+      delivered.push({ loaded, total });
+    };
+    await record('GET', `${BASE}/bytes/100000`, null, (xhr) => {
+      xhr.responseType = 'arraybuffer';
+      xhr.addEventListener('progress', (event: Event) =>
+        onDownloadProgress(event as ProgressEvent)
+      );
+      xhr.onloadend = (event) => onDownloadProgress(event);
+    });
+
+    expect(delivered.pop()).toEqual({ loaded: 100000, total: 100000 });
+  });
+});

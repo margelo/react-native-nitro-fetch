@@ -12,6 +12,7 @@
 
 import { bytesToBlob } from './blob';
 import {
+  bodySize,
   sendXMLHttpRequest,
   type XMLHttpRequestTransportHandle,
 } from './XMLHttpRequestTransport';
@@ -87,7 +88,7 @@ function reportListenerError(error: unknown): void {
 }
 
 class NitroEventTarget {
-  private readonly _listeners = new Map<string, Set<Listener>>();
+  protected readonly _listeners = new Map<string, Set<Listener>>();
 
   addEventListener(
     type: string,
@@ -110,7 +111,9 @@ class NitroEventTarget {
   ): void {
     if (listener == null) return;
     const listeners = this._listeners.get(type);
-    listeners?.delete(listener);
+    if (listeners == null) return;
+    listeners.delete(listener);
+    if (listeners.size === 0) this._listeners.delete(type);
   }
 
   dispatchEvent(event: Event): boolean {
@@ -162,6 +165,21 @@ class NitroXMLHttpRequestEventTarget extends NitroEventTarget {
 
   dispatchProgress(type: string, init: ProgressInit = {}): void {
     this._dispatch(type, init);
+  }
+
+  // Whether anything listens to the upload, like a browser's upload listener
+  // flag.
+  _isObserved(): boolean {
+    return (
+      this.onabort != null ||
+      this.onerror != null ||
+      this.onload != null ||
+      this.onloadend != null ||
+      this.onloadstart != null ||
+      this.onprogress != null ||
+      this.ontimeout != null ||
+      this._listeners.size > 0
+    );
   }
 }
 
@@ -231,7 +249,23 @@ const INVALID_HEADER_VALUE = /[\0\n\r]/;
 const MAX_HEADER_KEYS = 256;
 const headerKeys = new Map<string, string>();
 
+// The fields of a failed request's events.
+const NO_PROGRESS: ProgressInit = {};
+
 let nextRequestId = 1;
+
+// The total for download progress events, or 0 when it is unknown.
+// Content-Length counts encoded bytes, so it does not apply to a body the
+// native client decompressed.
+function responseLength(headers: Record<string, string>): number {
+  const encoding = headers['content-encoding'];
+  if (encoding && encoding.trim().toLowerCase() !== 'identity') return 0;
+  const length = headers['content-length'];
+  if (length == null) return 0;
+  const total = Number(length);
+  // Digits only: Number() would also accept '1e3', '0x400' or 'Infinity'.
+  return total > 0 && total < Infinity && String(total) === length ? total : 0;
+}
 
 // The length of the bytes that end on a whole UTF-8 sequence. A sequence cut
 // off at the end waits for the next chunk.
@@ -435,6 +469,10 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   private _sendTime = 0;
   private _timeout = 0;
   private _timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+  private _total = 0;
+  // The request body's size while its upload events are due: -2 when only
+  // the native client knows it (FormData), -1 when no upload events are due.
+  private _uploadTotal = -1;
 
   static __setInterceptor_DO_NOT_USE(interceptor: XHRInterceptor | null): void {
     NitroXMLHttpRequest._interceptor = interceptor;
@@ -460,6 +498,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     this._chunks = [];
     this._loaded = 0;
     this._pendingText = null;
+    this._total = 0;
   }
 
   get responseType(): ResponseType {
@@ -572,19 +611,6 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     );
   }
 
-  __didUploadProgress(
-    requestId: number,
-    progress: number,
-    total: number
-  ): void {
-    if (requestId !== this._requestId) return;
-    this.upload.dispatchProgress('progress', {
-      lengthComputable: true,
-      loaded: progress,
-      total,
-    });
-  }
-
   __didReceiveResponse(
     requestId: number,
     status: number,
@@ -596,8 +622,14 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     if (this._perfKey != null && performanceLogger != null) {
       performanceLogger.stopTimespan(this._perfKey);
     }
+    if (this._uploadTotal !== -1) {
+      this._completeUpload(requestId);
+      // An upload listener may have aborted the request.
+      if (requestId !== this._requestId) return;
+    }
     this.status = status;
     this.setResponseHeaders(responseHeaders);
+    this._total = responseLength(this._lowerCaseResponseHeaders);
     this.setReadyState(this.HEADERS_RECEIVED);
     // A listener may have called abort() or open().
     if (requestId !== this._requestId) return;
@@ -649,7 +681,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   ): void {
     if (requestId !== this._requestId) return;
     this._dispatch('progress', {
-      lengthComputable: total >= 0,
+      lengthComputable: total > 0,
       loaded,
       total,
     });
@@ -854,6 +886,33 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     // The text of a response nothing watches, delivered when it completes.
     let bufferedText = '';
 
+    // Like a browser, the upload fires events only if something listened to
+    // it when send() was called.
+    this._uploadTotal = -1;
+    if (data != null && this.upload._isObserved()) {
+      let size: number | undefined;
+      try {
+        size = bodySize(data);
+      } catch {
+        // React Native's Blob, which counts a string's UTF-8 bytes, throws on
+        // a lone surrogate. The size is then unknown; the body is still sent.
+      }
+      this._uploadTotal = size ?? -2;
+    }
+    if (this.onloadstart != null || this._listeners.has('loadstart')) {
+      this._dispatch('loadstart');
+      // A loadstart listener may have aborted the request, or sent another.
+      if (requestId !== this._requestId) return;
+    }
+    if (this._uploadTotal !== -1) {
+      const total = Math.max(this._uploadTotal, 0);
+      this.upload.dispatchProgress('loadstart', {
+        lengthComputable: total > 0,
+        total,
+      });
+      if (requestId !== this._requestId) return;
+    }
+
     this._requestHandle = sendXMLHttpRequest(
       {
         body: data,
@@ -865,7 +924,7 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
         withCredentials: this.withCredentials,
       },
       {
-        onChunk: (chunk, loaded, total) => {
+        onChunk: (chunk, loaded) => {
           if (requestId !== this._requestId) return;
           this._loaded = loaded;
           const receivesText =
@@ -873,17 +932,17 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
             this._responseType !== 'blob';
           if (!receivesText) {
             this._chunks.push(chunk);
-            this.__didReceiveDataProgress(requestId, loaded, total);
+            this.__didReceiveDataProgress(requestId, loaded, this._total);
           } else if (incrementalEvents) {
             this.__didReceiveIncrementalData(
               requestId,
               this._decodeText(chunk),
               loaded,
-              total
+              this._total
             );
           } else {
             bufferedText += this._decodeText(chunk);
-            this.__didReceiveDataProgress(requestId, loaded, total);
+            this.__didReceiveDataProgress(requestId, loaded, this._total);
           }
         },
         onComplete: (error) => {
@@ -907,9 +966,6 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
         },
         onResponse: (status, headers, responseURL) => {
           this.__didReceiveResponse(requestId, status, headers, responseURL);
-        },
-        onUploadProgress: (loaded, total) => {
-          this.__didUploadProgress(requestId, loaded, total);
         },
       }
     );
@@ -952,20 +1008,41 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     const aborted = this._aborted;
     const hasError = this._hasError;
     const timedOut = this._timedOut;
+    // An upload still due at DONE failed with the request. Taken now, since a
+    // listener may send another request with its own upload.
+    const uploadFailed = this._uploadTotal !== -1 && newState === this.DONE;
+    if (uploadFailed) this._uploadTotal = -1;
     this.readyState = newState;
     this._dispatch('readystatechange');
     if (newState !== this.DONE) return;
+    // A failed request ends its upload first and reports no bytes.
+    let progress = NO_PROGRESS;
     if (aborted) {
+      if (uploadFailed) this._failUpload('abort');
       this._dispatch('abort');
     } else if (hasError) {
-      this._dispatch(timedOut ? 'timeout' : 'error');
+      const type = timedOut ? 'timeout' : 'error';
+      if (uploadFailed) this._failUpload(type);
+      this._dispatch(type);
     } else {
       // Like Chromium, a listener that called open() or abort() ends the
       // request without load and loadend.
       if (this.readyState !== this.DONE) return;
-      this._dispatch('load');
+      if (
+        this.onload != null ||
+        this.onloadend != null ||
+        this._listeners.has('load') ||
+        this._listeners.has('loadend')
+      ) {
+        progress = {
+          lengthComputable: this._total > 0,
+          loaded: this._loaded,
+          total: this._total,
+        };
+      }
+      this._dispatch('load', progress);
     }
-    this._dispatch('loadend');
+    this._dispatch('loadend', progress);
   }
 
   addEventListener(
@@ -1038,6 +1115,28 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     if (this._timeoutTimer == null) return;
     clearTimeout(this._timeoutTimer);
     this._timeoutTimer = null;
+  }
+
+  // The request body has been sent once the response starts. Neither native
+  // client reports upload progress, so a body of known size is reported at
+  // once. A listener that aborts the request stops the upload's events.
+  private _completeUpload(requestId: number): void {
+    const size = this._uploadTotal;
+    this._uploadTotal = -1;
+    const total = Math.max(size, 0);
+    const progress = { lengthComputable: total > 0, loaded: total, total };
+    if (size !== -2) {
+      this.upload.dispatchProgress('progress', progress);
+      if (requestId !== this._requestId) return;
+    }
+    this.upload.dispatchProgress('load', progress);
+    if (requestId !== this._requestId) return;
+    this.upload.dispatchProgress('loadend', progress);
+  }
+
+  private _failUpload(type: string): void {
+    this.upload.dispatchProgress(type);
+    this.upload.dispatchProgress('loadend');
   }
 
   private _mergeChunks(): Uint8Array<ArrayBuffer> {
