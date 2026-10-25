@@ -111,7 +111,9 @@ class NitroEventTarget {
   ): void {
     if (listener == null) return;
     const listeners = this._listeners.get(type);
-    listeners?.delete(listener);
+    if (listeners == null) return;
+    listeners.delete(listener);
+    if (listeners.size === 0) this._listeners.delete(type);
   }
 
   dispatchEvent(event: Event): boolean {
@@ -258,8 +260,11 @@ let nextRequestId = 1;
 function responseLength(headers: Record<string, string>): number {
   const encoding = headers['content-encoding'];
   if (encoding && encoding.trim().toLowerCase() !== 'identity') return 0;
-  const length = Number(headers['content-length']);
-  return length > 0 && length % 1 === 0 ? length : 0;
+  const length = headers['content-length'];
+  if (length == null) return 0;
+  const total = Number(length);
+  // Digits only: Number() would also accept '1e3', '0x400' or 'Infinity'.
+  return total > 0 && total < Infinity && String(total) === length ? total : 0;
 }
 
 // The length of the bytes that end on a whole UTF-8 sequence. A sequence cut
@@ -465,7 +470,8 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   private _timeout = 0;
   private _timeoutTimer: ReturnType<typeof setTimeout> | null = null;
   private _total = 0;
-  // The request body's size while its upload events are due, else -1.
+  // The request body's size while its upload events are due: -2 when only
+  // the native client knows it (FormData), -1 when no upload events are due.
   private _uploadTotal = -1;
 
   static __setInterceptor_DO_NOT_USE(interceptor: XHRInterceptor | null): void {
@@ -616,8 +622,8 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     if (this._perfKey != null && performanceLogger != null) {
       performanceLogger.stopTimespan(this._perfKey);
     }
-    if (this._uploadTotal >= 0) {
-      this._completeUpload();
+    if (this._uploadTotal !== -1) {
+      this._completeUpload(requestId);
       // An upload listener may have aborted the request.
       if (requestId !== this._requestId) return;
     }
@@ -884,25 +890,28 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
     // it when send() was called.
     this._uploadTotal = -1;
     if (data != null && this.upload._isObserved()) {
+      let size: number | undefined;
       try {
-        this._uploadTotal = bodySize(data) ?? 0;
+        size = bodySize(data);
       } catch {
         // React Native's Blob, which counts a string's UTF-8 bytes, throws on
-        // a lone surrogate. The total is then unknown; the body is still sent.
-        this._uploadTotal = 0;
+        // a lone surrogate. The size is then unknown; the body is still sent.
       }
+      this._uploadTotal = size ?? -2;
     }
     if (this.onloadstart != null || this._listeners.has('loadstart')) {
       this._dispatch('loadstart');
+      // A loadstart listener may have aborted the request, or sent another.
+      if (requestId !== this._requestId) return;
     }
-    if (this._uploadTotal >= 0) {
+    if (this._uploadTotal !== -1) {
+      const total = Math.max(this._uploadTotal, 0);
       this.upload.dispatchProgress('loadstart', {
-        lengthComputable: this._uploadTotal > 0,
-        total: this._uploadTotal,
+        lengthComputable: total > 0,
+        total,
       });
+      if (requestId !== this._requestId) return;
     }
-    // A loadstart listener may have aborted the request.
-    if (requestId !== this._requestId) return;
 
     this._requestHandle = sendXMLHttpRequest(
       {
@@ -1105,18 +1114,24 @@ export class NitroXMLHttpRequest extends NitroEventTarget {
   }
 
   // The request body has been sent once the response starts. Neither native
-  // client reports upload progress, so the whole body is reported at once.
-  private _completeUpload(): void {
-    const total = this._uploadTotal;
+  // client reports upload progress, so a body of known size is reported at
+  // once. A listener that aborts the request stops the upload's events.
+  private _completeUpload(requestId: number): void {
+    const size = this._uploadTotal;
     this._uploadTotal = -1;
+    const total = Math.max(size, 0);
     const progress = { lengthComputable: total > 0, loaded: total, total };
-    this.upload.dispatchProgress('progress', progress);
+    if (size !== -2) {
+      this.upload.dispatchProgress('progress', progress);
+      if (requestId !== this._requestId) return;
+    }
     this.upload.dispatchProgress('load', progress);
+    if (requestId !== this._requestId) return;
     this.upload.dispatchProgress('loadend', progress);
   }
 
   private _failUpload(type: string): void {
-    if (this._uploadTotal < 0) return;
+    if (this._uploadTotal === -1) return;
     this._uploadTotal = -1;
     this.upload.dispatchProgress(type);
     this.upload.dispatchProgress('loadend');

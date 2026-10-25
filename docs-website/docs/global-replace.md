@@ -38,8 +38,15 @@ globalThis.XMLHttpRequest = NitroXMLHttpRequest;
 The bridge supports the asynchronous API used by SuperAgent, including headers,
 credentials, aborts, response types, ready-state changes, and download progress.
 Synchronous XHR is not supported. React Native `FormData` uploads use Nitro's
-buffered native transport so file URIs continue to work; they emit completion
-progress rather than incremental upload progress.
+buffered native transport so file URIs continue to work.
+
+As in browsers, `xhr.upload` fires events only if it has a listener when
+`send()` is called, so attach upload listeners before `send()`. axios and
+SuperAgent already do. The native clients don't report upload progress yet: the
+upload fires a single `progress` event for the whole body when the response
+starts. Only the native client knows the size of a `FormData` body, so its
+upload fires `loadstart`, `load` and `loadend` with `lengthComputable: false`
+and no `progress`.
 
 A request nothing watches while it loads (no `readystatechange` or `progress`
 listener) with a text response is buffered like a plain `fetch`. Other requests

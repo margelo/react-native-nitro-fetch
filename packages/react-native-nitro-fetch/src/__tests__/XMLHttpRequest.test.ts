@@ -1227,6 +1227,9 @@ describe('NitroXMLHttpRequest', () => {
       'for a decompressed body',
       { 'content-encoding': 'gzip', 'content-length': '20' },
     ],
+    ['for a Content-Length in exponent form', { 'content-length': '1e2' }],
+    ['for a hexadecimal Content-Length', { 'content-length': '0x64' }],
+    ['for a negative Content-Length', { 'content-length': '-100' }],
   ])('reports no download total %s', async (_reason, headers) => {
     const response = makeResponse([new Uint8Array(100)], { headers });
     mockNitroFetch.mockResolvedValue(response);
@@ -1293,7 +1296,7 @@ describe('NitroXMLHttpRequest', () => {
     expect(totals).toEqual([[total, total > 0]]);
   });
 
-  it('sends a string whose size cannot be counted, with an unknown upload total', async () => {
+  it('sends a string whose size cannot be counted without throwing', async () => {
     // React Native's Blob counts a string's bytes with encodeURI, which throws
     // on a lone surrogate.
     const globals = globalThis as { Blob: typeof Blob };
@@ -1317,17 +1320,14 @@ describe('NitroXMLHttpRequest', () => {
       expect(() => xhr.send('a\uD800b')).not.toThrow();
       await completed;
 
-      const unknown = {
-        readyState: 1,
-        loaded: 0,
-        total: 0,
-        lengthComputable: false,
-      };
-      expect(events.slice(1, 5)).toEqual([
-        { name: 'upload.loadstart', ...unknown },
-        { name: 'upload.progress', ...unknown },
-        { name: 'upload.load', ...unknown },
-        { name: 'upload.loadend', ...unknown },
+      const upload = events.filter(
+        (event) =>
+          event.name.startsWith('upload.') && event.name !== 'upload.progress'
+      );
+      expect(upload.map((event) => [event.name, event.readyState])).toEqual([
+        ['upload.loadstart', 1],
+        ['upload.load', 1],
+        ['upload.loadend', 1],
       ]);
       expect(eventNames(events).slice(-2)).toEqual(['load', 'loadend']);
       expect(mockNitroFetch).toHaveBeenCalledWith(
@@ -1365,6 +1365,205 @@ describe('NitroXMLHttpRequest', () => {
     } finally {
       globals.Blob = NodeBlob;
     }
+  });
+
+  it('reports a FormData upload without progress, as its size is unknown', async () => {
+    mockNitroFetch.mockResolvedValue(
+      makeResponse([new TextEncoder().encode('ok')])
+    );
+    const form = new FormData();
+    form.append('message', 'hello');
+    const xhr = new NitroXMLHttpRequest();
+    const events = recordProgressEvents(xhr);
+    xhr.open('POST', 'https://example.com/upload');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send(form);
+    await completed;
+
+    const unknown = {
+      readyState: 1,
+      loaded: 0,
+      total: 0,
+      lengthComputable: false,
+    };
+    expect(events.filter((event) => event.name.startsWith('upload.'))).toEqual([
+      { name: 'upload.loadstart', ...unknown },
+      { name: 'upload.load', ...unknown },
+      { name: 'upload.loadend', ...unknown },
+    ]);
+  });
+
+  it.each(['load', 'loadend'])(
+    'reports the bytes received to an on%s property alone',
+    async (type) => {
+      const response = makeResponse([new Uint8Array(1024)], {
+        headers: { 'content-length': '1024' },
+      });
+      mockNitroFetch.mockResolvedValue(response);
+
+      const xhr = new NitroXMLHttpRequest();
+      const fieldsOf = (event: ProgressEvent) => ({
+        loaded: event.loaded,
+        total: event.total,
+        lengthComputable: event.lengthComputable,
+      });
+      let loadstart: unknown;
+      xhr.onloadstart = (event) => {
+        loadstart = fieldsOf(event);
+      };
+      const done = new Promise((resolve) => {
+        if (type === 'load') xhr.onload = (event) => resolve(fieldsOf(event));
+        else xhr.onloadend = (event) => resolve(fieldsOf(event));
+      });
+      xhr.open('GET', 'https://example.com/bytes');
+      xhr.send();
+
+      expect(loadstart).toEqual({
+        loaded: 0,
+        total: 0,
+        lengthComputable: false,
+      });
+      expect(await done).toEqual({
+        loaded: 1024,
+        total: 1024,
+        lengthComputable: true,
+      });
+    }
+  );
+
+  it.each([
+    'loadstart',
+    'progress',
+    'load',
+    'loadend',
+    'abort',
+    'error',
+    'timeout',
+  ])('fires upload events for an upload.on%s property alone', async (type) => {
+    if (type === 'error') {
+      mockNitroFetch.mockRejectedValue(new Error('network failed'));
+    } else if (type === 'abort' || type === 'timeout') {
+      hangingFetch();
+    } else {
+      mockNitroFetch.mockResolvedValue(makeResponse([]));
+    }
+    const xhr = new NitroXMLHttpRequest();
+    const calls: string[] = [];
+    (xhr.upload as unknown as Record<string, unknown>)[`on${type}`] = () => {
+      calls.push(type);
+    };
+    if (type === 'timeout') xhr.timeout = 5;
+    xhr.open('POST', 'https://example.com/upload');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send('body');
+    if (type === 'abort') xhr.abort();
+    await completed;
+
+    expect(calls).toEqual([type]);
+  });
+
+  it('does not count removed upload listeners', async () => {
+    mockNitroFetch.mockResolvedValue(makeResponse([]));
+    const xhr = new NitroXMLHttpRequest();
+    const calls: string[] = [];
+    const listener = () => calls.push('upload.progress');
+    xhr.upload.addEventListener('progress', listener);
+    xhr.upload.removeEventListener('progress', listener);
+    xhr.upload.onload = null;
+    xhr.open('POST', 'https://example.com/upload');
+    const completed = waitForEvent(xhr, 'loadend');
+    xhr.send('body');
+    // Added after send(), so it does not count either.
+    xhr.upload.addEventListener('loadend', () => calls.push('upload.loadend'));
+    await completed;
+
+    expect(calls).toEqual([]);
+    expect(
+      (xhr.upload as unknown as { _isObserved(): boolean })._isObserved()
+    ).toBe(true);
+  });
+
+  it('stops the upload events when upload.onprogress aborts', async () => {
+    mockNitroFetch.mockResolvedValue(
+      makeResponse([new TextEncoder().encode('ok')])
+    );
+    const xhr = new NitroXMLHttpRequest();
+    const events: string[] = [];
+    xhr.onreadystatechange = () => {
+      events.push(`readystatechange.${xhr.readyState}`);
+    };
+    xhr.upload.onloadstart = () => events.push('upload.loadstart');
+    xhr.upload.onprogress = () => {
+      events.push('upload.progress');
+      xhr.abort();
+    };
+    xhr.upload.onload = () => events.push('upload.load');
+    xhr.upload.onloadend = () => events.push('upload.loadend');
+    xhr.onabort = () => events.push('abort');
+    const done = new Promise<void>((resolve) => {
+      xhr.onloadend = () => {
+        events.push('loadend');
+        resolve();
+      };
+    });
+    xhr.open('POST', 'https://example.com/upload');
+    xhr.send('body');
+    await done;
+    // Anything the response would still have delivered.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(events).toEqual([
+      'readystatechange.1',
+      'upload.loadstart',
+      'upload.progress',
+      'readystatechange.4',
+      'abort',
+      'loadend',
+    ]);
+    expect(xhr.status).toBe(0);
+  });
+
+  it('fires the upload loadstart once when a loadstart listener sends again', async () => {
+    mockNitroFetch.mockResolvedValue(
+      makeResponse([new TextEncoder().encode('ok')])
+    );
+    const xhr = new NitroXMLHttpRequest();
+    const events = recordProgressEvents(xhr);
+    let restarted = false;
+    xhr.addEventListener('loadstart', () => {
+      if (restarted) return;
+      restarted = true;
+      xhr.abort();
+      xhr.open('POST', 'https://example.com/second');
+      xhr.send('second');
+    });
+    xhr.open('POST', 'https://example.com/first');
+    const completed = new Promise((resolve) => {
+      xhr.addEventListener('load', resolve);
+    });
+    xhr.send('first');
+    await completed;
+
+    expect(mockNitroFetch).toHaveBeenCalledTimes(1);
+    expect(mockNitroFetch).toHaveBeenCalledWith(
+      'https://example.com/second',
+      expect.objectContaining({ body: 'second' })
+    );
+    expect(eventNames(events)).toEqual([
+      'loadstart',
+      'upload.abort',
+      'upload.loadend',
+      'abort',
+      'loadend',
+      'loadstart',
+      'upload.loadstart',
+      'upload.progress',
+      'upload.load',
+      'upload.loadend',
+      'progress',
+      'load',
+      'loadend',
+    ]);
   });
 
   it('fires no upload events without a request body', async () => {

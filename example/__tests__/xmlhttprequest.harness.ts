@@ -725,14 +725,14 @@ describe('XMLHttpRequest progress events', () => {
     const upload = events.filter((event) => event.name.startsWith('upload.'));
 
     expect(JSON.parse(xhr.responseText).form.message).toBe('hello');
+    // Only the native client knows the size of a multipart body, so there is
+    // no progress to report.
     expect(namesOn(events, 'upload.')).toEqual([
       'loadstart',
-      'progress',
       'load',
       'loadend',
     ]);
-    // Only the native client knows the size of a multipart body.
-    expect(upload.map((event) => event.readyState)).toEqual([1, 1, 1, 1]);
+    expect(upload.map((event) => event.readyState)).toEqual([1, 1, 1]);
     expect(fieldsOf(events, 'upload.loadend')).toEqual([NONE]);
   });
 
@@ -746,12 +746,10 @@ describe('XMLHttpRequest progress events', () => {
       'load',
       'loadend',
     ]);
-    expect(namesOn(events, 'upload.')).toEqual([
-      'loadstart',
-      'progress',
-      'load',
-      'loadend',
-    ]);
+    // Progress depends on whether the string's size can be counted.
+    expect(
+      namesOn(events, 'upload.').filter((name) => name !== 'progress')
+    ).toEqual(['loadstart', 'load', 'loadend']);
   });
 
   for (const [type, url, setUp] of [
