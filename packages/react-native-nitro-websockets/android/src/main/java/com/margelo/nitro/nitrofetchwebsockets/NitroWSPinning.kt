@@ -74,6 +74,27 @@ internal object NitroWSPinning {
   }
 
   /**
+   * Called by cpp-adapter.cpp when the first WebSocket connection (or prewarm) starts. Reads the
+   * pin file and, if it pins anything, sets up the platform trust manager on a background thread,
+   * so the first pinned handshake doesn't do that on the thread that serves every WebSocket. A
+   * handshake that gets there first waits for it, as it would without this.
+   */
+  @DoNotStrip
+  @JvmStatic
+  fun warmUp() {
+    Thread({
+      try {
+        if (domains().isNotEmpty()) {
+          trustExtensions
+          CertificateFactory.getInstance("X.509")
+        }
+      } catch (_: Exception) {
+        // The check reports it when a connection needs the pins.
+      }
+    }, "NitroWSPinningWarmUp").start()
+  }
+
+  /**
    * Whether the app ships a pin file. Asked once by cpp-adapter.cpp: without one, wss:// connections
    * skip the check. True when the file can't be read, so every connection asks [isPinned].
    */

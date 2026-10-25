@@ -242,6 +242,8 @@ void WebSocketConnection::connect(
     const std::string& url,
     const std::vector<std::string>& protocols,
     const std::unordered_map<std::string, std::string>& headers) {
+  // Off the lws thread, before the first TLS handshake needs the pins.
+  warmUpPins();
   _state = State::CONNECTING;
   startConnect(url, protocols, headers);
 }

@@ -4,6 +4,7 @@
 #include "WebSocketConnection.hpp"
 #include "WebSocketPrewarmer.hpp"
 
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -29,6 +30,18 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
 }
 
 namespace margelo::nitro::nitrofetchwebsockets {
+
+void warmUpPins() {
+  static std::once_flag once;
+  std::call_once(once, [] {
+    try {
+      const auto cls = JNitroWSPinning::javaClassStatic();
+      cls->getStaticMethod<void()>("warmUp")(cls);
+    } catch (const std::exception&) {
+      // The first pinned handshake then sets the pins up itself.
+    }
+  });
+}
 
 bool hasPins() {
   static const bool pins = [] {

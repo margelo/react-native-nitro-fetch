@@ -19,6 +19,8 @@
 namespace margelo::nitro::nitrofetchwebsockets {
 
 // nitro-fetch-pinning.json (NitroWSPinning.kt, called in cpp-adapter.cpp).
+// Reads the pin file and sets up the platform trust manager on a background thread, once.
+void warmUpPins();
 // Whether the app ships a pin file, asked once. Without one, wss:// connections skip the check.
 bool hasPins();
 // The check of a wss:// connection to `host`:`port`. `chain` returns the DER chain the server sent,
