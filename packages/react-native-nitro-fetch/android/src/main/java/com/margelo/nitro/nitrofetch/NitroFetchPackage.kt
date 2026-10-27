@@ -7,6 +7,11 @@ import com.facebook.react.module.model.ReactModuleInfo
 import com.facebook.react.module.model.ReactModuleInfoProvider
 
 class NitroFetchPackage : BaseReactPackage() {
+    init {
+        // Constructed while the app starts up, well before JS can issue a fetch.
+        HybridNitroFetch.prewarmEngine()
+    }
+
     override fun getModule(name: String, reactContext: ReactApplicationContext): NativeModule? {
         return if (name == NitroFetchBlob.NAME) NitroFetchBlob(reactContext) else null
     }

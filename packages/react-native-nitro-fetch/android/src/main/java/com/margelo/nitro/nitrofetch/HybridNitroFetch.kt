@@ -68,6 +68,22 @@ class HybridNitroFetch : HybridNitroFetchSpec() {
       }
     }
 
+    /**
+     * Builds the engine on a background thread so the first request doesn't pay for it. [getEngine]
+     * is synchronized, so a request that arrives mid-build waits for this build instead of starting
+     * another. Best-effort: on failure the next [getEngine] call builds the engine and surfaces the error.
+     */
+    fun prewarmEngine() {
+      if (engineRef != null) return
+      Thread({
+        try {
+          getEngine()
+        } catch (t: Throwable) {
+          NitroLogger.w("NitroFetch", "Cronet prewarm failed", t)
+        }
+      }, "NitroFetch-prewarm").apply { isDaemon = true }.start()
+    }
+
     fun shutdown() {
       synchronized(this) {
         try {
