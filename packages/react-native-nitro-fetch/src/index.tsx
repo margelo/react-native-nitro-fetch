@@ -2,6 +2,7 @@ export {
   nitroFetch as fetch,
   nitroFetchOnWorklet,
   prefetch,
+  clearPrefetchCache,
   prefetchOnAppStart,
   removeFromAutoPrefetch,
   removeAllFromAutoprefetch,

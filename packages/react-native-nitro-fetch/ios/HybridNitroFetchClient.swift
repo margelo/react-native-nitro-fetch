@@ -118,6 +118,10 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     return promise
   }
   
+  func clearPrefetchCache() throws {
+    NitroAutoPrefetcher.clearPrefetchCache()
+  }
+
   func prefetch(req: NitroRequest) throws -> Promise<Void> {
     let promise = Promise<Void>.init()
     let bodyData = HybridNitroFetchClient.uploadData(from: req)
@@ -362,7 +366,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
 
     // Mark pending and start the request. beginPending is atomic, so two racing
     // prefetches for the same key cannot both start one.
-    guard FetchCache.beginPending(key) else {
+    guard let token = FetchCache.beginPending(key) else {
       return // already pending
     }
     Task.detached {
@@ -395,10 +399,10 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
           bodyString: bodyStr,
           bodyBytes: bodyBytesAb
         )
-        FetchCache.complete(key, with: .success(res))
+        FetchCache.complete(key, token: token, with: .success(res))
       } catch {
         let failure = CertificatePinning.mapFailure(error, requestURL: URL(string: req.url), cancelledByCaller: false)
-        FetchCache.complete(key, with: .failure(failure))
+        FetchCache.complete(key, token: token, with: .failure(failure))
       }
     }
   }

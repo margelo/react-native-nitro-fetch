@@ -239,6 +239,17 @@ open class HybridNitroFetchClientSpec_cxx {
   }
   
   @inline(__always)
+  public final func clearPrefetchCache() -> bridge.Result_void_ {
+    do {
+      try self.__implementation.clearPrefetchCache()
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+
+  @inline(__always)
   public final func requestSync(req: NitroRequest) -> bridge.Result_NitroResponse_ {
     do {
       let __result = try self.__implementation.requestSync(req: req)

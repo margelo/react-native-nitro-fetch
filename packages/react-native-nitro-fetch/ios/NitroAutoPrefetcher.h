@@ -44,6 +44,9 @@ NS_ASSUME_NONNULL_BEGIN
 /// Starts prefetch immediately without persisting options or replaying stored tokens.
 + (void)prefetchWithOptions:(NSDictionary<NSString *, id> *)options NS_SWIFT_NAME(prefetch(options:));
 
+/// Clears completed and pending response data; keeps saved startup requests.
++ (void)clearPrefetchCache;
+
 @end
 
 NS_ASSUME_NONNULL_END

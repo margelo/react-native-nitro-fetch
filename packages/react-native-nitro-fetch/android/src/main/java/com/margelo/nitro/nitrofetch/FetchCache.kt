@@ -12,6 +12,7 @@ object FetchCache {
   fun getPending(key: String): CompletableFuture<NitroResponse>? = pending[key]
 
   /** Atomically registers a prefetch. Returns the already-pending future if one exists. */
+  @Synchronized
   fun beginPending(key: String, future: CompletableFuture<NitroResponse>): CompletableFuture<NitroResponse>? {
     val existing = pending.putIfAbsent(key, future)
     if (existing == null) {
@@ -20,13 +21,17 @@ object FetchCache {
     return existing
   }
 
-  fun complete(key: String, value: NitroResponse) {
-    results[key] = CachedEntry(value, System.currentTimeMillis())
-    pending.remove(key)?.complete(value)
+  fun complete(key: String, value: NitroResponse, future: CompletableFuture<NitroResponse>) {
+    synchronized(this) {
+      // A cleared request must not populate the cache or complete a newer request with the same key.
+      if (!pending.remove(key, future)) return
+      results[key] = CachedEntry(value, System.currentTimeMillis())
+    }
+    future.complete(value)
   }
 
-  fun completeExceptionally(key: String, t: Throwable) {
-    pending.remove(key)?.completeExceptionally(t)
+  fun completeExceptionally(key: String, t: Throwable, future: CompletableFuture<NitroResponse>) {
+    if (pending.remove(key, future)) future.completeExceptionally(t)
   }
 
   fun getResult(key: String): NitroResponse? {
@@ -57,7 +62,12 @@ object FetchCache {
   }
 
   fun clear() {
-    pending.clear()
-    results.clear()
+    val discarded = synchronized(this) {
+      val futures = pending.values.toList()
+      pending.clear()
+      results.clear()
+      futures
+    }
+    discarded.forEach { it.cancel(false) }
   }
 }

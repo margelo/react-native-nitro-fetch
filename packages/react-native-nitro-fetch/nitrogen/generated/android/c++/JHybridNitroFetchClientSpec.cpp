@@ -143,6 +143,10 @@ namespace margelo::nitro::nitrofetch {
       return __promise;
     }();
   }
+  void JHybridNitroFetchClientSpec::clearPrefetchCache() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("clearPrefetchCache");
+    method(_javaPart);
+  }
   NitroResponse JHybridNitroFetchClientSpec::requestSync(const NitroRequest& req) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JNitroResponse>(jni::alias_ref<JNitroRequest> /* req */)>("requestSync");
     auto __result = method(_javaPart, JNitroRequest::fromCpp(req));
