@@ -1,4 +1,5 @@
 import { type HybridObject, NitroModules } from 'react-native-nitro-modules'
+import { assertValidHandshake } from './handshake'
 
 const WS_PREWARM_KEY = 'nitro_ws_prewarm_queue'
 
@@ -48,6 +49,7 @@ export function prewarmOnAppStart(
   protocols?: string[],
   headers?: Record<string, string>
 ): void {
+  assertValidHandshake(protocols ?? [], headers)
   const storage = getStorage()
   const queue = readQueue(storage)
   const idx = queue.findIndex((e) => e.url === url)
