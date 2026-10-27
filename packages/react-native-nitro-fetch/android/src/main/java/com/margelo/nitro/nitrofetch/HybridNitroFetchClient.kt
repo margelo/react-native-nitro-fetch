@@ -16,6 +16,7 @@ import org.chromium.net.UrlResponseInfo
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.nio.ByteBuffer
+import java.nio.charset.CharacterCodingException
 import java.nio.charset.Charset
 import java.nio.charset.CodingErrorAction
 import java.util.UUID
@@ -794,7 +795,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
             // streamed body has already gone to onData.
             val bodyStr: String? = if (bytesResult != null) null else try {
               decodeText(bytes, length, charset)
-            } catch (_: Throwable) { null }
+            } catch (_: CharacterCodingException) { null }
             val bodyBytesAb: ArrayBuffer? = if (bytesResult != null)
               bytesResult.toArrayBuffer()
             else if (bodyStr == null && length > 0)
@@ -996,7 +997,7 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       val mime = guessMime(req.url)
       val bodyStr: String? = try {
         decodeText(bytes, bytes.size, Charsets.UTF_8)
-      } catch (_: Throwable) { null }
+      } catch (_: CharacterCodingException) { null }
       val bodyBytesAb: ArrayBuffer? = if (bodyStr == null && bytes.isNotEmpty())
         bytes.toArrayBuffer()
       else null
