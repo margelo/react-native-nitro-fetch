@@ -1144,6 +1144,8 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
     return promise
   }
 
+  override fun clearPrefetchCache() = AutoPrefetcher.clearPrefetchCache()
+
   override fun prefetch(req: NitroRequest): Promise<Unit> {
     val promise = Promise<Unit>()
     val key = findPrefetchKey(req)
@@ -1166,15 +1168,15 @@ class HybridNitroFetchClient(private val engine: CronetEngine, private val execu
       req,
       onSuccess = { res ->
         try {
-          FetchCache.complete(key, res)
+          FetchCache.complete(key, res, future)
           promise.resolve(Unit)
         } catch (t: Throwable) {
-          FetchCache.completeExceptionally(key, t)
+          FetchCache.completeExceptionally(key, t, future)
           promise.reject(t)
         }
       },
       onFail = { err ->
-        FetchCache.completeExceptionally(key, err)
+        FetchCache.completeExceptionally(key, err, future)
         promise.reject(err)
       }
     )

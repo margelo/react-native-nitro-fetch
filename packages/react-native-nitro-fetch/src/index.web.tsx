@@ -204,3 +204,6 @@ export function getNestedField(
 export function applyTemplate(template: string, value: string): string {
   return template.replace(/\{\{value\}\}/g, value);
 }
+
+/** Native prefetch caches do not exist on web. */
+export function clearPrefetchCache(): void {}

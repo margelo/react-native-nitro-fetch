@@ -130,6 +130,12 @@ public final class NitroAutoPrefetcher: NSObject {
     Task { try? await HybridNitroFetchClient.prefetchStatic(request) }
   }
 
+  /// Clear response data without removing the saved startup request list.
+  @objc
+  public static func clearPrefetchCache() {
+    FetchCache.clear()
+  }
+
   @objc
   public static func prefetchOnStart() {
     workQueue.async {
