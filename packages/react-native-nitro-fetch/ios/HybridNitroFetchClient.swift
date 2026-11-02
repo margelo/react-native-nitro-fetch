@@ -440,6 +440,7 @@ final class HybridNitroFetchClient: HybridNitroFetchClientSpec {
     }
     if let t = req.timeoutMs, t > 0 { r.timeoutInterval = TimeInterval(t) / 1000.0 }
     if req.credentials == .omit { r.httpShouldHandleCookies = false }
+    r.bypassCacheIfConditional()
     return (r, nil)
   }
 

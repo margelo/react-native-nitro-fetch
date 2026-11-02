@@ -863,7 +863,7 @@ cause, and that a caller abort still reports `AbortError`.
 - [ ] **C-17** `stale-while-revalidate` → Stale served, background revalidation · NEW
 - [ ] **C-18** Authorization responses with `private` → Cached per platform rules. Document · NEW
 - [ ] **C-19** `cache: 'only-if-cached'` without `mode: 'same-origin'` → Throws `TypeError` (spec), or the deviation is documented
-- [ ] **C-20** Caller sets `If-None-Match` or `If-Modified-Since` on a URL with a cached entry → JS gets the raw 304 with an empty body, the cache neither merges nor updates · `/cache/:id?maxAge=60`
+- [ ] **C-20** Caller sets `If-None-Match` or `If-Modified-Since` on a URL with a cached entry → JS gets the raw 304 with an empty body, the cache neither merges nor updates · `/cache/:id?maxAge=60` _(partial: NF)_
 - [ ] **C-21** `cache: 'reload'`, `'no-cache'`, `'no-store'` with a caller-set `Cache-Control` or `Pragma` → Caller's header kept, nothing appended (one `Cache-Control` on the wire) · `/headers` _(partial: API)_
 - [ ] **C-22** Caller-set `If-Match` (mismatch), `If-Unmodified-Since` (past), `If-None-Match: *` on PUT, `If-Range` strong and weak → 412 or 200 returned unchanged, not retried. Strong matching `If-Range` gives 206, weak or mismatched gives 200 · NEW `/conditional`
 - [ ] **C-23** Heuristic freshness: `Last-Modified` 10 days old, no `Cache-Control`, no `Expires` → Second GET within about a day served from cache, or documented per platform · NEW `/cache/:id?lm=`

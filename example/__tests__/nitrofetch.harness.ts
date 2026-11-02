@@ -623,6 +623,35 @@ describe('NitroFetch - HTTP cache', () => {
     expect(await cacheReport(id)).toEqual({ requests: 2, conditional: 1 });
   });
 
+  it('returns the raw 304 when the caller sends If-None-Match', async () => {
+    const id = cacheId();
+    const url = `${BASE}/cache/${id}`;
+    const etag = (await nitroFetch(url)).headers.get('etag');
+    expect(etag).not.toBeNull();
+    const res = await nitroFetch(url, {
+      headers: { 'If-None-Match': etag ?? '' },
+    });
+    expect(res.status).toBe(304);
+    expect(await res.text()).toBe('');
+    expect(await cacheReport(id)).toEqual({ requests: 2, conditional: 1 });
+    // The 304 must not replace the cached entry.
+    const plain = await nitroFetch(url);
+    expect(plain.status).toBe(200);
+    expect(await plain.json()).toEqual({ id });
+  });
+
+  it('sends If-None-Match to the server even when the cached entry is fresh', async () => {
+    const id = cacheId();
+    const url = `${BASE}/cache/${id}?maxAge=60`;
+    const etag = (await nitroFetch(url)).headers.get('etag');
+    expect(etag).not.toBeNull();
+    const res = await nitroFetch(url, {
+      headers: { 'If-None-Match': etag ?? '' },
+    });
+    expect(res.status).toBe(304);
+    expect(await cacheReport(id)).toEqual({ requests: 2, conditional: 1 });
+  });
+
   // A watched XMLHttpRequest runs on the default client, so the two share one
   // cache.
   it('a watched XMLHttpRequest is served from what the default transport cached', async () => {
