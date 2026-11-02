@@ -93,12 +93,16 @@ object AutoPrefetcher {
     val future = CompletableFuture<NitroResponse>()
     val shared = FetchCache.beginPending(key, future) ?: future.also {
       HybridNitroFetchClient.fetch(req,
-        onSuccess = { response -> FetchCache.complete(key, response) },
-        onFail = { error -> FetchCache.completeExceptionally(key, error) })
+        onSuccess = { response -> FetchCache.complete(key, response, future) },
+        onFail = { error -> FetchCache.completeExceptionally(key, error, future) })
     }
     // A caller can cancel its future without cancelling the shared request.
     return shared.thenApply { it }
   }
+
+  /** Clears response data without removing the saved startup request list. */
+  @JvmStatic
+  fun clearPrefetchCache() = FetchCache.clear()
 
   fun prefetchOnStart(app: Application) {
     // Queue decrypt + token refresh are blocking — keep them off the startup critical path.
@@ -182,15 +186,15 @@ object AutoPrefetcher {
       HybridNitroFetchClient.fetch(req,
         onSuccess = { res ->
           try {
-            FetchCache.complete(prefetchKey, res)
+            FetchCache.complete(prefetchKey, res, future)
             future.complete(res)
           } catch (t: Throwable) {
-            FetchCache.completeExceptionally(prefetchKey, t)
+            FetchCache.completeExceptionally(prefetchKey, t, future)
             future.completeExceptionally(t)
           }
         },
         onFail = { err ->
-          FetchCache.completeExceptionally(prefetchKey, err)
+          FetchCache.completeExceptionally(prefetchKey, err, future)
           future.completeExceptionally(err)
         }
       )

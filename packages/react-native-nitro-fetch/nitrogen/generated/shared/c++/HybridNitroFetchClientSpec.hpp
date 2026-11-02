@@ -66,6 +66,7 @@ namespace margelo::nitro::nitrofetch {
       virtual std::shared_ptr<Promise<NitroResponse>> request(const NitroRequest& req) = 0;
       virtual std::shared_ptr<Promise<NitroResponse>> requestWithEvents(const NitroRequest& req, const NitroRequestOptions& options, const std::optional<std::function<void(const UrlResponseInfo& /* info */)>>& onResponseStarted, const std::optional<std::function<std::shared_ptr<Promise<bool>>(const std::shared_ptr<ArrayBuffer>& /* chunk */)>>& onData, const std::optional<std::function<void(double /* loaded */, double /* total */)>>& onProgress) = 0;
       virtual std::shared_ptr<Promise<void>> prefetch(const NitroRequest& req) = 0;
+      virtual void clearPrefetchCache() = 0;
       virtual NitroResponse requestSync(const NitroRequest& req) = 0;
       virtual void cancelRequest(const std::string& requestId) = 0;
 

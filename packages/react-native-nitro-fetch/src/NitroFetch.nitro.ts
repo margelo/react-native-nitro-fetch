@@ -107,6 +107,8 @@ export interface NitroFetchClient extends HybridObject<{
   ): Promise<NitroResponse>;
   // Start a prefetch for a given request; expects a header `prefetchKey`.
   prefetch(req: NitroRequest): Promise<void>;
+  // Clear prefetched responses, retaining the saved startup request list.
+  clearPrefetchCache(): void;
 
   // Synchronous version of request for worklets
   requestSync(req: NitroRequest): NitroResponse;

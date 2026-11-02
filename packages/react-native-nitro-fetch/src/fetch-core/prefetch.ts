@@ -42,6 +42,11 @@ export async function prefetch(
   await client.prefetch(req);
 }
 
+/** Clear in-memory prefetch responses and pending entries. Saved startup registrations are preserved. */
+export function clearPrefetchCache(): void {
+  ensureClient()?.clearPrefetchCache?.();
+}
+
 const AUTOPREFETCH_QUEUE_KEY = 'nitrofetch_autoprefetch_queue';
 
 // Persist a request to storage so native can prefetch it on app start.

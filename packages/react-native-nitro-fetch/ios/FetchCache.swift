@@ -6,8 +6,13 @@ final class FetchCache {
     let timestampMs: Int64
   }
 
+  private struct PendingEntry {
+    let token = UUID()
+    var callbacks: [(Result<NitroResponse, Error>) -> Void] = []
+  }
+
   private static let lock = NSLock()
-  private static var pending: [String: [(Result<NitroResponse, Error>) -> Void]] = [:]
+  private static var pending: [String: PendingEntry] = [:]
   private static var results: [String: CachedEntry] = [:]
 
   static func getPending(_ key: String) -> Bool {
@@ -16,12 +21,13 @@ final class FetchCache {
     return pending[key] != nil
   }
 
-  static func beginPending(_ key: String) -> Bool {
+  static func beginPending(_ key: String) -> UUID? {
     lock.lock()
     defer { lock.unlock() }
-    if pending[key] != nil { return false }
-    pending[key] = []
-    return true
+    if pending[key] != nil { return nil }
+    let entry = PendingEntry()
+    pending[key] = entry
+    return entry.token
   }
 
 
@@ -32,19 +38,30 @@ final class FetchCache {
     lock.lock()
     defer { lock.unlock() }
     guard pending[key] != nil else { return false }
-    pending[key]?.append(completion)
+    pending[key]?.callbacks.append(completion)
     return true
   }
 
-  static func complete(_ key: String, with result: Result<NitroResponse, Error>) {
+  static func complete(_ key: String, token: UUID, with result: Result<NitroResponse, Error>) {
     lock.lock()
-    let callbacks = pending.removeValue(forKey: key) ?? []
+    // A cleared request must not populate the cache or complete a newer request with the same key.
+    guard pending[key]?.token == token else { lock.unlock(); return }
+    let callbacks = pending.removeValue(forKey: key)?.callbacks ?? []
     if case let .success(resp) = result {
       results[key] = CachedEntry(response: resp, timestampMs: Int64(Date().timeIntervalSince1970 * 1000))
     }
     lock.unlock()
     // Outside the lock: a callback may re-enter FetchCache.
     callbacks.forEach { $0(result) }
+  }
+
+  static func clear() {
+    lock.lock()
+    let callbacks = pending.values.flatMap { $0.callbacks }
+    pending.removeAll()
+    results.removeAll()
+    lock.unlock()
+    callbacks.forEach { $0(.failure(CancellationError())) }
   }
 
   // maxAgeMs stays a Double: converting a NaN, infinite or out-of-range TTL to

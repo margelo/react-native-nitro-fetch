@@ -4,6 +4,7 @@ import 'web-streams-polyfill/dist/polyfill.js';
 export { nitroFetch } from './fetch';
 export {
   prefetch,
+  clearPrefetchCache,
   prefetchOnAppStart,
   removeFromAutoPrefetch,
   removeAllFromAutoprefetch,
