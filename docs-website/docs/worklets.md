@@ -73,4 +73,4 @@ In a release build on a Samsung F14, repeatedly parsing a ~1 MB JSON payload pro
 | `preferBytes` | `false` | When `true`, sends `bodyBytes` to the mapper; when `false`, sends `bodyString` |
 | `runtimeName` | — | Optional name for the created worklet runtime |
 
-For more details, see the full [react-native-worklets documentation](https://docs.swmansion.com/react-native-worklets/docs/).
+For more details, see the full [react-native-worklets documentation](https://docs.swmansion.com/react-native-worklets/docs/fundamentals/getting-started/).
