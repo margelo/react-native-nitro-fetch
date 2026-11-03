@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.NitroModules
 import java.security.KeyStore
@@ -108,6 +109,7 @@ internal object NitroFetchSecureAtRest {
 }
 
 @DoNotStrip
+@Keep
 class HybridNativeStorage : HybridNativeStorageSpec() {
 
   companion object {

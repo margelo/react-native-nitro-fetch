@@ -1,6 +1,7 @@
 package com.margelo.nitro.nitrofetch
 
 import android.app.Application
+import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
 import org.chromium.net.CronetEngine
 import org.chromium.net.CronetProvider
@@ -13,6 +14,7 @@ import java.util.concurrent.Executors
  * Manages the Cronet engine and provides URL request building for streaming.
  */
 @DoNotStrip
+@Keep
 class HybridNitroCronet : HybridNitroCronetSpec() {
 
   override fun newUrlRequestBuilder(url: String): HybridUrlRequestBuilderSpec {
