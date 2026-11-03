@@ -1,6 +1,7 @@
 package com.margelo.nitro.nitrofetch
 
 import android.app.Application
+import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
 import org.chromium.net.CronetEngine
 import org.chromium.net.CronetProvider
@@ -9,6 +10,7 @@ import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
 @DoNotStrip
+@Keep
 class HybridNitroFetch : HybridNitroFetchSpec() {
   // Generated base may expect env-less createClient.
   override fun createClient(): HybridNitroFetchClient {
