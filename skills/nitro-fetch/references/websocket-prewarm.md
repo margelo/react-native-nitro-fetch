@@ -144,7 +144,7 @@ If you forget, the next cold start tries to reconnect with a stale auth header.
 
 ### Refresh tokens before replay
 
-If your stored auth header expires, register a token-refresh config (see `docs-website/docs/token-refresh.md`). The native bootstrap calls the refresh endpoint first, then replays the queue with the fresh headers.
+If your stored auth header expires, register a token-refresh config (see [Token Refresh](https://fetch.margelo.com/docs/token-refresh)). The native bootstrap calls the refresh endpoint first, then replays the queue with the fresh headers.
 
 ## Gotchas
 

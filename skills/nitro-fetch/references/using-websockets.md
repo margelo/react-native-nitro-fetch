@@ -190,5 +190,5 @@ For migrating an existing app, see [`migrate-from-rn-ws.md`](./migrate-from-rn-w
 - C++ side: [`packages/react-native-nitro-websockets/cpp/HybridWebSocket.cpp`](../../../packages/react-native-nitro-websockets/cpp/HybridWebSocket.cpp)
 - Bundled CA: [`packages/react-native-nitro-websockets/android/src/main/cpp/cacert.pem`](../../../packages/react-native-nitro-websockets/android/src/main/cpp/cacert.pem)
 - Working example: [`example/src/screens/WebSocketScreen.tsx`](../../../example/src/screens/WebSocketScreen.tsx)
-- Long-form docs: [`docs-website/docs/websockets.md`](../../../docs-website/docs/websockets.md)
+- Long-form docs: [WebSockets](https://fetch.margelo.com/docs/websockets)
 - Related: [`websocket-prewarm.md`](./websocket-prewarm.md), [`migrate-from-rn-ws.md`](./migrate-from-rn-ws.md), [`network-inspector.md`](./network-inspector.md)
