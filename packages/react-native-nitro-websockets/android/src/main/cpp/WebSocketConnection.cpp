@@ -10,6 +10,7 @@
 
 #include <libwebsockets.h>
 #include <mbedtls/x509_crt.h>
+#include <arpa/inet.h>
 #include <cctype>
 #include <cstring>
 #include <stdexcept>
@@ -81,14 +82,24 @@ static ParsedUrl parseUrl(const std::string& url) {
   const size_t at = authority.rfind('@');
   if (at != std::string::npos) authority = authority.substr(at + 1);
 
+  std::string port;
   if (!authority.empty() && authority[0] == '[') {
-    throw std::invalid_argument("IPv6 addresses are not supported: " + url);
-  }
-  const size_t colon = authority.rfind(':');
-  r.host = authority.substr(0, colon);
-  const std::string port = colon == std::string::npos ? std::string() : authority.substr(colon + 1);
-  if (r.host.empty() || r.host.find(':') != std::string::npos) {
-    throw std::invalid_argument("Invalid WebSocket URL: " + url);
+    const size_t close = authority.find(']');
+    if (close == std::string::npos) throw std::invalid_argument("Invalid WebSocket URL: " + url);
+    r.host = authority.substr(1, close - 1);
+    const std::string rest = authority.substr(close + 1);
+    in6_addr addr;
+    if (inet_pton(AF_INET6, r.host.c_str(), &addr) != 1 || (!rest.empty() && rest[0] != ':')) {
+      throw std::invalid_argument("Invalid WebSocket URL: " + url);
+    }
+    if (!rest.empty()) port = rest.substr(1);
+  } else {
+    const size_t colon = authority.rfind(':');
+    r.host = authority.substr(0, colon);
+    if (colon != std::string::npos) port = authority.substr(colon + 1);
+    if (r.host.empty() || r.host.find(':') != std::string::npos) {
+      throw std::invalid_argument("Invalid WebSocket URL: " + url);
+    }
   }
   if (!port.empty()) {
     if (port.find_first_not_of("0123456789") != std::string::npos) {
@@ -109,7 +120,7 @@ static ParsedUrl parseUrl(const std::string& url) {
   r.path = percentEncodeTarget(target);
   if (r.path.empty() || r.path[0] != '/') r.path = "/" + r.path;
 
-  r.hostHeader = r.host;
+  r.hostHeader = r.host.find(':') != std::string::npos ? "[" + r.host + "]" : r.host;
   if (r.port != defaultPort) r.hostHeader += ":" + std::to_string(r.port);
   return r;
 }

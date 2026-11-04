@@ -671,6 +671,18 @@ describe('NitroWebSocket - Error Handling', () => {
     );
     expect(settled).toBe(true);
   });
+
+  it('accepts a bracketed IPv6 host', async () => {
+    const error = await withTimeout(
+      new Promise<string>((resolve) => {
+        const ws = new NitroWebSocket('ws://[::1]:1/');
+        ws.onerror = resolve;
+      }),
+      15_000,
+      'error for IPv6 loopback'
+    );
+    expect(error).not.toMatch(/Invalid WebSocket URL|not supported/);
+  });
 });
 
 describe('NitroWebSocket - Late handlers', () => {
