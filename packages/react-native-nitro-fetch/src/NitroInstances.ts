@@ -6,6 +6,7 @@ import type {
 import type { NitroCronet } from './NitroCronet.nitro';
 
 // Create singletons once per JS runtime
+/** The native fetch module. Apps normally use `fetch` instead. */
 export const NitroFetch: NitroFetchType =
   NitroModules.createHybridObject<NitroFetchType>('NitroFetch');
 

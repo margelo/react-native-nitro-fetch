@@ -5,10 +5,15 @@ import { NitroFetchHybrid, ensureClient } from './client';
 import { resolveRequestBody, resolveBlobBody } from './body';
 import { buildNitroRequest } from './request';
 
-// Start a native prefetch. Requires a `prefetchKey` header on the request.
+/** Start a native prefetch. Requires a `prefetchKey`, as a header or in `init`. */
 export async function prefetch(
   input: RequestInfo | URL,
-  init?: RequestInit & { timeoutMs?: number; priority?: RequestPriority }
+  init?: RequestInit & {
+    /** Fails the request if no data arrives for this many milliseconds. */
+    timeoutMs?: number;
+    /** How urgent the request is. Default `'auto'`. */
+    priority?: RequestPriority;
+  }
 ): Promise<void> {
   // If native implementation is not present yet, do nothing
   const hasNative =
@@ -49,13 +54,16 @@ export function clearPrefetchCache(): void {
 
 const AUTOPREFETCH_QUEUE_KEY = 'nitrofetch_autoprefetch_queue';
 
-// Persist a request to storage so native can prefetch it on app start.
+/** Save a request so native code can prefetch it on app start. */
 // Entries embed request headers (may hold credentials) — stored encrypted at rest.
 export async function prefetchOnAppStart(
   input: RequestInfo | URL,
   init?: RequestInit & {
+    /** Key that a later `fetch` uses to pick up the result. Can also be set as a header. */
     prefetchKey?: string;
+    /** Fails the request if no data arrives for this many milliseconds. */
     timeoutMs?: number;
+    /** How urgent the request is. Default `'auto'`. */
     priority?: RequestPriority;
   }
 ): Promise<void> {
@@ -127,7 +135,7 @@ export async function prefetchOnAppStart(
   }
 }
 
-// Remove one entry (by prefetchKey) from the auto-prefetch queue.
+/** Remove one entry (by prefetchKey) from the auto-prefetch queue. */
 export async function removeFromAutoPrefetch(
   prefetchKey: string
 ): Promise<void> {
@@ -156,7 +164,7 @@ export async function removeFromAutoPrefetch(
   }
 }
 
-// Remove all entries from the auto-prefetch queue.
+/** Remove all entries from the auto-prefetch queue. */
 export async function removeAllFromAutoprefetch(): Promise<void> {
   try {
     NativeStorageSingleton.removeSecureString(AUTOPREFETCH_QUEUE_KEY);
@@ -165,6 +173,7 @@ export async function removeAllFromAutoprefetch(): Promise<void> {
   }
 }
 
+/** @internal Reads the app-start prefetch list. */
 export function __readAutoPrefetchQueue(): Array<Record<string, any>> {
   try {
     const raw = NativeStorageSingleton.getSecureString(AUTOPREFETCH_QUEUE_KEY);

@@ -35,14 +35,7 @@ function writeQueue(storage: NativeStorage, queue: PrewarmEntry[]): void {
   storage.setString(WS_PREWARM_KEY, JSON.stringify(queue))
 }
 
-/**
- * Persist a WebSocket URL (with optional protocols and headers) to storage so
- * the native auto-prewarmer connects to it on every subsequent app launch —
- * before React Native even boots.
- *
- * Call this once, e.g. after the user logs in. The setting survives app
- * restarts; remove it with `removeFromPrewarmQueue` on logout.
- */
+/** Save a WebSocket URL so native code connects to it on every app launch, before React Native boots. Remove it with `removeFromPrewarmQueue`. */
 export function prewarmOnAppStart(
   url: string,
   protocols?: string[],
@@ -64,18 +57,14 @@ export function prewarmOnAppStart(
   writeQueue(storage, queue)
 }
 
-/**
- * Remove a URL from the prewarm queue. No-op if the URL isn't in the queue.
- */
+/** Remove a URL from the prewarm queue. Does nothing if it isn't there. */
 export function removeFromPrewarmQueue(url: string): void {
   const storage = getStorage()
   const queue = readQueue(storage).filter((e) => e.url !== url)
   writeQueue(storage, queue)
 }
 
-/**
- * Remove all entries from the prewarm queue.
- */
+/** Remove all entries from the prewarm queue. */
 export function clearPrewarmQueue(): void {
   const storage = getStorage()
   storage.removeString(WS_PREWARM_KEY)

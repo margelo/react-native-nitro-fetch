@@ -1,9 +1,15 @@
+/** The request to turn into a `curl` command. */
 export interface CurlOptions {
   url: string;
+  /** Left out of the command when it is `'GET'`. */
   method: string;
+  /** Each becomes a `-H` option. */
   headers?: Array<{ key: string; value: string }>;
+  /** Cut to 10,000 characters. */
   body?: string;
+  /** Adds `-v`. */
   verbose?: boolean;
+  /** Adds `--compressed`. */
   compressed?: boolean;
 }
 
@@ -12,6 +18,7 @@ function shellEscape(str: string): string {
   return "'" + str.replace(/'/g, "'\\''") + "'";
 }
 
+/** Writes a request as a `curl` command you can paste into a terminal. Leaves out the `prefetchKey` header. */
 export function generateCurl(options: CurlOptions): string {
   const parts: string[] = ['curl'];
 

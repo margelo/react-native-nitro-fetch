@@ -3,8 +3,11 @@ import { stringToUTF8, utf8ToString } from './utf8';
 import { bytesToBlob } from './blob';
 import { parseFormData } from './Response';
 
+/** `'follow'` follows redirects, `'manual'` returns the redirect response, `'error'` throws. */
 export type RequestRedirect = 'follow' | 'error' | 'manual';
+/** How urgent a request is. `'auto'` leaves it to the system. */
 export type RequestPriority = 'high' | 'low' | 'auto';
+/** `'no-store'`, `'no-cache'` and `'reload'` add matching cache headers. Other values do nothing. */
 export type RequestCache =
   | 'default'
   | 'no-store'
@@ -13,34 +16,57 @@ export type RequestCache =
   | 'force-cache'
   | 'only-if-cached';
 
+/** Options for `new Request()`. The same fields as the standard `RequestInit`. */
 export interface NitroRequestInit {
+  /** HTTP method. Default `'GET'`. */
   method?: string;
   headers?: HeadersInit | NitroHeaders;
   body?: BodyInit | null;
+  /** What to do with a redirect. Default `'follow'`. */
   redirect?: RequestRedirect;
+  /** Cancels the request when aborted. */
   signal?: AbortSignal | null;
+  /** Adds cache headers. See {@link RequestCache}. */
   cache?: RequestCache;
+  /** `'omit'` sends and saves no cookies. Default `'same-origin'`. */
   credentials?: RequestCredentials;
+  /** Kept on the request. `fetch` ignores it. */
   mode?: RequestMode;
+  /** Kept on the request. `fetch` ignores it. */
   referrer?: string;
+  /** Kept on the request. `fetch` ignores it. */
   referrerPolicy?: ReferrerPolicy;
+  /** Kept on the request. `fetch` ignores it. */
   integrity?: string;
+  /** Kept on the request. `fetch` ignores it. */
   keepalive?: boolean;
 }
 
+/** A request you can pass to `fetch`. Works like the standard `Request`. */
 export class NitroRequest {
   readonly url: string;
+  /** HTTP method, in capitals. */
   readonly method: string;
   readonly headers: NitroHeaders;
+  /** Default `'follow'`. */
   readonly redirect: RequestRedirect;
+  /** Cancels the request when aborted. */
   readonly signal: AbortSignal;
+  /** Default `'default'`. */
   readonly cache: RequestCache;
+  /** Default `'same-origin'`. */
   readonly credentials: RequestCredentials;
+  /** Default `'cors'`. `fetch` ignores it. */
   readonly mode: RequestMode;
+  /** Default `'about:client'`. `fetch` ignores it. */
   readonly referrer: string;
+  /** Default `''`. `fetch` ignores it. */
   readonly referrerPolicy: ReferrerPolicy;
+  /** Default `''`. `fetch` ignores it. */
   readonly integrity: string;
+  /** Default `false`. `fetch` ignores it. */
   readonly keepalive: boolean;
+  /** Always `''`. */
   readonly destination: RequestDestination;
 
   private _body: BodyInit | null;
@@ -127,10 +153,12 @@ export class NitroRequest {
     this.destination = '';
   }
 
+  /** `true` once the body has been read. A body can only be read once. */
   get bodyUsed(): boolean {
     return this._bodyUsed;
   }
 
+  /** The body as a stream, or `null` if there is none. */
   get body(): ReadableStream<Uint8Array<ArrayBuffer>> | null {
     if (this._body == null) return null;
     const bodyBytes = this._getBodyBytes();
@@ -177,12 +205,14 @@ export class NitroRequest {
     return '';
   }
 
+  /** Reads the body as text. */
   async text(): Promise<string> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
     return this._getBodyString();
   }
 
+  /** Reads the body as JSON. An empty body gives `{}`. */
   async json(): Promise<any> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
@@ -190,12 +220,14 @@ export class NitroRequest {
     return JSON.parse(t || '{}');
   }
 
+  /** Reads the body as raw bytes. */
   async arrayBuffer(): Promise<ArrayBuffer> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
     return this._getBodyBytes() ?? new ArrayBuffer(0);
   }
 
+  /** Reads the body as a `Blob`. */
   async blob(): Promise<Blob> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
@@ -208,6 +240,7 @@ export class NitroRequest {
     return bytesToBlob(this._getBodyBytes() ?? new ArrayBuffer(0), contentType);
   }
 
+  /** Reads the body as a `Uint8Array`. */
   async bytes(): Promise<Uint8Array<ArrayBuffer>> {
     this._throwIfBodyUsed();
     this._bodyUsed = true;
@@ -215,6 +248,7 @@ export class NitroRequest {
     return new Uint8Array(buffer);
   }
 
+  /** Makes a copy. Throws if the body has already been read. */
   clone(): NitroRequest {
     if (this._bodyUsed) {
       throw new TypeError('Cannot clone a Request whose body has been used.');
@@ -222,6 +256,7 @@ export class NitroRequest {
     return new NitroRequest(this);
   }
 
+  /** Reads a URL-encoded form body. Other body types throw. */
   async formData(): Promise<FormData> {
     return parseFormData(await this.text(), this.headers.get('content-type'));
   }
