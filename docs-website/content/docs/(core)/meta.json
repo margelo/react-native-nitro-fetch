@@ -1,0 +1,12 @@
+{
+  "title": "Core",
+  "defaultOpen": true,
+  "pages": [
+    "prefetch",
+    "streaming",
+    "abort-controller",
+    "form-data",
+    "token-refresh",
+    "certificate-pinning"
+  ]
+}

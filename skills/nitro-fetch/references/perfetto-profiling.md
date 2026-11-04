@@ -131,7 +131,7 @@ Rebuild from Xcode (or `yarn ios`). The env vars inject `-DNITRO_WS_TRACING=1` a
 6. **Start recording**, exercise the app, **Stop**.
 7. In the timeline, find your app's process. HTTP requests appear as async slices labelled `NitroFetch GET /path`, etc. WebSocket events appear as sync slices labelled `NitroWS connect <url>`, `NitroWS send text`, `NitroWS receive`, `NitroWS close`, etc.
 
-A protobuf config alternative for `adb shell perfetto` is in [`docs-website/docs/inspection.md`](../../../docs-website/docs/inspection.md).
+A protobuf config alternative for `adb shell perfetto` is in [Inspection](https://fetch.margelo.com/docs/inspection).
 
 ### Capture an iOS Instruments trace
 
@@ -183,5 +183,5 @@ Trace point definitions: [`packages/react-native-nitro-websockets/cpp/WsTrace.hp
 - Inspector skill: [`network-inspector.md`](./network-inspector.md)
 - Hermes profiler: [`packages/react-native-nitro-fetch/src/HermesProfiler.ts`](../../../packages/react-native-nitro-fetch/src/HermesProfiler.ts)
 - Trace macros: [`packages/react-native-nitro-websockets/cpp/WsTrace.hpp`](../../../packages/react-native-nitro-websockets/cpp/WsTrace.hpp)
-- Long-form docs (with screenshots): [`docs-website/docs/inspection.md`](../../../docs-website/docs/inspection.md)
+- Long-form docs (with screenshots): [Inspection](https://fetch.margelo.com/docs/inspection)
 - Once slow APIs are identified — usual fixes: [`prefetching.md`](./prefetching.md), [`websocket-prewarm.md`](./websocket-prewarm.md)

@@ -227,6 +227,6 @@ A full reference implementation (filter tabs, detail view, curl export, live con
 - Source: [`packages/react-native-nitro-fetch/src/NetworkInspector.ts`](../../../packages/react-native-nitro-fetch/src/NetworkInspector.ts)
 - curl generator: [`packages/react-native-nitro-fetch/src/CurlGenerator.ts`](../../../packages/react-native-nitro-fetch/src/CurlGenerator.ts)
 - Reference UI: [`example/src/screens/NetworkInspectorScreen.tsx`](../../../example/src/screens/NetworkInspectorScreen.tsx)
-- Long-form docs: [`docs-website/docs/inspection.md`](../../../docs-website/docs/inspection.md)
+- Long-form docs: [Inspection](https://fetch.margelo.com/docs/inspection)
 - When this isn't enough: [`perfetto-profiling.md`](./perfetto-profiling.md)
 - Plugging axios into nitro-fetch: [`axios-adapter.md`](./axios-adapter.md)

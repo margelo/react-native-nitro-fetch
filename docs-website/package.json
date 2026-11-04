@@ -1,47 +1,40 @@
 {
   "name": "docs-website",
-  "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
-    "docusaurus": "docusaurus",
-    "start": "docusaurus start",
-    "build": "docusaurus build",
-    "swizzle": "docusaurus swizzle",
-    "deploy": "docusaurus deploy",
-    "clear": "docusaurus clear",
-    "serve": "docusaurus serve",
-    "write-translations": "docusaurus write-translations",
-    "write-heading-ids": "docusaurus write-heading-ids",
-    "typecheck": "tsc"
-  },
-  "dependencies": {
-    "@docusaurus/core": "3.9.2",
-    "@docusaurus/preset-classic": "3.9.2",
-    "@mdx-js/react": "^3.0.0",
-    "clsx": "^2.0.0",
-    "prism-react-renderer": "^2.3.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "dev": "bun run docs:api && fumadocs-mdx && next dev",
+    "build": "bun run docs:api && next build",
+    "start": "next start",
+    "postinstall": "fumadocs-mdx",
+    "types:check": "fumadocs-mdx && next typegen && tsc --noEmit",
+    "docs:api": "typedoc --options typedoc.config.mjs"
   },
   "devDependencies": {
-    "@docusaurus/module-type-aliases": "3.9.2",
-    "@docusaurus/tsconfig": "3.9.2",
-    "@docusaurus/types": "3.9.2",
-    "typescript": "~5.6.2"
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/bun": "latest",
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^4.3.3",
+    "typedoc": "^0.28.20",
+    "typedoc-plugin-frontmatter": "^1.3.2",
+    "typedoc-plugin-markdown": "^4.13.1",
+    "typescript": "6.0.3"
   },
-  "browserslist": {
-    "production": [
-      ">0.5%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 3 chrome version",
-      "last 3 firefox version",
-      "last 5 safari version"
-    ]
-  },
-  "engines": {
-    "node": ">=20.0"
+  "dependencies": {
+    "@r4ai/remark-callout": "^0.6.2",
+    "fumadocs-core": "^16.15.12",
+    "fumadocs-docgen": "^3.1.1",
+    "fumadocs-mdx": "^15.4.3",
+    "fumadocs-typescript": "^5.4.1",
+    "fumadocs-ui": "^16.15.12",
+    "motion": "^14.0.0",
+    "next": "16",
+    "react": "19",
+    "react-dom": "19",
+    "refractor": "^5.0.0",
+    "rehype-prism-plus": "^2.0.2"
   }
 }

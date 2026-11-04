@@ -225,7 +225,7 @@ If neither option works for you (the URL itself must contain a fresh value, e.g.
 
 ### Without token refresh
 
-If you don't register a refresh config, the bootstrap reuses whatever headers were stored at `prefetchOnAppStart` time. That works fine for tokens that outlive the app's typical kill/restart cycle. See [`docs-website/docs/token-refresh.md`](../../../docs-website/docs/token-refresh.md) for the full reference (composite headers, plain-text response bodies, `onFailure` modes).
+If you don't register a refresh config, the bootstrap reuses whatever headers were stored at `prefetchOnAppStart` time. That works fine for tokens that outlive the app's typical kill/restart cycle. See [Token Refresh](https://fetch.margelo.com/docs/token-refresh) for the full reference (composite headers, plain-text response bodies, `onFailure` modes).
 
 ## Gotchas
 
@@ -242,5 +242,5 @@ If you don't register a refresh config, the bootstrap reuses whatever headers we
 - Android bootstrap: [`packages/react-native-nitro-fetch/android/src/main/java/com/margelo/nitro/nitrofetch/AutoPrefetcher.kt`](../../../packages/react-native-nitro-fetch/android/src/main/java/com/margelo/nitro/nitrofetch/AutoPrefetcher.kt)
 - iOS bootstrap: [`packages/react-native-nitro-fetch/ios/NitroBootstrap.mm`](../../../packages/react-native-nitro-fetch/ios/NitroBootstrap.mm)
 - End-to-end example: [`example/src/screens/PrefetchScreen.tsx`](../../../example/src/screens/PrefetchScreen.tsx)
-- Long-form docs: [`docs-website/docs/prefetch.md`](../../../docs-website/docs/prefetch.md)
+- Long-form docs: [Prefetch & Auto-Prefetch](https://fetch.margelo.com/docs/prefetch)
 - Related: [`axios-adapter.md`](./axios-adapter.md), [`network-inspector.md`](./network-inspector.md)
