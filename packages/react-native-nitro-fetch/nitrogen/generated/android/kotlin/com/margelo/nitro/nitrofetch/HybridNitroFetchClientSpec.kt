@@ -51,7 +51,7 @@ abstract class HybridNitroFetchClientSpec: HybridObject() {
   @DoNotStrip
   @Keep
   abstract fun clearPrefetchCache(): Unit
-
+  
   @DoNotStrip
   @Keep
   abstract fun requestSync(req: NitroRequest): NitroResponse

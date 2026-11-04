@@ -248,7 +248,7 @@ open class HybridNitroFetchClientSpec_cxx {
       return bridge.create_Result_void_(__exceptionPtr)
     }
   }
-
+  
   @inline(__always)
   public final func requestSync(req: NitroRequest) -> bridge.Result_NitroResponse_ {
     do {
