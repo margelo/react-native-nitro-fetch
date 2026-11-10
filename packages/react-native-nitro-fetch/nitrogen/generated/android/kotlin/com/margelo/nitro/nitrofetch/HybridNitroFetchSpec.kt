@@ -11,6 +11,7 @@ import androidx.annotation.Keep
 import com.facebook.jni.HybridData
 import com.facebook.proguard.annotations.DoNotStrip
 import dalvik.annotation.optimization.FastNative
+import com.margelo.nitro.core.Promise
 import com.margelo.nitro.core.HybridObject
 
 /**
@@ -32,6 +33,18 @@ abstract class HybridNitroFetchSpec: HybridObject() {
   @DoNotStrip
   @Keep
   abstract fun createClient(): HybridNitroFetchClientSpec
+  
+  @DoNotStrip
+  @Keep
+  abstract fun prefetchOnAppStart(entryJson: String): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun removeFromAutoPrefetch(prefetchKey: String): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun removeAllFromAutoprefetch(): Promise<Unit>
 
   // Default implementation of `HybridObject.toString()`
   override fun toString(): String {

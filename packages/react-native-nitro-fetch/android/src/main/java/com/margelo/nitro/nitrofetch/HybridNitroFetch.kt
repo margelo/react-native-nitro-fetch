@@ -1,11 +1,15 @@
 package com.margelo.nitro.nitrofetch
 
 import android.app.Application
+import android.content.Context
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
+import com.margelo.nitro.NitroModules
+import com.margelo.nitro.core.Promise
 import org.chromium.net.CronetEngine
 import org.chromium.net.CronetProvider
 import java.io.File
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
@@ -15,6 +19,25 @@ class HybridNitroFetch : HybridNitroFetchSpec() {
   // Generated base may expect env-less createClient.
   override fun createClient(): HybridNitroFetchClient {
     return HybridNitroFetchClient(getEngine(), ioExecutor)
+  }
+
+  override fun prefetchOnAppStart(entryJson: String): Promise<Unit> =
+    onPrefetchQueue { AutoPrefetcher.prefetchOnAppStart(it, entryJson) }
+
+  override fun removeFromAutoPrefetch(prefetchKey: String): Promise<Unit> =
+    onPrefetchQueue { AutoPrefetcher.removeFromAutoPrefetch(it, prefetchKey) }
+
+  override fun removeAllFromAutoprefetch(): Promise<Unit> =
+    onPrefetchQueue { AutoPrefetcher.removeAllFromAutoprefetch(it) }
+
+  private fun onPrefetchQueue(update: (Context) -> CompletableFuture<Void>): Promise<Unit> {
+    val context = NitroModules.applicationContext
+      ?: throw IllegalStateException("Cannot update startup prefetches - no Android Context")
+    val promise = Promise<Unit>()
+    update(context).whenComplete { _, error ->
+      if (error == null) promise.resolve(Unit) else promise.reject(error)
+    }
+    return promise
   }
 
   companion object {

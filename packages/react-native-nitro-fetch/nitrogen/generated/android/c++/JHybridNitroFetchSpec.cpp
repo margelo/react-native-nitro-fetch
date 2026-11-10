@@ -13,6 +13,10 @@ namespace margelo::nitro::nitrofetch { class HybridNitroFetchClientSpec; }
 #include <memory>
 #include "HybridNitroFetchClientSpec.hpp"
 #include "JHybridNitroFetchClientSpec.hpp"
+#include <NitroModules/Promise.hpp>
+#include <NitroModules/JPromise.hpp>
+#include <NitroModules/JUnit.hpp>
+#include <string>
 
 namespace margelo::nitro::nitrofetch {
 
@@ -51,6 +55,51 @@ namespace margelo::nitro::nitrofetch {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JHybridNitroFetchClientSpec::JavaPart>()>("createClient");
     auto __result = method(_javaPart);
     return __result->getJHybridNitroFetchClientSpec();
+  }
+  std::shared_ptr<Promise<void>> JHybridNitroFetchSpec::prefetchOnAppStart(const std::string& entryJson) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* entryJson */)>("prefetchOnAppStart");
+    auto __result = method(_javaPart, jni::make_jstring(entryJson));
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<void>> JHybridNitroFetchSpec::removeFromAutoPrefetch(const std::string& prefetchKey) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* prefetchKey */)>("removeFromAutoPrefetch");
+    auto __result = method(_javaPart, jni::make_jstring(prefetchKey));
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<void>> JHybridNitroFetchSpec::removeAllFromAutoprefetch() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("removeAllFromAutoprefetch");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
   }
 
 } // namespace margelo::nitro::nitrofetch

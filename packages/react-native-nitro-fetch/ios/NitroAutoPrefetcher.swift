@@ -98,21 +98,7 @@ public final class NitroAutoPrefetcher: NSObject {
     )
     workQueue.async {
       let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
-
-      var arr: [[String: Any]] = []
-      // Entries embed request headers (may hold credentials) — encrypted-at-rest; legacy plaintext migrates on read.
-      if let raw = NitroFetchSecureAtRest.decryptedString(forKey: queueKey, defaults: userDefaults),
-         !raw.isEmpty,
-         let data = raw.data(using: .utf8),
-         let parsed = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-        arr = parsed
-      }
-      arr.removeAll { ($0["prefetchKey"] as? String) == prefetchKey }
-      arr.append(entry)
-      if let data = try? JSONSerialization.data(withJSONObject: arr),
-         let str = String(data: data, encoding: .utf8) {
-        NitroFetchSecureAtRest.setEncrypted(str, forKey: queueKey, defaults: userDefaults)
-      }
+      saveToQueue(entry, userDefaults: userDefaults)
 
       if initialized {
         // Late path — apply cached tokens + kick immediate prefetch
@@ -120,6 +106,65 @@ public final class NitroAutoPrefetcher: NSObject {
           NitroFetchSecureAtRest.decryptedString(forKey: tokenCacheKey, defaults: userDefaults))
         startPrefetches([entry], tokens: tokens)
       }
+    }
+  }
+
+  /// Saves a JS `prefetchOnAppStart` entry like `registerPrefetch`, without the late-path prefetch.
+  static func prefetchOnAppStart(entryJson: String, completion: @escaping () -> Void) {
+    workQueue.async {
+      defer { completion() }
+      guard let data = entryJson.data(using: .utf8),
+            let entry = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+      saveToQueue(entry, userDefaults: UserDefaults(suiteName: suiteName) ?? UserDefaults.standard)
+    }
+  }
+
+  static func removeFromAutoPrefetch(prefetchKey: String, completion: @escaping () -> Void) {
+    workQueue.async {
+      defer { completion() }
+      let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
+      let arr = readQueue(userDefaults: userDefaults)
+      let next = arr.filter { ($0["prefetchKey"] as? String) != prefetchKey }
+      if next.isEmpty {
+        NitroFetchSecureAtRest.remove(forKey: queueKey, defaults: userDefaults)
+      } else if next.count != arr.count {
+        writeQueue(next, userDefaults: userDefaults)
+      }
+    }
+  }
+
+  static func removeAllFromAutoprefetch(completion: @escaping () -> Void) {
+    workQueue.async {
+      defer { completion() }
+      NitroFetchSecureAtRest.remove(forKey: queueKey, defaults: UserDefaults(suiteName: suiteName) ?? UserDefaults.standard)
+    }
+  }
+
+  private static func saveToQueue(_ entry: [String: Any], userDefaults: UserDefaults) {
+    let prefetchKey = entry["prefetchKey"] as? String
+    var arr = readQueue(userDefaults: userDefaults)
+    if let existing = arr.first(where: { ($0["prefetchKey"] as? String) == prefetchKey }),
+       NSDictionary(dictionary: existing).isEqual(to: entry) {
+      return
+    }
+    arr.removeAll { ($0["prefetchKey"] as? String) == prefetchKey }
+    arr.append(entry)
+    writeQueue(arr, userDefaults: userDefaults)
+  }
+
+  private static func readQueue(userDefaults: UserDefaults) -> [[String: Any]] {
+    // Entries embed request headers (may hold credentials) — encrypted-at-rest; legacy plaintext migrates on read.
+    guard let raw = NitroFetchSecureAtRest.decryptedString(forKey: queueKey, defaults: userDefaults),
+          !raw.isEmpty,
+          let data = raw.data(using: .utf8),
+          let parsed = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+    return parsed
+  }
+
+  private static func writeQueue(_ arr: [[String: Any]], userDefaults: UserDefaults) {
+    if let data = try? JSONSerialization.data(withJSONObject: arr),
+       let str = String(data: data, encoding: .utf8) {
+      NitroFetchSecureAtRest.setEncrypted(str, forKey: queueKey, defaults: userDefaults)
     }
   }
 

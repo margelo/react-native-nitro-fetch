@@ -17,6 +17,8 @@ namespace margelo::nitro::nitrofetch { class HybridNitroFetchClientSpec; }
 
 #include <memory>
 #include "HybridNitroFetchClientSpec.hpp"
+#include <NitroModules/Promise.hpp>
+#include <string>
 
 #include "NitroFetch-Swift-Cxx-Umbrella.hpp"
 
@@ -70,6 +72,30 @@ namespace margelo::nitro::nitrofetch {
     // Methods
     inline std::shared_ptr<HybridNitroFetchClientSpec> createClient() override {
       auto __result = _swiftPart.createClient();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> prefetchOnAppStart(const std::string& entryJson) override {
+      auto __result = _swiftPart.prefetchOnAppStart(entryJson);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> removeFromAutoPrefetch(const std::string& prefetchKey) override {
+      auto __result = _swiftPart.removeFromAutoPrefetch(prefetchKey);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<void>> removeAllFromAutoprefetch() override {
+      auto __result = _swiftPart.removeAllFromAutoprefetch();
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

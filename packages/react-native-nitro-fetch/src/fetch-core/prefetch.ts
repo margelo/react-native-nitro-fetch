@@ -110,26 +110,8 @@ export async function prefetchOnAppStart(
   if (typeof req.prefetchCacheTtlMs === 'number')
     entry.prefetchCacheTtlMs = req.prefetchCacheTtlMs;
 
-  // Write or append to storage queue
   try {
-    let arr: any[] = [];
-    try {
-      const raw = NativeStorageSingleton.getSecureString(
-        AUTOPREFETCH_QUEUE_KEY
-      );
-      if (raw) arr = JSON.parse(raw);
-      if (!Array.isArray(arr)) arr = [];
-    } catch {
-      arr = [];
-    }
-    if (arr.some((e) => e && e.prefetchKey === prefetchKey)) {
-      arr = arr.filter((e) => e && e.prefetchKey !== prefetchKey);
-    }
-    arr.push(entry);
-    NativeStorageSingleton.setSecureString(
-      AUTOPREFETCH_QUEUE_KEY,
-      JSON.stringify(arr)
-    );
+    await NitroFetchHybrid.prefetchOnAppStart(JSON.stringify(entry));
   } catch (e) {
     console.warn('Failed to persist prefetch queue', e);
   }
@@ -140,25 +122,7 @@ export async function removeFromAutoPrefetch(
   prefetchKey: string
 ): Promise<void> {
   try {
-    let arr: any[] = [];
-    try {
-      const raw = NativeStorageSingleton.getSecureString(
-        AUTOPREFETCH_QUEUE_KEY
-      );
-      if (raw) arr = JSON.parse(raw);
-      if (!Array.isArray(arr)) arr = [];
-    } catch {
-      arr = [];
-    }
-    const next = arr.filter((e) => e && e.prefetchKey !== prefetchKey);
-    if (next.length === 0) {
-      NativeStorageSingleton.removeSecureString(AUTOPREFETCH_QUEUE_KEY);
-    } else if (next.length !== arr.length) {
-      NativeStorageSingleton.setSecureString(
-        AUTOPREFETCH_QUEUE_KEY,
-        JSON.stringify(next)
-      );
-    }
+    await NitroFetchHybrid.removeFromAutoPrefetch(prefetchKey);
   } catch (e) {
     console.warn('Failed to remove from prefetch queue', e);
   }
@@ -167,7 +131,7 @@ export async function removeFromAutoPrefetch(
 /** Remove all entries from the auto-prefetch queue. */
 export async function removeAllFromAutoprefetch(): Promise<void> {
   try {
-    NativeStorageSingleton.removeSecureString(AUTOPREFETCH_QUEUE_KEY);
+    await NitroFetchHybrid.removeAllFromAutoprefetch();
   } catch (e) {
     console.warn('Failed to clear prefetch queue', e);
   }
