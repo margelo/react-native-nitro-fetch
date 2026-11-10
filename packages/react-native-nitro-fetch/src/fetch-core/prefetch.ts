@@ -54,38 +54,6 @@ export function clearPrefetchCache(): void {
 
 const AUTOPREFETCH_QUEUE_KEY = 'nitrofetch_autoprefetch_queue';
 
-// Every secure read or write of the queue is a synchronous Keystore (Android) or
-// Keychain (iOS) round trip on the JS thread. The decrypted queue is reused while the
-// stored ciphertext it was decrypted from is unchanged; reading that is cheap.
-let cachedQueue: { stored: string; entries: any[] } | undefined;
-
-function readQueue(): any[] {
-  try {
-    const stored = NativeStorageSingleton.getString(AUTOPREFETCH_QUEUE_KEY);
-    if (cachedQueue && cachedQueue.stored === stored)
-      return cachedQueue.entries;
-    const raw = NativeStorageSingleton.getSecureString(AUTOPREFETCH_QUEUE_KEY);
-    let entries: any[] = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(entries)) entries = [];
-    // `stored` is from before decrypting, so a native `registerPrefetch` save
-    // meanwhile makes the next read decrypt again.
-    cachedQueue = { stored, entries };
-    return entries;
-  } catch {
-    cachedQueue = undefined;
-    return [];
-  }
-}
-
-function writeQueue(entries: any[]): void {
-  // Not cached: native `registerPrefetch` can save between this write and a read-back.
-  cachedQueue = undefined;
-  NativeStorageSingleton.setSecureString(
-    AUTOPREFETCH_QUEUE_KEY,
-    JSON.stringify(entries)
-  );
-}
-
 /** Save a request so native code can prefetch it on app start. */
 // Entries embed request headers (may hold credentials) — stored encrypted at rest.
 export async function prefetchOnAppStart(
@@ -144,14 +112,24 @@ export async function prefetchOnAppStart(
 
   // Write or append to storage queue
   try {
-    const queue = readQueue();
-    const existing = queue.find((e) => e && e.prefetchKey === prefetchKey);
-    // Apps usually register the same requests on every launch; skip rewriting them.
-    if (existing && JSON.stringify(existing) === JSON.stringify(entry)) return;
-    writeQueue([
-      ...queue.filter((e) => e && e.prefetchKey !== prefetchKey),
-      entry,
-    ]);
+    let arr: any[] = [];
+    try {
+      const raw = NativeStorageSingleton.getSecureString(
+        AUTOPREFETCH_QUEUE_KEY
+      );
+      if (raw) arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) arr = [];
+    } catch {
+      arr = [];
+    }
+    if (arr.some((e) => e && e.prefetchKey === prefetchKey)) {
+      arr = arr.filter((e) => e && e.prefetchKey !== prefetchKey);
+    }
+    arr.push(entry);
+    NativeStorageSingleton.setSecureString(
+      AUTOPREFETCH_QUEUE_KEY,
+      JSON.stringify(arr)
+    );
   } catch (e) {
     console.warn('Failed to persist prefetch queue', e);
   }
@@ -162,13 +140,24 @@ export async function removeFromAutoPrefetch(
   prefetchKey: string
 ): Promise<void> {
   try {
-    const queue = readQueue();
-    const next = queue.filter((e) => e && e.prefetchKey !== prefetchKey);
+    let arr: any[] = [];
+    try {
+      const raw = NativeStorageSingleton.getSecureString(
+        AUTOPREFETCH_QUEUE_KEY
+      );
+      if (raw) arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) arr = [];
+    } catch {
+      arr = [];
+    }
+    const next = arr.filter((e) => e && e.prefetchKey !== prefetchKey);
     if (next.length === 0) {
-      cachedQueue = undefined;
       NativeStorageSingleton.removeSecureString(AUTOPREFETCH_QUEUE_KEY);
-    } else if (next.length !== queue.length) {
-      writeQueue(next);
+    } else if (next.length !== arr.length) {
+      NativeStorageSingleton.setSecureString(
+        AUTOPREFETCH_QUEUE_KEY,
+        JSON.stringify(next)
+      );
     }
   } catch (e) {
     console.warn('Failed to remove from prefetch queue', e);
@@ -178,7 +167,6 @@ export async function removeFromAutoPrefetch(
 /** Remove all entries from the auto-prefetch queue. */
 export async function removeAllFromAutoprefetch(): Promise<void> {
   try {
-    cachedQueue = undefined;
     NativeStorageSingleton.removeSecureString(AUTOPREFETCH_QUEUE_KEY);
   } catch (e) {
     console.warn('Failed to clear prefetch queue', e);
