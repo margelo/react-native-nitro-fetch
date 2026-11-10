@@ -55,6 +55,9 @@ namespace margelo::nitro::nitrofetch {
   public:
     // Methods
     std::shared_ptr<HybridNitroFetchClientSpec> createClient() override;
+    std::shared_ptr<Promise<void>> prefetchOnAppStart(const std::string& entryJson) override;
+    std::shared_ptr<Promise<void>> removeFromAutoPrefetch(const std::string& prefetchKey) override;
+    std::shared_ptr<Promise<void>> removeAllFromAutoprefetch() override;
 
   private:
     jni::global_ref<JHybridNitroFetchSpec::JavaPart> _javaPart;
