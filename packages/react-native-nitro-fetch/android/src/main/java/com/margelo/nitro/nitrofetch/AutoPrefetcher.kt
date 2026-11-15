@@ -80,12 +80,17 @@ object AutoPrefetcher {
   }
 
   /** Saves a JS `prefetchOnAppStart` entry like [registerPrefetch], without the late-path prefetch. */
-  internal fun prefetchOnAppStart(context: Context, entryJson: String): CompletableFuture<Void> =
+  internal fun saveAutoPrefetchEntry(context: Context, entryJson: String): CompletableFuture<Unit> =
     onQueue(context) { prefs ->
-      check(saveToQueue(prefs, JSONObject(entryJson))) { "Failed to save the startup prefetch queue" }
+      val entry = JSONObject(entryJson)
+      // Same rule as [registerPrefetch]: an entry without a url or a key can't be prefetched or replaced.
+      require(!entry.optStringOrNull("url").isNullOrEmpty() && !entry.optStringOrNull("prefetchKey").isNullOrEmpty()) {
+        "A startup prefetch entry needs a url and a prefetchKey"
+      }
+      check(saveToQueue(prefs, entry)) { "Failed to save the startup prefetch queue" }
     }
 
-  internal fun removeFromAutoPrefetch(context: Context, prefetchKey: String): CompletableFuture<Void> =
+  internal fun removeFromAutoPrefetch(context: Context, prefetchKey: String): CompletableFuture<Unit> =
     onQueue(context) { prefs ->
       val arr = readQueue(prefs)
       val next = JSONArray()
@@ -100,15 +105,19 @@ object AutoPrefetcher {
       }
     }
 
-  internal fun removeAllFromAutoprefetch(context: Context): CompletableFuture<Void> =
+  internal fun removeAllFromAutoprefetch(context: Context): CompletableFuture<Unit> =
     onQueue(context) { prefs ->
       check(NitroFetchSecureAtRest.removeFromPrefs(prefs, KEY_QUEUE)) { "Failed to clear the startup prefetch queue" }
     }
 
-  private fun onQueue(context: Context, update: (SharedPreferences) -> Unit): CompletableFuture<Void> {
+  /** The saved list as JSON, or "" if there is none. Reads on the queue thread, so it never overlaps a save. */
+  internal fun readAutoPrefetchQueue(context: Context): CompletableFuture<String> =
+    onQueue(context) { prefs -> NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: "" }
+
+  private fun <T> onQueue(context: Context, task: (SharedPreferences) -> T): CompletableFuture<T> {
     val appContext = context.applicationContext
-    return CompletableFuture.runAsync({
-      update(appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))
+    return CompletableFuture.supplyAsync({
+      task(appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))
     }, queueExecutor)
   }
 

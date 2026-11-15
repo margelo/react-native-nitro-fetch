@@ -36,7 +36,7 @@ abstract class HybridNitroFetchSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
-  abstract fun prefetchOnAppStart(entryJson: String): Promise<Unit>
+  abstract fun saveAutoPrefetchEntry(entryJson: String): Promise<Unit>
   
   @DoNotStrip
   @Keep
@@ -45,6 +45,10 @@ abstract class HybridNitroFetchSpec: HybridObject() {
   @DoNotStrip
   @Keep
   abstract fun removeAllFromAutoprefetch(): Promise<Unit>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun readAutoPrefetchQueue(): Promise<String>
 
   // Default implementation of `HybridObject.toString()`
   override fun toString(): String {

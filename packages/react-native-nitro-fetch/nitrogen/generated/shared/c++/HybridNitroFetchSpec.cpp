@@ -15,9 +15,10 @@ namespace margelo::nitro::nitrofetch {
     // load custom methods/properties
     registerHybrids(this, [](Prototype& prototype) {
       prototype.registerHybridMethod("createClient", &HybridNitroFetchSpec::createClient);
-      prototype.registerHybridMethod("prefetchOnAppStart", &HybridNitroFetchSpec::prefetchOnAppStart);
+      prototype.registerHybridMethod("saveAutoPrefetchEntry", &HybridNitroFetchSpec::saveAutoPrefetchEntry);
       prototype.registerHybridMethod("removeFromAutoPrefetch", &HybridNitroFetchSpec::removeFromAutoPrefetch);
       prototype.registerHybridMethod("removeAllFromAutoprefetch", &HybridNitroFetchSpec::removeAllFromAutoprefetch);
+      prototype.registerHybridMethod("readAutoPrefetchQueue", &HybridNitroFetchSpec::readAutoPrefetchQueue);
     });
   }
 

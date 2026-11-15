@@ -1,4 +1,3 @@
-import { NativeStorage as NativeStorageSingleton } from '../NitroInstances';
 import type { RequestPriority } from '../Request';
 import { base64FromBytes } from '../blob';
 import { NitroFetchHybrid, ensureClient } from './client';
@@ -51,8 +50,6 @@ export async function prefetch(
 export function clearPrefetchCache(): void {
   ensureClient()?.clearPrefetchCache?.();
 }
-
-const AUTOPREFETCH_QUEUE_KEY = 'nitrofetch_autoprefetch_queue';
 
 /** Save a request so native code can prefetch it on app start. */
 // Entries embed request headers (may hold credentials) — stored encrypted at rest.
@@ -111,7 +108,7 @@ export async function prefetchOnAppStart(
     entry.prefetchCacheTtlMs = req.prefetchCacheTtlMs;
 
   try {
-    await NitroFetchHybrid.prefetchOnAppStart(JSON.stringify(entry));
+    await NitroFetchHybrid.saveAutoPrefetchEntry(JSON.stringify(entry));
   } catch (e) {
     console.warn('Failed to persist prefetch queue', e);
   }
@@ -138,9 +135,11 @@ export async function removeAllFromAutoprefetch(): Promise<void> {
 }
 
 /** @internal Reads the app-start prefetch list. */
-export function __readAutoPrefetchQueue(): Array<Record<string, any>> {
+export async function __readAutoPrefetchQueue(): Promise<
+  Array<Record<string, any>>
+> {
   try {
-    const raw = NativeStorageSingleton.getSecureString(AUTOPREFETCH_QUEUE_KEY);
+    const raw = await NitroFetchHybrid.readAutoPrefetchQueue();
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];

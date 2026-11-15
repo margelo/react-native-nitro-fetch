@@ -78,8 +78,8 @@ namespace margelo::nitro::nitrofetch {
       auto __value = std::move(__result.value());
       return __value;
     }
-    inline std::shared_ptr<Promise<void>> prefetchOnAppStart(const std::string& entryJson) override {
-      auto __result = _swiftPart.prefetchOnAppStart(entryJson);
+    inline std::shared_ptr<Promise<void>> saveAutoPrefetchEntry(const std::string& entryJson) override {
+      auto __result = _swiftPart.saveAutoPrefetchEntry(entryJson);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
@@ -96,6 +96,14 @@ namespace margelo::nitro::nitrofetch {
     }
     inline std::shared_ptr<Promise<void>> removeAllFromAutoprefetch() override {
       auto __result = _swiftPart.removeAllFromAutoprefetch();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<std::string>> readAutoPrefetchQueue() override {
+      auto __result = _swiftPart.readAutoPrefetchQueue();
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

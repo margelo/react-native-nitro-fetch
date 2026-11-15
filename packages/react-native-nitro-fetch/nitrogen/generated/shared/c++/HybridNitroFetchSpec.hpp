@@ -53,9 +53,10 @@ namespace margelo::nitro::nitrofetch {
     public:
       // Methods
       virtual std::shared_ptr<HybridNitroFetchClientSpec> createClient() = 0;
-      virtual std::shared_ptr<Promise<void>> prefetchOnAppStart(const std::string& entryJson) = 0;
+      virtual std::shared_ptr<Promise<void>> saveAutoPrefetchEntry(const std::string& entryJson) = 0;
       virtual std::shared_ptr<Promise<void>> removeFromAutoPrefetch(const std::string& prefetchKey) = 0;
       virtual std::shared_ptr<Promise<void>> removeAllFromAutoprefetch() = 0;
+      virtual std::shared_ptr<Promise<std::string>> readAutoPrefetchQueue() = 0;
 
     protected:
       // Hybrid Setup

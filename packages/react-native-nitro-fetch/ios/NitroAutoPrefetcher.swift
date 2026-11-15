@@ -98,7 +98,7 @@ public final class NitroAutoPrefetcher: NSObject {
     )
     workQueue.async {
       let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
-      saveToQueue(entry, userDefaults: userDefaults)
+      try? saveToQueue(entry, userDefaults: userDefaults) // best-effort
 
       if initialized {
         // Late path — apply cached tokens + kick immediate prefetch
@@ -110,37 +110,57 @@ public final class NitroAutoPrefetcher: NSObject {
   }
 
   /// Saves a JS `prefetchOnAppStart` entry like `registerPrefetch`, without the late-path prefetch.
-  static func prefetchOnAppStart(entryJson: String, completion: @escaping () -> Void) {
-    workQueue.async {
-      defer { completion() }
-      guard let data = entryJson.data(using: .utf8),
-            let entry = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
-      saveToQueue(entry, userDefaults: UserDefaults(suiteName: suiteName) ?? UserDefaults.standard)
+  static func saveAutoPrefetchEntry(entryJson: String, completion: @escaping (Result<Void, Error>) -> Void) {
+    onWorkQueue(completion) { userDefaults in
+      // Same rule as `registerPrefetch`: an entry without a url or a key can't be prefetched or replaced.
+      guard let entry = try JSONSerialization.jsonObject(with: Data(entryJson.utf8)) as? [String: Any],
+            (entry["url"] as? String)?.isEmpty == false,
+            (entry["prefetchKey"] as? String)?.isEmpty == false else {
+        throw queueError("A startup prefetch entry needs a url and a prefetchKey")
+      }
+      try saveToQueue(entry, userDefaults: userDefaults)
     }
   }
 
-  static func removeFromAutoPrefetch(prefetchKey: String, completion: @escaping () -> Void) {
-    workQueue.async {
-      defer { completion() }
-      let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
+  static func removeFromAutoPrefetch(prefetchKey: String, completion: @escaping (Result<Void, Error>) -> Void) {
+    onWorkQueue(completion) { userDefaults in
       let arr = readQueue(userDefaults: userDefaults)
       let next = arr.filter { ($0["prefetchKey"] as? String) != prefetchKey }
       if next.isEmpty {
         NitroFetchSecureAtRest.remove(forKey: queueKey, defaults: userDefaults)
       } else if next.count != arr.count {
-        writeQueue(next, userDefaults: userDefaults)
+        try writeQueue(next, userDefaults: userDefaults)
       }
     }
   }
 
-  static func removeAllFromAutoprefetch(completion: @escaping () -> Void) {
-    workQueue.async {
-      defer { completion() }
-      NitroFetchSecureAtRest.remove(forKey: queueKey, defaults: UserDefaults(suiteName: suiteName) ?? UserDefaults.standard)
+  static func removeAllFromAutoprefetch(completion: @escaping (Result<Void, Error>) -> Void) {
+    onWorkQueue(completion) { userDefaults in
+      NitroFetchSecureAtRest.remove(forKey: queueKey, defaults: userDefaults)
     }
   }
 
-  private static func saveToQueue(_ entry: [String: Any], userDefaults: UserDefaults) {
+  /// The saved list as JSON, or "" if there is none. Reads on `workQueue`, so it never overlaps a save.
+  static func readAutoPrefetchQueue(completion: @escaping (Result<String, Error>) -> Void) {
+    onWorkQueue(completion) { userDefaults in
+      NitroFetchSecureAtRest.decryptedString(forKey: queueKey, defaults: userDefaults) ?? ""
+    }
+  }
+
+  private static func onWorkQueue<T>(
+    _ completion: @escaping (Result<T, Error>) -> Void,
+    _ task: @escaping (UserDefaults) throws -> T
+  ) {
+    workQueue.async {
+      completion(Result { try task(UserDefaults(suiteName: suiteName) ?? UserDefaults.standard) })
+    }
+  }
+
+  private static func queueError(_ message: String) -> NSError {
+    NSError(domain: "NitroFetch", code: -4, userInfo: [NSLocalizedDescriptionKey: message])
+  }
+
+  private static func saveToQueue(_ entry: [String: Any], userDefaults: UserDefaults) throws {
     let prefetchKey = entry["prefetchKey"] as? String
     var arr = readQueue(userDefaults: userDefaults)
     if let existing = arr.first(where: { ($0["prefetchKey"] as? String) == prefetchKey }),
@@ -149,7 +169,7 @@ public final class NitroAutoPrefetcher: NSObject {
     }
     arr.removeAll { ($0["prefetchKey"] as? String) == prefetchKey }
     arr.append(entry)
-    writeQueue(arr, userDefaults: userDefaults)
+    try writeQueue(arr, userDefaults: userDefaults)
   }
 
   private static func readQueue(userDefaults: UserDefaults) -> [[String: Any]] {
@@ -157,15 +177,18 @@ public final class NitroAutoPrefetcher: NSObject {
     guard let raw = NitroFetchSecureAtRest.decryptedString(forKey: queueKey, defaults: userDefaults),
           !raw.isEmpty,
           let data = raw.data(using: .utf8),
-          let parsed = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
-    return parsed
+          let parsed = try? JSONSerialization.jsonObject(with: data) as? [Any] else { return [] }
+    // A malformed element is skipped; it must not drop the rest of the list.
+    return parsed.compactMap { $0 as? [String: Any] }
   }
 
-  private static func writeQueue(_ arr: [[String: Any]], userDefaults: UserDefaults) {
-    if let data = try? JSONSerialization.data(withJSONObject: arr),
-       let str = String(data: data, encoding: .utf8) {
-      NitroFetchSecureAtRest.setEncrypted(str, forKey: queueKey, defaults: userDefaults)
+  private static func writeQueue(_ arr: [[String: Any]], userDefaults: UserDefaults) throws {
+    // `data(withJSONObject:)` raises an Objective-C exception on an invalid object, so check first.
+    guard JSONSerialization.isValidJSONObject(arr) else {
+      throw queueError("Failed to save the startup prefetch queue")
     }
+    let data = try JSONSerialization.data(withJSONObject: arr)
+    NitroFetchSecureAtRest.setEncrypted(String(decoding: data, as: UTF8.self), forKey: queueKey, defaults: userDefaults)
   }
 
   /// Starts prefetch immediately without registering it for a future launch.

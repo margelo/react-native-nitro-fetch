@@ -14,9 +14,10 @@ public protocol HybridNitroFetchSpec_protocol: HybridObject {
 
   // Methods
   func createClient() throws -> (any HybridNitroFetchClientSpec)
-  func prefetchOnAppStart(entryJson: String) throws -> Promise<Void>
+  func saveAutoPrefetchEntry(entryJson: String) throws -> Promise<Void>
   func removeFromAutoPrefetch(prefetchKey: String) throws -> Promise<Void>
   func removeAllFromAutoprefetch() throws -> Promise<Void>
+  func readAutoPrefetchQueue() throws -> Promise<String>
 }
 
 public extension HybridNitroFetchSpec_protocol {

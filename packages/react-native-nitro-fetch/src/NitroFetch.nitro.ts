@@ -148,12 +148,18 @@ export interface NitroFetch extends HybridObject<{
   /** Create a client bound to a given environment (e.g., cache dir). */
   createClient(): NitroFetchClient;
   // Startup prefetch list methods live here so they work without a client (whose Android creation starts Cronet).
-  /** Save a `prefetchOnAppStart` entry (JSON) for the next launch on a background thread. Resolves once saved. */
-  prefetchOnAppStart(entryJson: string): Promise<void>;
-  /** Remove one saved entry, on the same thread as saves so calls apply in order. */
+  // They all run on one native background thread, so calls apply in order.
+  /**
+   * @internal Apps use `prefetchOnAppStart`, which builds the entry.
+   * Save one entry (JSON) for the next launch. Rejects if it has no `url` or `prefetchKey`.
+   */
+  saveAutoPrefetchEntry(entryJson: string): Promise<void>;
+  /** Remove one saved entry. */
   removeFromAutoPrefetch(prefetchKey: string): Promise<void>;
-  /** Remove all saved entries, on the same thread as saves so calls apply in order. */
+  /** Remove all saved entries. */
   removeAllFromAutoprefetch(): Promise<void>;
+  /** @internal Read the saved list as a JSON array, or `''` if there is none. */
+  readAutoPrefetchQueue(): Promise<string>;
 
   // Optional future: global abort/teardown
   // shutdown(): void;

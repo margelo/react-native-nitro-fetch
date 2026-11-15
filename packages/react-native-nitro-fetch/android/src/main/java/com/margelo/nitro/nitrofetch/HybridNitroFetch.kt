@@ -10,6 +10,7 @@ import org.chromium.net.CronetEngine
 import org.chromium.net.CronetProvider
 import java.io.File
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
@@ -21,8 +22,8 @@ class HybridNitroFetch : HybridNitroFetchSpec() {
     return HybridNitroFetchClient(getEngine(), ioExecutor)
   }
 
-  override fun prefetchOnAppStart(entryJson: String): Promise<Unit> =
-    onPrefetchQueue { AutoPrefetcher.prefetchOnAppStart(it, entryJson) }
+  override fun saveAutoPrefetchEntry(entryJson: String): Promise<Unit> =
+    onPrefetchQueue { AutoPrefetcher.saveAutoPrefetchEntry(it, entryJson) }
 
   override fun removeFromAutoPrefetch(prefetchKey: String): Promise<Unit> =
     onPrefetchQueue { AutoPrefetcher.removeFromAutoPrefetch(it, prefetchKey) }
@@ -30,12 +31,16 @@ class HybridNitroFetch : HybridNitroFetchSpec() {
   override fun removeAllFromAutoprefetch(): Promise<Unit> =
     onPrefetchQueue { AutoPrefetcher.removeAllFromAutoprefetch(it) }
 
-  private fun onPrefetchQueue(update: (Context) -> CompletableFuture<Void>): Promise<Unit> {
+  override fun readAutoPrefetchQueue(): Promise<String> =
+    onPrefetchQueue { AutoPrefetcher.readAutoPrefetchQueue(it) }
+
+  private fun <T> onPrefetchQueue(task: (Context) -> CompletableFuture<T>): Promise<T> {
     val context = NitroModules.applicationContext
-      ?: throw IllegalStateException("Cannot update startup prefetches - no Android Context")
-    val promise = Promise<Unit>()
-    update(context).whenComplete { _, error ->
-      if (error == null) promise.resolve(Unit) else promise.reject(error)
+      ?: throw IllegalStateException("Cannot access startup prefetches - no Android Context")
+    val promise = Promise<T>()
+    task(context).whenComplete { result, error ->
+      // The future wraps a failure in CompletionException; JS should see the real error.
+      if (error == null) promise.resolve(result) else promise.reject((error as? CompletionException)?.cause ?: error)
     }
     return promise
   }

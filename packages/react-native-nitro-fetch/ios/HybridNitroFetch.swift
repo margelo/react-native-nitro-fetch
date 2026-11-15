@@ -6,8 +6,8 @@ final class HybridNitroFetch: HybridNitroFetchSpec {
     return HybridNitroFetchClient()
   }
 
-  func prefetchOnAppStart(entryJson: String) throws -> Promise<Void> {
-    onPrefetchQueue { NitroAutoPrefetcher.prefetchOnAppStart(entryJson: entryJson, completion: $0) }
+  func saveAutoPrefetchEntry(entryJson: String) throws -> Promise<Void> {
+    onPrefetchQueue { NitroAutoPrefetcher.saveAutoPrefetchEntry(entryJson: entryJson, completion: $0) }
   }
 
   func removeFromAutoPrefetch(prefetchKey: String) throws -> Promise<Void> {
@@ -18,11 +18,18 @@ final class HybridNitroFetch: HybridNitroFetchSpec {
     onPrefetchQueue { NitroAutoPrefetcher.removeAllFromAutoprefetch(completion: $0) }
   }
 
-  private func onPrefetchQueue(_ update: (@escaping () -> Void) -> Void) -> Promise<Void> {
-    let promise = Promise<Void>.init()
-    update { promise.resolve(withResult: ()) }
+  func readAutoPrefetchQueue() throws -> Promise<String> {
+    onPrefetchQueue { NitroAutoPrefetcher.readAutoPrefetchQueue(completion: $0) }
+  }
+
+  private func onPrefetchQueue<T>(_ task: (@escaping (Result<T, Error>) -> Void) -> Void) -> Promise<T> {
+    let promise = Promise<T>()
+    task { result in
+      switch result {
+      case .success(let value): promise.resolve(withResult: value)
+      case .failure(let error): promise.reject(withError: error)
+      }
+    }
     return promise
   }
-  
 }
-
