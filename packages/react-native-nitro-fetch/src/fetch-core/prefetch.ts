@@ -1,4 +1,3 @@
-import { NativeStorage as NativeStorageSingleton } from '../NitroInstances';
 import type { RequestPriority } from '../Request';
 import { base64FromBytes } from '../blob';
 import { NitroFetchHybrid, ensureClient } from './client';
@@ -51,8 +50,6 @@ export async function prefetch(
 export function clearPrefetchCache(): void {
   ensureClient()?.clearPrefetchCache?.();
 }
-
-const AUTOPREFETCH_QUEUE_KEY = 'nitrofetch_autoprefetch_queue';
 
 /** Save a request so native code can prefetch it on app start. */
 // Entries embed request headers (may hold credentials) — stored encrypted at rest.
@@ -110,26 +107,8 @@ export async function prefetchOnAppStart(
   if (typeof req.prefetchCacheTtlMs === 'number')
     entry.prefetchCacheTtlMs = req.prefetchCacheTtlMs;
 
-  // Write or append to storage queue
   try {
-    let arr: any[] = [];
-    try {
-      const raw = NativeStorageSingleton.getSecureString(
-        AUTOPREFETCH_QUEUE_KEY
-      );
-      if (raw) arr = JSON.parse(raw);
-      if (!Array.isArray(arr)) arr = [];
-    } catch {
-      arr = [];
-    }
-    if (arr.some((e) => e && e.prefetchKey === prefetchKey)) {
-      arr = arr.filter((e) => e && e.prefetchKey !== prefetchKey);
-    }
-    arr.push(entry);
-    NativeStorageSingleton.setSecureString(
-      AUTOPREFETCH_QUEUE_KEY,
-      JSON.stringify(arr)
-    );
+    await NitroFetchHybrid.saveAutoPrefetchEntry(JSON.stringify(entry));
   } catch (e) {
     console.warn('Failed to persist prefetch queue', e);
   }
@@ -140,25 +119,7 @@ export async function removeFromAutoPrefetch(
   prefetchKey: string
 ): Promise<void> {
   try {
-    let arr: any[] = [];
-    try {
-      const raw = NativeStorageSingleton.getSecureString(
-        AUTOPREFETCH_QUEUE_KEY
-      );
-      if (raw) arr = JSON.parse(raw);
-      if (!Array.isArray(arr)) arr = [];
-    } catch {
-      arr = [];
-    }
-    const next = arr.filter((e) => e && e.prefetchKey !== prefetchKey);
-    if (next.length === 0) {
-      NativeStorageSingleton.removeSecureString(AUTOPREFETCH_QUEUE_KEY);
-    } else if (next.length !== arr.length) {
-      NativeStorageSingleton.setSecureString(
-        AUTOPREFETCH_QUEUE_KEY,
-        JSON.stringify(next)
-      );
-    }
+    await NitroFetchHybrid.removeFromAutoPrefetch(prefetchKey);
   } catch (e) {
     console.warn('Failed to remove from prefetch queue', e);
   }
@@ -167,16 +128,18 @@ export async function removeFromAutoPrefetch(
 /** Remove all entries from the auto-prefetch queue. */
 export async function removeAllFromAutoprefetch(): Promise<void> {
   try {
-    NativeStorageSingleton.removeSecureString(AUTOPREFETCH_QUEUE_KEY);
+    await NitroFetchHybrid.removeAllFromAutoprefetch();
   } catch (e) {
     console.warn('Failed to clear prefetch queue', e);
   }
 }
 
 /** @internal Reads the app-start prefetch list. */
-export function __readAutoPrefetchQueue(): Array<Record<string, any>> {
+export async function __readAutoPrefetchQueue(): Promise<
+  Array<Record<string, any>>
+> {
   try {
-    const raw = NativeStorageSingleton.getSecureString(AUTOPREFETCH_QUEUE_KEY);
+    const raw = await NitroFetchHybrid.readAutoPrefetchQueue();
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];

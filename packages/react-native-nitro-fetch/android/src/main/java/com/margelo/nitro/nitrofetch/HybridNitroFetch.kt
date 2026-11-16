@@ -1,11 +1,16 @@
 package com.margelo.nitro.nitrofetch
 
 import android.app.Application
+import android.content.Context
 import androidx.annotation.Keep
 import com.facebook.proguard.annotations.DoNotStrip
+import com.margelo.nitro.NitroModules
+import com.margelo.nitro.core.Promise
 import org.chromium.net.CronetEngine
 import org.chromium.net.CronetProvider
 import java.io.File
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
@@ -15,6 +20,28 @@ class HybridNitroFetch : HybridNitroFetchSpec() {
   // Generated base may expect env-less createClient.
   override fun createClient(): HybridNitroFetchClient {
     return HybridNitroFetchClient(getEngine(), ioExecutor)
+  }
+
+  override fun saveAutoPrefetchEntry(entryJson: String): Promise<Unit> =
+    onPrefetchQueue { AutoPrefetcher.saveAutoPrefetchEntry(it, entryJson) }
+
+  override fun removeFromAutoPrefetch(prefetchKey: String): Promise<Unit> =
+    onPrefetchQueue { AutoPrefetcher.removeFromAutoPrefetch(it, prefetchKey) }
+
+  override fun removeAllFromAutoprefetch(): Promise<Unit> =
+    onPrefetchQueue { AutoPrefetcher.removeAllFromAutoprefetch(it) }
+
+  override fun readAutoPrefetchQueue(): Promise<String> =
+    onPrefetchQueue { AutoPrefetcher.readAutoPrefetchQueue(it) }
+
+  private fun <T> onPrefetchQueue(task: (Context) -> CompletableFuture<T>): Promise<T> {
+    val context = NitroModules.applicationContext
+      ?: throw IllegalStateException("Cannot access startup prefetches - no Android Context")
+    val promise = Promise<T>()
+    task(context).whenComplete { result, error ->
+      if (error == null) promise.resolve(result) else promise.reject((error as? CompletionException)?.cause ?: error)
+    }
+    return promise
   }
 
   companion object {

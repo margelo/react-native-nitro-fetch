@@ -172,6 +172,14 @@ namespace margelo::nitro::nitrofetch::bridge::swift {
     return swiftPart.toUnsafe();
   }
   
+  // pragma MARK: std::function<void(const std::string& /* result */)>
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = NitroFetch::Func_void_std__string::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::string& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
   // pragma MARK: std::shared_ptr<HybridNitroFetchSpec>
   std::shared_ptr<HybridNitroFetchSpec> create_std__shared_ptr_HybridNitroFetchSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
     NitroFetch::HybridNitroFetchSpec_cxx swiftPart = NitroFetch::HybridNitroFetchSpec_cxx::fromUnsafe(swiftUnsafePointer);

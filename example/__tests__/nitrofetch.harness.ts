@@ -147,7 +147,7 @@ describe('NitroFetch - Prefetch cache TTL', () => {
       prefetchKey: KEY,
       prefetchCacheTtlMs: 12_345,
     } as any);
-    const entry = __readAutoPrefetchQueue().find(
+    const entry = (await __readAutoPrefetchQueue()).find(
       (e: any) => e?.prefetchKey === KEY
     );
     expect(entry).toBeDefined();
@@ -160,7 +160,7 @@ describe('NitroFetch - Prefetch cache TTL', () => {
     await prefetchOnAppStart(`${BASE}/get`, {
       prefetchKey: KEY,
     } as any);
-    const entry = __readAutoPrefetchQueue().find(
+    const entry = (await __readAutoPrefetchQueue()).find(
       (e: any) => e?.prefetchKey === KEY
     );
     expect(entry).toBeDefined();
@@ -646,8 +646,8 @@ describe('NitroFetch - HTTP cache', () => {
 });
 
 describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
-  const findEntry = (key: string) =>
-    __readAutoPrefetchQueue().find((e: any) => e?.prefetchKey === key);
+  const findEntry = async (key: string) =>
+    (await __readAutoPrefetchQueue()).find((e: any) => e?.prefetchKey === key);
 
   it('POST + string body round-trips through the queue', async () => {
     const KEY = 'pf-post-string';
@@ -656,7 +656,7 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
       body: 'hello',
       prefetchKey: KEY,
     } as any);
-    const entry = findEntry(KEY);
+    const entry = await findEntry(KEY);
     expect(entry).toBeDefined();
     expect(entry!.method).toBe('POST');
     expect(entry!.bodyString).toBe('hello');
@@ -675,7 +675,7 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
         'prefetchKey': KEY,
       },
     });
-    const entry = findEntry(KEY);
+    const entry = await findEntry(KEY);
     expect(entry).toBeDefined();
     expect(entry!.method).toBe('POST');
     expect(entry!.bodyString).toBe(JSON.stringify(payload));
@@ -697,7 +697,7 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
       body: fd,
       prefetchKey: KEY,
     } as any);
-    const entry = findEntry(KEY);
+    const entry = await findEntry(KEY);
     expect(entry).toBeDefined();
     expect(entry!.method).toBe('POST');
     expect(Array.isArray(entry!.bodyFormData)).toBe(true);
@@ -719,7 +719,7 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
         'prefetchKey': KEY,
       },
     });
-    const entry = findEntry(KEY);
+    const entry = await findEntry(KEY);
     expect(entry).toBeDefined();
     expect(entry!.method).toBe('POST');
     expect(entry!.bodyBytesBase64).toBe('AH+A//4=');
@@ -749,7 +749,7 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
   it('GET (default) omits method/body from entry', async () => {
     const KEY = 'pf-get-default';
     await prefetchOnAppStart(`${BASE}/get`, { prefetchKey: KEY });
-    const entry = findEntry(KEY);
+    const entry = await findEntry(KEY);
     expect(entry).toBeDefined();
     expect(entry!.method).toBeUndefined();
     expect(entry!.bodyString).toBeUndefined();
@@ -763,7 +763,7 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
       prefetchKey: KEY,
       redirect: 'error',
     } as any);
-    const entry = findEntry(KEY);
+    const entry = await findEntry(KEY);
     expect(entry).toBeDefined();
     expect(entry!.followRedirects).toBe(false);
     await removeFromAutoPrefetch(KEY);
@@ -772,10 +772,54 @@ describe('NitroFetch - prefetchOnAppStart persists method + body', () => {
   it('redirect=follow (default) omits followRedirects', async () => {
     const KEY = 'pf-yesredir';
     await prefetchOnAppStart(`${BASE}/get`, { prefetchKey: KEY });
-    const entry = findEntry(KEY);
+    const entry = await findEntry(KEY);
     expect(entry).toBeDefined();
     expect(entry!.followRedirects).toBeUndefined();
     await removeFromAutoPrefetch(KEY);
+  });
+});
+
+describe('NitroFetch - startup prefetch queue updates', () => {
+  const entriesFor = async (key: string) =>
+    (await __readAutoPrefetchQueue()).filter(
+      (e: any) => e?.prefetchKey === key
+    );
+  const tokenOf = (entry: any) =>
+    Object.entries((entry?.headers ?? {}) as Record<string, string>).find(
+      ([k]) => k.toLowerCase() === 'x-token'
+    )?.[1];
+
+  it('a changed request under the same prefetchKey replaces the saved entry', async () => {
+    const KEY = 'pf-queue-replace';
+    const save = (token: string) =>
+      prefetchOnAppStart(`${BASE}/get`, {
+        prefetchKey: KEY,
+        headers: { 'X-Token': token },
+      });
+    await save('old');
+    await save('old');
+    await save('new');
+    const entries = await entriesFor(KEY);
+    expect(entries.length).toBe(1);
+    expect(tokenOf(entries[0])).toBe('new');
+    await removeFromAutoPrefetch(KEY);
+  });
+
+  it('saving or removing one entry keeps the other entries', async () => {
+    const KEPT = 'pf-queue-kept';
+    const OTHER = 'pf-queue-other';
+    await prefetchOnAppStart(`${BASE}/get`, {
+      prefetchKey: KEPT,
+      headers: { 'X-Token': 'kept' },
+    });
+    await prefetchOnAppStart(`${BASE}/get`, { prefetchKey: OTHER });
+    expect((await entriesFor(OTHER)).length).toBe(1);
+    expect(tokenOf((await entriesFor(KEPT))[0])).toBe('kept');
+
+    await removeFromAutoPrefetch(OTHER);
+    expect((await entriesFor(OTHER)).length).toBe(0);
+    expect(tokenOf((await entriesFor(KEPT))[0])).toBe('kept');
+    await removeFromAutoPrefetch(KEPT);
   });
 });
 
@@ -930,7 +974,7 @@ describe('NitroFetch - timeoutMs', () => {
       prefetchKey: KEY,
       timeoutMs: 12_345,
     });
-    const entry = __readAutoPrefetchQueue().find(
+    const entry = (await __readAutoPrefetchQueue()).find(
       (e: any) => e?.prefetchKey === KEY
     );
     expect(entry).toBeDefined();
@@ -1080,7 +1124,7 @@ describe('NitroFetch - priority', () => {
       prefetchKey: 'pf-priority-auto',
       priority: 'auto',
     });
-    const queue = __readAutoPrefetchQueue();
+    const queue = await __readAutoPrefetchQueue();
     const find = (key: string) =>
       queue.find((e: any) => e?.prefetchKey === key);
     expect(find('pf-priority-high')?.priority).toBe('high');

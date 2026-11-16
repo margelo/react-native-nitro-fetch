@@ -2,6 +2,7 @@ package com.margelo.nitro.nitrofetch
 
 import android.app.Application
 import android.content.Context
+import android.content.SharedPreferences
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -12,8 +13,9 @@ import java.util.concurrent.Executors
 
 object AutoPrefetcher {
   @Volatile private var initialized = false
-  // Serializes queue reads/writes and keeps Keystore work off the caller (main) thread.
   private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "NitroAutoPrefetch") }
+  private val queueExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "NitroPrefetchQueue") }
+  private var queueCommitFailed = false
   private const val KEY_QUEUE = "nitrofetch_autoprefetch_queue"
   private const val KEY_TOKEN_REFRESH = "nitro_token_refresh_fetch"
   private const val KEY_TOKEN_CACHE = "nitro_token_refresh_fetch_cache"
@@ -50,32 +52,92 @@ object AutoPrefetcher {
       prefetchCacheTtlMs
     )
     val appContext = context.applicationContext
-    executor.execute {
+    queueExecutor.execute {
       try {
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        // Entries embed request headers (may hold credentials) — encrypted-at-rest; legacy plaintext migrates on read.
-        val raw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: ""
-        val arr = if (raw.isEmpty()) JSONArray() else try { JSONArray(raw) } catch (_: Throwable) { JSONArray() }
-
-        val next = JSONArray()
-        for (i in 0 until arr.length()) {
-          val o = arr.optJSONObject(i) ?: continue
-          if (o.optString("prefetchKey", "") == prefetchKey) continue
-          next.put(o)
-        }
-        next.put(entry)
-        NitroFetchSecureAtRest.putEncrypted(prefs, KEY_QUEUE, next.toString())
+        saveToQueue(prefs, entry)
 
         if (initialized) {
           // late path — kick a single immediate prefetch with cached tokens
-          val tokens = deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
-          val single = JSONArray().apply { put(entry) }
-          startPrefetches(single, tokens)
+          executor.execute {
+            try {
+              val tokens = deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
+              val single = JSONArray().apply { put(entry) }
+              startPrefetches(single, tokens)
+            } catch (_: Throwable) {}
+          }
         }
       } catch (_: Throwable) {
         // best-effort
       }
     }
+  }
+
+  internal fun saveAutoPrefetchEntry(context: Context, entryJson: String): CompletableFuture<Unit> =
+    onQueue(context) { prefs ->
+      val entry = JSONObject(entryJson)
+      require(!entry.optStringOrNull("url").isNullOrEmpty() && !entry.optStringOrNull("prefetchKey").isNullOrEmpty()) {
+        "A startup prefetch entry needs a url and a prefetchKey"
+      }
+      check(saveToQueue(prefs, entry)) { "Failed to save the startup prefetch queue" }
+    }
+
+  internal fun removeFromAutoPrefetch(context: Context, prefetchKey: String): CompletableFuture<Unit> =
+    onQueue(context) { prefs ->
+      val arr = readQueue(prefs)
+      val next = JSONArray()
+      for (i in 0 until arr.length()) {
+        val o = arr.optJSONObject(i) ?: continue
+        if (o.optString("prefetchKey", "") != prefetchKey) next.put(o)
+      }
+      if (next.length() == 0) {
+        check(NitroFetchSecureAtRest.removeFromPrefs(prefs, KEY_QUEUE)) { "Failed to clear the startup prefetch queue" }
+      } else if (next.length() != arr.length()) {
+        check(writeQueue(prefs, next)) { "Failed to save the startup prefetch queue" }
+      }
+    }
+
+  internal fun removeAllFromAutoprefetch(context: Context): CompletableFuture<Unit> =
+    onQueue(context) { prefs ->
+      check(NitroFetchSecureAtRest.removeFromPrefs(prefs, KEY_QUEUE)) { "Failed to clear the startup prefetch queue" }
+    }
+
+  internal fun readAutoPrefetchQueue(context: Context): CompletableFuture<String> =
+    onQueue(context) { prefs -> NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: "" }
+
+  private fun <T> onQueue(context: Context, task: (SharedPreferences) -> T): CompletableFuture<T> {
+    val appContext = context.applicationContext
+    return CompletableFuture.supplyAsync({
+      task(appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))
+    }, queueExecutor)
+  }
+
+  private fun saveToQueue(prefs: SharedPreferences, entry: JSONObject): Boolean {
+    val prefetchKey = entry.optString("prefetchKey", "")
+    val arr = readQueue(prefs)
+
+    val next = JSONArray()
+    for (i in 0 until arr.length()) {
+      val o = arr.optJSONObject(i) ?: continue
+      if (o.optString("prefetchKey", "") == prefetchKey) {
+        if (!queueCommitFailed && o.toString() == entry.toString()) return true
+        continue
+      }
+      next.put(o)
+    }
+    next.put(entry)
+    return writeQueue(prefs, next)
+  }
+
+  private fun readQueue(prefs: SharedPreferences): JSONArray {
+    // Entries embed request headers (may hold credentials) — encrypted-at-rest; legacy plaintext migrates on read.
+    val raw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: ""
+    return if (raw.isEmpty()) JSONArray() else try { JSONArray(raw) } catch (_: Throwable) { JSONArray() }
+  }
+
+  private fun writeQueue(prefs: SharedPreferences, arr: JSONArray): Boolean {
+    queueCommitFailed = !NitroFetchSecureAtRest.putEncrypted(prefs, KEY_QUEUE, arr.toString())
+    return !queueCommitFailed
   }
 
   /** Prefetches now without persisting the request. Completes after the response is cached. */
@@ -111,10 +173,12 @@ object AutoPrefetcher {
 
   private fun runPrefetchOnStart(app: Application) {
     if (initialized) return
-    initialized = true
     try {
       val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-      val raw = NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: ""
+      val raw = CompletableFuture.supplyAsync({
+        initialized = true
+        NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: ""
+      }, queueExecutor).get()
       if (raw.isEmpty()) return
       val arr = JSONArray(raw)
 

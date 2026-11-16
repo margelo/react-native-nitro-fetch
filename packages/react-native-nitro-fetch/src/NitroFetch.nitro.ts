@@ -147,6 +147,10 @@ export interface NitroFetch extends HybridObject<{
 }> {
   /** Create a client bound to a given environment (e.g., cache dir). */
   createClient(): NitroFetchClient;
+  saveAutoPrefetchEntry(entryJson: string): Promise<void>;
+  removeFromAutoPrefetch(prefetchKey: string): Promise<void>;
+  removeAllFromAutoprefetch(): Promise<void>;
+  readAutoPrefetchQueue(): Promise<string>;
 
   // Optional future: global abort/teardown
   // shutdown(): void;
