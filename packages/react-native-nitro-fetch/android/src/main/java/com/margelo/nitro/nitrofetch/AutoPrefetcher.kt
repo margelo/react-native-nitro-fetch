@@ -13,12 +13,8 @@ import java.util.concurrent.Executors
 
 object AutoPrefetcher {
   @Volatile private var initialized = false
-  // Runs startup prefetch, including blocking token refresh, off the caller (main) thread.
   private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "NitroAutoPrefetch") }
-  // Serializes queue reads/writes and keeps Keystore work off the caller thread; never waits on the network.
   private val queueExecutor = Executors.newSingleThreadExecutor { r -> Thread(r, "NitroPrefetchQueue") }
-  // A failed commit stays in SharedPreferences' memory, so the next save must not skip it as unchanged.
-  // Only accessed on [queueExecutor].
   private var queueCommitFailed = false
   private const val KEY_QUEUE = "nitrofetch_autoprefetch_queue"
   private const val KEY_TOKEN_REFRESH = "nitro_token_refresh_fetch"
@@ -62,15 +58,13 @@ object AutoPrefetcher {
         saveToQueue(prefs, entry)
 
         if (initialized) {
-          // late path — kick a single immediate prefetch with cached tokens, after any startup token refresh
+          // late path — kick a single immediate prefetch with cached tokens
           executor.execute {
             try {
               val tokens = deserializeCache(NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_TOKEN_CACHE))
               val single = JSONArray().apply { put(entry) }
               startPrefetches(single, tokens)
-            } catch (_: Throwable) {
-              // best-effort
-            }
+            } catch (_: Throwable) {}
           }
         }
       } catch (_: Throwable) {
@@ -79,11 +73,9 @@ object AutoPrefetcher {
     }
   }
 
-  /** Saves a JS `prefetchOnAppStart` entry like [registerPrefetch], without the late-path prefetch. */
   internal fun saveAutoPrefetchEntry(context: Context, entryJson: String): CompletableFuture<Unit> =
     onQueue(context) { prefs ->
       val entry = JSONObject(entryJson)
-      // Same rule as [registerPrefetch]: an entry without a url or a key can't be prefetched or replaced.
       require(!entry.optStringOrNull("url").isNullOrEmpty() && !entry.optStringOrNull("prefetchKey").isNullOrEmpty()) {
         "A startup prefetch entry needs a url and a prefetchKey"
       }
@@ -110,7 +102,6 @@ object AutoPrefetcher {
       check(NitroFetchSecureAtRest.removeFromPrefs(prefs, KEY_QUEUE)) { "Failed to clear the startup prefetch queue" }
     }
 
-  /** The saved list as JSON, or "" if there is none. Reads on the queue thread, so it never overlaps a save. */
   internal fun readAutoPrefetchQueue(context: Context): CompletableFuture<String> =
     onQueue(context) { prefs -> NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: "" }
 
@@ -184,7 +175,6 @@ object AutoPrefetcher {
     if (initialized) return
     try {
       val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-      // Read on the queue thread so earlier saves are included; later ones take the late path.
       val raw = CompletableFuture.supplyAsync({
         initialized = true
         NitroFetchSecureAtRest.getDecryptedForPrefs(prefs, KEY_QUEUE) ?: ""

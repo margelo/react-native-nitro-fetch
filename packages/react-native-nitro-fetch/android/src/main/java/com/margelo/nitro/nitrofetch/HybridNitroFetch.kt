@@ -39,7 +39,6 @@ class HybridNitroFetch : HybridNitroFetchSpec() {
       ?: throw IllegalStateException("Cannot access startup prefetches - no Android Context")
     val promise = Promise<T>()
     task(context).whenComplete { result, error ->
-      // The future wraps a failure in CompletionException; JS should see the real error.
       if (error == null) promise.resolve(result) else promise.reject((error as? CompletionException)?.cause ?: error)
     }
     return promise

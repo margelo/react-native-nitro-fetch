@@ -797,7 +797,6 @@ describe('NitroFetch - startup prefetch queue updates', () => {
         headers: { 'X-Token': token },
       });
     await save('old');
-    // An unchanged request is not written again; the change after it must still be.
     await save('old');
     await save('new');
     const entries = await entriesFor(KEY);

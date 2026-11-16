@@ -98,7 +98,7 @@ public final class NitroAutoPrefetcher: NSObject {
     )
     workQueue.async {
       let userDefaults = UserDefaults(suiteName: suiteName) ?? UserDefaults.standard
-      try? saveToQueue(entry, userDefaults: userDefaults) // best-effort
+      try? saveToQueue(entry, userDefaults: userDefaults)
 
       if initialized {
         // Late path — apply cached tokens + kick immediate prefetch
@@ -109,10 +109,8 @@ public final class NitroAutoPrefetcher: NSObject {
     }
   }
 
-  /// Saves a JS `prefetchOnAppStart` entry like `registerPrefetch`, without the late-path prefetch.
   static func saveAutoPrefetchEntry(entryJson: String, completion: @escaping (Result<Void, Error>) -> Void) {
     onWorkQueue(completion) { userDefaults in
-      // Same rule as `registerPrefetch`: an entry without a url or a key can't be prefetched or replaced.
       guard let entry = try JSONSerialization.jsonObject(with: Data(entryJson.utf8)) as? [String: Any],
             (entry["url"] as? String)?.isEmpty == false,
             (entry["prefetchKey"] as? String)?.isEmpty == false else {
@@ -140,7 +138,6 @@ public final class NitroAutoPrefetcher: NSObject {
     }
   }
 
-  /// The saved list as JSON, or "" if there is none. Reads on `workQueue`, so it never overlaps a save.
   static func readAutoPrefetchQueue(completion: @escaping (Result<String, Error>) -> Void) {
     onWorkQueue(completion) { userDefaults in
       NitroFetchSecureAtRest.decryptedString(forKey: queueKey, defaults: userDefaults) ?? ""
@@ -178,12 +175,10 @@ public final class NitroAutoPrefetcher: NSObject {
           !raw.isEmpty,
           let data = raw.data(using: .utf8),
           let parsed = try? JSONSerialization.jsonObject(with: data) as? [Any] else { return [] }
-    // A malformed element is skipped; it must not drop the rest of the list.
     return parsed.compactMap { $0 as? [String: Any] }
   }
 
   private static func writeQueue(_ arr: [[String: Any]], userDefaults: UserDefaults) throws {
-    // `data(withJSONObject:)` raises an Objective-C exception on an invalid object, so check first.
     guard JSONSerialization.isValidJSONObject(arr) else {
       throw queueError("Failed to save the startup prefetch queue")
     }
