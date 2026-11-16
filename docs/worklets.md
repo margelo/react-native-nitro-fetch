@@ -1,6 +1,6 @@
 # Worklets
 
-`nitroFetchOnWorklet()` lets you run parsing/mapping off the JS thread using [react-native-worklets](https://docs.swmansion.com/react-native-worklets/docs).
+`nitroFetchOnWorklet()` lets you run parsing/mapping off the JS thread using [react-native-worklets](https://docs.swmansion.com/react-native-worklets/docs/fundamentals/getting-started/).
 
 ## Usage
 

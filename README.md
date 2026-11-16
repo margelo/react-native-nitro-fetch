@@ -292,7 +292,7 @@ const data = await nitroFetchOnWorklet(
   }
 )
 ```
-Before using worklet mapping, install and configure [react-native-worklets](https://docs.swmansion.com/react-native-worklets/docs/).
+Before using worklet mapping, install and configure [react-native-worklets](https://docs.swmansion.com/react-native-worklets/docs/fundamentals/getting-started/).
 
 ### Streaming with `TextDecoder` 
 
