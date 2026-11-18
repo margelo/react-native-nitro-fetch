@@ -54,6 +54,7 @@ object AutoPrefetcher {
     val appContext = context.applicationContext
     queueExecutor.execute {
       try {
+        NitroFetchSecureAtRest.initialize(appContext)
         val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         saveToQueue(prefs, entry)
 
@@ -174,6 +175,7 @@ object AutoPrefetcher {
   private fun runPrefetchOnStart(app: Application) {
     if (initialized) return
     try {
+      NitroFetchSecureAtRest.initialize(app)
       val prefs = app.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
       val raw = CompletableFuture.supplyAsync({
         initialized = true
