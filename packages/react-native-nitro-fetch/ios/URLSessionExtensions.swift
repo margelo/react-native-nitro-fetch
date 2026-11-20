@@ -43,10 +43,7 @@ extension HTTPURLResponse {
 }
 
 extension URLRequest {
-  // A request that carries its own validators (If-None-Match, If-Modified-Since, ...)
-  // must not go through URLCache: URLSession would answer the origin's 304 with
-  // the cached 200 and body. The Fetch spec treats such requests as cache mode
-  // "no-store", so the caller sees the raw response.
+  // Caller-set validators must skip the local cache, else URLSession swaps the origin's 304 for the cached 200.
   mutating func bypassCacheIfConditional() {
     guard cachePolicy == .useProtocolCachePolicy else { return }
     let conditionalHeaders = ["If-None-Match", "If-Modified-Since", "If-Match", "If-Unmodified-Since", "If-Range"]
