@@ -5,6 +5,7 @@ import type {
   HybridWebSocketMessageEvent,
   WebSocketCloseEvent as NitroWSCloseEvent,
 } from './NitroWebSocket.nitro'
+import { assertValidHandshake } from './handshake'
 
 export { createWebSocket } from './NitroWebSocket.nitro'
 export type {
@@ -69,12 +70,13 @@ export class NitroWebSocket {
     protocols?: string | string[],
     headers?: Record<string, string>
   ) {
-    this._ws = NitroModules.createHybridObject<HybridWebSocket>('WebSocket')
     const protocolList = protocols
       ? Array.isArray(protocols)
         ? protocols
         : [protocols]
       : []
+    assertValidHandshake(protocolList, headers)
+    this._ws = NitroModules.createHybridObject<HybridWebSocket>('WebSocket')
     const headerPairs = headers
       ? Object.entries(headers).map(([key, value]) => ({ key, value }))
       : []
