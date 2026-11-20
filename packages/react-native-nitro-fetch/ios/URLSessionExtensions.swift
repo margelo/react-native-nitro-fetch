@@ -42,6 +42,17 @@ extension HTTPURLResponse {
   }
 }
 
+extension URLRequest {
+  // Caller-set validators must skip the local cache, else URLSession swaps the origin's 304 for the cached 200.
+  mutating func bypassCacheIfConditional() {
+    guard cachePolicy == .useProtocolCachePolicy else { return }
+    let conditionalHeaders = ["If-None-Match", "If-Modified-Since", "If-Match", "If-Unmodified-Since", "If-Range"]
+    if conditionalHeaders.contains(where: { value(forHTTPHeaderField: $0) != nil }) {
+      cachePolicy = .reloadIgnoringLocalCacheData
+    }
+  }
+}
+
 extension Error {
   func toNitro() -> RequestException {
     return RequestException(message: localizedDescription)

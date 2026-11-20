@@ -112,6 +112,7 @@ class HybridUrlRequestBuilder: HybridUrlRequestBuilderSpec {
       devToolsRequestId: devToolsRequestId
     )
 
+    urlRequest.bypassCacheIfConditional()
     let task: URLSessionDataTask = session.dataTask(with: urlRequest)
     task.delegate = delegate
 
