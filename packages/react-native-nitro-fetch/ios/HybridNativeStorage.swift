@@ -14,8 +14,8 @@ internal enum NitroFetchSecureAtRest {
   private static let keychainAccount = "master"
 
   private static func loadOrCreateSymmetricKey() throws -> SymmetricKey {
-    if let data = try loadKeyData(), data.count == 32 {
-      return SymmetricKey(data: data)
+    if let data = try loadKeyData() {
+      return try validatedKey(data)
     }
     var bytes = [UInt8](repeating: 0, count: 32)
     let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
@@ -23,7 +23,13 @@ internal enum NitroFetchSecureAtRest {
       throw NSError(domain: "NitroFetchSecure", code: Int(status), userInfo: nil)
     }
     let data = Data(bytes)
-    try saveKeyData(data)
+    return try validatedKey(saveKeyData(data))
+  }
+
+  private static func validatedKey(_ data: Data) throws -> SymmetricKey {
+    guard data.count == 32 else {
+      throw NSError(domain: "NitroFetchSecure", code: Int(errSecDecode), userInfo: nil)
+    }
     return SymmetricKey(data: data)
   }
 
@@ -45,13 +51,7 @@ internal enum NitroFetchSecureAtRest {
     return d
   }
 
-  private static func saveKeyData(_ data: Data) throws {
-    let deleteQuery: [String: Any] = [
-      kSecClass as String: kSecClassGenericPassword,
-      kSecAttrService as String: keychainService,
-      kSecAttrAccount as String: keychainAccount,
-    ]
-    SecItemDelete(deleteQuery as CFDictionary)
+  private static func saveKeyData(_ data: Data) throws -> Data {
     let add: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: keychainService,
@@ -60,9 +60,15 @@ internal enum NitroFetchSecureAtRest {
       kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
     ]
     let status = SecItemAdd(add as CFDictionary, nil)
+    // Fetch and WebSocket startup share this master. Never replace a key
+    // another caller may already have used to encrypt persisted data.
+    if status == errSecDuplicateItem, let existing = try loadKeyData() {
+      return existing
+    }
     guard status == errSecSuccess else {
       throw NSError(domain: "NitroFetchSecure", code: Int(status), userInfo: nil)
     }
+    return data
   }
 
   private static func encrypt(_ plain: String) throws -> String {
@@ -78,7 +84,10 @@ internal enum NitroFetchSecureAtRest {
     guard let raw = Data(base64Encoded: b64) else {
       throw NSError(domain: "NitroFetchSecure", code: -2, userInfo: nil)
     }
-    let key = try loadOrCreateSymmetricKey()
+    guard let keyData = try loadKeyData() else {
+      throw NSError(domain: "NitroFetchSecure", code: Int(errSecItemNotFound), userInfo: nil)
+    }
+    let key = try validatedKey(keyData)
     let box = try AES.GCM.SealedBox(combined: raw)
     let data = try AES.GCM.open(box, using: key)
     guard let s = String(data: data, encoding: .utf8) else {
