@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'react-native-harness';
 import { Platform } from 'react-native';
-import { NitroWebSocket, createWebSocket } from 'react-native-nitro-websockets';
+import {
+  NitroWebSocket,
+  createWebSocket,
+  prewarmOnAppStart,
+  removeFromPrewarmQueue,
+} from 'react-native-nitro-websockets';
 import { TextDecoder } from 'react-native-nitro-text-decoder';
 import type {
   HybridWebSocket,
@@ -647,6 +652,63 @@ describe('NitroWebSocket - Subprotocols with line breaks', () => {
       ws.close();
     }
   );
+});
+
+describe('NitroWebSocket - Invalid handshake input', () => {
+  function thrownName(fn: () => void): string {
+    try {
+      fn();
+      return 'no error';
+    } catch (e: any) {
+      return e?.name;
+    }
+  }
+
+  function open(protocols?: string[], headers?: Record<string, string>) {
+    const ws = new NitroWebSocket(`${WS_BASE}/ws/echo`, protocols, headers);
+    ws.close();
+  }
+
+  it('throws a SyntaxError for subprotocols that are not unique tokens', () => {
+    for (const protocols of [
+      ['chat\r\nX-Injected: 1'],
+      ['a b'],
+      ['a,b'],
+      [''],
+      ['chat', 'chat'],
+    ]) {
+      expect(
+        `${JSON.stringify(protocols)} ${thrownName(() => open(protocols))}`
+      ).toBe(`${JSON.stringify(protocols)} SyntaxError`);
+    }
+  });
+
+  it('throws a TypeError for invalid handshake header names and values', () => {
+    const invalid: Record<string, string>[] = [
+      { 'X-A\r\nX-Injected': '1' },
+      { 'bad name': '1' },
+      { 'X-Bad': 'a\r\nX-Injected: 1' },
+    ];
+    for (const headers of invalid) {
+      expect(
+        `${JSON.stringify(headers)} ${thrownName(() => open(undefined, headers))}`
+      ).toBe(`${JSON.stringify(headers)} TypeError`);
+    }
+  });
+
+  it('prewarmOnAppStart rejects the same input', () => {
+    const url = `${WS_BASE}/ws/echo?prewarm=invalid-input`;
+    try {
+      expect(thrownName(() => prewarmOnAppStart(url, ['a b']))).toBe(
+        'SyntaxError'
+      );
+      expect(
+        thrownName(() => prewarmOnAppStart(url, [], { 'bad name': '1' }))
+      ).toBe('TypeError');
+    } finally {
+      removeFromPrewarmQueue(url);
+    }
+  });
 });
 
 // ─── Error Handling ───────────────────────────────────────────────────────────
